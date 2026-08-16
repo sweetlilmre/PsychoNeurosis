@@ -117,28 +117,35 @@ var
     by their DGROUP offset (CurShape, MorphFrom, MorphTo are Words holding
     $0636, $5136, $63F6) and walks them with pointer arithmetic; a working
     copy is the readable equivalent. }
-  Work : TShape;
+{$I gen/P3SHAPE.INC}     { const ShapeSphere, ShapeCube, ShapeGrid : TShape }
 
-  { the morph loop's point counter -- a DGROUP word because the
-    assembler block below decrements it directly }
-  Count : Word;
+{ --------------------------------------------------------------------------
+  SHAPE ADDRESSING
 
-{ [inferred] The three components of point P of the current working shape.
-  Written as functions because the original reaches them by pointer
-  arithmetic (six bytes per point) rather than by name. }
-function PointX(P : Integer) : Integer;
+  The original identifies a shape by its absolute DGROUP offset and walks it
+  six bytes at a time: CurShape, MorphFrom and MorphTo all hold $0636, $5136
+  or $63F6, and DrawShape does `MOV BX,[SI] / MOV CX,[SI+2] / MOV DX,[SI+4]`
+  then `ADD SI,6`.
+
+  The shapes are Pascal constants here, so those offsets have to be mapped
+  onto them. An earlier version kept the offsets AND indexed a `Work` array
+  with them -- Work[$0636] on a `array[1..765]` -- and the assembler morph
+  loop dereferenced them as raw DS addresses, reading whatever Turbo Pascal
+  happened to have put at $0636. That is what reduced the scene to a cluster
+  of stray dots: the coordinates were never the shape data at all.
+  -------------------------------------------------------------------------- }
+type
+  TShapePtr = ^TShape;
+
+function ShapeOf(Slot : Word) : TShapePtr;
 begin
-  PointX := Work[P, 1];
-end;
-
-function PointY(P : Integer) : Integer;
-begin
-  PointY := Work[P, 2];
-end;
-
-function PointZ(P : Integer) : Integer;
-begin
-  PointZ := Work[P, 3];
+  case Slot of
+    Shape0 : ShapeOf := @ShapeSphere;      { $0636 }
+    Shape4 : ShapeOf := @ShapeCube;        { $5136 }
+    Shape5 : ShapeOf := @ShapeGrid;        { $63F6 }
+  else
+    ShapeOf := @ShapeSphere;
+  end;
 end;
 
 { [transcribed] VGA_GetPalette768 1139:034d / VGA_SetPalette768 1139:0335 --
@@ -172,7 +179,6 @@ begin
   end;
 end;
 
-{$I gen/P3SHAPE.INC}     { const ShapeSphere, ShapeCube, ShapeGrid : TShape }
 
 var
   AngX, AngY, AngZ    : Integer;   { DS:$BE9C, $BE9E, $BEA0 }
@@ -370,17 +376,18 @@ end;
           The .png files are previews rendered with the constants below.
           See docs/08-part3-scene3-morph.md.
   -------------------------------------------------------------------------- }
+{ 1139:01f9 -- 765 points ([$BEC4] := $2FD), read as three words with a
+  stride of six, transformed and plotted. }
 procedure DrawShape(Shape : Word);
 var
   I, SX, SY : Integer;
-  P : Word;
+  S : TShapePtr;
 begin
-  P := Shape;
+  S := ShapeOf(Shape);
   for I := 1 to NumPoints do
   begin
-    TransformPoint(PointX(P), PointY(P), PointZ(P), SX, SY);
+    TransformPoint(S^[I, 1], S^[I, 2], S^[I, 3], SX, SY);
     PlotPixel(SX, SY);
-    Inc(P, 6);
   end;
 end;
 
@@ -406,66 +413,58 @@ end;
   Once MorphStep passes MorphSteps the morph is complete: it copies MorphTo
   over CurShape and just draws the destination shape from then on.
   -------------------------------------------------------------------------- }
-procedure DrawMorph; assembler;
-asm
-        MOV     BX, [MorphStep]
-        CMP     BX, [MorphSteps]
-        JLE     @@Blend
-        MOV     BX, [MorphTo]              { morph finished -- }
-        MOV     [CurShape], BX             {   latch the destination }
-        CALL    DrawShape
-        JMP     @@Done
+{ --------------------------------------------------------------------------
+  1139:021d -- DrawMorph
 
-@@Blend:
-        MOV     WORD PTR [Count], 765      { $2FD points }
-        MOV     SI, [MorphFrom]
-        MOV     DI, [MorphTo]
-@@Point:
-        PUSH    DI
-        PUSH    SI
+      if MorphStep > MorphSteps then
+        CurShape := MorphTo ; DrawShape(CurShape)
+      else
+        for I := 1 to 765 do
+          P := A[I] + (B[I] - A[I]) * MorphStep div MorphSteps
+          TransformPoint(P) ; PlotPixel
+        Inc(MorphStep)
 
-        MOV     AX, [DI]                   { X := A.X + (B.X-A.X)*Step div Steps }
-        SUB     AX, [SI]
-        CWD
-        IMUL    WORD PTR [MorphStep]
-        IDIV    WORD PTR [MorphSteps]
-        ADD     AX, [SI]
-        MOV     BX, AX                     { X -> BX }
-        ADD     SI, 2
-        ADD     DI, 2
+  The original walks both shapes with SI and DI six bytes at a time and does
+  each component as `AX := B-A ; CWD ; IMUL MorphStep ; IDIV MorphSteps ;
+  ADD AX,A` -- a 32-bit intermediate between the multiply and the divide,
+  which is why the LongInt cast below is needed and a plain Integer
+  expression would overflow on the wider shapes.
 
-        MOV     AX, [DI]                   { Y }
-        SUB     AX, [SI]
-        CWD
-        IMUL    WORD PTR [MorphStep]
-        IDIV    WORD PTR [MorphSteps]
-        ADD     AX, [SI]
-        MOV     CX, AX                     { Y -> CX }
-        ADD     SI, 2
-        ADD     DI, 2
+  This used to be an assembler block that dereferenced MorphFrom and MorphTo
+  as raw DS offsets. Those offsets only mean anything in the original's data
+  segment; here the shapes are Pascal constants, so it read rubbish. See the
+  note on shape addressing above.
+  -------------------------------------------------------------------------- }
+procedure DrawMorph;
+var
+  I, SX, SY  : Integer;
+  A, B       : TShapePtr;
+  X, Y, Z    : Integer;
 
-        MOV     AX, [DI]                   { Z }
-        SUB     AX, [SI]
-        CWD
-        IMUL    WORD PTR [MorphStep]
-        IDIV    WORD PTR [MorphSteps]
-        ADD     AX, [SI]
-        MOV     DX, AX                     { Z -> DX }
-        ADD     SI, 2
-        ADD     DI, 2
+  function Blend(P, Q : Integer) : Integer;
+  begin
+    Blend := P + (LongInt(Q - P) * MorphStep) div MorphSteps;
+  end;
 
-        CALL    TransformPoint             { 1139:0096 -- takes BX, CX, DX }
-        CALL    PlotPixel                  { 1139:01bb }
+begin
+  if MorphStep > MorphSteps then
+  begin
+    CurShape := MorphTo;
+    DrawShape(CurShape);
+    Exit;
+  end;
 
-        POP     SI
-        POP     DI
-        ADD     DI, 6
-        ADD     SI, 6
-        DEC     WORD PTR [Count]
-        JNZ     @@Point
-
-        INC     WORD PTR [MorphStep]
-@@Done:
+  A := ShapeOf(MorphFrom);
+  B := ShapeOf(MorphTo);
+  for I := 1 to NumPoints do
+  begin
+    X := Blend(A^[I, 1], B^[I, 1]);
+    Y := Blend(A^[I, 2], B^[I, 2]);
+    Z := Blend(A^[I, 3], B^[I, 3]);
+    TransformPoint(X, Y, Z, SX, SY);
+    PlotPixel(SX, SY);
+  end;
+  Inc(MorphStep);
 end;
 
 { --------------------------------------------------------------------------

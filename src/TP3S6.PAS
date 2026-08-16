@@ -34,6 +34,7 @@ begin
   Scene6;
 
   VirtScrFree;
+  SetMode13h;         { 1000:0097 -- what the driver does after scene 3 }
   SetTextMode;
 
   WriteLn('Done.');

@@ -30,7 +30,12 @@ VGA_OPEN = """  SetMode13h;
   VirtScrAlloc;
   MusicInit;          { harmless with no player resident }
 """
+# Scene 3 leaves the adapter in unchained 320x400, and the part's own driver
+# calls SetMode13h again afterwards (1000:0097) rather than leaving the scene
+# to tidy up. A scene harness stands in for the driver, so it does the same --
+# without it TP3S3 exits into a graphics mode.
 VGA_CLOSE = """  VirtScrFree;
+  SetMode13h;         { 1000:0097 -- what the driver does after scene 3 }
   SetTextMode;
 """
 
