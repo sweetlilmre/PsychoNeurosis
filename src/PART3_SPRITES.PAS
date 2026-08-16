@@ -242,12 +242,12 @@ asm
 
   MOV  BH, 56              { BH counts output rows                          }
 
-@@Row:
+@@Row:                     { <- once per output row                         }
   MOV  CX, FixX            { CX := U, this row's fixed-point X              }
   MOV  AX, FixY            { AX := V, this row's fixed-point Y              }
   MOV  BL, 56              { BL counts output columns                       }
 
-@@Col:
+@@Col:                     { <- once per output pixel                       }
   INC  SI                  { assume the pixel is skipped: advance the index }
   CMP  AX, $2F80           { V >= 190.0 ?  (190 * 64)                       }
   JGE  @@Skip              {   below the screen -- drop it                  }
@@ -272,25 +272,25 @@ asm
   SUB  DI, 2               { step back two -- SI advanced, DI must not      }
   MOVSB                    { ES:[DI-1] := Src[SI+1] (the filler, on the     }
                            {              left this time)                   }
-  JMP  @@Next
-@@Even:
+  JMP  @@Next              { the pair is written -- rejoin                  }
+@@Even:                    { <- at or below the half turn                   }
   MOVSW                    { ES:[DI] := Src[SI], ES:[DI+1] := Src[SI+1]     }
-@@Next:
+@@Next:                    { <- both stores rejoin here                     }
   DEC  SI                  { MOVSB/MOVSW left SI two on; net advance is one }
 
-@@Skip:
+@@Skip:                    { <- clipped pixels join here, SI already on     }
   ADD  CX, SinA            { U += sin -- step along the output row          }
   ADD  AX, CosA            { V += cos                                       }
   DEC  BL                  { one column done                                }
-  JNZ  @@Col
+  JNZ  @@Col               { round again until the row is finished          }
 
-  MOV  DX, CosA
+  MOV  DX, CosA            { the column direction's X component             }
   ADD  FixX, DX            { next row starts cos further along X            }
-  MOV  DX, SinA
+  MOV  DX, SinA            { and its Y component                            }
   SUB  FixY, DX            { and sin back up Y -- (cos, -sin) is the        }
                            {   column direction of the rotation matrix      }
   DEC  BH                  { one row done                                   }
-  JNZ  @@Row
+  JNZ  @@Row               { round again until all 56 rows are done         }
 
   POP  DS                  { restore our data segment                       }
 end;

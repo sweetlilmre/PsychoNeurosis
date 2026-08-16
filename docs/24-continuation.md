@@ -53,7 +53,7 @@ not listed there is meant to match the binary — if it does not, that is a bug.
 |---|---|
 | 001 | five scene units + `P1Intro` driver. Scenes 1–5 all tested and working. **Assembler audit NOT done.** |
 | 002 | `P2S1`, `P2S2`, five shared units, `P2Main` driver. Both scenes tested and working. **Assembler audit NOT done.** |
-| 003 | seven scene units + `P3Main` driver. **Audit done.** S1, S3, S4, S5 confirmed working. S7 rewritten from the binary and building, not yet run. S2 unverified. |
+| 003 | seven scene units + `P3Main` driver. **Audit done, and every unit now passes `tools/asmaudit.py`.** S1, S3, S4, S5 confirmed working. S2 and S7 rewritten from the binary and building, neither re-run yet. |
 | 004–007 | single files, never run, no harnesses. All 17 stubs, 3 inferred and 4 empty bodies live here. |
 
 All 17 harnesses build (`python tools/dosbox/dosbuild.py`).
@@ -116,12 +116,31 @@ Scene6 once with 36414.
 
 **Next:** run `TP3S7` and compare against `ORIG3.EXE`.
 
-### S2 (`TP3S2`) — "looks too fast, may be correct"
+### S2 (`TP3S2`) — four defects found and fixed, **not yet re-run**
 
-Nothing found wrong. `PART3_STARS` was checked twice and is clean: its point
-record declares X and Y as `LongInt` so the `shl 8` is already 32-bit, and `-Z`
-is positive by the `ZPlotFar < Z < ZPlotNear` guard above it. Compare against
-`ORIG3.EXE` before touching anything.
+Two earlier passes called this unit clean. It was not; the checks had been
+aimed at the arithmetic and the bug was in the loading.
+
+- **The waypoint table was never loaded.** The `BlockRead` went to a raw
+  `Mem[DSeg:$B250]` — where the block sits in the *original's* data segment,
+  which has nothing to do with where Turbo Pascal put our array. `Waypoints`
+  stayed all zeros, so every `Hold` read as 0, the walk stepped one index a
+  frame and ended after fifty, and `PanX`/`PanY` never left 0. Both reported
+  symptoms — "does not move around the screen" and "ends sooner" — were this
+  one bug. **Any `BlockRead` into a hard-coded `Mem[DSeg:...]` is this bug;
+  the rest of the tree is worth grepping for the pattern.**
+- **`ProjectAndPlot`'s bounds tests are unsigned** in the binary (`JBE`/`JNC`
+  at `10b8:00dd` and `00e4`), not signed. `SX`/`SY` are `Word` now. The
+  display-list pass in phase 2 genuinely *is* signed (`JLE`/`JGE` at
+  `10b8:035c` on), so the two are not interchangeable.
+- **The collapse loop is hand assembler** — `LODSB`/`LODSW`, `LOOP`, the row
+  table indexed inline instead of a `PutPixel` call — and had been Pascal-ised.
+  Back in verbatim.
+- **`Generate` is the unit initialisation section**, not part of `Scene2`:
+  `1000:0037` is entry 14 of the init chain and calls `10b8:05f2` directly.
+
+Also worth knowing: `Math_DivLong` (`10b8:07f4`) is `IDIV ESI`, so scene 2
+needs a 386 even though nothing else in the part does.
 
 ---
 
@@ -129,6 +148,14 @@ is positive by the `ZPlotFar < Z < ZPlotNear` guard above it. Compare against
 
 **Only part 003 has been swept.** Parts 001, 002 and 004–007 have not, and
 part 003 turned up eleven Pascal-ised routines, so expect more.
+
+`python tools/asmaudit.py` reports which units still fail rules 1.2 and 1.3 —
+a comment on every assembler line, and an equivalent-Pascal block above each
+routine. It is reporting only and never fails a build. As of now all seven
+part 003 units pass; `VGA`, `DemoVT`, all six part 002 units and
+`PART5_ROTOZOOM` do not. It cannot check rule 1.1 (that the assembler is
+verbatim) — that needs the binary, so a unit passing the script is not the
+same as a unit that has been audited.
 
 The method, per program (open it in Ghidra first):
 

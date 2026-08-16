@@ -153,6 +153,35 @@ end;
   Hand assembler: it juggles DS/ES per pixel to read an offset from one
   table's segment, another from the second, then move a byte between two
   further segments.
+
+  DS IS REPOINTED THREE TIMES PER PIXEL, so the segment values have to be in
+  registers before the loop starts. Reading them by name inside it --
+  `MOV DS,[DstSeg]` -- looks like Pascal and compiles, but by the second
+  iteration DS is the virtual screen, so it fetches the "segment" out of video
+  memory and the blit scatters bytes at random. 119d:01be caches both in CX
+  and DX ahead of the loop for exactly this reason.
+
+  One small liberty: the source offset is loaded straight into SI rather than
+  through CX, which saves the reload the original needs at 119d:01d2 after
+  using CX as scratch. Same bytes moved, one instruction fewer.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      for I := 1 to TableSize div 2 - 1 do
+        Mem[$A000 : DstOfs^[I]] := Mem[VirtScrSeg : SrcOfs^[I]];
+
+      for Y := 1 to ScrollRows do
+      begin
+        W := MemW[VirtScrSeg : Y*320 + 1];
+        Move(Mem[VirtScrSeg : Y*320 + 1], Mem[VirtScrSeg : Y*320],
+             ScrollWords * 2);
+        MemW[VirtScrSeg : Y*320 + ScrollWords*2] := W;
+      end;
+
+  It cannot be written that way and still work: DstOfs and SrcOfs are not
+  Pascal arrays but two far heap blocks read a word at a time with DS pointed
+  at each in turn, and the wrap in pass 2 writes back to where DI ended up
+  rather than to a recomputed address.
   -------------------------------------------------------------------------- }
 procedure RenderFrame;
 begin
@@ -160,53 +189,43 @@ begin
   if KeyPressed then Exit;
 
   asm
-  { ---- pass 1: precomputed scatter blit ----
-
-    DS IS REPOINTED THREE TIMES PER PIXEL, so the segment values have to be in
-    registers before the loop starts. Reading them by name inside it --
-    `MOV DS,[DstSeg]` -- looks like Pascal and compiles, but by the second
-    iteration DS is the virtual screen, so it fetches the "segment" out of
-    video memory and the blit scatters bytes at random. 119d:01be caches both
-    in CX and DX ahead of the loop for exactly this reason.
-
-    The source offset is loaded straight into SI rather than through CX, which
-    saves the reload the original needs at 119d:01d2 after using CX as
-    scratch. }
-  PUSH DS
-  MOV  AX, $A000
-  MOV  ES, AX                  { destination is always video }
-  MOV  BX, 2                   { entry 0 is skipped }
-  MOV  AX, [VirtScrSeg]        { DS is still DGROUP here -- read them now }
-  MOV  CX, [SrcSeg]
-  MOV  DX, [DstSeg]
-@Blit:
-  MOV  DS, DX                  { DS := the destination-offset table }
-  MOV  SI, BX
-  MOV  DI, [SI]                { DI := DstOfs[i] }
-  MOV  DS, CX                  { DS := the source-offset table }
-  MOV  SI, [SI]                { SI := SrcOfs[i] }
-  MOV  DS, AX                  { DS := virtual screen }
-  ADD  BX, 2
-  MOVSB                        { ES:[DI] <- DS:[SI] }
-  CMP  BX, TableSize
-  JNZ  @Blit
+  { ---- pass 1: precomputed scatter blit ---- }
+  PUSH DS                      { DS is about to be used as scratch            }
+  MOV  AX, $A000               { video memory                                 }
+  MOV  ES, AX                  { destination is always video                  }
+  MOV  BX, 2                   { entry 0 is skipped -- the tables are 1-based }
+  MOV  AX, [VirtScrSeg]        { DS is still DGROUP here -- read them now     }
+  MOV  CX, [SrcSeg]            { the source-offset table's segment            }
+  MOV  DX, [DstSeg]            { the destination-offset table's segment       }
+@Blit:                         { <- once per pixel of the sphere map          }
+  MOV  DS, DX                  { DS := the destination-offset table           }
+  MOV  SI, BX                  { SI := the byte index of this entry           }
+  MOV  DI, [SI]                { DI := DstOfs[i], the screen offset           }
+  MOV  DS, CX                  { DS := the source-offset table                }
+  MOV  SI, [SI]                { SI := SrcOfs[i], the texture offset          }
+  MOV  DS, AX                  { DS := virtual screen, where the texture is   }
+  ADD  BX, 2                   { step to the next pair of table entries       }
+  MOVSB                        { ES:[DI] <- DS:[SI] -- one warped pixel       }
+  CMP  BX, TableSize           { end of the tables?                           }
+  JNZ  @Blit                   {   no: round again                            }
 
   { ---- pass 2: scroll rows 1..150 left by one pixel, with wrap ---- }
-  MOV  ES, AX
-  MOV  DS, AX
-  MOV  DI, 320                 { row 1, column 0 }
-  MOV  SI, 321                 { one pixel along }
-  MOV  BX, ScrollRows
-@Row:
-  MOV  AX, [SI]                { save the word about to be shifted off }
-  MOV  CX, ScrollWords
-  REP  MOVSW
-  MOV  ES:[DI], AX             { and wrap it to the end of the row }
-  ADD  DI, ScrollSkip
-  ADD  SI, ScrollSkip
-  DEC  BX
-  JNZ  @Row
-  POP  DS
+  MOV  ES, AX                  { both source and destination are the          }
+  MOV  DS, AX                  {   virtual screen for this pass               }
+  MOV  DI, 320                 { row 1, column 0 -- the write pointer         }
+  MOV  SI, 321                 { one pixel along -- the read pointer          }
+  MOV  BX, ScrollRows          { 150 rows of texture to shift                 }
+@Row:                          { <- once per row                              }
+  MOV  AX, [SI]                { save the word about to be shifted off        }
+  MOV  CX, ScrollWords         { how many words make up the band              }
+  REP  MOVSW                   { slide the row one pixel left                 }
+  MOV  ES:[DI], AX             { and wrap it to the end of the row -- DI is   }
+                               {   already there after the REP                }
+  ADD  DI, ScrollSkip          { step both pointers to the next row           }
+  ADD  SI, ScrollSkip          {                                              }
+  DEC  BX                      { one row done                                 }
+  JNZ  @Row                    { round again until all 150 are shifted        }
+  POP  DS                      { restore our data segment                     }
   end;
 end;
 

@@ -103,43 +103,43 @@ end;
 procedure StepBlockUp(BlockAt : Word); assembler;
 asm
   PUSH ES               { the original saves ES around the block             }
-  MOV  AX, $A000
+  MOV  AX, $A000        { video memory                                       }
   MOV  ES, AX           { ES := video memory                                 }
   MOV  DI, BlockAt      { DI := this block's screen offset, from the table   }
   MOV  CX, 10           { CX counts the ten rows                             }
   MOV  DX, 10           { DX counts the ten pixels across a row              }
-@@Pixel:
+@@Pixel:                { <- once per pixel of the block                     }
   MOV  AL, ES:[DI]      { read the pixel back out of video memory            }
   INC  AL               { one shade brighter along the ramp                  }
   STOSB                 { write it back; DI advances one pixel               }
   DEC  DX               { one pixel done                                     }
-  JNZ  @@Pixel
+  JNZ  @@Pixel          { across until the row is finished                   }
   ADD  DI, $136         { 310 = the rest of the 320-byte row                 }
   MOV  DX, 10           { reload the across-count for the next row           }
   DEC  CX               { one row done                                       }
-  JNZ  @@Pixel
+  JNZ  @@Pixel          { down until all ten rows are done                   }
   POP  ES               { restore ES                                         }
 end;
 
 procedure StepBlockDown(BlockAt : Word); assembler;
 asm
-  PUSH ES               { as above, but stepping the other way              }
-  MOV  AX, $A000
+  PUSH ES               { as above, but stepping the other way               }
+  MOV  AX, $A000        { video memory                                       }
   MOV  ES, AX           { ES := video memory                                 }
   MOV  DI, BlockAt      { DI := this block's screen offset                   }
   MOV  CX, 10           { ten rows                                           }
   MOV  DX, 10           { ten pixels across                                  }
-@@Pixel:
+@@Pixel:                { <- once per pixel of the block                     }
   MOV  AL, ES:[DI]      { read the pixel back                                }
   DEC  AL               { one shade darker along the ramp                    }
   STOSB                 { write it back; DI advances                         }
-  DEC  DX
-  JNZ  @@Pixel
+  DEC  DX               { one pixel done                                     }
+  JNZ  @@Pixel          { across until the row is finished                   }
   ADD  DI, $136         { rest of the row                                    }
-  MOV  DX, 10
-  DEC  CX
-  JNZ  @@Pixel
-  POP  ES
+  MOV  DX, 10           { reload the across-count                            }
+  DEC  CX               { one row done                                       }
+  JNZ  @@Pixel          { down until all ten rows are done                   }
+  POP  ES               { restore ES                                         }
 end;
 
 procedure Run;

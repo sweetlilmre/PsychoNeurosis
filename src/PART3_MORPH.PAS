@@ -254,15 +254,35 @@ begin
     RowOfs[I] := Word(LogicalWidth) * Word(I) shl 1;
 end;
 
+{ --------------------------------------------------------------------------
+  VGA_Set400Lines (1139:02f2)
+
+  CRTC register 9 is Maximum Scan Line. Its low five bits say how many times
+  each character row is repeated; mode 13h leaves them at 1, which is what
+  double-scans 200 lines into 400. Clearing them turns the double scan off,
+  so the 320x200 Mode-X screen becomes 320x400 with no other change.
+
+  The top three bits of register 9 are not ours to touch -- bit 7 is the
+  200-line double word mode flag and bits 5-6 are the start row of the text
+  cursor -- so the write is read-modify-write with AND $E0, not a plain MOV.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      Port[$3D4] := 9;
+      Port[$3D5] := Port[$3D5] and $E0;
+
+  That Pascal is genuinely equivalent here. It is written in assembler
+  because the original is, not because Pascal could not express it.
+  -------------------------------------------------------------------------- }
 procedure Set400Lines; assembler;
 asm
-  MOV  DX, $3D4
-  MOV  AL, 9
-  OUT  DX, AL
-  INC  DX
-  IN   AL, DX
-  AND  AL, $E0
-  OUT  DX, AL
+  MOV  DX, $3D4     { $3D4 is the CRTC index register                        }
+  MOV  AL, 9        { register 9 -- Maximum Scan Line                        }
+  OUT  DX, AL       { select it                                              }
+  INC  DX           { DX := $3D5, the CRTC data register                     }
+  IN   AL, DX       { read what is in register 9 now                         }
+  AND  AL, $E0      { keep bits 5-7, clear the repeat count in bits 0-4      }
+  OUT  DX, AL       { write it back -- no double scan, so 400 lines          }
 end;
 
 { --------------------------------------------------------------------------
@@ -324,36 +344,36 @@ asm
   CMP  BX, 0                     { did it go negative?                      }
   JGE  @@XNotNeg                 {   no                                     }
   ADD  BX, 360                   {   yes: wrap up one turn                  }
-@@XNotNeg:
+@@XNotNeg:                       { <- the not-negative case joins here      }
   CMP  BX, 360                   { did it pass a full turn?                 }
   JLE  @@XDone                   {   no                                     }
   SUB  BX, 360                   {   yes: wrap down one turn                }
-@@XDone:
+@@XDone:                         { <- both cases join here                  }
   MOV  [AngX], BX                { store back, and leave it in BX           }
 
   MOV  CX, [AngY]                { the Y angle, kept in CX                  }
-  ADD  CX, [StepY]
-  CMP  CX, 0
-  JGE  @@YNotNeg
-  ADD  CX, 360
-@@YNotNeg:
-  CMP  CX, 360
-  JLE  @@YDone
-  SUB  CX, 360
-@@YDone:
-  MOV  [AngY], CX
+  ADD  CX, [StepY]               { advance it -- DS:$BEA4                   }
+  CMP  CX, 0                     { negative?                                }
+  JGE  @@YNotNeg                 {   no                                     }
+  ADD  CX, 360                   {   yes: wrap up one turn                  }
+@@YNotNeg:                       { <- joins here                            }
+  CMP  CX, 360                   { past a full turn?                        }
+  JLE  @@YDone                   {   no                                     }
+  SUB  CX, 360                   {   yes: wrap down one turn                }
+@@YDone:                         { <- joins here                            }
+  MOV  [AngY], CX                { store back -- DS:$BE9E -- and keep in CX }
 
   MOV  DX, [AngZ]                { the Z angle, kept in DX                  }
-  ADD  DX, [StepZ]
-  CMP  DX, 0
-  JGE  @@ZNotNeg
-  ADD  DX, 360
-@@ZNotNeg:
-  CMP  DX, 360
-  JLE  @@ZDone
-  SUB  DX, 360
-@@ZDone:
-  MOV  [AngZ], DX
+  ADD  DX, [StepZ]               { advance it -- DS:$BEA6                   }
+  CMP  DX, 0                     { negative?                                }
+  JGE  @@ZNotNeg                 {   no                                     }
+  ADD  DX, 360                   {   yes: wrap up one turn                  }
+@@ZNotNeg:                       { <- joins here                            }
+  CMP  DX, 360                   { past a full turn?                        }
+  JLE  @@ZDone                   {   no                                     }
+  SUB  DX, 360                   {   yes: wrap down one turn                }
+@@ZDone:                         { <- joins here                            }
+  MOV  [AngZ], DX                { store back -- DS:$BEA0 -- and keep in DX }
 
   CALL SetAngles                 { BX, CX, DX now hold the three angles     }
 end;
@@ -418,125 +438,130 @@ procedure TransformPoint; assembler;
 var
   LX, LY, LZ, T1, T2 : Integer;    { [BP-2..-6], plus [$BEAA] and [$BEA8] }
 asm
-  MOV  LX, BX
-  MOV  LY, CX
-  MOV  LZ, DX
+  MOV  LX, BX                      { the caller left X in BX                 }
+  MOV  LY, CX                      { Y in CX                                 }
+  MOV  LZ, DX                      { Z in DX -- all three now in the frame   }
 
-  MOV  CX, [CosX]                  { about the first axis }
-  MOV  BX, [SinX]
-  MOV  AX, LY
-  IMUL CX
-  MOV  SI, AX
-  MOV  DI, DX
-  MOV  AX, LZ
-  IMUL BX
-  ADD  AX, SI
-  ADC  DX, DI
-  SHL  AX, 1
-  RCL  DX, 1
-  SHL  AX, 1
-  RCL  DX, 1
-  MOV  T1, DX
-  MOV  AX, LY
-  IMUL BX
-  MOV  SI, AX
-  MOV  DI, DX
-  MOV  AX, LZ
-  IMUL CX
-  SUB  AX, SI
-  SBB  DX, DI
-  SHL  AX, 1
-  RCL  DX, 1
-  SHL  AX, 1
-  RCL  DX, 1
-  MOV  LZ, DX
-  MOV  DX, T1
-  MOV  LY, DX
+  { ---- first axis: rotate Y and Z about X ---- }
+  MOV  CX, [CosX]                  { CX := cos(AngX), 16.14  -- DS:$BE90     }
+  MOV  BX, [SinX]                  { BX := sin(AngX)         -- DS:$BE92     }
+  MOV  AX, LY                      { AX := Y                                 }
+  IMUL CX                          { DX:AX := Y * cos, 32 bits signed        }
+  MOV  SI, AX                      { stash the low half                      }
+  MOV  DI, DX                      { and the high half                       }
+  MOV  AX, LZ                      { AX := Z                                 }
+  IMUL BX                          { DX:AX := Z * sin                        }
+  ADD  AX, SI                      { add the stashed product back in,        }
+  ADC  DX, DI                      {   full 32 bits: Y*cos + Z*sin           }
+  SHL  AX, 1                       { shift the 32-bit value left one bit...  }
+  RCL  DX, 1                       {   ...carrying into the high word        }
+  SHL  AX, 1                       { and again, so the product is now x4     }
+  RCL  DX, 1                       {                                         }
+  MOV  T1, DX                      { keeping DX alone is >>16 on the x4      }
+                                   {   value, i.e. an ARITHMETIC >>14        }
+  MOV  AX, LY                      { AX := Y again                           }
+  IMUL BX                          { DX:AX := Y * sin                        }
+  MOV  SI, AX                      { stash it                                }
+  MOV  DI, DX                      {                                         }
+  MOV  AX, LZ                      { AX := Z                                 }
+  IMUL CX                          { DX:AX := Z * cos                        }
+  SUB  AX, SI                      { subtract the stashed product,           }
+  SBB  DX, DI                      {   32 bits: Z*cos - Y*sin                }
+  SHL  AX, 1                       { x4 again...                             }
+  RCL  DX, 1                       {                                         }
+  SHL  AX, 1                       {                                         }
+  RCL  DX, 1                       {                                         }
+  MOV  LZ, DX                      { Z := (Z*cos - Y*sin) >> 14              }
+  MOV  DX, T1                      { fetch the first result back             }
+  MOV  LY, DX                      { Y := (Y*cos + Z*sin) >> 14              }
 
-  MOV  CX, [CosY]                  { second axis }
-  MOV  BX, [SinY]
-  MOV  AX, LZ
-  IMUL BX
-  MOV  SI, AX
-  MOV  DI, DX
-  MOV  AX, LX
-  IMUL CX
-  SUB  AX, SI
-  SBB  DX, DI
-  SHL  AX, 1
-  RCL  DX, 1
-  SHL  AX, 1
-  RCL  DX, 1
-  MOV  T2, DX
-  MOV  AX, LX
-  IMUL BX
-  MOV  SI, AX
-  MOV  DI, DX
-  MOV  AX, LZ
-  IMUL CX
-  ADD  AX, SI
-  ADC  DX, DI
-  SHL  AX, 1
-  RCL  DX, 1
-  SHL  AX, 1
-  RCL  DX, 1
-  MOV  LZ, DX
-  MOV  DX, T2
-  MOV  LX, DX
+  { ---- second axis: rotate Z and X about Y ---- }
+  MOV  CX, [CosY]                  { CX := cos(AngY)         -- DS:$BE94     }
+  MOV  BX, [SinY]                  { BX := sin(AngY)         -- DS:$BE96     }
+  MOV  AX, LZ                      { AX := the Z from the first rotation     }
+  IMUL BX                          { DX:AX := Z * sin                        }
+  MOV  SI, AX                      { stash it                                }
+  MOV  DI, DX                      {                                         }
+  MOV  AX, LX                      { AX := X                                 }
+  IMUL CX                          { DX:AX := X * cos                        }
+  SUB  AX, SI                      { X*cos - Z*sin,                          }
+  SBB  DX, DI                      {   32 bits                               }
+  SHL  AX, 1                       { x4...                                   }
+  RCL  DX, 1                       {                                         }
+  SHL  AX, 1                       {                                         }
+  RCL  DX, 1                       {                                         }
+  MOV  T2, DX                      { ...and keep the high word: >>14         }
+  MOV  AX, LX                      { AX := X again                           }
+  IMUL BX                          { DX:AX := X * sin                        }
+  MOV  SI, AX                      { stash it                                }
+  MOV  DI, DX                      {                                         }
+  MOV  AX, LZ                      { AX := Z                                 }
+  IMUL CX                          { DX:AX := Z * cos                        }
+  ADD  AX, SI                      { Z*cos + X*sin,                          }
+  ADC  DX, DI                      {   32 bits                               }
+  SHL  AX, 1                       { x4...                                   }
+  RCL  DX, 1                       {                                         }
+  SHL  AX, 1                       {                                         }
+  RCL  DX, 1                       {                                         }
+  MOV  LZ, DX                      { Z := (Z*cos + X*sin) >> 14              }
+  MOV  DX, T2                      { fetch the first result back             }
+  MOV  LX, DX                      { X := (X*cos - Z*sin) >> 14              }
 
-  MOV  CX, [CosZ]                  { third axis }
-  MOV  BX, [SinZ]
-  MOV  AX, LY
-  IMUL BX
-  MOV  SI, AX
-  MOV  DI, DX
-  MOV  AX, LX
-  IMUL CX
-  ADD  AX, SI
-  ADC  DX, DI
-  SHL  AX, 1
-  RCL  DX, 1
-  SHL  AX, 1
-  RCL  DX, 1
-  MOV  T2, DX
-  MOV  AX, LX
-  IMUL BX
-  MOV  SI, AX
-  MOV  DI, DX
-  MOV  AX, LY
-  IMUL CX
-  SUB  AX, SI
-  SBB  DX, DI
-  SHL  AX, 1
-  RCL  DX, 1
-  SHL  AX, 1
-  RCL  DX, 1
-  MOV  LY, DX
-  MOV  DX, T2
-  MOV  LX, DX
+  { ---- third axis: rotate X and Y about Z ---- }
+  MOV  CX, [CosZ]                  { CX := cos(AngZ)         -- DS:$BE98     }
+  MOV  BX, [SinZ]                  { BX := sin(AngZ)         -- DS:$BE9A     }
+  MOV  AX, LY                      { AX := Y                                 }
+  IMUL BX                          { DX:AX := Y * sin                        }
+  MOV  SI, AX                      { stash it                                }
+  MOV  DI, DX                      {                                         }
+  MOV  AX, LX                      { AX := X                                 }
+  IMUL CX                          { DX:AX := X * cos                        }
+  ADD  AX, SI                      { X*cos + Y*sin,                          }
+  ADC  DX, DI                      {   32 bits                               }
+  SHL  AX, 1                       { x4...                                   }
+  RCL  DX, 1                       {                                         }
+  SHL  AX, 1                       {                                         }
+  RCL  DX, 1                       {                                         }
+  MOV  T2, DX                      { ...high word only: >>14                 }
+  MOV  AX, LX                      { AX := X again                           }
+  IMUL BX                          { DX:AX := X * sin                        }
+  MOV  SI, AX                      { stash it                                }
+  MOV  DI, DX                      {                                         }
+  MOV  AX, LY                      { AX := Y                                 }
+  IMUL CX                          { DX:AX := Y * cos                        }
+  SUB  AX, SI                      { Y*cos - X*sin,                          }
+  SBB  DX, DI                      {   32 bits                               }
+  SHL  AX, 1                       { x4...                                   }
+  RCL  DX, 1                       {                                         }
+  SHL  AX, 1                       {                                         }
+  RCL  DX, 1                       {                                         }
+  MOV  LY, DX                      { Y := (Y*cos - X*sin) >> 14              }
+  MOV  DX, T2                      { fetch the first result back             }
+  MOV  LX, DX                      { X := (X*cos + Y*sin) >> 14              }
 
-  MOV  BX, [ViewDist]              { perspective -- the one real IDIV }
-  SUB  BX, LZ
-  CMP  BX, 0
-  JL   @@Behind
-  MOV  CX, [ProjScale]
-  MOV  AX, LX
-  SUB  AX, [XCentre]
-  IMUL CX
-  IDIV BX
-  ADD  AX, 160                     { $A0 }
-  MOV  DI, AX
-  MOV  AX, LY
-  SUB  AX, [YCentre]
-  IMUL CX
-  IDIV BX
-  ADD  AX, 200                     { $C8 }
-  MOV  BX, AX
-  JMP  @@Done
-@@Behind:
-  MOV  DI, -1
-  MOV  BX, -1
-@@Done:
+  { ---- perspective: the one real divide in the whole frame path ---- }
+  MOV  BX, [ViewDist]              { BX := 2500              -- DS:$BEB4     }
+  SUB  BX, LZ                      { BX := the point's distance from the eye }
+  CMP  BX, 0                       { has it gone behind us?                  }
+  JL   @@Behind                    {   yes -- there is no projection for it  }
+  MOV  CX, [ProjScale]             { CX := 256               -- DS:$BEB2     }
+  MOV  AX, LX                      { AX := the rotated X                     }
+  SUB  AX, [XCentre]               { measure it from the object's own centre }
+  IMUL CX                          { DX:AX := that * 256, 32 bits            }
+  IDIV BX                          { AX := divided by the distance -- signed }
+  ADD  AX, 160                     { $A0 -- half of the 320-pixel page       }
+  MOV  DI, AX                      { DI := screen X, for PlotPixel           }
+  MOV  AX, LY                      { AX := the rotated Y                     }
+  SUB  AX, [YCentre]               { from the object's centre                }
+  IMUL CX                          { DX:AX := that * 256                     }
+  IDIV BX                          { AX := divided by the same distance      }
+  ADD  AX, 200                     { $C8 -- half of the 400-line page        }
+  MOV  BX, AX                      { BX := screen Y, for PlotPixel           }
+  JMP  @@Done                      { skip the off-screen case                }
+@@Behind:                          { <- the point is behind the viewer       }
+  MOV  DI, -1                      { an X PlotPixel's bounds test rejects    }
+  MOV  BX, -1                      { and a Y likewise                        }
+@@Done:                            { <- both cases leave DI and BX set       }
 end;
 
 { --------------------------------------------------------------------------
@@ -553,31 +578,32 @@ end;
   -------------------------------------------------------------------------- }
 procedure PlotPixel; assembler;
 asm
-  CMP  DI, 0
-  JL   @@Out
-  CMP  DI, 319
-  JG   @@Out
-  CMP  BX, 0
-  JL   @@Out
-  CMP  BX, 399
-  JG   @@Out
-  SHL  BX, 1
-  MOV  BX, [BX + OFFSET RowOfs]
-  MOV  CX, DI
-  SHR  DI, 2
-  ADD  DI, BX
-  ADD  DI, [PageOfs]
-  AND  CX, 3
-  MOV  AH, 1
-  SHL  AH, CL
-  MOV  DX, $3C4
-  MOV  AL, 2
-  OUT  DX, AX
-  MOV  AX, $A000
-  MOV  ES, AX
-  MOV  AL, DotColour
-  STOSB
-@@Out:
+  CMP  DI, 0            { X off the left?                                    }
+  JL   @@Out            {   drop the point                                   }
+  CMP  DI, 319          { X off the right? ($13F)                            }
+  JG   @@Out            {   drop it                                          }
+  CMP  BX, 0            { Y above the page?                                  }
+  JL   @@Out            {   drop it                                          }
+  CMP  BX, 399          { Y below it? ($18F -- 400 lines, not 200)           }
+  JG   @@Out            {   drop it                                          }
+  SHL  BX, 1            { BX := Y * 2, a word index into the row table       }
+  MOV  BX, [BX + OFFSET RowOfs]   { BX := RowOfs[Y] -- DS:$BEC6, Y*160       }
+  MOV  CX, DI           { keep a copy of X: the plane number comes from it   }
+  SHR  DI, 2            { X div 4 -- Mode X puts every 4th pixel in a plane, }
+                        {   so the byte offset within the row is X shr 2     }
+  ADD  DI, BX           { + the row's own offset                             }
+  ADD  DI, [PageOfs]    { + 0 or 80, whichever page is being drawn           }
+  AND  CX, 3            { CL := X mod 4 = which of the four planes           }
+  MOV  AH, 1            { one bit...                                         }
+  SHL  AH, CL           {   ...shifted to that plane's position in the mask  }
+  MOV  DX, $3C4         { Sequencer address register                         }
+  MOV  AL, 2            { register 2 -- Map Mask                             }
+  OUT  DX, AX           { index in AL, value in AH, one 16-bit OUT           }
+  MOV  AX, $A000        { video memory                                       }
+  MOV  ES, AX           { ES:DI now addresses the pixel                      }
+  MOV  AL, DotColour    { $0E -- yellow                                      }
+  STOSB                 { write it; only the enabled plane takes it          }
+@@Out:                  { <- every clipped case lands here and returns       }
 end;
 
 { --------------------------------------------------------------------------
@@ -600,19 +626,19 @@ end;
 procedure ClearPage; assembler;
 asm
   MOV  DI, [PageOfs]    { DI := 0 or 80 -- which half of the row to clear    }
-  MOV  AX, $A000
+  MOV  AX, $A000        { video memory                                       }
   MOV  ES, AX           { ES := video; the pages live in VRAM, not the heap  }
   MOV  DX, $3C4         { Sequencer address register                         }
   MOV  AX, $0F02        { register 2 (Map Mask) := $0F, all four planes      }
   OUT  DX, AX           { so one STOSW clears four pixels per plane at once  }
   XOR  AX, AX           { the fill value: black                              }
-  MOV  DX, 399          { $18F rows                                          }
-@@Row:
+  MOV  DX, 399          { $18F rows -- one short of the page, see above      }
+@@Row:                  { <- once per row                                    }
   MOV  CX, 40           { $28 words = 80 bytes = 320 pixels of this page     }
   REP  STOSW            { blank the row; DI advances 80                      }
   ADD  DI, 80           { $50: step over the OTHER page's half of the row    }
   DEC  DX               { one row done                                       }
-  JNZ  @@Row
+  JNZ  @@Row            { round again until all 399 are clear                }
 end;
 
 { --------------------------------------------------------------------------
@@ -637,12 +663,12 @@ asm
   MOV  BX, [PageOfs]    { BX := the offset of the page just drawn            }
   MOV  AH, BH           { high byte of the start address                     }
   MOV  AL, $0C          { CRTC register $0C: start address HIGH              }
-  MOV  DX, $3D4
+  MOV  DX, $3D4         { CRTC address register                              }
   OUT  DX, AX           { write index and value in one 16-bit OUT            }
   MOV  AH, BL           { low byte of the start address                      }
   MOV  AL, $0D          { CRTC register $0D: start address LOW               }
-  MOV  DX, $3D4
-  OUT  DX, AX
+  MOV  DX, $3D4         { CRTC address register again                        }
+  OUT  DX, AX           { and the second half of the start address           }
   MOV  AX, 80           { $50 -- the other page                              }
   SUB  AX, BX           { 80 - PageOfs toggles between 0 and 80              }
   MOV  [PageOfs], AX    { next frame draws into whichever was just shown     }
@@ -674,19 +700,19 @@ end;
   -------------------------------------------------------------------------- }
 procedure DrawShape; assembler;
 asm
-  MOV  SI, [CurShape]
-  MOV  WORD PTR [Count], 765       { $2FD }
-@@Point:
-  PUSH SI
-  MOV  BX, [SI]
-  MOV  CX, [SI+2]
-  MOV  DX, [SI+4]
-  CALL TransformPoint
-  CALL PlotPixel
-  POP  SI
-  ADD  SI, 6
-  DEC  WORD PTR [Count]
-  JNZ  @@Point
+  MOV  SI, [CurShape]              { DS:$BEBA -- the shape's DGROUP offset   }
+  MOV  WORD PTR [Count], 765       { $2FD points -- DS:$BEC4                 }
+@@Point:                           { <- once per point                       }
+  PUSH SI                          { TransformPoint clobbers SI, so save it  }
+  MOV  BX, [SI]                    { BX := X, the first word of the record   }
+  MOV  CX, [SI+2]                  { CX := Y                                 }
+  MOV  DX, [SI+4]                  { DX := Z -- the register convention      }
+  CALL TransformPoint              { rotate and project: out in DI and BX    }
+  CALL PlotPixel                   { plot it straight from those registers   }
+  POP  SI                          { get the record pointer back             }
+  ADD  SI, 6                       { three signed words per point            }
+  DEC  WORD PTR [Count]            { one point done                          }
+  JNZ  @@Point                     { round again until all 765 are drawn     }
 end;
 
 { --------------------------------------------------------------------------
@@ -713,62 +739,62 @@ end;
   -------------------------------------------------------------------------- }
 procedure DrawMorph; assembler;
 asm
-  MOV  BX, [MorphStep]
-  CMP  BX, [MorphSteps]
-  JLE  @@Blend
-  MOV  BX, [MorphTo]
-  MOV  [CurShape], BX
-  CALL DrawShape
-  JMP  @@Done
+  MOV  BX, [MorphStep]             { DS:$BEB8 -- how far through the blend   }
+  CMP  BX, [MorphSteps]            { DS:$BEB6 -- 45 steps in all             }
+  JLE  @@Blend                     { still blending: go and interpolate      }
+  MOV  BX, [MorphTo]               { finished: the destination shape wins    }
+  MOV  [CurShape], BX              { -> DS:$BEBA                             }
+  CALL DrawShape                   { and draw it straight, no blending       }
+  JMP  @@Done                      { nothing else to do this frame           }
 
-@@Blend:
-  MOV  WORD PTR [Count], 765
-  MOV  SI, [MorphFrom]
-  MOV  DI, [MorphTo]
-@@Point:
-  PUSH DI
-  PUSH SI
+@@Blend:                           { <- the interpolating case               }
+  MOV  WORD PTR [Count], 765       { $2FD points -- DS:$BEC4                 }
+  MOV  SI, [MorphFrom]             { DS:$BEBC -- the shape being left        }
+  MOV  DI, [MorphTo]               { DS:$BEBE -- the shape being approached  }
+@@Point:                           { <- once per point                       }
+  PUSH DI                          { both walkers are clobbered by the calls }
+  PUSH SI                          {   below, so save them                   }
 
-  MOV  AX, [DI]
-  SUB  AX, [SI]
-  CWD
-  IMUL WORD PTR [MorphStep]
-  IDIV WORD PTR [MorphSteps]
-  ADD  AX, [SI]
-  MOV  BX, AX
-  ADD  SI, 2
-  ADD  DI, 2
+  MOV  AX, [DI]                    { AX := the destination X                 }
+  SUB  AX, [SI]                    { AX := destination - source, the span    }
+  CWD                              { sign-extend it into DX:AX               }
+  IMUL WORD PTR [MorphStep]        { DX:AX := span * step, 32 bits wide      }
+  IDIV WORD PTR [MorphSteps]       { AX := that / 45 -- the fraction covered }
+  ADD  AX, [SI]                    { AX := source + it = the blended X       }
+  MOV  BX, AX                      { BX is where TransformPoint wants X      }
+  ADD  SI, 2                       { step both walkers on to Y               }
+  ADD  DI, 2                       {                                         }
 
-  MOV  AX, [DI]
-  SUB  AX, [SI]
-  CWD
-  IMUL WORD PTR [MorphStep]
-  IDIV WORD PTR [MorphSteps]
-  ADD  AX, [SI]
-  MOV  CX, AX
-  ADD  SI, 2
-  ADD  DI, 2
+  MOV  AX, [DI]                    { AX := the destination Y                 }
+  SUB  AX, [SI]                    { the span                                }
+  CWD                              { sign-extend                             }
+  IMUL WORD PTR [MorphStep]        { * step                                  }
+  IDIV WORD PTR [MorphSteps]       { / 45                                    }
+  ADD  AX, [SI]                    { + source = the blended Y                }
+  MOV  CX, AX                      { CX is where TransformPoint wants Y      }
+  ADD  SI, 2                       { step both walkers on to Z               }
+  ADD  DI, 2                       {                                         }
 
-  MOV  AX, [DI]
-  SUB  AX, [SI]
-  CWD
-  IMUL WORD PTR [MorphStep]
-  IDIV WORD PTR [MorphSteps]
-  ADD  AX, [SI]
-  MOV  DX, AX
+  MOV  AX, [DI]                    { AX := the destination Z                 }
+  SUB  AX, [SI]                    { the span                                }
+  CWD                              { sign-extend                             }
+  IMUL WORD PTR [MorphStep]        { * step                                  }
+  IDIV WORD PTR [MorphSteps]       { / 45                                    }
+  ADD  AX, [SI]                    { + source = the blended Z                }
+  MOV  DX, AX                      { DX is where TransformPoint wants Z      }
 
-  CALL TransformPoint
-  CALL PlotPixel
+  CALL TransformPoint              { rotate and project: out in DI and BX    }
+  CALL PlotPixel                   { plot it straight from those registers   }
 
-  POP  SI
-  POP  DI
-  ADD  DI, 6
-  ADD  SI, 6
-  DEC  WORD PTR [Count]
-  JNZ  @@Point
+  POP  SI                          { the walkers back, still on this point's }
+  POP  DI                          {   first word                            }
+  ADD  DI, 6                       { three signed words per point            }
+  ADD  SI, 6                       {                                         }
+  DEC  WORD PTR [Count]            { one point done                          }
+  JNZ  @@Point                     { round again until all 765 are drawn     }
 
-  INC  WORD PTR [MorphStep]
-@@Done:
+  INC  WORD PTR [MorphStep]        { one step further along the blend        }
+@@Done:                            { <- both cases return from here          }
 end;
 
 { --------------------------------------------------------------------------

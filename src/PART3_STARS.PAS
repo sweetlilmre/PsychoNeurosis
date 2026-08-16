@@ -10,8 +10,18 @@
   Unlike Scene 1 (mode-X, hardware panning) this is plain mode 13h with a
   software virtual screen -- the two scenes use quite different machinery.
 
-  Floating point is used ONCE, to generate the point cloud at startup. The
-  per-frame render is pure integer: a 32-bit shift and a 32-bit divide.
+  Floating point is used ONCE, to generate the point cloud, and that happens
+  in the UNIT INITIALISATION section (1000:0037 calls 10b8:05f2 directly),
+  not in Scene2. The per-frame render is pure integer: a 32-bit shift and a
+  32-bit divide.
+
+  THE PAN. Each point carries its own screen origin, XOfs/YOfs. A point only
+  picks up the current PanX/PanY when it recycles past the viewer, so the pan
+  washes through the tube from the near end rather than moving it all at
+  once. The waypoint table drives PanX/PanY: index 50 counting down to 0,
+  each record holding a hold count that stalls the walk for that many frames.
+  With 56 authored records and hold counts in them the scene runs for several
+  hundred frames, not fifty.
 
   ADDRESS MAP (part 003)
     Demo_Scene2            10b8:0592     Stars_ProjectAndPlot  10b8:0000
@@ -40,21 +50,27 @@ const
   TubeRadius   = 40.0;      { CS:$05EE -- Single }
   ProjShift    = 8;         { CX passed to RTL_Shl32: X*256 before the divide }
 
-  ZStep        = 30;        { per frame, toward the viewer }
-  ZWrap        = -500;      { recycle distance }
+  ZStep        = 30;        { $1E per frame, toward the viewer }
+  ZWrap        = -500;      { $1F4 subtracted -- recycle distance }
   ZNear        = -10;       { past this the point has flown by }
   ZPlotNear    = -3;        { nearer than this is not drawn }
-  ZPlotFar     = -500;
+  ZPlotFar     = -500;      { $FE0C }
 
-  NumWaypoints = 50;
+  { The block really is 500 six-byte records; only 1..57 hold authored data
+    and the scene walks 50 down to 1. See the note at the foot of the file. }
+  NumWaypoints = 500;
+  StartWaypoint = 50;       { $32 -- 10b8:012a }
   DataOfs      = $0C0276;   { NEUROSIS.DAT seek -- 787062 }
-  DataSize     = 3000;      { 500 six-byte records; the scene walks 50 }
-  DataAddr     = $B250;
-
-  CollapseFrames = 32;      { DS:$02A6 }
+  DataSize     = 3000;      { $BB8 }
 
   ScrW = 320;  ScrH = 200;
   CentreX = 160;  CentreY = 100;
+
+{ DS:$02A6. A typed constant, not a literal: the collapse loop's assembler
+  divides by it in memory (10b8:0417 and 10b8:042d are IDIV [$02A6]), so it
+  has to be addressable. }
+const
+  CollapseFrames : Integer = 32;
 
 type
   { 14 bytes. X and Y are LongInt because the generator scales them by 40 and
@@ -73,48 +89,81 @@ type
 
 var
   Live, Source : ^TPointArray;                          { DS:$A880, DS:$A884 }
-  Waypoints    : array[1..NumWaypoints] of TWaypoint;   { in the loaded block }
+
+  { DS:$A888 and DS:$A88A. Both are unit-level in the original -- the loop
+    counter is addressed as a bare global by every routine in the segment. }
+  Angle        : Integer;
+  Idx          : Integer;
+
   Display      : array[1..NumPoints] of TPlot;          { DS:$A88C }
-  DisplayCount : Integer;                               { DS:$BE0C }
+
+  { DS:$B250. 500 six-byte records read straight off the DAT. The walk is
+    Waypoints[50] down to Waypoints[1], and it reads Waypoints[0] once on the
+    way out -- see RunScene -- so the array starts at zero. }
+  Waypoints    : array[0..NumWaypoints] of TWaypoint;
+
   PanX, PanY   : Integer;                               { DS:$BE0A, DS:$BE08 }
+  DisplayCount : Integer;                               { DS:$BE0C }
   WaypointIdx  : Integer;                               { DS:$BE0E }
 
 { --------------------------------------------------------------------------
-  Stars_Generate (10b8:05f2)
+  DegToRad (10b8:0487)
+  -------------------------------------------------------------------------- }
+function DegToRad(D : Real) : Real;
+begin
+  DegToRad := D * Pi / 180.0;
+end;
 
-  The point cloud is NOT loaded from disk -- it is generated here. Each point
-  gets a random angle on a circle of radius 40, and a depth equal to minus its
-  index, so the 500 points are spread evenly from Z=-1 to Z=-500: a tube.
+{ --------------------------------------------------------------------------
+  Stars_Generate (10b8:05f2) -- THE UNIT INITIALISATION SECTION.
+
+  This is not called by Scene2. It is entry 14 in the unit-initialisation
+  chain at 1000:0000, so the point cloud is built once when the program
+  loads, long before the scene runs. RunScene frees both blocks at the end,
+  which is why the scene cannot be run twice.
+
+  The point cloud is NOT loaded from disk. Each point gets a random angle on
+  a circle of radius 40 and a depth equal to minus its index, so the 500
+  points spread evenly from Z=-1 to Z=-500: a tube. A point that rounds to
+  dead centre is thrown away and re-rolled, otherwise it would sit on the
+  vanishing point forever.
+
+  The first point is written out longhand ahead of the loop (10b8:0613, with
+  the field offsets constant-folded), with its Z set FIRST and no rejection
+  test; every other point sets Z last, after the test. Reproduced as written.
 
   This is the only floating point in the scene.
   -------------------------------------------------------------------------- }
 procedure Generate;
 var
-  I     : Integer;
-  A     : Real;
+  I : Integer;
 begin
-  GetMem(Live,   ArraySize);
-  GetMem(Source, ArraySize);
+  GetMem(Live,   ArraySize);                  { 10b8:05f8 }
+  GetMem(Source, ArraySize);                  { 10b8:0607 }
 
-  I := 1;
-  while I <= NumPoints do
+  Live^[1].Z := -1;                           { 10b8:0617 }
+  Angle := Random(360);                       { 10b8:0620 }
+  Live^[1].X := Round(Cos(DegToRad(Angle)) * TubeRadius);   { RTL_Cos 137b:3257 }
+  Live^[1].Y := Round(Sin(DegToRad(Angle)) * TubeRadius);   { RTL_Sin 137b:3252 }
+  Live^[1].XOfs := CentreX;
+  Live^[1].YOfs := CentreY;
+
+  for I := 2 to NumPoints do                  { 10b8:069d }
   begin
-    A := Random(360) * Pi / 180;              { DegToRad, 10b8:0487 }
-    Live^[I].X := Round(Cos(A) * TubeRadius); { RTL_Cos 137b:3257 -> +0 }
-    Live^[I].Y := Round(Sin(A) * TubeRadius); { RTL_Sin 137b:3252 -> +4 }
-    Live^[I].XOfs := CentreX;
-    Live^[I].YOfs := CentreY;
-
-    { Reject a point that rounded to dead centre, otherwise it would sit on
-      the vanishing point forever. }
-    if (Live^[I].X <> 0) or (Live^[I].Y <> 0) then
-    begin
-      Live^[I].Z := -I;
-      Inc(I);
-    end;
+    repeat
+      Angle := Random(360);
+      Live^[I].X := Round(Cos(DegToRad(Angle)) * TubeRadius);
+      Live^[I].Y := Round(Sin(DegToRad(Angle)) * TubeRadius);
+      Live^[I].XOfs := CentreX;
+      Live^[I].YOfs := CentreY;
+    until (Live^[I].X <> 0) or (Live^[I].Y <> 0);   { 10b8:074e -- re-roll }
+    Live^[I].Z := -I;                         { 10b8:077b }
   end;
 
-  Move(Live^, Source^, ArraySize);            { Source is the reset template }
+  { 10b8:079c -- copied a record at a time, not in one 7,000-byte Move.
+    Source is the reset template every recycled point is rebuilt from. }
+  for I := 1 to NumPoints do
+    Move(Live^[I], Source^[I], RecSize);
 end;
 
 { --------------------------------------------------------------------------
@@ -124,7 +173,8 @@ end;
   -------------------------------------------------------------------------- }
 procedure InitPalette;
 begin
-  SetMode13h;
+  PanX := 0;  PanY := 0;  DisplayCount := 0;   { 10b8:04c6 -- before the mode }
+  SetMode13h;                                  { 10b8:04d5 }
   SetRGB( 1, 0, 0, $3C);   SetRGB( 2, 0, 0, $37);
   SetRGB( 3, 0, 0, $32);   SetRGB( 4, 0, 0, $2D);
   SetRGB( 5, 0, 0, $28);   SetRGB( 6, 0, 0, $23);
@@ -132,7 +182,6 @@ begin
   SetRGB( 9, 0, 0, $14);   SetRGB(10, 0, 0, $0F);
   SetRGB(11, 0, 0, $0A);   SetRGB(12, 0, 0, $05);
   SetRGB(13, 0, 0, $00);
-  PanX := 0;  PanY := 0;  DisplayCount := 0;
 end;
 
 { --------------------------------------------------------------------------
@@ -140,53 +189,67 @@ end;
 
   Fixed-point perspective: (X shl 8) div Z. The shift is done by RTL_Shl32
   (137b:36f2), a 32-bit DX:AX shl CX that branches on CPU type -- a loop on
-  8086, a single shift on 386. The divide is Math_DivLong (10b8:07f4).
+  8086, a single shift on 386. The divide is Math_DivLong (10b8:07f4), which
+  is three 386 instructions round an IDIV ESI, so scene 2 needs a 386 even
+  though nothing else in the part does.
+
+  THE BOUNDS TESTS ARE UNSIGNED. 10b8:00dd and 00e4 are JBE and JNC, not
+  JLE and JGE, so a point that projects to a negative X or Y becomes a large
+  positive and is rejected by the `>= 320` / `>= 200` half of the test rather
+  than passing the `< 320` half. SX and SY are Word here for that reason.
+  The display-list pass in RunScene is the other way round -- it really does
+  use signed compares (10b8:035c is JLE) -- so the two are not interchangeable.
   -------------------------------------------------------------------------- }
 procedure ProjectAndPlot(Dest : Word);
 var
-  I, SX, SY : Integer;
+  SX, SY : Word;
 begin
-  for I := 1 to NumPoints do
-    with Live^[I] do
+  for Idx := 1 to NumPoints do
+    with Live^[Idx] do
       if (Z < ZPlotNear) and (Z > ZPlotFar) then
       begin
         SX := XOfs + ((X shl ProjShift) div Z);
         SY := YOfs + ((Y shl ProjShift) div Z);
         if (SX <> 0) and (SX < ScrW) and (SY <> 0) and (SY < ScrH) then
-          { PutPixel is (Segment, Colour, Y, X) -- see VGA.PAS, where the
-            order is fixed by the transcribed assembler. }
           PutPixel(SX, SY, ((-Z) shr 6) + 1, Dest);
       end;
 end;
 
 { --------------------------------------------------------------------------
   Stars_RunScene (10b8:0126)
+
+  Phase 3 -- the collapse -- has a hand-assembler inner loop. Everything
+  round it (the frame loop, ClearVirtual, CopyScreen) is compiled Pascal, so
+  only the plotting loop is transcribed.
   -------------------------------------------------------------------------- }
 procedure RunScene;
 var
-  I, T, SX, SY : Integer;
+  T      : Integer;      { [BP-2]  -- the collapse frame, read by the asm }
+  SX, SY : Integer;      { [BP-4], [BP-6] -- signed here, see below }
+  Col    : Byte;         { [BP-9]  -- ditto }
 begin
   { ---- Phase 1: fly the tube, stepping back through the waypoint table ---- }
-  WaypointIdx := NumWaypoints;
+  WaypointIdx := StartWaypoint;                { 10b8:012a }
   repeat
-    for I := 1 to NumPoints do
-      with Live^[I] do
+    for Idx := 1 to NumPoints do
+      with Live^[Idx] do
       begin
-        Inc(Z, ZStep);
-        if Z > ZNear then                   { flown past -- recycle }
+        Inc(Z, ZStep);                         { 10b8:014b }
+        if Z > ZNear then                      { flown past -- recycle }
         begin
-          Inc(Z, ZWrap);                    { push back 500 }
-          XOfs := Source^[I].XOfs + PanX;
-          YOfs := Source^[I].YOfs + PanY;
-          X    := Source^[I].X;
-          Y    := Source^[I].Y;
+          Inc(Z, ZWrap);                       { 10b8:0183 -- push back 500 }
+          XOfs := Source^[Idx].XOfs + PanX;    { 10b8:01a6 -- pick up the pan }
+          YOfs := Source^[Idx].YOfs + PanY;    { 10b8:01ca }
+          X    := Source^[Idx].X;              { 10b8:01ea }
+          Y    := Source^[Idx].Y;              { 10b8:0210 }
         end;
       end;
 
-    ClearVirtual;
-    ProjectAndPlot(VirtScrSeg);
-    CopyScreen(VirtScrSeg, $A000);
+    ClearVirtual;                              { 10b8:023c }
+    ProjectAndPlot(VirtScrSeg);                { 10b8:0245 }
+    CopyScreen(VirtScrSeg, $A000);             { 10b8:024f }
 
+    { 10b8:0260 -- hold on this waypoint, or step to the next one }
     if Waypoints[WaypointIdx].Hold < 1 then
     begin
       Dec(WaypointIdx);
@@ -198,13 +261,15 @@ begin
   until WaypointIdx = 0;
 
   { ---- Phase 2: freeze the visible points into a display list ---- }
+  { Signed compares here (10b8:035c JLE, 0367 JGE, 036e JGE, 0374 JLE) --
+    unlike ProjectAndPlot above. }
   DisplayCount := 0;
-  for I := 1 to NumPoints do
-    with Live^[I] do
+  for Idx := 1 to NumPoints do
+    with Live^[Idx] do
     begin
       SX := XOfs + ((X shl ProjShift) div Z);
       SY := YOfs + ((Y shl ProjShift) div Z);
-      if (SX > 0) and (SX < ScrW) and (SY > 0) and (SY < ScrH) then
+      if (SX > 0) and (SX < ScrW) and (SY < ScrH) and (SY > 0) then
       begin
         Inc(DisplayCount);
         Display[DisplayCount].X      := SX;
@@ -217,16 +282,84 @@ begin
   for T := 1 to CollapseFrames do
   begin
     ClearVirtual;
-    for I := 1 to DisplayCount do
-      with Display[I] do
-        PutPixel(X + (LongInt(CentreX - X) * T) div CollapseFrames,
-                 Y + (LongInt(CentreY - Y) * T) div CollapseFrames,
-                 Colour, VirtScrSeg);
-    CopyScreen(VirtScrSeg, $A000);
+
+    { ----------------------------------------------------------------------
+      10b8:03f9 -- HAND ASSEMBLER, transcribed verbatim.
+
+      One pass over the display list, moving every dot a fraction T/32 of
+      the way from where it was to screen centre and plotting it. It walks
+      the five-byte records with LODSB/LODSW rather than indexing them,
+      counts down with LOOP, and writes through the row table itself instead
+      of calling PutPixel -- so there is no call, no multiply and no bounds
+      test in the loop at all.
+
+      The interpolation is done in 32 bits: CWD sign-extends the difference
+      before IMUL, so the product is DX:AX and the following IDIV divides
+      the full 32-bit value. Writing it in Pascal with Integer operands
+      would overflow -- (CentreY - Y) can reach 100 and T reaches 32, which
+      is fine, but (CentreX - X) reaches 160 and 160*32 = 5120 is only safe
+      by luck; the original never relies on that.
+
+      There is no guard on DisplayCount being zero. LOOP with CX = 0 runs
+      65,536 times, and the original has that hole too.
+
+      EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+          for I := 1 to DisplayCount do
+            with Display[I] do
+              Mem[VirtScrSeg :
+                  YOfs[Y + (LongInt(CentreY - Y) * T) div CollapseFrames]
+                  + X + (LongInt(CentreX - X) * T) div CollapseFrames]
+                := Colour;
+
+      Where that is not the same thing: Colour is read FIRST, before either
+      coordinate, because the records are walked in storage order by a
+      pointer that only ever moves forward -- LODSB then LODSW then LODSW is
+      one pass over the record with no addressing arithmetic whatsoever.
+      ---------------------------------------------------------------------- }
+    asm
+      MOV  AX, OFFSET Display   { DS:$A88C -- the first display record       }
+      MOV  SI, AX               { SI walks the list, one record per pass     }
+      MOV  AX, [VirtScrSeg]     { DS:$E770                                   }
+      MOV  ES, AX               { ES: is where the dots go                   }
+      MOV  CX, [DisplayCount]   { DS:$BE0C -- the LOOP counter               }
+    @@Dot:                    { <- once per display record                 }
+      LODSB                     { AL := Colour; SI now points at X           }
+      MOV  Col, AL              { stash it -- AX is needed for the maths     }
+
+      LODSW                     { AX := X; SI now points at Y                }
+      MOV  BX, AX               { BX := X, kept for the ADD below            }
+      MOV  AX, 160              { CentreX                                    }
+      SUB  AX, BX               { AX := CentreX - X, the distance to travel  }
+      CWD                       { sign-extend it into DX:AX                  }
+      IMUL T                    { DX:AX := (CentreX - X) * frame             }
+      IDIV [CollapseFrames]     { AX := that / 32 -- the fraction covered    }
+      ADD  AX, BX               { AX := X + the step = this frame's X        }
+      MOV  BX, AX               { via BX, exactly as the original does        }
+      MOV  DI, BX               { DI := screen X                             }
+
+      LODSW                     { AX := Y; SI now points at the next record  }
+      MOV  BX, AX               { BX := Y                                    }
+      MOV  AX, 100              { CentreY                                    }
+      SUB  AX, BX               { AX := CentreY - Y                          }
+      CWD                       { sign-extend into DX:AX                     }
+      IMUL T                    { DX:AX := (CentreY - Y) * frame             }
+      IDIV [CollapseFrames]     { AX := that / 32                            }
+      ADD  AX, BX               { AX := this frame's Y                       }
+      MOV  BX, AX               { BX := screen Y                             }
+      ADD  BX, BX               { BX := Y * 2, a word index                  }
+      ADD  DI, [BX + OFFSET YOfs]  { + YOfs[Y] = Y*320, so DI is the offset  }
+                                {   of the pixel. DS:$E772 is VGA's table.   }
+      MOV  AL, Col              { get the colour back                        }
+      MOV  ES:[DI], AL          { plot it                                    }
+      LOOP @@Dot                { next record until CX runs out              }
+    end;
+
+    CopyScreen(VirtScrSeg, $A000);             { 10b8:044a }
   end;
 
-  FreeMem(Live,   ArraySize);
-  FreeMem(Source, ArraySize);
+  FreeMem(Live,   ArraySize);                  { 10b8:0462 }
+  FreeMem(Source, ArraySize);                  { 10b8:0472 }
 end;
 
 { --------------------------------------------------------------------------
@@ -235,8 +368,9 @@ end;
   ASSETS  NEUROSIS.DAT $0C0276, 3000 bytes:
             assets/part003/stars_waypoints.bin
           500 six-byte records (PanX, PanY, Hold); the scene walks indices
-          50 down to 1. The point cloud is NOT an asset -- Generate builds
-          it procedurally. See docs/07-part3-scene2-stars.md.
+          50 down to 1. The point cloud is NOT an asset -- the unit's
+          initialisation section builds it procedurally.
+          See docs/07-part3-scene2-stars.md.
   -------------------------------------------------------------------------- }
 procedure Scene2;
 var
@@ -245,14 +379,21 @@ begin
   Assign(F, 'neurosis.dat');
   Reset(F, 1);
   Seek(F, DataOfs);
-  BlockRead(F, Mem[DSeg:DataAddr], DataSize);   { waypoint table }
+  WaypointIdx := 4;             { 10b8:05c0 -- dead: RunScene sets it to 50
+                                  before ever reading it. Kept because it is
+                                  there. }
+  BlockRead(F, Waypoints[1], DataSize);        { 10b8:05d7 -> DS:$B250 }
   Close(F);
 
-  Generate;
-  InitPalette;
-  RunScene;
+  InitPalette;                                 { 10b8:05e6 }
+  RunScene;                                    { 10b8:05e9 }
 end;
 
+begin
+  { 1000:0037 -- the unit initialisation. The original has Generate's code
+    directly in this section rather than in a procedure it calls; the extra
+    call is the only difference. }
+  Generate;
 end.
 
 { ===========================================================================
@@ -260,16 +401,38 @@ end.
 
   * Tube radius   40.0     CS:$05EE, Single, multiplied into Cos/Sin at generate
   * Projection    shl 8    CX=8 passed to RTL_Shl32, so X*256 before div Z
-  * Collapse      32       DS:$02A6
+  * Collapse      32       DS:$02A6, a typed constant -- the asm divides by it
   * Z range       -1..-500 Z is simply minus the point index
   * X uses RTL_Cos (137b:3257), Y uses RTL_Sin (137b:3252) -- read directly
     off the two CALLF targets in the generator, which also settles the
     Sin/Cos identification used by Scene 1.
 
-  CORRECTION
+  CORRECTIONS made after running it against ORIG3.EXE
+
+  * THE WAYPOINT TABLE WAS NEVER BEING LOADED. The BlockRead went to a raw
+    Mem[DSeg:$B250], which is where the block sits in the ORIGINAL's data
+    segment and has nothing to do with where Turbo Pascal puts our array. So
+    Waypoints stayed all zeros: every Hold read as 0, the walk stepped one
+    index a frame and ended after fifty, and PanX/PanY stayed 0 so the tube
+    never moved. Both reported symptoms -- "does not move around the screen"
+    and "ends sooner" -- were this one bug. It now reads into the array.
+
+  * ProjectAndPlot's bounds tests are UNSIGNED in the binary (JBE/JNC at
+    10b8:00dd and 00e4). They had been transcribed as signed, which let a
+    point projecting to a negative X or Y through the `< 320` test and
+    plotted it wrapped onto the previous row. SX and SY are Word now. The
+    display-list pass in phase 2 genuinely is signed (JLE/JGE at 10b8:035c
+    onward), so the two differ on purpose.
+
+  * The collapse loop is hand assembler (LODSB/LODSW, LOOP, the row table
+    indexed inline) and had been rewritten as Pascal. It is back verbatim.
+
+  * Generate is the unit INITIALISATION section, not part of Scene2 --
+    1000:0037 calls 10b8:05f2 directly, as entry 14 of the init chain.
+
   * An earlier draft said the point cloud was loaded from NEUROSIS.DAT. It is
-    not -- Stars_Generate builds it procedurally and then Moves it into the
-    Source template. The 3000-byte block from the file is the waypoint data.
+    not -- Generate builds it procedurally and copies it into the Source
+    template. The 3000-byte block from the file is the waypoint data.
 
   RESOLVED -- THE UNWALKED TAIL OF THE PAN TABLE
   * The block is declared as 500 six-byte records but only 56 of them are
@@ -279,6 +442,11 @@ end.
     that is never reached, and the remaining 443 records are pure padding.
     The table was simply declared at a round 500 and filled as far as the
     choreography needed.
+  * Index 0 IS read, once: the last time round the loop WaypointIdx drops to
+    0 and PanX/PanY are loaded from Waypoints[0] before the test ends the
+    loop. In the original that reads the six bytes below the block; here the
+    array starts at 0 so it reads zeros. The values are never used either
+    way -- the loop exits immediately afterwards.
 
   OPEN
   * Nothing outstanding.
