@@ -17,6 +17,8 @@ implementation
 uses VGA, Crt, DemoVT;
 
 const
+  { 1082:00BB and 1082:05BB both pass 10 -- the delay between fade frames. }
+  FadePause   = 10;
   CometFrames = 10;
   CometW      = 65;
   CometH      = 48;
@@ -53,19 +55,26 @@ var
       15,104  the font, 59 glyphs of 16 x 16 (59 * 256)
 
   Between the screen read and the font read it blanks all 256 DAC entries,
-  shows the screen, then lays a RED ramp over entries 1..121 (R := I div 2)
-  and shows it again -- which is the fade-up onto the title backdrop.
+  shows the screen, FADES UP to the palette it just loaded, and only then
+  lays a RED ramp over entries 1..121 (R := I div 2) and shows it again.
+
+  THE FADE-UP IS 1491:0215, a 64-step walk with Delay(10) between frames.
+  An earlier version of this file did a plain SetPalette here, so the
+  backdrop appeared instantly instead of coming up out of black. The
+  matching fade-DOWN at the end of the scene was missing too -- see Scene2.
+
+  The font block is GetMem'd LATE, after the fade, which is the original's
+  order (1082:03A0) and is why it is not with the other three.
   -------------------------------------------------------------------------- }
 procedure Load;
 var
   F : file;
   I : Integer;
 begin
-  GetMem(WorkBuf,   SizeOf(TWorkBuf));
+  GetMem(WorkBuf,   SizeOf(TWorkBuf));        { 1082:0000 }
   GetMem(Backdrop,  64000);
   BackdropSeg := Seg(Backdrop^);
   GetMem(CometBank, SizeOf(TCometBank));
-  GetMem(FontBuf,   SizeOf(TFontBuf));
 
   Assign(F, 'neurosis.dat');
   Reset(F, 1);
@@ -76,19 +85,20 @@ begin
   ClearScreen($A000, 0);
   BlockRead(F, Mem[VirtScrSeg : 0], 64000);
 
-  { Blank, show, then fade UP to the palette just loaded -- 1491:0215 with a
-    step of 10. Only after that does the red ramp go over entries 1..121.
+  { Blank, show, then fade UP to the palette just loaded. Only after that
+    does the red ramp go over entries 1..121.
 
     An earlier version blanked the DAC and set nothing but the ramp, which
     left colours 122..255 BLACK. Most of the backdrop is in that range, so the
     scene ran correctly and displayed nothing. }
-  for I := 0 to 255 do SetRGB(I, 0, 0, 0);
-  CopyScreen(VirtScrSeg, $A000);
-  SetPalette;                                     { the fade's destination }
-  for I := 1 to 121 do SetRGB(I, I div 2, 0, 0);  { the red ramp over it }
+  for I := 0 to 255 do SetRGB(I, 0, 0, 0);        { 1082:0086 }
+  CopyScreen(VirtScrSeg, $A000);                  { 1082:00B0 }
+  PaletteFadeUp(@Palette, FadePause);             { 1082:00BB -- 1491:0215 }
+  for I := 1 to 121 do SetRGB(I, I div 2, 0, 0);  { 1082:00C6, the red ramp }
   CopyScreen(VirtScrSeg, $A000);
   CopyScreen(VirtScrSeg, BackdropSeg);            { keep a clean copy }
 
+  GetMem(FontBuf, SizeOf(TFontBuf));              { 1082:03A0 -- late }
   BlockRead(F, FontBuf^, SizeOf(TFontBuf));
   Close(F);
 end;
@@ -408,10 +418,11 @@ end;
 
 procedure Scene2;
 begin
-  Load;
-  ShowWord('ASPHYXIA');
-  ShowWord('PRESENTS');
-  Unload;
+  Load;                                   { 1082:0000 }
+  ShowWord('ASPHYXIA');                   { 1082:0592 }
+  ShowWord('PRESENTS');                   { 1082:059D }
+  PaletteFadeOut(FadePause);              { 1082:05BB -- 1491:0330 }
+  Unload;                                 { 1082:05C1, four FreeMems }
 end;
 
 end.

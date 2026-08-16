@@ -41,6 +41,9 @@
   The orders below are read off the disassembly and are the originals.
   =========================================================================== }
 
+{$G+}   { 286 instructions: REP OUTSB and REP INSB in the palette routines.
+          The original targets 386 and above. }
+
 unit VGA;
 
 interface
@@ -87,6 +90,16 @@ procedure FlushKeys;
 procedure SetPalette;
 procedure GetPalette;
 procedure DrawLine(X1, Y1, X2, Y2 : Integer; Colour : Byte; Segment : Word);
+
+{ The palette machinery. These are part 001's copy of the unit (segment 1491)
+  and are NOT in part 003's (12f8/1192), which is what this file was first
+  transcribed from -- so they were missing altogether until part 001 scene 2
+  turned out to have no fade at either end. }
+procedure SetPalette768(P : Pointer);                far;   { 1491:01C2 }
+procedure GetPalette768(P : Pointer);                far;   { 1491:01DA }
+procedure PaletteDim(P : Pointer);                   far;   { 1491:01F2 }
+procedure PaletteFadeUp(P : Pointer; Pause : Word);  far;   { 1491:0215 }
+procedure PaletteFadeOut(Pause : Word);              far;   { 1491:0330 }
 
 procedure PutPixel(X, Y : Word; Colour : Byte; Segment : Word); far;
 procedure SetRGB(Col, R, G, B : Byte); far;
@@ -193,6 +206,90 @@ asm
   IN   AL, DX           { blue                                              }
   LES  DI, B            { ES:DI := @B                                       }
   STOSB                 { store it                                          }
+end;
+
+{ --------------------------------------------------------------------------
+  1491:01C2 -- out $3C8 := 0 then REP OUTSB 768 bytes from P^.
+
+  Byte for byte P2VGA's 1436:0083. Note it does NOT wait for retrace; the
+  callers that care do that themselves, which is why both fades below have an
+  explicit WaitRetrace in the loop.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      Port[$3C8] := 0;
+      for I := 0 to 767 do Port[$3C9] := TPal768(P^)[I];
+
+  REP OUTSB is one instruction for the whole 768; the Pascal loop is several
+  per byte and shows as a visible step on a fade.
+  -------------------------------------------------------------------------- }
+procedure SetPalette768(P : Pointer); assembler;
+asm
+  PUSH DS               { DS is about to point at the caller's buffer       }
+  LDS  SI, P            { DS:SI := the 768-byte palette                     }
+  MOV  DX, $3C8         { the DAC WRITE index register                      }
+  MOV  AL, 0            { start at colour 0                                 }
+  OUT  DX, AL           { select it -- the DAC auto-increments from here    }
+  INC  DX               { DX := $3C9, the DAC data register                 }
+  MOV  CX, $300         { 768 bytes = 256 entries of R, G, B                }
+  REP  OUTSB            { write them all out from DS:SI                     }
+  POP  DS               { restore our data segment                          }
+end;
+
+{ --------------------------------------------------------------------------
+  1491:01DA -- out $3C7 := 0 then REP INSB 768 bytes into P^.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      Port[$3C7] := 0;
+      for I := 0 to 767 do TPal768(P^)[I] := Port[$3C9];
+  -------------------------------------------------------------------------- }
+procedure GetPalette768(P : Pointer); assembler;
+asm
+  LES  DI, P            { ES:DI := where the palette is to go               }
+  MOV  DX, $3C7         { the DAC READ index register                       }
+  MOV  AL, 0            { start at colour 0                                 }
+  OUT  DX, AL           { select it                                         }
+  ADD  DX, 2            { DX := $3C9, the DAC data register                 }
+  MOV  CX, $300         { 768 bytes                                         }
+  REP  INSB             { read them all in to ES:DI                         }
+end;
+
+{ --------------------------------------------------------------------------
+  1491:01F2 -- walk 768 bytes; every NON-ZERO one is decremented in place and
+  written back, zeroes are stepped over (the JZ at 1491:0202 skips the STOSB
+  and just bumps DI). One step of a fade held in a palette buffer.
+
+  It reads and writes the SAME buffer through two segment registers -- LES DI
+  and LDS SI are both loaded from the one parameter -- so SI runs one byte
+  ahead of DI and each decrement lands back where it came from.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      for I := 0 to 767 do
+        if TPal768(P^)[I] <> 0 then Dec(TPal768(P^)[I]);
+  -------------------------------------------------------------------------- }
+procedure PaletteDim(P : Pointer); assembler;
+asm
+  PUSH DS               { DS becomes the buffer's segment below             }
+  LES  DI, P            { ES:DI := the buffer, for writing                  }
+  LDS  SI, P            { DS:SI := the same buffer, for reading             }
+  MOV  CX, $300         { 768 bytes                                         }
+@@Next:                 { <- once per component                             }
+  LODSB                 { AL := this component; SI moves on                 }
+  OR   AL, AL           { already black?                                    }
+  JZ   @@Skip           {   yes -- leave it alone                           }
+  DEC  AL               { one step darker                                   }
+  STOSB                 { write it back; DI moves on                        }
+  DEC  CX               { one byte done                                     }
+  JNZ  @@Next           { round again                                       }
+  JMP  @@Out            { finished                                          }
+@@Skip:                 { <- the zero case: no store, so bump DI by hand    }
+  INC  DI               { keep DI level with SI                             }
+  DEC  CX               { one byte done                                     }
+  JNZ  @@Next           { round again                                       }
+@@Out:                  { <- both exits                                     }
+  POP  DS               { restore our data segment                          }
 end;
 
 { --------------------------------------------------------------------------
@@ -434,30 +531,80 @@ end;
 { Palette transfer. Port $3C8 selects the entry for writing ($3C7 for
   reading), then $3C9 takes R, G, B in turn and auto-increments, so the whole
   table moves in one burst. }
+{ The no-argument forms are a convenience over the global Palette; the
+  original has only the pointer-taking 1491:01C2 and 1491:01DA. The
+  WaitRetrace here is OURS -- 1491:01C2 does not wait, because the callers
+  that care (both fades below) wait for themselves. }
 procedure SetPalette;
-var
-  I : Integer;
 begin
   WaitRetrace;
-  Port[$3C8] := 0;
-  for I := 0 to 255 do
-  begin
-    Port[$3C9] := Palette[I, 0];
-    Port[$3C9] := Palette[I, 1];
-    Port[$3C9] := Palette[I, 2];
-  end;
+  SetPalette768(@Palette);
 end;
 
 procedure GetPalette;
-var
-  I : Integer;
 begin
-  Port[$3C7] := 0;
-  for I := 0 to 255 do
+  GetPalette768(@Palette);
+end;
+
+{ --------------------------------------------------------------------------
+  1491:0215 -- PaletteFadeUp(P, Pause). Compiled Pascal in the binary
+  (ENTER $602: two 768-byte buffers and two counters).
+
+  Copies the target palette into a local, blanks a second one, and then walks
+  every component of the second UP toward the first by one a step, showing it
+  after each. 64 steps with Delay(Pause) between them.
+
+  Because it steps by one and stops when it matches, a component that starts
+  at 63 takes all 64 steps and one at 10 arrives after 10 -- so dark colours
+  land early and the bright ones keep climbing. That is what gives the fade
+  its shape rather than a flat linear ramp.
+  -------------------------------------------------------------------------- }
+procedure PaletteFadeUp(P : Pointer; Pause : Word);
+var
+  Target : TPalette;              { [BP-$302] }
+  Cur    : TPalette;              { [BP-$602] }
+  Step   : Byte;                  { [BP-$604] }
+  I      : Byte;                  { [BP-$603] }
+begin
+  Move(P^, Target, SizeOf(Target));          { 1491:0219 }
+  FillChar(Cur, SizeOf(Cur), 0);              { 1491:0232 -- start from black }
+  for Step := 0 to $3F do
   begin
-    Palette[I, 0] := Port[$3C9];
-    Palette[I, 1] := Port[$3C9];
-    Palette[I, 2] := Port[$3C9];
+    for I := 0 to 255 do
+    begin
+      if Cur[I, 0] < Target[I, 0] then Inc(Cur[I, 0]);
+      if Cur[I, 1] < Target[I, 1] then Inc(Cur[I, 1]);
+      if Cur[I, 2] < Target[I, 2] then Inc(Cur[I, 2]);
+    end;
+    WaitRetrace;                              { 1491:0300 }
+    SetPalette768(@Cur);                      { 1491:0306 }
+    Delay(Pause);                             { 1491:0311 }
+  end;
+end;
+
+{ --------------------------------------------------------------------------
+  1491:0330 -- PaletteFadeOut(Pause). Compiled Pascal (ENTER $302).
+
+  Reads the live DAC back, then 64 rounds of show-then-darken with
+  Delay(Pause) between them. Note the order: it SHOWS the buffer and then
+  dims it, so the first frame is the palette exactly as it was and the last
+  is 63 steps down -- not quite black if anything started above 63, which
+  nothing does.
+
+  Called once in the whole demo, from Demo_Scene2 at 1082:05BB with Pause=10.
+  -------------------------------------------------------------------------- }
+procedure PaletteFadeOut(Pause : Word);
+var
+  Buf  : TPalette;                { [BP-$302] }
+  Step : Byte;                    { [BP-$303] }
+begin
+  GetPalette768(@Buf);                        { 1491:033B }
+  for Step := 0 to $3F do
+  begin
+    WaitRetrace;                              { 1491:034A }
+    SetPalette768(@Buf);                      { 1491:0354 }
+    PaletteDim(@Buf);                         { 1491:035E }
+    Delay(Pause);                             { 1491:0364 }
   end;
 end;
 
