@@ -1,0 +1,176 @@
+
+   ÜÜÄÄÄÜÜ  ÜÜÄÄÄÜÜ  ÜÜ   ÜÜ  ÜÜÄÄÄÜÜ  ÜÜ   ÜÛ  ÜÜÄÄÄÜÜ
+   ÛÛ   ÛÛ  ÛÛ       ÛÛ   ÛÛ  ÛÛ   ßß ÄÛÛÄÄÄÛÛ  ÛÛ   ÛÛ
+  ÄÛÛÄÄÄßß  ßßÄÄÄÜÜ  ßßÄÄÄÛÛ  ÛÛ       ÛÛ   ÛÛ  ÛÛ   ÛÛ
+   ÛÛ       ÜÜ   ÛÛ       ÛÛ  ÛÛ   ÜÜ  ÛÛ   ÛÛ  ÛÛ   ÛÛ
+   ßß       ßßßßßßß   ßßßßßß  ßßßßßßß  Ûß   ßß  ßßßßßßß
+          ÜÜÄÄÄÜ   ÜÜÄÄÄÜÜ ÄÜÜ   ÜÜ ÄÄÄÄÄÄÜÜ  ÜÜÄÄÄÜÜ  ÜÜÄÄÄÜÜ  ÜÜ  ÜÜÄÄÄÜÜ
+          ÛÛ   ÛÛ  ßÛÄ  ßß  ÛÛ   ÛÛ  ÛÛÄÄÜÛß  ÛÛ   ÛÛ  ÛÛ       ÛÛ  ÛÛ
+          ÛÛ   ÛÛ  ÛÛ   ÜÜ  ÛÛ   ÛÛ  ÛÛ  ÛÛ   ÛÛ   ÛÛ  ßßÄÄÄÜÜ  ÛÛ  ßßÄÄÄÜÜ
+          ÛÛ   ÛÛ  ÛÛ    Û  ÛÛ   ÛÛ  ÛÛ  ÛÛÜ  ÛÛ   ÛÛ  ÜÜ   ÛÛ  ÛÛ  ÜÜ   ÛÛ
+          ßß   ßß  ßßßßßßß  ßßßßßßß  ßß   ßß  ßßßßßßß  ßßßßßßß  ßß  ßßßßßßß
+ ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
+
+Welcome to Asphyxia's first MegaDemo. This demo has been a long time in
+coming, through much toil, hardship and in-fighting we've finally made it!
+
+
+
+                                   Index!
+                                   ÄÄÄÄÄÄ
+
+                            1. Running the demo.
+
+                                 2. Credits.
+
+                              3. Asphyxia Info.
+
+
+
+
+
+
+
+
+
+                            1. Running the demo.
+                            ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
+
+
+
+Right in order to run this demo you need LOTS of memory, well not really,
+but make sure that you have about 600k free. Also make sure that unless you
+REALLY need it, that you don't use a memory manager - this slows the demo
+down, and is generally a bhaaaad idea. The demo features quite a few mods,
+so a Soundblaster/Soundblaster-Pro/SB-16/Gravis Ultra Sound would be a good
+idea. Though don't worry - there's a 'NoSound' option for weenies,
+shit happens :-).
+
+Oh yes, I almost forgot, if you don't have a 386 :
+
+
+              ÚÄ¿     ÚÄ¿  ÚÄ¿  ÚÄ¿  ÚÄ¿  ÚÄ¿  ÚÄ¿       ÚÄ¿
+            ÚÄÙ ³ÚÄÄÄ¿³ ÀÄ¿³ ÀÄ¿³ ÀÄ¿³ ÀÄ¿³ ÀÄ¿³ ÀÄ¿ÚÄÄÄ¿³ À¿
+            ³ Ä ³³ ÍÄ´³   ³³   ³³   ³³   ³³   ³³   ³³ ÚÄÙ³ ÄÁ¿
+            ÀÄÄÄÙÀÄÄÄÙÀÄÁÄÙÀÄÁÄÙÀÄÁÄÙÀÄÁÄÙÀÄÁÄÙÀÄÁÄÙÀÄÙ  ÀÄÄÄÙ
+            Ü  Ü  ÜÜ  Ü  Ü     Ü     ÜÜ   ÜÜ   ÜÜ   ÜÜÜ  ÜÜÜ Ü
+            ßÜÜß Û  Û Û  Û     Û    Û  Û Û  Û Û  Û ßÜÜ  ÛÜÜ  Û
+             Şİ  ßÜÜß ßÜÜß     ßÜÜÜ ßÜÜß ßÜÜß ßÜÜß ÜÜÜß ßÜÜÜ Ü
+
+
+             ÉÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍ»
+             ºOh yes, one more thing, this is a _VGA_ demo, º
+             ºso those with herc/cga/generally rubbish videoº
+             ºcards/displays - please go to your nearest    º
+             ºcomputer store, _directly_ to your nearest    º
+             ºcomputer store, collect dad's credit card     º
+             ºand do not even TRY running this demo!        º
+             ÈÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍ¼
+
+
+
+
+
+
+
+
+
+                                 2. Credits
+                                 ÄÄÄÄÄÄÄÄÄÄ
+
+
+Firstly we would like to thank Dudley Marcus, the SysOp of the Asphyxia BBS
+for putting up with all of our rubbish, for running an _excellent_ BBS, and
+for having the patience to wait for this demo!
+
+Secondly we would like to credit and thank JCAB of Iguana/VangeliSTeam
+for his excellent mod playing engine - DemoVT. Democoders: If you don't have
+it GET IT! We have written a pascal interface for this which will be
+released shortly, which brings me to...
+
+MAJOR thanx to Split, for help, and advice. Couldn't have done it without
+you dude!
+
+Also, as always, personal thanx go from me (EzE) to Greg Mahlknecht, the
+PlopMeister for all his help through the years.
+
+Thanks from Denthor go to Dreaden of VLA, for the contact info he's given
+me.
+
+Thanks from GoTH must go to :
+   GoTH - for putting up with me for so long!
+          * Damn, you're a Way Cool Dude *
+   And of course "the MENTOR", Greg Mahlknecht.
+
+
+Thanx from Fubar go to M. Blewitt of the University of Natal Durban (BIS
+department) for screwing up my test and therefore exam results, resulting in
+a pain in the ass week, an extra 600 km on my bike, and general hell. Way to
+go dude (not).
+
+
+And finally thanks to all the supporters of Asphyxia, and to the detractors
+without whom we wouldn't have someones arse to kick.
+
+         " and to all those opposed...
+           hmmmm.... well..            "
+
+                                          - G 'n F 'n R -> Get In The Ring.
+
+
+
+
+
+
+
+
+
+
+
+                              3. Asphyxia Info.
+                              ÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ
+
+
+We can be contacted at the following addresses :-
+
+
+
+
+                                  Internet.
+                                  ÄÄÄÄÄÄÄÄÄ
+
+EzE       : eze@beastie.cs.und.ac.za
+GoTH      : bailey@beastie.cs.und.ac.za
+Denthor   : smith0@beastie.cs.und.ac.za
+Fubar     : maybe this year...
+
+
+                                   BBS's.
+                                   ÄÄÄÄÄÄ
+
+Asphyxia BBS            : +0903 (031) 765-5312
+                          +0903 (031) 765-6293
+                          +0903 (031) 765-6292
+
+                           Under the names :-
+                           Peter Edwards,
+                           Grant Smith,
+                           Brian Bailey.
+
+
+
+Connectix BBS           : +0903 (031) 266-9992
+
+                           Under the names :-
+                           EzE,
+                           GoTH,
+                           Denthor,
+                           Fubar.
+
+
+Check the Asphyxia BBS for Asphyxia Trainers, music, info and demos.
+Also in the local S.A. conference RsaPROG leave mail to Peter Edwards, or
+Grant Smith, we like to visit there alot :-).
+
+
+Psycho Neurosis - (c) Asphyxia 1994.

@@ -1,0 +1,1 @@
+D:\DOSBox-X\dosbox-x.exe -conf tools\dosbox\interactive.conf

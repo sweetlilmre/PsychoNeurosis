@@ -1,0 +1,37 @@
+{ ===========================================================================
+  Test harness for part 002 scene 1 -- the garage: pan, door, stars.
+
+  Needs NEUROSIS.DAT in the current directory, so run it from run\.
+
+  Build:  python tools/dosbox/dosbuild.py TP2S1
+  =========================================================================== }
+
+program TP2S1;
+
+uses Crt, P2VGA, P2ModeX, P2VT, P2S1;
+
+var
+  F : file;
+begin
+  Assign(F, 'neurosis.dat');
+  {$I-} Reset(F, 1); {$I+}
+  if IOResult <> 0 then
+  begin
+    WriteLn('TP2S1: neurosis.dat not found in the current directory.');
+    WriteLn('       Run this from the run\ folder.');
+    Halt(1);
+  end;
+  Close(F);
+
+  WriteLn('part 002 scene 1 -- the garage: 1280-wide pan, door, starfield');
+  WriteLn('Press a key to start.');
+  ReadKey;
+
+  VirtScrAlloc;        { 1436:0006, what the main body does before the scene }
+  Scene1;
+  VirtScrFree;         { 1436:0033 }
+
+  Port[$3C8] := 0;
+  TextMode(CO80);
+  WriteLn('Done.');
+end.

@@ -1,0 +1,35 @@
+{ ===========================================================================
+  Test harness for part 002 scene 2 -- solid 3-D objects over a starfield.
+
+  Needs NEUROSIS.DAT in the current directory, so run it from run\.
+
+  Build:  python tools/dosbox/dosbuild.py TP2S2
+  =========================================================================== }
+
+program TP2S2;
+
+uses Crt, P2VGA, P2View, P2Fix, P2VT, P2S2;
+
+var
+  F : file;
+begin
+  Assign(F, 'neurosis.dat');
+  {$I-} Reset(F, 1); {$I+}
+  if IOResult <> 0 then
+  begin
+    WriteLn('TP2S2: neurosis.dat not found in the current directory.');
+    WriteLn('       Run this from the run\ folder.');
+    Halt(1);
+  end;
+  Close(F);
+
+  WriteLn('part 002 scene 2 -- solid vectors, starfield, typed banner');
+  WriteLn('Press a key to start.');
+  ReadKey;
+
+  Scene2;
+
+  Port[$3C8] := 0;
+  TextMode(CO80);
+  WriteLn('Done.');
+end.

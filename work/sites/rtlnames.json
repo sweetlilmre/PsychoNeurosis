@@ -1,0 +1,97 @@
+{
+ "000": {
+  "28a": "RTL_GetMem",
+  "29f": "RTL_FreeMem",
+  "0": "RTL_SystemInit",
+  "116": "RTL_Halt"
+ },
+ "001": {
+  "28a": "RTL_GetMem",
+  "29f": "RTL_FreeMem",
+  "d2e": "RTL_Random",
+  "ed7": "RTL_FillChar",
+  "347b": "RTL_FileAssign",
+  "3537": "RTL_FileClose",
+  "35a1": "RTL_FileBlockRead",
+  "3609": "RTL_FileSeek",
+  "0": "RTL_SystemInit",
+  "116": "RTL_Halt"
+ },
+ "002": {
+  "28a": "RTL_GetMem",
+  "29f": "RTL_FreeMem",
+  "d2e": "RTL_Random",
+  "ed7": "RTL_FillChar",
+  "347b": "RTL_FileAssign",
+  "3537": "RTL_FileClose",
+  "35a1": "RTL_FileBlockRead",
+  "3609": "RTL_FileSeek",
+  "0": "RTL_SystemInit",
+  "116": "RTL_Halt"
+ },
+ "003": {
+  "0": "RTL_SystemInit",
+  "116": "RTL_Halt",
+  "28a": "RTL_GetMem",
+  "29f": "RTL_FreeMem",
+  "cd3": "RTL_Random",
+  "e7c": "RTL_FillChar",
+  "320d": "RTL_RoundToInt",
+  "3420": "RTL_FileAssign",
+  "345b": "RTL_FileReset",
+  "34dc": "RTL_FileClose",
+  "3501": "RTL_FileCheckOpen",
+  "3546": "RTL_FileBlockRead",
+  "35ae": "RTL_FileSeek"
+ },
+ "004": {
+  "28a": "RTL_GetMem",
+  "29f": "RTL_FreeMem",
+  "8ce": "RTL_FileAssign",
+  "98a": "RTL_FileClose",
+  "9f4": "RTL_FileBlockRead",
+  "a5c": "RTL_FileSeek",
+  "0": "RTL_SystemInit",
+  "116": "RTL_Halt"
+ },
+ "005": {
+  "28a": "RTL_GetMem",
+  "29f": "RTL_FreeMem",
+  "d2e": "RTL_Random",
+  "ed7": "RTL_FillChar",
+  "347b": "RTL_FileAssign",
+  "3537": "RTL_FileClose",
+  "35a1": "RTL_FileBlockRead",
+  "3609": "RTL_FileSeek",
+  "0": "RTL_SystemInit",
+  "116": "RTL_Halt"
+ },
+ "006": {
+  "28a": "RTL_GetMem",
+  "29f": "RTL_FreeMem",
+  "cd3": "RTL_Random",
+  "e7c": "RTL_FillChar",
+  "3420": "RTL_FileAssign",
+  "34dc": "RTL_FileClose",
+  "3546": "RTL_FileBlockRead",
+  "35ae": "RTL_FileSeek",
+  "0": "RTL_SystemInit",
+  "116": "RTL_Halt"
+ },
+ "007": {
+  "28a": "RTL_GetMem",
+  "29f": "RTL_FreeMem",
+  "cd3": "RTL_Random",
+  "e7c": "RTL_FillChar",
+  "3623": "RTL_FileAssign",
+  "36df": "RTL_FileClose",
+  "3749": "RTL_FileBlockRead",
+  "37b1": "RTL_FileSeek",
+  "0": "RTL_SystemInit",
+  "116": "RTL_Halt"
+ },
+ "009": {
+  "0": "RTL_SystemInit",
+  "116": "RTL_Halt"
+ }
+}

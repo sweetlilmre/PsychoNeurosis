@@ -1,0 +1,19 @@
+# Compiler scratch. dosbuild.py wipes this at the start of every invocation,
+# so nothing here survives a build of anything else.
+build/
+
+# A writable copy of bin/ plus the built harnesses. Reproduce it with
+#   cp bin/* run/   and a build; dosbuild.py installs the .EXEs into it.
+run/
+
+# The Ghidra project -- 53 MB, holds live .lock files, and is rebuilt by
+# importing work/split/*.exe. The analysis itself lives in docs/ and src/.
+work/ghidra/
+
+__pycache__/
+*.pyc
+*.bak
+
+# Local tooling config -- machine-specific paths, not part of the project.
+.mcp.json
+.claude/

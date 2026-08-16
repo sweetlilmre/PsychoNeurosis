@@ -1,0 +1,157 @@
+staged 15 file(s) into build/: VGA.PAS, DEMOVT.PAS, P1INTRO.PAS, P2HOUSE.PAS, P3TUNNEL.PAS, P3STARS.PAS, P3MORPH.PAS, P3GLOBE.PAS, P3BLOCKS.PAS, P3WAVES.PAS, P3SPRITE.PAS, P4LEMS.PAS, P5ROTO.PAS, P6CRED.PAS, P7FLIC.PAS
+=== TPC build
+
+---- VGA.PAS
+Turbo Pascal  Version 7.0  Copyright (c) 1983,92 Borland International
+VGA.PAS(1)
+VGA.PAS(1)
+VGA.PAS(63)
+VGA.PAS(242)
+VGA.PAS(242)
+242 lines, 0.3 seconds, 294 bytes code, 402 bytes data.
+** OK
+
+---- DEMOVT.PAS
+Turbo Pascal  Version 7.0  Copyright (c) 1983,92 Borland International
+DEMOVT.PAS(1)
+DEMOVT.PAS(1)
+DEMOVT.PAS(179)
+DEMOVT.PAS(179)
+179 lines, 0.1 seconds, 334 bytes code, 12 bytes data.
+** OK
+
+---- P1INTRO.PAS
+Turbo Pascal  Version 7.0  Copyright (c) 1983,92 Borland International
+P1INTRO.PAS(1)
+P1INTRO.PAS(1)
+GEN\P1VECT.INC(1)
+GEN\P1VECT.INC(63)
+P1INTRO.PAS(40)
+P1INTRO.PAS(79): Error 3: Unknown identifier.
+  LoadLogo;                             { palette + 320x200 screen }
+  ^** FAILED
+
+---- P2HOUSE.PAS
+Turbo Pascal  Version 7.0  Copyright (c) 1983,92 Borland International
+P2HOUSE.PAS(1)
+P2HOUSE.PAS(1)
+GEN\P2OBJ.INC(1)
+GEN\P2OBJ.INC(192)
+GEN\P2OBJ.INC(208)
+P2HOUSE.PAS(39)
+P2HOUSE.PAS(76): Error 86: ":" expected.
+            assets/part002/house_plane0.raw       64,000 B  } four Mode-X
+                                                                   ^** FAILED
+
+---- P3TUNNEL.PAS
+Turbo Pascal  Version 7.0  Copyright (c) 1983,92 Borland International
+P3TUNNEL.PAS(1)
+P3TUNNEL.PAS(1)
+GEN\P3PAL.INC(1)
+GEN\P3PAL.INC(73)
+P3TUNNEL.PAS(108)
+P3TUNNEL.PAS(135): Error 76: Constant out of range.
+  FillChar(Mem[$A000:0], 65536, 0);          { clear all 256K at once }
+                              ^** FAILED
+
+---- P3STARS.PAS
+Turbo Pascal  Version 7.0  Copyright (c) 1983,92 Borland International
+P3STARS.PAS(1)
+P3STARS.PAS(1)
+P3STARS.PAS(127): Error 3: Unknown identifier.
+  SetMode13h;
+  ^** FAILED
+
+---- P3MORPH.PAS
+Turbo Pascal  Version 7.0  Copyright (c) 1983,92 Borland International
+P3MORPH.PAS(1)
+P3MORPH.PAS(1)
+GEN\P3SINE.INC(1)
+GEN\P3SINE.INC(54)
+P3MORPH.PAS(97)
+GEN\P3SHAPE.INC(1)
+GEN\P3SHAPE.INC(53)
+GEN\P3SHAPE.INC(980)
+GEN\P3SHAPE.INC(1163)
+P3MORPH.PAS(98)
+P3MORPH.PAS(189): Error 3: Unknown identifier.
+    SX := ((X - XCentre) * ProjScale) div D;
+                ^** FAILED
+
+---- P3GLOBE.PAS
+Turbo Pascal  Version 7.0  Copyright (c) 1983,92 Borland International
+P3GLOBE.PAS(1)
+P3GLOBE.PAS(1)
+P3GLOBE.PAS(85): Error 3: Unknown identifier.
+  BlockRead(F, Target,  PaletteSize);
+            ^** FAILED
+
+---- P3BLOCKS.PAS
+Turbo Pascal  Version 7.0  Copyright (c) 1983,92 Borland International
+P3BLOCKS.PAS(1)
+P3BLOCKS.PAS(1)
+P3BLOCKS.PAS(72): Error 3: Unknown identifier.
+  ClearVirtual;
+  ^** FAILED
+
+---- P3WAVES.PAS
+Turbo Pascal  Version 7.0  Copyright (c) 1983,92 Borland International
+P3WAVES.PAS(1)
+P3WAVES.PAS(1)
+P3WAVES.PAS(53): Error 2: Identifier expected.
+  Curve  : ^array[0..Curves - 1, 0..CurveSteps - 1] of Integer;  { 36414 B }
+            ^** FAILED
+
+---- P3SPRITE.PAS
+Turbo Pascal  Version 7.0  Copyright (c) 1983,92 Borland International
+P3SPRITE.PAS(1)
+P3SPRITE.PAS(1)
+GEN\P3CAPT.INC(1)
+GEN\P3CAPT.INC(51)
+P3SPRITE.PAS(29)
+P3SPRITE.PAS(81): Error 3: Unknown identifier.
+  BlockRead(F, Header, HeaderSize);
+               ^** FAILED
+
+---- P4LEMS.PAS
+Turbo Pascal  Version 7.0  Copyright (c) 1983,92 Borland International
+P4LEMS.PAS(1)
+P4LEMS.PAS(1)
+P4LEMS.PAS(120): Error 3: Unknown identifier.
+      if Y > 199 then Remove(I);           { fell off the bottom }
+                      ^** FAILED
+
+---- P5ROTO.PAS
+Turbo Pascal  Version 7.0  Copyright (c) 1983,92 Borland International
+P5ROTO.PAS(1)
+P5ROTO.PAS(1)
+GEN\P5MESH.INC(1)
+GEN\P5MESH.INC(95)
+GEN\P5MESH.INC(657)
+P5ROTO.PAS(25)
+P5ROTO.PAS(65): Error 3: Unknown identifier.
+  LoadPaletteAndScreen($1549E5);
+  ^** FAILED
+
+---- P6CRED.PAS
+Turbo Pascal  Version 7.0  Copyright (c) 1983,92 Borland International
+P6CRED.PAS(1)
+P6CRED.PAS(1)
+GEN\P6TEXT.INC(1)
+GEN\P6TEXT.INC(112)
+P6CRED.PAS(25)
+GEN\P6CELL.INC(1)
+GEN\P6CELL.INC(490)
+P6CRED.PAS(26)
+P6CRED.PAS(37): Error 3: Unknown identifier.
+    DrawLine(I, 199 - I * 6, 0, 0, 320 - I * 2);
+    ^** FAILED
+
+---- P7FLIC.PAS
+Turbo Pascal  Version 7.0  Copyright (c) 1983,92 Borland International
+P7FLIC.PAS(1)
+P7FLIC.PAS(1)
+P7FLIC.PAS(77): Error 3: Unknown identifier.
+  FlicInit;
+  ^** FAILED
+

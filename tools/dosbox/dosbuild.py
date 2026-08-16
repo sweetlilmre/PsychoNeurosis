@@ -1,0 +1,319 @@
+"""Compile the reconstruction with the real Turbo Pascal 7.01, under DOSBox-X.
+
+The reconstruction is written in Pascal but has never been through a compiler,
+so "does it build" has never been asked. This asks it.
+
+    python tools/dosbox/dosbuild.py --selftest    prove the toolchain works
+    python tools/dosbox/dosbuild.py               stage + compile the real source
+    python tools/dosbox/dosbuild.py VGA           compile one unit
+
+Everything is staged into build/ with 8.3 names because TP7 is a real-mode DOS
+tool: DOS filenames are 8.3, so PART3_SPRITES.PAS has to become P3SPRITE.PAS,
+and the `uses` clauses and {$I} directives are rewritten to match.
+
+DOSBox-X is a GUI application and writes nothing to stdout, so the compiler's
+output is redirected to a file INSIDE the mounted drive and read back from the
+host afterwards.
+"""
+import re
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+BUILD = ROOT / "build"
+CONF = ROOT / "tools" / "dosbox" / "psycho.conf"
+DOSBOX = Path(r"D:\DOSBox-X\dosbox-x.exe")
+
+# Reconstruction source -> 8.3 DOS name. The unit name inside each file is the
+# Pascal identifier and is independent of the filename, but TP7 finds units BY
+# FILENAME, so `uses Part3Sprites` must become `uses P3Sprite`.
+NAMES = {
+    "VGA.PAS":        ("VGA.PAS",      "VGA",           "VGA"),
+    "DEMOVT.PAS":     ("DEMOVT.PAS",   "DemoVT",        "DemoVT"),
+
+    # part 001 -- one unit per scene, plus a driver
+    "P1S1.PAS":       ("P1S1.PAS",     "P1S1",          "P1S1"),
+    "P1S2.PAS":       ("P1S2.PAS",     "P1S2",          "P1S2"),
+    "P1S3.PAS":       ("P1S3.PAS",     "P1S3",          "P1S3"),
+    "P1S4.PAS":       ("P1S4.PAS",     "P1S4",          "P1S4"),
+    "P1S5.PAS":       ("P1S5.PAS",     "P1S5",          "P1S5"),
+    "P1INTRO.PAS":    ("P1INTRO.PAS",  "P1Intro",       "P1Intro"),
+
+    "PART2.PAS":      ("P2HOUSE.PAS",  "Part2",         "P2House"),
+
+    # part 002 -- one unit per scene, plus the three units they share.
+    # Every one of these is transcribed from NEUROSIS_002_fpu.exe; the
+    # segment each came from is in its header comment.
+    "P2VGA.PAS":      ("P2VGA.PAS",    "P2VGA",         "P2VGA"),
+    "P2MODEX.PAS":    ("P2MODEX.PAS",  "P2ModeX",       "P2ModeX"),
+    "P2VT.PAS":       ("P2VT.PAS",     "P2VT",          "P2VT"),
+    "P2FIX.PAS":      ("P2FIX.PAS",    "P2Fix",         "P2Fix"),
+    "P2VIEW.PAS":     ("P2VIEW.PAS",   "P2View",        "P2View"),
+    "P2S1.PAS":       ("P2S1.PAS",     "P2S1",          "P2S1"),
+    "P2S2.PAS":       ("P2S2.PAS",     "P2S2",          "P2S2"),
+    "TP2S1.PAS":      ("TP2S1.PAS",    "TP2S1",         "TP2S1"),
+    "TP2S2.PAS":      ("TP2S2.PAS",    "TP2S2",         "TP2S2"),
+
+    # part 003 -- already one unit per scene
+    "PART3_TUNNEL.PAS":  ("P3TUNNEL.PAS", "Part3Tunnel",  "P3Tunnel"),
+    "PART3_STARS.PAS":   ("P3STARS.PAS",  "Part3Stars",   "P3Stars"),
+    "PART3_MORPH.PAS":   ("P3MORPH.PAS",  "Part3Morph",   "P3Morph"),
+    "PART3_GLOBE.PAS":   ("P3GLOBE.PAS",  "Part3Globe",   "P3Globe"),
+    "PART3_BLOCKS.PAS":  ("P3BLOCKS.PAS", "Part3Blocks",  "P3Blocks"),
+    "PART3_WAVES.PAS":   ("P3WAVES.PAS",  "Part3Waves",   "P3Waves"),
+    "PART3_SPRITES.PAS": ("P3SPRITE.PAS", "Part3Sprites", "P3Sprite"),
+
+    "PART4_LEMMINGS.PAS": ("P4LEMS.PAS",  "Part4Lemmings", "P4Lems"),
+    "PART5_ROTOZOOM.PAS": ("P5ROTO.PAS",  "Part5Rotozoom", "P5Roto"),
+    "PART6_CREDITS.PAS":  ("P6CRED.PAS",  "Part6Credits",  "P6Cred"),
+    "PART7_FLIC.PAS":     ("P7FLIC.PAS",  "Part7Flic",     "P7Flic"),
+
+    # generated scene harnesses -- see tools/mktests.py
+    "TP1S1.PAS":      ("TP1S1.PAS",    "TP1S1",         "TP1S1"),
+    "TP1S2.PAS":      ("TP1S2.PAS",    "TP1S2",         "TP1S2"),
+    "TP1S3.PAS":      ("TP1S3.PAS",    "TP1S3",         "TP1S3"),
+    "TP1S4.PAS":      ("TP1S4.PAS",    "TP1S4",         "TP1S4"),
+    "TP1S5.PAS":      ("TP1S5.PAS",    "TP1S5",         "TP1S5"),
+    "TP3TUN.PAS":     ("TP3TUN.PAS",   "TP3TUN",        "TP3TUN"),
+    "TP3STR.PAS":     ("TP3STR.PAS",   "TP3STR",        "TP3STR"),
+    "TP3MOR.PAS":     ("TP3MOR.PAS",   "TP3MOR",        "TP3MOR"),
+    "TP3GLB.PAS":     ("TP3GLB.PAS",   "TP3GLB",        "TP3GLB"),
+    "TP3BLK.PAS":     ("TP3BLK.PAS",   "TP3BLK",        "TP3BLK"),
+    "TP3WAV.PAS":     ("TP3WAV.PAS",   "TP3WAV",        "TP3WAV"),
+    "TP3SPR.PAS":     ("TP3SPR.PAS",   "TP3SPR",        "TP3SPR"),
+}
+
+# test harness -> the unit it exercises (see tools/mktests.py)
+HARNESS = {
+    "TP1S1": "P1S1", "TP1S2": "P1S2", "TP1S3": "P1S3",
+    "TP1S4": "P1S4", "TP1S5": "P1S5",
+    "TP3TUN": "P3TUNNEL", "TP3STR": "P3STARS", "TP3MOR": "P3MORPH",
+    "TP3GLB": "P3GLOBE", "TP3BLK": "P3BLOCKS", "TP3WAV": "P3WAVES",
+    "TP3SPR": "P3SPRITE",
+    "TP2S1": "P2S1",
+    "TP2S2": "P2S2",
+    "TESTTUN": "P3TUNNEL",
+}
+
+HELLO = """program Hello;
+{ Toolchain self-test: proves TPC.EXE runs and produces an executable. }
+var
+  I : Integer;
+begin
+  WriteLn('TP7 self-test OK');
+  for I := 1 to 3 do WriteLn('  line ', I);
+end.
+"""
+
+
+def stage_source(text, name83):
+    """Rewrite unit name, uses clauses and include paths for the 8.3 world."""
+    _, unit_old, unit_new = NAMES[name83]
+    # `unit Part3Sprites;` -> `unit P3Sprite;`
+    text = re.sub(r"(?im)^(\s*unit\s+)%s(\s*;)" % re.escape(unit_old),
+                  r"\g<1>%s\g<2>" % unit_new, text)
+    # every other unit referenced in a uses clause
+    for _, (_, old, new) in NAMES.items():
+        text = re.sub(r"(?i)\b%s\b" % re.escape(old), new, text)
+    # {$I gen/P3PAL.INC} -> {$I GEN\P3PAL.INC}
+    text = re.sub(r"(?i)\{\$I\s+gen/([A-Z0-9_]+\.INC)\s*\}",
+                  r"{$I GEN\\\1}", text)
+    return text
+
+
+def prepare(selftest=False):
+    BUILD.mkdir(exist_ok=True)
+    for f in BUILD.glob("*"):
+        if f.is_file():
+            f.unlink()
+    if selftest:
+        (BUILD / "HELLO.PAS").write_text(HELLO, encoding="ascii")
+        return ["HELLO.PAS"]
+
+    gen = BUILD / "GEN"
+    gen.mkdir(exist_ok=True)
+    for f in gen.glob("*"):
+        f.unlink()
+    for inc in (ROOT / "src" / "gen").glob("*.INC"):
+        shutil.copy(inc, gen / inc.name)
+
+    staged = []
+    for src, (name83, _, _) in NAMES.items():
+        p = ROOT / "src" / src
+        if not p.exists():
+            continue
+        # Pascal sources are 7-bit; anything else is a mistake worth seeing.
+        text = p.read_text(encoding="utf-8", errors="replace")
+        (BUILD / name83).write_text(stage_source(text, src), encoding="ascii",
+                                    errors="replace")
+        staged.append(name83)
+    return staged
+
+
+USES = re.compile(r"(?is)\buses\b(.*?);")
+
+
+def unit_deps(name83):
+    """The 8.3 names a staged source depends on, from its `uses` clauses.
+
+    Reads the STAGED copy in build/, so the names have already been rewritten
+    to their 8.3 form and match the filenames on disk. Units TP7 ships with
+    (Crt, Dos, System, ...) simply do not exist in build/ and drop out.
+    """
+    p = BUILD / name83
+    if not p.exists():
+        return []
+    text = p.read_text(encoding="latin1", errors="replace")
+    # strip comments so a `uses` inside one cannot pull in a phantom
+    text = re.sub(r"(?s)\{.*?\}|\(\*.*?\*\)", " ", text)
+    out = []
+    for clause in USES.findall(text):
+        for word in re.split(r"[,\s]+", clause):
+            cand = word.strip().upper()
+            if cand and (BUILD / (cand + ".PAS")).exists():
+                out.append(cand + ".PAS")
+    return out
+
+
+def deps_first(sel):
+    """`sel` plus everything it needs, units before the things that use them."""
+    order, seen = [], set()
+
+    def visit(name):
+        if name in seen:
+            return
+        seen.add(name)
+        for d in unit_deps(name):
+            visit(d)
+        order.append(name)
+
+    for t in sel:
+        visit(t)
+    return order
+
+
+def write_batch(targets):
+    """TPC switches that matter here:
+         /E<dir>   where the .EXE goes
+         /U<dirs>  where to LOOK for units (semicolon separated)
+         /I<dirs>  where to look for {$I} includes
+         /M        make -- only recompile what changed
+       There is no /D output switch: /D is conditional DEFINES, and passing a
+       path to it is what produced "Error 130: Error in initial conditional
+       defines" on the first attempt. .TPU files land next to the source.
+    """
+    lines = ["@echo off", "echo === TPC build > D:\\BUILD.LOG"]
+    for t in targets:
+        lines.append("echo. >> D:\\BUILD.LOG")
+        lines.append(f"echo ---- {t} >> D:\\BUILD.LOG")
+        lines.append(f"C:\\TP\\BIN\\TPC.EXE {t} /ED: /UD:;C:\\TP\\UNITS /ID:;D:\\GEN "
+                     f">> D:\\BUILD.LOG")
+        lines.append("if errorlevel 1 echo ** FAILED >> D:\\BUILD.LOG")
+        lines.append("if not errorlevel 1 echo ** OK >> D:\\BUILD.LOG")
+    (BUILD / "BUILD.BAT").write_text("\r\n".join(lines) + "\r\n", encoding="ascii")
+
+
+def run_dosbox(timeout=180):
+    log = BUILD / "BUILD.LOG"
+    if log.exists():
+        log.unlink()
+    cmd = [str(DOSBOX), "-conf", str(CONF), "-silent", "-exit"]
+    try:
+        subprocess.run(cmd, cwd=str(ROOT), timeout=timeout,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except subprocess.TimeoutExpired:
+        return None, "TIMEOUT - dosbox-x did not exit"
+    if not log.exists():
+        return None, "no BUILD.LOG produced - autoexec did not run"
+    return log.read_text(encoding="latin1"), None
+
+
+def main(argv):
+    selftest = "--selftest" in argv
+    only = [a.upper() for a in argv if not a.startswith("-")]
+
+    # Lint FIRST. TP7 reports a nested-comment defect dozens of lines away
+    # from its cause, so catching it here saves a wild goose chase -- this has
+    # bitten three times already.
+    if not selftest:
+        lint = subprocess.run(
+            [sys.executable, str(ROOT / "tools" / "paslint.py")],
+            capture_output=True, text=True)
+        if lint.returncode:
+            print(lint.stdout)
+            print("build refused: fix the above first")
+            return 2
+
+    targets = prepare(selftest)
+    if only and not selftest:
+        # match on the 8.3 stem, e.g. "VGA" or "P3TUNNEL"
+        sel = [t for t in targets if t.split(".")[0] in only]
+        if not sel:
+            print(f"no target matches {only}; known: "
+                  f"{', '.join(t.split('.')[0] for t in targets)}")
+            return 2
+        # prepare() wipes build/, so everything a target depends on has to be
+        # rebuilt even when only that target was asked for. The dependencies
+        # are read out of the staged sources' own `uses` clauses rather than
+        # listed here -- a hardcoded ["VGA.PAS", "DEMOVT.PAS"] silently gave
+        # "Error 15: File not found (P2VGA.TPU)" the moment a part arrived
+        # that uses anything else.
+        targets = deps_first(sel)
+    write_batch(targets)
+
+    print(f"staged {len(targets)} file(s) into build/: {', '.join(targets)}")
+    out, err = run_dosbox()
+    if err:
+        print("FAILED:", err)
+        return 1
+    # Show the source around each failure -- TPC prints the offending line but
+    # not its context, and context is usually what identifies the fix.
+    shown = 0
+    pat = re.compile(r"^([A-Z0-9_\\]+\.(?:PAS|INC))\((\d+)\): (Error .+)$", re.M)
+    for m in pat.finditer(out):
+        fname, line, msg = m.group(1), int(m.group(2)), m.group(3)
+        print("")
+        print(fname + "(" + str(line) + "): " + msg)
+        f = BUILD / fname
+        if f.exists():
+            src = f.read_text(encoding="latin1", errors="replace").splitlines()
+            lo, hi = max(1, line - 4), min(len(src), line + 2)
+            for n in range(lo, hi + 1):
+                mark = ">>" if n == line else "  "
+                print("  %s %4d %s" % (mark, n, src[n - 1].rstrip()))
+        shown += 1
+    if not shown:
+        ok = re.findall(r"^(\d+) lines,", out, re.M)
+        if ok:
+            print("all %d target(s) compiled: %s"
+                  % (len(ok), ", ".join(n + " lines" for n in ok)))
+        else:
+            print(out)
+        install(targets)
+    return 0
+
+
+def install(targets):
+    """Copy every .EXE just built into run/, where the harnesses are run from.
+
+    prepare() wipes build/ at the start of each invocation, so an .EXE only
+    survives until the next build of anything else. Copying it by hand
+    afterwards is a step that is easy to forget and, worse, easy to get away
+    with: run/ still holds the PREVIOUS build under the same name, so the
+    harness launches, behaves like the old code, and the change looks like it
+    did nothing. That happened once already. Do it here instead.
+    """
+    run = ROOT / "run"
+    if not run.is_dir():
+        return
+    for t in targets:
+        exe = BUILD / (t.split(".")[0] + ".EXE")
+        if exe.exists():
+            shutil.copy(exe, run / exe.name)
+            print("  installed run/%s  (%d bytes)" % (exe.name, exe.stat().st_size))
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
