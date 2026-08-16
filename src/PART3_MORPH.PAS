@@ -38,6 +38,10 @@
     VGA_SetPalette768 1139:0335    VGA_GetPalette768     1139:034d
   =========================================================================== }
 
+{$G+}   { 286 instructions: 1139:01d9 is SHR DI,2, and a shift by an
+          immediate other than 1 is a 286 encoding. The original
+          targeted 286+, so enabling this is faithful, not a shortcut. }
+
 unit Part3Morph;
 
 interface
@@ -138,30 +142,21 @@ var
 { --------------------------------------------------------------------------
   SHAPE ADDRESSING
 
-  The original identifies a shape by its absolute DGROUP offset and walks it
-  six bytes at a time: CurShape, MorphFrom and MorphTo all hold $0636, $5136
-  or $63F6, and DrawShape does `MOV BX,[SI] / MOV CX,[SI+2] / MOV DX,[SI+4]`
-  then `ADD SI,6`.
-
-  The shapes are Pascal constants here, so those offsets have to be mapped
-  onto them. An earlier version kept the offsets AND indexed a `Work` array
-  with them -- Work[$0636] on a `array[1..765]` -- and the assembler morph
-  loop dereferenced them as raw DS addresses, reading whatever Turbo Pascal
-  happened to have put at $0636. That is what reduced the scene to a cluster
-  of stray dots: the coordinates were never the shape data at all.
+  The original identifies a shape by its DGROUP offset -- $0636, $5136,
+  $63F6 -- and DrawShape/DrawMorph walk it with SI six bytes at a time.
+  Typed constants live in DGROUP here too, so Ofs() gives exactly the same
+  kind of value and the assembler below stays literal. The three compiled-in
+  offsets cannot be reused verbatim because the compiler decides where it
+  puts these arrays, but nothing else about the addressing changes.
   -------------------------------------------------------------------------- }
-type
-  TShapePtr = ^TShape;
+var
+  OfsSphere, OfsCube, OfsGrid : Word;
 
-function ShapeOf(Slot : Word) : TShapePtr;
+procedure BindShapes;
 begin
-  case Slot of
-    Shape0 : ShapeOf := @ShapeSphere;      { $0636 }
-    Shape4 : ShapeOf := @ShapeCube;        { $5136 }
-    Shape5 : ShapeOf := @ShapeGrid;        { $63F6 }
-  else
-    ShapeOf := @ShapeSphere;
-  end;
+  OfsSphere := Ofs(ShapeSphere);      { $0636 in the original }
+  OfsCube   := Ofs(ShapeCube);        { $5136 }
+  OfsGrid   := Ofs(ShapeGrid);        { $63F6 }
 end;
 
 { [transcribed] VGA_GetPalette768 1139:034d / VGA_SetPalette768 1139:0335 --
@@ -206,6 +201,7 @@ var
   MorphFrom, MorphTo  : Word;      { DS:$BEBC, $BEBE }
   MorphStep           : Integer;   { DS:$BEB8 }
   PageOfs             : Word;      { DS:$BEC0 -- 0 or 80 }
+  Count               : Word;      { DS:$BEC4 -- the point counter }
   Frames              : Integer;   { DS:$BEC2 }
   { DS:$BEC6 -- EIGHT HUNDRED entries, not PageHeight. 1192:0000 fills
     0..$31F regardless of how many rows the mode actually shows. }
@@ -312,82 +308,172 @@ end;
   An earlier version of this used `div 16384`, which is numerically close but
   is not what the code does and rounds the other way on negatives.
   -------------------------------------------------------------------------- }
-type
-  TSplit = record Lo, Hi : Integer end;
-
-function Scale14(P : LongInt) : Integer;
-begin
-  P := P shl 2;
-  Scale14 := TSplit(P).Hi;
-end;
-
-procedure TransformPoint(X, Y, Z : Integer; var SX, SY : Integer);
+{ --------------------------------------------------------------------------
+  1139:0096 -- TransformPoint.  X in BX, Y in CX, Z in DX; SX out in DI,
+  SY out in BX.  Hand assembler in the original and kept as such: it is
+  reached by CALL with the registers already loaded, which is not a calling
+  convention Turbo Pascal can express, and its fixed-point scaling is the
+  SHL AX,1 / RCL DX,1 pair keeping DX -- an arithmetic shift right by 14
+  with no divide anywhere.
+  -------------------------------------------------------------------------- }
+procedure TransformPoint; assembler;
 var
-  T, U, V, D : LongInt;
-begin
-  { rotate about the first axis }
-  T := Scale14(LongInt(Z) * SinX + LongInt(Y) * CosX);
-  U := Scale14(LongInt(Z) * CosX - LongInt(Y) * SinX);
+  LX, LY, LZ, T1, T2 : Integer;    { [BP-2..-6], plus [$BEAA] and [$BEA8] }
+asm
+  MOV  LX, BX
+  MOV  LY, CX
+  MOV  LZ, DX
 
-  { second axis }
-  V := Scale14(LongInt(X) * CosY - U * SinY);
-  U := Scale14(U * CosY + LongInt(X) * SinY);
+  MOV  CX, [CosX]                  { about the first axis }
+  MOV  BX, [SinX]
+  MOV  AX, LY
+  IMUL CX
+  MOV  SI, AX
+  MOV  DI, DX
+  MOV  AX, LZ
+  IMUL BX
+  ADD  AX, SI
+  ADC  DX, DI
+  SHL  AX, 1
+  RCL  DX, 1
+  SHL  AX, 1
+  RCL  DX, 1
+  MOV  T1, DX
+  MOV  AX, LY
+  IMUL BX
+  MOV  SI, AX
+  MOV  DI, DX
+  MOV  AX, LZ
+  IMUL CX
+  SUB  AX, SI
+  SBB  DX, DI
+  SHL  AX, 1
+  RCL  DX, 1
+  SHL  AX, 1
+  RCL  DX, 1
+  MOV  LZ, DX
+  MOV  DX, T1
+  MOV  LY, DX
 
-  { third axis }
-  X := Scale14(V * CosZ + T * SinZ);
-  Y := Scale14(T * CosZ - V * SinZ);
+  MOV  CX, [CosY]                  { second axis }
+  MOV  BX, [SinY]
+  MOV  AX, LZ
+  IMUL BX
+  MOV  SI, AX
+  MOV  DI, DX
+  MOV  AX, LX
+  IMUL CX
+  SUB  AX, SI
+  SBB  DX, DI
+  SHL  AX, 1
+  RCL  DX, 1
+  SHL  AX, 1
+  RCL  DX, 1
+  MOV  T2, DX
+  MOV  AX, LX
+  IMUL BX
+  MOV  SI, AX
+  MOV  DI, DX
+  MOV  AX, LZ
+  IMUL CX
+  ADD  AX, SI
+  ADC  DX, DI
+  SHL  AX, 1
+  RCL  DX, 1
+  SHL  AX, 1
+  RCL  DX, 1
+  MOV  LZ, DX
+  MOV  DX, T2
+  MOV  LX, DX
 
-  D := ViewDist - U;
-  if D >= 0 then
-  begin
-    { 1139:019c and 1139:01ac add the SCREEN centre as literals -- $A0 and
-      $C8, i.e. 160 and 200, which is the middle of a 320 x 400 page. It is
-      200 and not 100 because double scanning is off.
+  MOV  CX, [CosZ]                  { third axis }
+  MOV  BX, [SinZ]
+  MOV  AX, LY
+  IMUL BX
+  MOV  SI, AX
+  MOV  DI, DX
+  MOV  AX, LX
+  IMUL CX
+  ADD  AX, SI
+  ADC  DX, DI
+  SHL  AX, 1
+  RCL  DX, 1
+  SHL  AX, 1
+  RCL  DX, 1
+  MOV  T2, DX
+  MOV  AX, LX
+  IMUL BX
+  MOV  SI, AX
+  MOV  DI, DX
+  MOV  AX, LY
+  IMUL CX
+  SUB  AX, SI
+  SBB  DX, DI
+  SHL  AX, 1
+  RCL  DX, 1
+  SHL  AX, 1
+  RCL  DX, 1
+  MOV  LY, DX
+  MOV  DX, T2
+  MOV  LX, DX
 
-      XCentre and YCentre are something else: MODEL centres, subtracted from
-      the coordinate before the divide, and InitScene sets both to zero. Using
-      them as the screen centre left every point projected about (0, 0), which
-      is what clustered the shape into the left edge. }
-    { The LongInt cast is load-bearing. 1139:0191 is
-
-          MOV AX,[BP-2] / SUB AX,[$BEAE] / IMUL CX / IDIV BX
-
-      -- IMUL leaves a 32-BIT product in DX:AX and IDIV then divides that by
-      BX. Written as `(X - XCentre) * ProjScale` with three Integers, Turbo
-      Pascal evaluates the multiply in 16 bits, so any coordinate past +/-127
-      overflows and wraps: the shapes reach +/-1000 and ProjScale is 256, so
-      almost every point wrapped to a more or less arbitrary value. That is
-      what scattered the scene into a rectangle of random dots. }
-    SX := (LongInt(X - XCentre) * ProjScale) div D + ScreenCentreX;
-    SY := (LongInt(Y - YCentre) * ProjScale) div D + ScreenCentreY;
-  end
-  else
-  begin
-    SX := -1;                     { 1139:01b3 -- behind the viewer }
-    SY := -1;
-  end;
+  MOV  BX, [ViewDist]              { perspective -- the one real IDIV }
+  SUB  BX, LZ
+  CMP  BX, 0
+  JL   @@Behind
+  MOV  CX, [ProjScale]
+  MOV  AX, LX
+  SUB  AX, [XCentre]
+  IMUL CX
+  IDIV BX
+  ADD  AX, 160                     { $A0 }
+  MOV  DI, AX
+  MOV  AX, LY
+  SUB  AX, [YCentre]
+  IMUL CX
+  IDIV BX
+  ADD  AX, 200                     { $C8 }
+  MOV  BX, AX
+  JMP  @@Done
+@@Behind:
+  MOV  DI, -1
+  MOV  BX, -1
+@@Done:
 end;
 
 { --------------------------------------------------------------------------
-  ModeX_PlotPixel (1139:01bb)
-  Map Mask selects the plane from x mod 4; the byte address is x div 4 plus
-  the row offset plus the current back-page offset.
+  1139:01bb -- PlotPixel.  X in DI, Y in BX.  Clips to 0..319 by 0..399,
+  looks the row up, selects the plane from X and 3, and stores colour $0E.
   -------------------------------------------------------------------------- }
-procedure PlotPixel(X, Y : Integer);
-begin
-  if (X >= 0) and (X < PageWidth) and (Y >= 0) and (Y < PageHeight) then
-  begin
-    PortW[$3C4] := (Word($01 shl (X and 3)) shl 8) or 2;
-    Mem[VGASeg : (X shr 2) + RowOfs[Y] + PageOfs] := DotColour;
-  end;
+procedure PlotPixel; assembler;
+asm
+  CMP  DI, 0
+  JL   @@Out
+  CMP  DI, 319
+  JG   @@Out
+  CMP  BX, 0
+  JL   @@Out
+  CMP  BX, 399
+  JG   @@Out
+  SHL  BX, 1
+  MOV  BX, [BX + OFFSET RowOfs]
+  MOV  CX, DI
+  SHR  DI, 2
+  ADD  DI, BX
+  ADD  DI, [PageOfs]
+  AND  CX, 3
+  MOV  AH, 1
+  SHL  AH, CL
+  MOV  DX, $3C4
+  MOV  AL, 2
+  OUT  DX, AX
+  MOV  AX, $A000
+  MOV  ES, AX
+  MOV  AL, DotColour
+  STOSB
+@@Out:
 end;
 
-{ --------------------------------------------------------------------------
-  ModeX_ClearPage (1139:02a2)
-  All four planes at once, then 40 words cleared and 40 words skipped per
-  row -- i.e. it wipes the 80-byte half of each 160-byte row belonging to the
-  back page, leaving the visible page untouched.
-  -------------------------------------------------------------------------- }
 procedure ClearPage;
 var
   P : Word;
@@ -429,96 +515,96 @@ end;
           The .png files are previews rendered with the constants below.
           See docs/08-part3-scene3-morph.md.
   -------------------------------------------------------------------------- }
-{ 1139:01f9 -- 765 points ([$BEC4] := $2FD), read as three words with a
-  stride of six, transformed and plotted. }
-procedure DrawShape(Shape : Word);
-var
-  I, SX, SY : Integer;
-  S : TShapePtr;
-begin
-  S := ShapeOf(Shape);
-  for I := 1 to NumPoints do
-  begin
-    TransformPoint(S^[I, 1], S^[I, 2], S^[I, 3], SX, SY);
-    PlotPixel(SX, SY);
-  end;
+{ --------------------------------------------------------------------------
+  1139:01f9 -- DrawShape.  Reads CurShape, walks 765 points six bytes at a
+  time and hands each to TransformPoint in BX, CX, DX, whose results go
+  straight on to PlotPixel in DI and BX. Assembler in the original; the
+  register hand-off between the three is the whole reason.
+  -------------------------------------------------------------------------- }
+procedure DrawShape; assembler;
+asm
+  MOV  SI, [CurShape]
+  MOV  WORD PTR [Count], 765       { $2FD }
+@@Point:
+  PUSH SI
+  MOV  BX, [SI]
+  MOV  CX, [SI+2]
+  MOV  DX, [SI+4]
+  CALL TransformPoint
+  CALL PlotPixel
+  POP  SI
+  ADD  SI, 6
+  DEC  WORD PTR [Count]
+  JNZ  @@Point
 end;
 
 { --------------------------------------------------------------------------
-  Morph_DrawMorph (1139:021d)
+  1139:021d -- DrawMorph.
 
-  Transcribed instruction by instruction. There is NO floating point here --
-  the blend is plain 16-bit integer linear interpolation done with IMUL/IDIV
-  through a 32-bit intermediate (CWD before each IMUL), which is exactly why
-  it survives at full frame rate:
+      if MorphStep > MorphSteps then CurShape := MorphTo ; DrawShape
+      else  blend 765 points and Inc(MorphStep)
 
-      P := A + (B - A) * MorphStep div MorphSteps
-
-  applied to each of X, Y and Z in turn. The two shape pointers advance two
-  bytes between components and six bytes between points; they are PUSHed
-  before the per-point calls and POPped after, so the calls are free to use
-  SI and DI.
-
-  The three blended components are handed to Morph_TransformPoint in
-  REGISTERS -- X in BX, Y in CX, Z in DX -- not on the stack. That is a
-  register-convention call. DrawMorph used to be assembler for that reason
-  and is now Pascal -- see the note on it.
-
-  Once MorphStep passes MorphSteps the morph is complete: it copies MorphTo
-  over CurShape and just draws the destination shape from then on.
+  Each component is `AX := B-A ; CWD ; IMUL MorphStep ; IDIV MorphSteps ;
+  ADD AX,A` -- a 32-bit intermediate between the multiply and the divide.
   -------------------------------------------------------------------------- }
-{ --------------------------------------------------------------------------
-  1139:021d -- DrawMorph
+procedure DrawMorph; assembler;
+asm
+  MOV  BX, [MorphStep]
+  CMP  BX, [MorphSteps]
+  JLE  @@Blend
+  MOV  BX, [MorphTo]
+  MOV  [CurShape], BX
+  CALL DrawShape
+  JMP  @@Done
 
-      if MorphStep > MorphSteps then
-        CurShape := MorphTo ; DrawShape(CurShape)
-      else
-        for I := 1 to 765 do
-          P := A[I] + (B[I] - A[I]) * MorphStep div MorphSteps
-          TransformPoint(P) ; PlotPixel
-        Inc(MorphStep)
+@@Blend:
+  MOV  WORD PTR [Count], 765
+  MOV  SI, [MorphFrom]
+  MOV  DI, [MorphTo]
+@@Point:
+  PUSH DI
+  PUSH SI
 
-  The original walks both shapes with SI and DI six bytes at a time and does
-  each component as `AX := B-A ; CWD ; IMUL MorphStep ; IDIV MorphSteps ;
-  ADD AX,A` -- a 32-bit intermediate between the multiply and the divide,
-  which is why the LongInt cast below is needed and a plain Integer
-  expression would overflow on the wider shapes.
+  MOV  AX, [DI]
+  SUB  AX, [SI]
+  CWD
+  IMUL WORD PTR [MorphStep]
+  IDIV WORD PTR [MorphSteps]
+  ADD  AX, [SI]
+  MOV  BX, AX
+  ADD  SI, 2
+  ADD  DI, 2
 
-  This used to be an assembler block that dereferenced MorphFrom and MorphTo
-  as raw DS offsets. Those offsets only mean anything in the original's data
-  segment; here the shapes are Pascal constants, so it read rubbish. See the
-  note on shape addressing above.
-  -------------------------------------------------------------------------- }
-procedure DrawMorph;
-var
-  I, SX, SY  : Integer;
-  A, B       : TShapePtr;
-  X, Y, Z    : Integer;
+  MOV  AX, [DI]
+  SUB  AX, [SI]
+  CWD
+  IMUL WORD PTR [MorphStep]
+  IDIV WORD PTR [MorphSteps]
+  ADD  AX, [SI]
+  MOV  CX, AX
+  ADD  SI, 2
+  ADD  DI, 2
 
-  function Blend(P, Q : Integer) : Integer;
-  begin
-    Blend := P + (LongInt(Q - P) * MorphStep) div MorphSteps;
-  end;
+  MOV  AX, [DI]
+  SUB  AX, [SI]
+  CWD
+  IMUL WORD PTR [MorphStep]
+  IDIV WORD PTR [MorphSteps]
+  ADD  AX, [SI]
+  MOV  DX, AX
 
-begin
-  if MorphStep > MorphSteps then
-  begin
-    CurShape := MorphTo;
-    DrawShape(CurShape);
-    Exit;
-  end;
+  CALL TransformPoint
+  CALL PlotPixel
 
-  A := ShapeOf(MorphFrom);
-  B := ShapeOf(MorphTo);
-  for I := 1 to NumPoints do
-  begin
-    X := Blend(A^[I, 1], B^[I, 1]);
-    Y := Blend(A^[I, 2], B^[I, 2]);
-    Z := Blend(A^[I, 3], B^[I, 3]);
-    TransformPoint(X, Y, Z, SX, SY);
-    PlotPixel(SX, SY);
-  end;
-  Inc(MorphStep);
+  POP  SI
+  POP  DI
+  ADD  DI, 6
+  ADD  SI, 6
+  DEC  WORD PTR [Count]
+  JNZ  @@Point
+
+  INC  WORD PTR [MorphStep]
+@@Done:
 end;
 
 { --------------------------------------------------------------------------
@@ -572,7 +658,7 @@ procedure Scene3;
   function Frame(Morphing : Boolean) : Boolean;
   begin
     ClearPage;
-    if Morphing then DrawMorph else DrawShape(CurShape);
+    if Morphing then DrawMorph else DrawShape;
     FlipPage;
     WaitRetrace;
     StepAngles;
@@ -602,25 +688,26 @@ procedure Scene3;
   end;
 
 begin
+  BindShapes;
   InitScene;
   PageOfs := PageOfsB;
-  CurShape  := Shape0;
-  MorphFrom := Shape0;
-  MorphTo   := Shape4;
+  CurShape  := OfsSphere;
+  MorphFrom := OfsSphere;
+  MorphTo   := OfsCube;
   StepX := SpinX;  StepY := SpinY;  StepZ := SpinZ;
   AngX  := 0;      AngY  := 0;      AngZ  := 0;
 
   Hold(SegFrames);                          { 1: shape 0 }
-  MorphTo_(Shape0, Shape4, SegFrames);      { 2: 0 -> 4  }
+  MorphTo_(OfsSphere, OfsCube, SegFrames);      { 2: 0 -> 4  }
   Hold(SegFrames);                          { 3: shape 4 }
-  MorphTo_(Shape4, Shape5, SegFrames);      { 4: 4 -> 5  }
+  MorphTo_(OfsCube, OfsGrid, SegFrames);      { 4: 4 -> 5  }
   Hold(SegFrames);                          { 5: shape 5 }
-  MorphTo_(Shape5, Shape4, SegFrames);      { 6: 5 -> 4  }
+  MorphTo_(OfsGrid, OfsCube, SegFrames);      { 6: 5 -> 4  }
   Hold(SegFrames);                          { 7: shape 4 }
 
   { 8: morph back to shape 0 while fading the palette out }
-  MorphFrom := Shape4;
-  MorphTo   := Shape0;
+  MorphFrom := OfsCube;
+  MorphTo   := OfsSphere;
   MorphStep := 0;
   Frames    := LastFrames;
   repeat
