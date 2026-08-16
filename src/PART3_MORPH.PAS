@@ -796,7 +796,9 @@ var
 
     Widening the array by one above and two below gives those three accesses
     real storage. Nothing ever reads them, so the palette result is identical
-    -- this reproduces the behaviour without reproducing the corruption. }
+    -- this reproduces the behaviour without reproducing the corruption.
+
+    THIS IS A DELIBERATE DEVIATION. See docs/23-deviations.md. }
   Pal : array[-2..768] of Byte;
   I   : Integer;
 begin

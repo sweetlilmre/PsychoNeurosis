@@ -152,7 +152,11 @@ begin
   Assign(F, 'neurosis.dat');
   Reset(F, 1);
   Seek(F, DataOfs);
-  ClearVirtual;
+  { 11f3:0048 clears the VISIBLE screen, not the virtual one -- the blocks are
+    read back from and written to $A000 directly, so this is the surface the
+    effect actually works on. ClearVirtual here left whatever was on screen in
+    place and the brighten pass then stepped that instead of black. }
+  ClearScreen(VGASeg, 0);
 
   { Blank everything, then lay a ramp over entries 1..221. The ramp is what
     turns "increment a pixel" into "brighten a pixel". }

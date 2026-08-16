@@ -191,3 +191,20 @@ Run them from `run/` (drive `E:` under `interactive.conf`); they need
 Adding a scene is one row in `mktests.py`. `dosbuild.py` picks up anything
 matching `src/TP*.PAS` on its own — the names are already 8.3 and the program
 identifiers already match, so there is no second table to keep in step.
+
+## Running the original alongside the reconstruction
+
+The `NEUROSIS.00x` files are plain MZ executables — they begin `4D 5A` — so
+each part runs directly. `run/` carries a copy of each as `ORIG0.EXE` ..
+`ORIG9.EXE`:
+
+```
+ORIG1   the intro          against TPART1
+ORIG2   the house          against TPART2
+ORIG3   Techno Tick        against TPART3
+ORIG0   setup, ORIG9 the end screen, ORIG4..8 the remaining parts
+```
+
+They read `NEUROSIS.DAT` from the current directory, which `run/` has, and they
+degrade gracefully when the music player is not resident. Deviations found by
+comparing the two belong in [docs/23](23-deviations.md).
