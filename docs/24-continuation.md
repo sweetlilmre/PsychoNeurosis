@@ -176,6 +176,40 @@ padding after forward conditional jumps is an assembler artifact, and
 image (`tools/dosbox/dosbuild.py`, `TASM` constant). `dosbuild.py` assembles
 every `src/asm/*.ASM` before compiling.
 
+### Which parts used external 386 assembler -- the full sweep
+
+A 386 instruction inside a 16-bit segment cannot have come from TP7's built-in
+assembler, so it is an exact marker for `{$L}`-linked TASM. Scanning every
+part for the `0x66` operand-size prefix and clustering the hits gives the
+whole picture:
+
+| part | user 386 code | state |
+|---|---|---|
+| 001 | the maths trio TWICE -- `1107:1804/18B6/1A04` (scene 4) and `12C5:192D/19DF/1B2D` (scene 5) -- plus an unreferenced 16.16 divide at `1107:09D0` and `12C5:0AF9` | transcribed |
+| 002 | the trio once, `108B:342F/34E1/362F`, plus an unreferenced divide at `108B:25FB` | transcribed |
+| 003 | `Math_DivLong` at `10B8:07F4` only -- a plain signed 32-bit `IDIV ESI` | **Pascal `div` in `PART3_STARS`.** Same result, just slower; the RTL helper does the work instead of one instruction |
+| 004 | none at all | clean |
+| **005** | **the trio once** -- `1102:11D9` SinCos (table at `CS:$03C5`), `1102:128B` RotatePoint, `1102:13D9` Project -- plus helpers at `1102:0391` and `1102:03A5` | **NOT transcribed.** `PART5_ROTOZOOM` computes sin/cos with `Sin()`/`Cos()` at run time and rotates in Pascal |
+| 006 | none | clean |
+| 007 | none | clean |
+
+Everything else the scan turns up is the Turbo Pascal RTL's own LongInt
+multiply and divide helpers -- byte-identical in every part, starting
+`80 3E <addr> 02 / 72 1B / 66 C1 E0 10 ...`, which tests the CPU-type byte and
+takes a 386 path. Not ours.
+
+Two things worth knowing from this:
+
+- **The unreferenced divide is evidence for `{$L}`.** `1107:09D0`, `12C5:0AF9`
+  and `108B:25FB` are the same 16.16 divide and nothing calls any of them.
+  TP7 links an object whole, so a PUBLIC nothing uses still lands in the
+  executable. It also means the original's `.ASM` exported more than the three
+  routines `DEMOMATH.ASM` currently does.
+- **Part 005 is the one real gap**, and it is the same object: `1102:128B` is
+  byte-for-byte `RotatePoint`. Doing it is mostly declaration changes, but
+  part 005 has never been run and still has stubs, so there is nothing to
+  check the result against yet.
+
 ### Resolved: the DemoVT / P2VT disagreement
 
 The old note about the two units disagreeing over dispatch function numbers is
