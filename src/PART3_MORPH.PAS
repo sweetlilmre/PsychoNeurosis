@@ -779,19 +779,39 @@ end;
   -------------------------------------------------------------------------- }
 procedure FadeStep;
 var
-  Pal : array[0..767] of Byte;
+  { THE ORIGINAL'S LOOP RUNS OFF BOTH ENDS OF THE BUFFER.
+
+    1139:0372 loads DI with $300 -- 768, one PAST the last byte of a 768-byte
+    array -- and the body reads, decrements and writes back at DI, DI-1 and
+    DI-2, dropping DI by one after each, then loops while DI is not negative.
+    So it touches 768 down to -2: 771 bytes, of which only 0..767 are the
+    palette.
+
+    In the original the buffer sits at BP-$300, so index 768 is [BP] -- the
+    saved BP itself -- and -1, -2 are dead stack below the frame. It survives
+    because LEAVE reads BP before popping, and Demo_Scene3 keeps nothing in
+    BP. Reproduced literally in Pascal it lands on a different frame layout
+    and, over the closing segment's 63 calls, walks over something that
+    matters: the scene faded to black and then hung.
+
+    Widening the array by one above and two below gives those three accesses
+    real storage. Nothing ever reads them, so the palette result is identical
+    -- this reproduces the behaviour without reproducing the corruption. }
+  Pal : array[-2..768] of Byte;
   I   : Integer;
 begin
-  GetPalette768(Pal);
-  I := $300;
+  GetPalette768(Pal[0]);
+  I := $300;                       { 1139:0372 -- MOV DI,$300 }
   repeat
-    if Pal[I]     <> 0 then Dec(Pal[I]);
-    if Pal[I - 1] <> 0 then Dec(Pal[I - 1]);
-    if Pal[I - 2] <> 0 then Dec(Pal[I - 2]);
-    Dec(I, 3);
-  until I < 0;
-  WaitRetrace;
-  SetPalette768(Pal);
+    if Pal[I] <> 0 then Dec(Pal[I]);   { 1139:0375 }
+    Dec(I);                            { 1139:0383 -- DEC DI }
+    if Pal[I] <> 0 then Dec(Pal[I]);   { 1139:0384 }
+    Dec(I);                            { 1139:0392 }
+    if Pal[I] <> 0 then Dec(Pal[I]);   { 1139:0393 }
+    Dec(I);                            { 1139:03a1 }
+  until I < 0;                         { 1139:03a2 -- JNS }
+  WaitRetrace;                         { 1139:03a4 }
+  SetPalette768(Pal[0]);               { 1139:03af }
 end;
 
 { --------------------------------------------------------------------------
