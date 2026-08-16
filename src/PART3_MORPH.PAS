@@ -184,13 +184,41 @@ var
   MorphStep           : Integer;   { DS:$BEB8 }
   PageOfs             : Word;      { DS:$BEC0 -- 0 or 80 }
   Frames              : Integer;   { DS:$BEC2 }
-  RowOfs              : array[0..PageHeight - 1] of Word;   { y * RowBytes }
+  { DS:$BEC6 -- EIGHT HUNDRED entries, not PageHeight. 1192:0000 fills
+    0..$31F regardless of how many rows the mode actually shows. }
+  RowOfs              : array[0..799] of Word;
 
 { --------------------------------------------------------------------------
   VGA_Set400Lines (1139:02f2)
   CRTC register 9, low five bits cleared: maximum scan line = 0, i.e. no
   double scanning. That turns the 320x200 Mode-X screen into 320x400.
   -------------------------------------------------------------------------- }
+{ --------------------------------------------------------------------------
+  1192:0000 -- the Mode-X row table
+
+      for I := 0 to $31F do
+        RowOfs[I] := (LogicalWidth * I) shl 1
+
+  LogicalWidth is the byte at DS:$76B6, which InitScene sets to 80, so the
+  stride is 160 bytes per row -- one plane of a 640-pixel logical line.
+
+  THIS IS NOT VGA.BuildRowTable. That one fills VGA's own YOfs with y * 320
+  for the 200 rows of mode 13h, and it is what InitScene used to call: the
+  table below stayed all zeros, every dot landed on row 0, and the scene drew
+  nothing. The two tables coexist and must not be conflated -- the note at the
+  bottom of VGA.PAS says exactly that.
+
+  The code lives in segment 1192 with the rest of the VGA unit, but the table
+  it fills is at DS:$BEC6, in this scene's own data, which is why it is here.
+  -------------------------------------------------------------------------- }
+procedure BuildModeXRows;
+var
+  I : Integer;
+begin
+  for I := 0 to 799 do
+    RowOfs[I] := Word(LogicalWidth) * Word(I) shl 1;
+end;
+
 procedure Set400Lines; assembler;
 asm
   MOV  DX, $3D4
@@ -457,7 +485,7 @@ begin
   LogicalWidth := 80;          { DS:$76B6 -- 640 logical pixels per row }
   SetMode;                     { mode 13h -> Mode-X }
   Set400Lines;                 { and now 320x400 }
-  BuildRowTable;               { 1192:0000 }
+  BuildModeXRows;              { 1192:0000 -- NOT VGA's BuildRowTable }
   MorphStep := 0;
   MorphSteps := 45;
   XCentre := 0;  YCentre := 0;
