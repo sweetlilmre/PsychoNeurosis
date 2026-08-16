@@ -59,6 +59,8 @@ const
   SinTable   = $02A8;      { 450 entries, 16.14 fixed point }
   CosTable   = $035C;      { = SinTable + 90 entries }
   FixedBits  = 14;         { products are shifted right by 14 }
+  ScreenCentreX = 160;     { $A0 -- 1139:019c }
+  ScreenCentreY = 200;     { $C8 -- 1139:01ac, half of 400 rows }
 
   PageWidth  = 320;        { visible page }
   PageHeight = 400;        { double-scan disabled -- see VGA_Set400Lines }
@@ -73,7 +75,6 @@ const
   MorphSteps : Integer = 45;     { DS:$BEB6 }
   ViewDist   : Integer = 2500;   { DS:$BEB4 }
   ProjScale  : Integer = 256;    { DS:$BEB2 }
-  CentreY    : Integer = 200;    { added after the perspective divide }
 
 const
 
@@ -290,8 +291,21 @@ begin
   D := ViewDist - U;
   if D >= 0 then
   begin
-    SX := ((X - XCentre) * ProjScale) div D;
-    SY := ((Y - YCentre) * ProjScale) div D + CentreY;
+    { 1139:019c and 1139:01ac add the SCREEN centre as literals -- $A0 and
+      $C8, i.e. 160 and 200, which is the middle of a 320 x 400 page. It is
+      200 and not 100 because double scanning is off.
+
+      XCentre and YCentre are something else: MODEL centres, subtracted from
+      the coordinate before the divide, and InitScene sets both to zero. Using
+      them as the screen centre left every point projected about (0, 0), which
+      is what clustered the shape into the left edge. }
+    SX := ((X - XCentre) * ProjScale) div D + ScreenCentreX;
+    SY := ((Y - YCentre) * ProjScale) div D + ScreenCentreY;
+  end
+  else
+  begin
+    SX := -1;                     { 1139:01b3 -- behind the viewer }
+    SY := -1;
   end;
 end;
 
