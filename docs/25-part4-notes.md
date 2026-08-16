@@ -1,0 +1,196 @@
+# Part 004 — working notes from the disassembly
+
+Raw findings, written down as they are read so the work survives a context
+reset. Everything here is off `NEUROSIS_004.exe`; nothing is inferred.
+
+`src/P4VGA.PAS` and `src/P4VT.PAS` are **done**. The scene unit is not.
+
+---
+
+## Layout
+
+| segment | what |
+|---|---|
+| `1005` | the whole Lemmings scene, 0x1D40 bytes, ~30 routines |
+| `11d9` | the tracker client — **done**, `P4VT.PAS` |
+| `11e3` | the VGA unit — **done**, `P4VGA.PAS` |
+| `1226` | Turbo Pascal's Crt |
+| `1288` | the RTL |
+
+**No 386 instructions anywhere in part 004**, so there is no TASM object to
+link — unlike parts 001, 002 and 005.
+
+Hand assembler in `1005`, from the `ENTER` and `REP` sweeps:
+
+- `1005:0328` vertical run
+- `1005:0354` horizontal run
+- `1005:037a` transparent sprite blit
+- `1005:07f9` the scroller's blit-and-shift
+- `1005:0835` 64,000-byte screen copy
+
+Everything else in `1005` has a compiler frame.
+
+---
+
+## The lemming record
+
+`Lem_InitAll` (`1005:06c8`) clears index 1 through 25, stride `$15` = 21
+bytes, so the array is `array[0..25]` at **`DS:$02FC`** with 1..25 in use.
+Element *I* is at `I * $15 + $2FC`.
+
+Fields, as offsets within the record, with the values `Lem_Spawn`
+(`1005:06e7`) writes:
+
+| ofs | size | spawn value | what |
+|---|---|---|---|
+| +0 | Word | `$23` = 35 | X |
+| +2 | Word | `$3C` = 60 | Y |
+| +4 | Word | 0 | — |
+| +6 | Word | 1 | animation frame (`Lem_DrawSprite` indexes banks with it) |
+| +8 | Word | 0 | — (also zeroed by `Lem_SetState`) |
+| +10 | Word | 0 | — |
+| +12 | Byte | 1 | active flag; 0 = slot free |
+| +13 | Byte | 2 | **state** (`Lem_SetState` writes here) |
+| +14 | Byte | 1 | direction — `Lem_DrawSprite` tests `< 1` and mirrors |
+| +15 | Byte | 0 | sub-state; state 2 branches on `< 4` |
+| +16 | Word | `$23` | spawn X, kept |
+| +18 | Word | `$3C` | spawn Y, kept |
+| +20 | Byte | 2 | — |
+
+Counters: `DS:$051E` is the live count, `DS:$0520` the total spawned.
+`Lem_Spawn` stops at `$50` = 80 spawned and scripts four one-off events at
+totals 3, 5, `$41` and `$50` by poking three fields of a fixed slot.
+
+`Lem_SetState(S, N)` sets state, frame := 1 and +8 := 0.
+
+---
+
+## The sprite banks
+
+`Lem_DrawSprite` (`1005:03b9`) switches on the state byte. Every base
+address resolves to a `LoadAssets` `BlockRead` destination once you account
+for the frame index being **one-based** — the compiler folds `base - stride`
+into the instruction.
+
+| state | name | W x H | stride | bank at | bytes | frames |
+|---|---|---|---|---|---|---|
+| 1 | Walker | 6 x 9 | `$36` | `$0522` | `$1B0` | 8 (4 + 4 mirrored) |
+| 2 | Faller, sub < 4 | 6 x 9 | `$36` | `$0522` | shared | |
+| 2 | Faller, sub >= 4 | 10 x 10 | 100 | `$06D2` | 400 | 4 |
+| 3 | Timer | 10 x 15 | `$96` | `$23E2` | `$2EE` | 5 |
+| 4 | Basher | 17 x 13 | `$DD` | `$1498` | `$52E` | 6 |
+| 5 | Builder | 12 x 10 | `$78` | `$2112` | `$2D0` | 6 |
+| 6 | DeathA | 9 x 12 | `$6C` | `$1E8A` | `$288` | 6 |
+| 7 | DeathB | 16 x 10 | `$A0` | `$1B6A` | 800 | 5 |
+| 8 | Splat | 12 x 10 | `$78` | `$12B8` | `$1E0` | 4 |
+| 10 | Miner | 14 x 10 | `$8C` | `$19C6` | `$1A4` | 3 |
+| 11 | Countdown | 63 x 55 | `$D89` | `$26D0` | `$5EBF` | 7 |
+
+Two specials:
+
+- **state 6 frame 1** also blits a 53 x 60 still from `$BF97` (`$C6C`) at a
+  fixed (50, 95) — a one-off picture, not part of the animation.
+- **state 11** shows the FIRST frame for frames 1..9 and only starts stepping
+  the bank at frame 10, via `$1947 + (Frame-8) * $D89`.
+
+Direction: `Lem_DrawSprite` adds 4 to the frame index for states 1 and 2 when
+the direction byte is `< 1`, so the walker bank holds four frames facing one
+way and four the other.
+
+Blit parameter order, read off `1005:037a`:
+`Blit(Src : Pointer; X, Y, W, H : Integer; Segment : Word)` — `Src` highest at
+`[BP+$E]`, `Segment` lowest at `[BP+4]`.
+
+---
+
+## The drawing primitives
+
+`1005:0328` and `1005:0354` are named `VGA_FillRect` and `VGA_FillTri` by
+Ghidra and are **neither**:
+
+- `1005:0328` `(X, YTop, YBottom, Colour, Segment)` — a one-pixel-wide
+  VERTICAL run. `STOSB` then `ADD DI,$13F`, which with the store's own +1
+  is 320.
+- `1005:0354` `(X1, X2, Y, Colour, Segment)` — a HORIZONTAL run, `REP STOSB`.
+
+`1005:07f9` is the scroller's renderer, and it takes no parameters:
+
+```
+    ES := [DS:$030D]                  the destination screen
+    DS:SI := [DS:$0309]               the scroll buffer, 341 x 18 = 6138
+    18 rows of REP MOVSW 160          320 visible bytes per row
+      SI += $15                       341 - 320 = 21 off-screen
+    18 x  write 0 at row start, stepping $155
+    then MOVSW $BFC words from offset 2 to offset 0
+```
+
+so the buffer is 341 bytes per row with a 320-pixel window, and the whole
+6,138 bytes are shifted left two bytes per call — the rows are scrolled as
+one linear block, not individually. `Demo_Main` frees `$17FA` = 6138 for it.
+
+---
+
+## NEUROSIS.DAT
+
+`Lemmings_LoadAssets` (`1005:00a6`) seeks **`$001228CE`** = 1,189,070 and
+reads twenty blocks in this order:
+
+| # | bytes | destination | what |
+|---|---|---|---|
+| 1 | `$5B8C` 23436 | GetMem, `DS:$CC03` | |
+| 2 | 768 | stack | palette for the first screen |
+| 3 | 64000 | virtual screen | first screen |
+| 4 | 64000 | virtual screen | second screen |
+| 5 | 768 | stack | |
+| 6 | 768 | `DS:$CC07` | the scene palette |
+| 7 | `$1B0` 432 | `DS:$0522` | walker, 8 frames |
+| 8 | 400 | `DS:$06D2` | faller, 4 frames |
+| 9 | `$1E0` 480 | `DS:$12B8` | splat, 4 frames |
+| 10 | `$52E` 1326 | `DS:$1498` | basher, 6 frames |
+| 11 | `$1A4` 420 | `DS:$19C6` | miner, 3 frames |
+| 12 | 800 | `DS:$1B6A` | death B, 5 frames |
+| 13 | `$C18` 3096 | `DS:$858F` | |
+| 14 | `$288` 648 | `DS:$1E8A` | death A, 6 frames |
+| 15 | `$2D0` 720 | `DS:$2112` | builder, 6 frames |
+| 16 | `$C6C` 3180 | `DS:$BF97` | the 53 x 60 still |
+| 17 | `$2AA8` 10920 | `DS:$91A7` | |
+| 18 | `$348` 840 | `DS:$BC4F` | |
+| 19 | `$5EBF` 24255 | `DS:$26D0` | countdown, 7 frames of 63 x 55 |
+| 20 | `$2EE` 750 | `DS:$23E2` | timer, 5 frames |
+
+Between reads 3 and 4 it runs `Effect_ColumnSlideIn`, `Delay($514)` = 1300,
+then 64 x `FadeStep`. After read 20 it sets the palette and blacks entries
+`$E0`..`$E9`.
+
+Blocks 1, 13, 17 and 18 are not yet identified.
+
+---
+
+## Still to read
+
+Everything in the state machine and the frame loop:
+
+`Effect_ColumnSlideIn 1005:0000`, `Lemming_Walk 1005:0a4f`,
+`Lemmings_Intro 1005:0a86`, `LemState2_Faller 0b68`,
+`LemState5_Builder 0d1a`, `LemState4_Basher 0df5`, `LemState10_Miner 1166`,
+`LemState1_Walker 14d6`, `LemState8_Splat 17ff`, `LemState6_DeathA 1850`,
+`LemState7_DeathB 18a6`, `LemState3_Timer 18fc`,
+`LemState11_Countdown 1954`, `Lem_UpdateAll 1a4c`,
+`Lemmings_MainLoop 1bbb`, `Scroller_DrawChar 0853`, `Scroller_Step 08ad`,
+`FUN_1005_1c9a`, `FUN_1005_1d3a`.
+
+`Demo_Main` (`1005:1cd6`) is:
+
+```
+    MusicDetect                 11d9:0000
+    FUN_1005_1c9a
+    LoadAssets
+    Intro
+    Saved := GetVolume
+    MainLoop
+    FreeMem 64000  @DS:$0305        the second screen
+    FreeMem $17FA  @DS:$0309        the scroll buffer
+    MusicStop                   11d9:004E
+    SetVolume(Saved)
+    ...
+```
