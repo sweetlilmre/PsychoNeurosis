@@ -159,35 +159,41 @@ begin
   OfsGrid   := Ofs(ShapeGrid);        { $63F6 }
 end;
 
-{ [transcribed] VGA_GetPalette768 1139:034d / VGA_SetPalette768 1139:0335 --
-  the whole DAC in one burst through ports $3C7/$3C8/$3C9. }
-procedure GetPalette768(var P);
-var
-  I : Integer;
-  B : array[0..767] of Byte absolute P;
-begin
-  Port[$3C7] := 0;
-  for I := 0 to 255 do
-  begin
-    B[I * 3    ] := Port[$3C9];
-    B[I * 3 + 1] := Port[$3C9];
-    B[I * 3 + 2] := Port[$3C9];
-  end;
+{ --------------------------------------------------------------------------
+  1139:034d -- GetPalette768(var P)
+
+  Hand assembler. The whole DAC comes back in a single REP INSB rather than a
+  counted loop, which is why there is no loop here to transcribe.
+  -------------------------------------------------------------------------- }
+procedure GetPalette768(var P); assembler;
+asm
+  LES  DI, P            { ES:DI := the caller's 768-byte buffer, from [BP+4] }
+  MOV  DX, $3C7         { $3C7 is the DAC READ index register                }
+  MOV  AL, 0            { start at colour 0                                  }
+  OUT  DX, AL           { select it; the DAC now auto-increments             }
+  ADD  DX, 2            { DX := $3C9, the DAC data register                  }
+  MOV  CX, $300         { 768 bytes: 256 colours x 3 components              }
+  REP  INSB             { read them all straight into ES:DI                  }
 end;
 
-procedure SetPalette768(var P);
-var
-  I : Integer;
-  B : array[0..767] of Byte absolute P;
-begin
-  WaitRetrace;
-  Port[$3C8] := 0;
-  for I := 0 to 255 do
-  begin
-    Port[$3C9] := B[I * 3    ];
-    Port[$3C9] := B[I * 3 + 1];
-    Port[$3C9] := B[I * 3 + 2];
-  end;
+{ --------------------------------------------------------------------------
+  1139:0335 -- SetPalette768(var P)
+
+  The write side, likewise a single REP OUTSB. Note there is NO retrace wait
+  in the original -- the Pascal version used to add one, which is a change in
+  behaviour, not a tidy-up.
+  -------------------------------------------------------------------------- }
+procedure SetPalette768(var P); assembler;
+asm
+  PUSH DS               { OUTSB sources from DS:SI, so DS must be restored   }
+  LDS  SI, P            { DS:SI := the caller's 768-byte buffer, from [BP+4] }
+  MOV  DX, $3C8         { $3C8 is the DAC WRITE index register               }
+  MOV  AL, 0            { start at colour 0                                  }
+  OUT  DX, AL           { select it                                          }
+  INC  DX               { DX := $3C9, the DAC data register                  }
+  MOV  CX, $300         { 768 bytes                                          }
+  REP  OUTSB            { write them all out from DS:SI                      }
+  POP  DS               { restore the data segment                           }
 end;
 
 
@@ -250,35 +256,83 @@ asm
 end;
 
 { --------------------------------------------------------------------------
-  Morph_SetAngles (1139:0000)
-  One sine table serves both functions: cos(a) is sin(a + 90), so CosTable is
-  simply SinTable advanced by 90 entries.
+  1139:0000 -- SetAngles.  AngX in BX, AngY in CX, AngZ in DX.
+
+  Hand assembler, reached by a plain CALL from StepAngles with the angles
+  already in registers. One table serves both functions: cos(a) is sin(a+90),
+  so the cosine lookup is the same table 90 entries -- 180 bytes -- further
+  along. That is why the original quotes two base addresses, $02A8 and $035C,
+  for one table. No trig call anywhere in the frame path.
   -------------------------------------------------------------------------- }
-procedure SetAngles(AX_, AY, AZ : Integer);
-begin
-  SinX := SinTab[AX_];  CosX := SinTab[AX_ + 90];
-  SinY := SinTab[AY];   CosY := SinTab[AY  + 90];
-  SinZ := SinTab[AZ];   CosZ := SinTab[AZ  + 90];
+procedure SetAngles; assembler;
+asm
+  ADD  BX, BX                          { BX := AngX * 2, a word index        }
+  MOV  AX, [BX + OFFSET SinTab]        { AX := sin(AngX)          tbl $02A8  }
+  MOV  [SinX], AX                      { -> DS:$BE92                         }
+  MOV  AX, [BX + OFFSET SinTab + 180]  { +90 entries = cos(AngX)  tbl $035C  }
+  MOV  [CosX], AX                      { -> DS:$BE90                         }
+
+  MOV  BX, CX                          { the Y angle arrived in CX           }
+  ADD  BX, BX                          { BX := AngY * 2                      }
+  MOV  AX, [BX + OFFSET SinTab]        { AX := sin(AngY)                     }
+  MOV  [SinY], AX                      { -> DS:$BE96                         }
+  MOV  AX, [BX + OFFSET SinTab + 180]  { AX := cos(AngY)                     }
+  MOV  [CosY], AX                      { -> DS:$BE94                         }
+
+  MOV  BX, DX                          { the Z angle arrived in DX           }
+  ADD  BX, BX                          { BX := AngZ * 2                      }
+  MOV  AX, [BX + OFFSET SinTab]        { AX := sin(AngZ)                     }
+  MOV  [SinZ], AX                      { -> DS:$BE9A                         }
+  MOV  AX, [BX + OFFSET SinTab + 180]  { AX := cos(AngZ)                     }
+  MOV  [CosZ], AX                      { -> DS:$BE98                         }
 end;
 
 { --------------------------------------------------------------------------
-  Morph_StepAngles (1139:0035)
-  Advance each axis and wrap into 0..360. Degrees again, as in Scene 1.
+  1139:0035 -- StepAngles.  Advance each axis, wrap into 0..360, then hand
+  all three to SetAngles in BX, CX and DX.
+
+  The wrap is two compares rather than a modulo. That is exact only because
+  the step is small: three degrees a frame cannot overshoot by a whole turn.
   -------------------------------------------------------------------------- }
-procedure StepAngles;
+procedure StepAngles; assembler;
+asm
+  MOV  BX, [AngX]                { BX := the X angle                        }
+  ADD  BX, [StepX]               { advance it by this scene's step          }
+  CMP  BX, 0                     { did it go negative?                      }
+  JGE  @@XNotNeg                 {   no                                     }
+  ADD  BX, 360                   {   yes: wrap up one turn                  }
+@@XNotNeg:
+  CMP  BX, 360                   { did it pass a full turn?                 }
+  JLE  @@XDone                   {   no                                     }
+  SUB  BX, 360                   {   yes: wrap down one turn                }
+@@XDone:
+  MOV  [AngX], BX                { store back, and leave it in BX           }
 
-  function Wrap(A : Integer) : Integer;
-  begin
-    if A < 0          then A := A + AngleWrap;
-    if A > AngleWrap  then A := A - AngleWrap;
-    Wrap := A;
-  end;
+  MOV  CX, [AngY]                { the Y angle, kept in CX                  }
+  ADD  CX, [StepY]
+  CMP  CX, 0
+  JGE  @@YNotNeg
+  ADD  CX, 360
+@@YNotNeg:
+  CMP  CX, 360
+  JLE  @@YDone
+  SUB  CX, 360
+@@YDone:
+  MOV  [AngY], CX
 
-begin
-  AngX := Wrap(AngX + StepX);
-  AngY := Wrap(AngY + StepY);
-  AngZ := Wrap(AngZ + StepZ);
-  SetAngles(AngX, AngY, AngZ);
+  MOV  DX, [AngZ]                { the Z angle, kept in DX                  }
+  ADD  DX, [StepZ]
+  CMP  DX, 0
+  JGE  @@ZNotNeg
+  ADD  DX, 360
+@@ZNotNeg:
+  CMP  DX, 360
+  JLE  @@ZDone
+  SUB  DX, 360
+@@ZDone:
+  MOV  [AngZ], DX
+
+  CALL SetAngles                 { BX, CX, DX now hold the three angles     }
 end;
 
 { --------------------------------------------------------------------------
@@ -474,33 +528,56 @@ asm
 @@Out:
 end;
 
-procedure ClearPage;
-var
-  P : Word;
-  I, Y : Integer;
-begin
-  P := PageOfs;
-  PortW[$3C4] := $0F02;                { Map Mask: all planes }
-  for Y := 1 to PageHeight - 1 do
-  begin
-    for I := 1 to RowBytes div 4 do    { 40 words = 80 bytes = 320 pixels }
-    begin
-      MemW[VGASeg : P] := 0;
-      Inc(P, 2);
-    end;
-    Inc(P, RowBytes div 2);            { skip the other page's half }
-  end;
+{ --------------------------------------------------------------------------
+  1139:02a2 -- ClearPage.  Blanks the half of each row belonging to the back
+  page. Hand assembler: a REP STOSW per row with a fixed skip between them.
+
+  Note it runs 399 rows, not 400 -- the last row of the page is never
+  cleared. That is the original's count and is kept.
+  -------------------------------------------------------------------------- }
+procedure ClearPage; assembler;
+asm
+  MOV  DI, [PageOfs]    { DI := 0 or 80 -- which half of the row to clear    }
+  MOV  AX, $A000
+  MOV  ES, AX           { ES := video; the pages live in VRAM, not the heap  }
+  MOV  DX, $3C4         { Sequencer address register                         }
+  MOV  AX, $0F02        { register 2 (Map Mask) := $0F, all four planes      }
+  OUT  DX, AX           { so one STOSW clears four pixels per plane at once  }
+  XOR  AX, AX           { the fill value: black                              }
+  MOV  DX, 399          { $18F rows                                          }
+@@Row:
+  MOV  CX, 40           { $28 words = 80 bytes = 320 pixels of this page     }
+  REP  STOSW            { blank the row; DI advances 80                      }
+  ADD  DI, 80           { $50: step over the OTHER page's half of the row    }
+  DEC  DX               { one row done                                       }
+  JNZ  @@Row
 end;
 
 { --------------------------------------------------------------------------
   ModeX_FlipPage (1139:02c3)
   Show the page we just drew, then make the other one current.
   -------------------------------------------------------------------------- }
-procedure FlipPage;
-begin
-  Port[$3D4] := $0C;  Port[$3D5] := Hi(PageOfs);
-  Port[$3D4] := $0D;  Port[$3D5] := Lo(PageOfs);
-  PageOfs := PageOfsB - PageOfs;       { 0 <-> 80 }
+{ --------------------------------------------------------------------------
+  1139:02c3 -- FlipPage.  Points the CRTC at the page just drawn, then swaps
+  PageOfs so the next frame draws into the other one.
+
+  The two pages are the left and right halves of a 640-pixel logical line, so
+  "flipping" is just moving the display start 80 bytes along the row.
+  -------------------------------------------------------------------------- }
+procedure FlipPage; assembler;
+asm
+  MOV  BX, [PageOfs]    { BX := the offset of the page just drawn            }
+  MOV  AH, BH           { high byte of the start address                     }
+  MOV  AL, $0C          { CRTC register $0C: start address HIGH              }
+  MOV  DX, $3D4
+  OUT  DX, AX           { write index and value in one 16-bit OUT            }
+  MOV  AH, BL           { low byte of the start address                      }
+  MOV  AL, $0D          { CRTC register $0D: start address LOW               }
+  MOV  DX, $3D4
+  OUT  DX, AX
+  MOV  AX, 80           { $50 -- the other page                              }
+  SUB  AX, BX           { 80 - PageOfs toggles between 0 and 80              }
+  MOV  [PageOfs], AX    { next frame draws into whichever was just shown     }
 end;
 
 { --------------------------------------------------------------------------
