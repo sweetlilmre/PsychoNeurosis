@@ -53,7 +53,7 @@ not listed there is meant to match the binary — if it does not, that is a bug.
 |---|---|
 | 001 | five scene units + `P1Intro` driver. Scenes 1–5 all tested and working. **Assembler audit NOT done.** |
 | 002 | `P2S1`, `P2S2`, five shared units, `P2Main` driver. Both scenes tested and working. **Assembler audit NOT done.** |
-| 003 | seven scene units + `P3Main` driver. **Audit done.** S1, S3, S4, S5 confirmed working. S2 and S7 outstanding. |
+| 003 | seven scene units + `P3Main` driver. **Audit done.** S1, S3, S4, S5 confirmed working. S7 rewritten from the binary and building, not yet run. S2 unverified. |
 | 004–007 | single files, never run, no harnesses. All 17 stubs, 3 inferred and 4 empty bodies live here. |
 
 All 17 harnesses build (`python tools/dosbox/dosbuild.py`).
@@ -62,44 +62,59 @@ All 17 harnesses build (`python tools/dosbox/dosbuild.py`).
 
 ## Outstanding: part 003
 
-### S7 (`TP3S7`) — black screen, substantially unimplemented
+### S7 (`TP3S7`) — rewritten from the binary, builds, **not yet run**
 
-`PART3_SPRITES.Prepare` carries a stale `[inferred]` marker calling it a caption
-routine, and the code only plots caption dots. The correct description is
-already in the second comment block above it. Everything below was decoded from
-the binary in this session but **not yet written**:
+`PART3_SPRITES.PAS` was rewritten wholesale. Every routine in segment `125e` has
+now been read; nothing in that segment is left inferred. What it does:
 
-`Sprites_Prepare` (`125e:0550`), parameter N at `[BP+4]`, three phases:
+`Sprites_Prepare` (`125e:0550`) is the whole per-member introduction, not a
+caption routine — three phases:
 
-1. **Fly-in.** `X := -20`; spin angle starts at **350**, `+5` a frame mod 360.
-   Per frame: if `X > 0` call `FadeStep`; clear the virtual screen; draw the
-   portrait; copy to `$A000`. Runs until `X = 70`. Y is fixed at **160**.
-2. **Orbit.** 180 frames. Angle `[BP-8]*2` degrees, converted via
-   `Pi/180`, `sin`/`cos`, times **60.0** (`CS:$054C`), then
-   `X := that + 140`, `Y := that + 100`. Still spinning `+5` a frame.
-3. **Typewriter.** `Delay(1000)`, then 10 rows x 50 columns, a character every
-   `Delay(10)`, drawn at `(Col*6, Row*6)` from
-   `DS:$6BB8 + N*$A00 + Row*$100 + Col`. Then `Delay(2000)` and a call to
-   `125e:0406` (not yet read).
+1. **Fly-in.** `for X := -20 to 70`; spin angle starts at 350, `+5` a frame
+   mod 360; `FadeStep` once `X > 0`; Y fixed at 160; position is `X*2`.
+2. **Orbit.** `for T := 0 to 180`, so 181 frames of `T*2` degrees = one full
+   turn. Radius **60.0** (`CS:$054C`) about (140, 100).
+3. **Typewriter.** `Delay(1000)`, then 10 rows x 50 columns, `Delay(10)` a
+   character, drawn **straight to `$A000`** at `(Col*6, Row*6)` from
+   `Captions[(N-1)*10 + Row][Col]`. Then `Delay(2000)` and `FadeOut`.
 
-`Sprites_Run` (`125e:077c`): `Prepare(1..4)`; four random angles `Random(360)`;
-`ClearScreen($A000,0)`; 64 x `FadeStep`; then sweep `[BP-4]` from `-20` to `120`
-drawing all four portraits a frame.
+`Sprites_Run` (`125e:077c`): `Prepare(1..4)`; four `Random(360)` angles;
+`ClearScreen($A000,0)`; 64 x `FadeStep`; then `for Sweep := -20 to 120` drawing
+all four longhand. X is fixed at 50/120/190/260, Y is `Sweep*2 + Wobble.Y`.
 
-**Two things the current source has wrong beyond the missing phases:**
+Everything that was outstanding is now resolved:
 
-- the four portraits are spread **horizontally** — X = 50, 120, 190, 260 — and
-  the Y sweep is `sweep*2 + TabB[angle].w1`, i.e. −40..240. `BaseY` and
-  `VSpacing` are misnamed;
-- `DrawRotated`'s parameters are `(Angle, A, B, X, Y, Src)`, X before Y.
+- **`125e:0388` `DrawRotated` is hand assembler** — the only one in the unit —
+  and is in verbatim with per-line comments and an equivalent-Pascal block. It
+  writes a *word* per source pixel to fill the gaps a rotated sample grid
+  leaves, swapping the byte order above 180°, and brackets each store with
+  `INC SI`/`DEC SI` so the source index still advances by exactly one. Its
+  parameters are `(Ang, SinA, CosA, X, Y, Src)`.
+- **`125e:0000` `DrawChar(X, Y, S, Segment)`** is compiled Pascal. It uses a
+  **5x5 bitmap font at `DS:$DDDE`** with the glyph's row index becoming screen
+  X and its column index screen Y — the font is stored transposed.
+- **`125e:0406` is `FadeOut`** — 64 passes decrementing every DAC channel,
+  with the single retrace wait *outside* both loops.
+- **`125e:0510` (and `125e:00d3`) are two identical nested `DegToRad`** copies,
+  one in `Prepare` and one in `Load`.
+- **`DS:$D29C`** is `Trig[0..359]` = `(Round(sin*64), Round(cos*64))`;
+  **`DS:$D83C`** is `Wobble[0..359]` = the same at amplitude **39.6**, read
+  225° along. The wobble is built as
+  `Round(sin(a)*39.6 + 65535.0) mod 65535` — the bias and modulo are how the
+  original gets a signed result out of `Round` without handing it a negative;
+  the low word of the LongInt is the answer.
 
-**Still to read:** `125e:0388` (the rotate-and-sample blit — very likely hand
-assembler), `125e:0000` (`DrawChar(X, Y, S, Segment)`, has `ENTER $10A` so
-compiled), `125e:0406`, `125e:0510` (a nested helper in the orbit), and the two
-360-entry x 4-byte tables at `DS:$D29C` and `DS:$D83C`.
+**The 1,550-byte read is NOT dead — it is the font.** 62 glyphs x 25 bytes.
+Earlier notes called it dead because the identical block in part 002 is, and
+because it contains only 0 and `$AB` — which is exactly a one-bit font stored a
+byte per pixel. `DrawChar` reads it at `[DI + $DAB8]` with
+`DI = Ord*25 + Row*5 + Col`, which resolves to the same `$DDDE` the
+`BlockRead` writes.
 
 Also confirmed: `137b:029f` is `FreeMem` — Scene7 calls it four times with 3136,
 Scene6 once with 36414.
+
+**Next:** run `TP3S7` and compare against `ORIG3.EXE`.
 
 ### S2 (`TP3S2`) — "looks too fast, may be correct"
 
@@ -150,7 +165,7 @@ Never run, no harnesses, and all the remaining debt:
 - `PART4_LEMMINGS` — empty bodies: `DrawChar`, `Setup`, `SetupPeriodic`
 - `PART7_FLIC` — empty body `ReferenceWork`; `[inferred] PlayFlic` (`100f:0453`)
 - `PART5_ROTOZOOM` — `[inferred] SetRotation` (`FUN_1102_02d1`)
-- `PART3_SPRITES` — `[inferred] Prepare` (`125e:0550`), covered above
+(`PART3_SPRITES.Prepare` used to be on this list; it is decoded now.)
 
 Parts 005 and 006 also want splitting into scene units the way 001–003 are; 004
 and 007 are single-scene. Add rows to `tools/mktests.py` — `dosbuild.py` picks
