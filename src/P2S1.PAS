@@ -30,6 +30,9 @@
       Palette_FadeOut       1008:02de
   =========================================================================== }
 
+{$G+}   { 286 instructions: 1008:0045 is SHL AX,8 and 1008:0069 SHR AX,8
+          in the blit. The original targets 386 and above. }
+
 unit P2S1;
 
 interface
@@ -116,43 +119,115 @@ end;
   PARAMETER ORDER. RET $A, so a pointer and three words. Taking the highest
   BP offset as the first declared: Src at BP+$A, XOfs at BP+8, Y at BP+6,
   XBase at BP+4. Scene1_DoorLoop calls it (@Door, $5C, $5E, $3C0).
-  -------------------------------------------------------------------------- }
-procedure BlitBitmapX(Src : Pointer; XOfs, Y, XBase : Integer);
-var
-  P     : ^Byte;
-  W, H  : Integer;
-  R, C  : Integer;
-  X     : Word;
-  D     : Word;
-  Plane : Integer;
-  V     : Byte;
-begin
-  P := Src;
-  W := P^;  Inc(LongInt(P));
-  H := P^;  Inc(LongInt(P));
-  X := XBase + XOfs;
 
-  for R := 0 to H - 1 do
-  begin
-    D     := RowOfs[Y + R] + (X shr 2);
-    Plane := X and 3;
-    for C := 0 to W - 1 do
-    begin
-      V := P^;
-      if V <> 0 then                      { 1008:0050 -- colour 0 is skipped }
+  HAND ASSEMBLER, transcribed verbatim. Like P2View's FillRect it uses BP as
+  a scratch register -- BP holds the Map Mask shifted up a byte, so the whole
+  16-bit Sequencer write is one MOV AX,BP away -- which is why it pushes BP
+  at the top and why nothing after 1008:002d can name a parameter.
+
+  The plane walk is the interesting part. Rather than recomputing
+  `1 shl (X and 3)` per pixel, it keeps the mask in the high byte of BP and
+  shifts it LEFT once per pixel. When it passes plane 3 the value reaches
+  $1000, and SUB BP,$F00 brings it back to $100 -- plane 0 -- while INC DI
+  steps the destination on by one byte. One shift, one compare, and the
+  addressing falls out of it.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      P := Src;
+      W := P^;  Inc(LongInt(P));
+      H := P^;  Inc(LongInt(P));
+      X := XBase + XOfs;
+      D     := RowOfs[Y] + (X shr 2);
+      Plane := X and 3;
+      for R := 0 to H - 1 do
       begin
-        SelectPlane(Plane);
-        Mem[VGASeg : D] := V;
+        Mask := Plane;
+        for C := 0 to W - 1 do
+        begin
+          SelectPlane(Mask);
+          if P^ <> 0 then Mem[VGASeg : D] := P^;
+          Inc(LongInt(P));
+          Inc(Mask);
+          if Mask = 4 then begin Mask := 0; Inc(D) end;
+        end;
+        Inc(D, 320 - W div 4);
       end;
-      Inc(LongInt(P));
-      Inc(Plane);
-      if Plane = 4 then
-      begin
-        Plane := 0;
-        Inc(D);
-      end;
-    end;
-  end;
+
+  That Pascal is close but not the same in two ways worth knowing. The
+  original selects the plane BEFORE testing the pixel, so it writes the
+  Sequencer even for transparent pixels; and its per-row correction is
+  `320 - (W div 4) - (1 if the mask ended in plane 0 or 1)`, which is not
+  expressible as one subtraction because it depends on where the mask
+  happened to stop.
+  -------------------------------------------------------------------------- }
+procedure BlitBitmapX(Src : Pointer; XOfs, Y, XBase : Integer); assembler;
+asm
+  PUSH DS                 { DS points at the source below                   }
+  PUSH BP                 { BP is about to become the plane mask            }
+  MOV  AX, $A000          { video memory                                    }
+  MOV  ES, AX             { ES:DI is the destination throughout             }
+  MOV  BX, Y              { the top row                                     }
+  SHL  BX, 1              { * 2, a word index                               }
+  MOV  DI, [BX + OFFSET RowOfs]   { DI := RowOfs[Y] -- P2ModeX's table      }
+  MOV  AX, XBase          { the pan base, $3C0                              }
+  ADD  AX, XOfs           { + the bitmap's own X                            }
+  LDS  SI, Src            { DS:SI := the bitmap, header first               }
+  MOV  CX, AX             { keep the pixel X for the plane number           }
+  SHR  AX, 2              { X div 4 -- four pixels to a byte offset         }
+  ADD  DI, AX             { DI := the first destination byte                }
+  AND  CX, 3              { CL := X mod 4 = the starting plane              }
+  XOR  AL, AL             { AL := 0, so AX is a clean mask<<8 below         }
+  MOV  AH, 1              { one bit, plane 0                                }
+  SHL  AH, CL             { moved to the starting plane                     }
+  MOV  BP, AX             { BP := the mask in its high byte                 }
+  MOV  BH, AH             { and BH keeps the row's starting mask            }
+  MOV  DX, $3C4           { Sequencer address register                      }
+  MOV  AL, 2              { register 2 -- Map Mask                          }
+  OUT  DX, AX             { select the first plane                          }
+  LODSB                   { AL := the bitmap's width byte                   }
+  MOV  BL, AL             { park it                                         }
+  LODSB                   { AL := the height byte                           }
+  MOV  CL, AL             { CL counts rows                                  }
+  MOV  CH, BL             { CH holds the width                              }
+  MOV  AL, AH             { dead -- overwritten at the top of @@Row         }
+@@Row:                    { <- once per row of the bitmap                   }
+  MOV  BL, CH             { BL counts the pixels across this row            }
+  MOV  AL, BH             { the row's starting plane mask                   }
+  SHL  AX, 8              { into the high byte                              }
+  MOV  BP, AX             { BP := the live mask, ready for the Sequencer    }
+@@Pixel:                  { <- once per pixel                               }
+  MOV  AX, BP             { AH := the mask                                  }
+  MOV  AL, 2              { AL := register 2, Map Mask                      }
+  OUT  DX, AX             { enable just this plane                          }
+  LODSB                   { AL := the source pixel; SI moves on             }
+  OR   AL, AL             { colour 0?                                       }
+  JZ   @@Skip             {   transparent -- draw nothing                   }
+  STOSB                   { write it; DI moves on...                        }
+  DEC  DI                 {   ...but it must not, so undo that. DI only     }
+                          {   advances when the mask wraps past plane 3     }
+@@Skip:                   { <- transparent pixels join here                 }
+  SHL  BP, 1              { rotate the mask to the next plane               }
+  CMP  BP, $1000          { has it passed plane 3?                          }
+  JL   @@NoWrap           {   no                                            }
+  SUB  BP, $F00           {   yes: $1000 back to $100, plane 0 again        }
+  INC  DI                 {   and NOW the destination byte steps on         }
+@@NoWrap:                 { <- both cases join here                         }
+  DEC  BL                 { one pixel done                                  }
+  JNZ  @@Pixel            { round again until the row is finished           }
+  MOV  AX, CX             { CH still holds the width                        }
+  SHR  AX, 8              { AX := the width                                 }
+  SHR  AX, 2              { div 4 = whole bytes the row advanced            }
+  CMP  BP, $200           { did the mask stop in plane 0 or 1?              }
+  JG   @@NoExtra          {   no                                            }
+  INC  AX                 {   yes: one more byte was consumed               }
+@@NoExtra:                { <- both cases join here                         }
+  ADD  DI, $140           { 320 -- one plane-row of the 1280-wide canvas    }
+  SUB  DI, AX             { less what the row already advanced              }
+  DEC  CL                 { one row done                                    }
+  JNZ  @@Row              { round again until the bitmap is drawn           }
+  POP  BP                 { BP is a frame pointer again                     }
+  POP  DS                 { restore our data segment                        }
 end;
 
 { --------------------------------------------------------------------------
@@ -164,11 +239,39 @@ end;
 
   $2FE8 is 12,264 = 146 * 85 - 146. So the whole image shifts up one row and
   sky comes in at the bottom: the door rolling open.
+
+  Note $2FE8 is a LITERAL in the original, not W * H - W computed from the
+  header -- only the width comes out of the header, and only to size the sky
+  row at the end. The height is baked in.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      W := Mem[Seg(Src^) : Ofs(Src^)];
+      Move(Mem[Seg(Src^) : Ofs(Src^) + 2 + W],
+           Mem[Seg(Src^) : Ofs(Src^) + 2], $2FE8);
+      FillChar(Mem[Seg(Src^) : Ofs(Src^) + 2 + $2FE8], W, SkyColour);
+
+  which is genuinely equivalent -- Move and FillChar are REP MOVSB and REP
+  STOSB. It is assembler because the original is, and because the original
+  does both with one pair of pointers instead of two calls.
   -------------------------------------------------------------------------- }
-procedure DoorRaiseOneRow;
-begin
-  Move(Door[2 + DoorW], Door[2], DoorW * DoorH - DoorW);
-  FillChar(Door[2 + DoorW * DoorH - DoorW], DoorW, SkyColour);
+procedure DoorRaiseOneRow(Src : Pointer); assembler;
+asm
+  PUSH DS                 { DS points at the bitmap below                   }
+  CLD                     { forwards -- this one really does set it         }
+  LDS  SI, Src            { DS:SI := the bitmap, for reading                }
+  LES  DI, Src            { ES:DI := the same bitmap, for writing           }
+  ADD  DI, 2              { the destination is the FIRST pixel row          }
+  LODSW                   { AX := the two header bytes; SI now at pixel 0   }
+  XOR  AH, AH             { keep the width only                             }
+  MOV  BX, AX             { park it -- the sky row below needs it           }
+  ADD  SI, AX             { the source is one row further in                }
+  MOV  CX, $2FE8          { 12,264 = 146 * 85 - 146, all but the last row   }
+  REP  MOVSB              { slide the whole image up by one row             }
+  MOV  CX, BX             { one row's worth of bytes                        }
+  MOV  AX, $80            { the sky colour                                  }
+  REP  STOSB              { and fill the row that came free at the bottom   }
+  POP  DS                 { restore our data segment                        }
 end;
 
 { --------------------------------------------------------------------------
@@ -351,7 +454,7 @@ begin
   { phase 1 -- the door rolls up, 85 rows }
   Frame := 0;
   repeat
-    DoorRaiseOneRow;
+    DoorRaiseOneRow(@Door);
     DrawStars;
     BlitBitmapX(@Door, DoorX, DoorY, DoorBase);
     EraseStars;

@@ -61,12 +61,20 @@ begin
   FixedToInt := (V + RealToFixed(0.5)) shr 16;
 end;
 
-{ 142a:00c0 -- MOV AX,$0013 / INT $10 and nothing else. Sits past the unit's
-  initialisation, which is empty. }
+{ --------------------------------------------------------------------------
+  142a:00c0 -- MOV AX,$0013 / INT $10 and nothing else, with no stack frame.
+  Sits past the unit's initialisation, which is empty.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      (none). Setting a video mode is a BIOS call; Turbo Pascal has no way to
+      make one without an asm block or an Intr() call, and Intr() would push
+      a Registers record the original does not have.
+  -------------------------------------------------------------------------- }
 procedure SetMode13h; assembler;
 asm
-  mov ax, $0013
-  int $10
+  MOV  AX, $0013          { BIOS function 0, mode $13: 320x200, 256 colours }
+  INT  $10                { the video BIOS                                  }
 end;
 
 { 142a:00a7 -- the unit's initialisation body is empty. }

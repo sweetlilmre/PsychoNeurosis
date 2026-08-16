@@ -13,6 +13,17 @@ error, because the compiler reports them somewhere other than where they are.
                   produces "Syntax error" inside an asm block; Text is a
                   built-in type.
 
+  DSeg addresses  Mem[DSeg:$XXXX] or Ptr(DSeg, $XXXX) reaching into our OWN
+                  data segment at an address copied out of the original. This
+                  one compiles, runs, and silently does nothing useful: the
+                  address is where the data sits in the ORIGINAL's DGROUP, and
+                  Turbo Pascal decides where ours goes. It cost a whole scene
+                  -- part 003 scene 2 loaded its waypoint table to $B250, the
+                  array it should have filled stayed zero, and the star tube
+                  neither moved nor ran to length. Name the variable instead.
+                  Mem[$A000:...] and Mem[VirtScrSeg:...] are fine; those are
+                  addresses we do not own and cannot name.
+
 Run it before reaching for the compiler:
 
     python tools/paslint.py
@@ -36,6 +47,30 @@ RESERVED = {
 }
 
 DECL = re.compile(r"(?im)^\s*(?:procedure|function)\s+\w+\s*\(([^)]*)\)")
+
+# Mem[DSeg : $B250]  /  MemW[DSeg:X]  /  Ptr(DSeg, $B250)
+DSEG = re.compile(r"(?i)\b(Mem[WL]?\s*\[\s*DSeg\s*:|Ptr\s*\(\s*DSeg\s*,)")
+
+
+def strip_comments(src):
+    """Blank out { } and (* *) comments, keeping line numbering intact."""
+    out = list(src)
+    i, n = 0, len(src)
+    while i < n:
+        if src[i] == "{":
+            j = src.find("}", i)
+            j = n if j < 0 else j + 1
+        elif src.startswith("(*", i):
+            j = src.find("*)", i)
+            j = n if j < 0 else j + 2
+        else:
+            i += 1
+            continue
+        for k in range(i, j):
+            if out[k] != "\n":
+                out[k] = " "
+        i = j
+    return "".join(out)
 
 
 def check(path):
@@ -70,6 +105,16 @@ def check(path):
                 why = RESERVED.get(ident.lower())
                 if why:
                     problems.append((ln, "parameter '%s': %s" % (ident, why)))
+
+    # ---- hard-coded addresses in our own data segment
+    code = strip_comments(src)
+    for m in DSEG.finditer(code):
+        ln = code[:m.start()].count("\n") + 1
+        problems.append((ln, "%s... addresses our own DGROUP at an offset "
+                             "taken from the original -- Turbo Pascal decides "
+                             "that layout, so this writes to the wrong place. "
+                             "Name the variable and use it."
+                         % m.group(1).replace(" ", "")))
 
     return problems
 
