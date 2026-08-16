@@ -68,6 +68,10 @@ NAMES = {
     "PART3_SPRITES.PAS": ("P3SPRITE.PAS", "Part3Sprites", "P3Sprite"),
     "P3MAIN.PAS":        ("P3MAIN.PAS",   "P3Main",       "P3Main"),
 
+    # part 004 -- its own VGA and music units, not the same builds as any
+    # other part's, plus the one scene.
+    "P4VGA.PAS":          ("P4VGA.PAS",   "P4VGA",         "P4VGA"),
+    "P4VT.PAS":           ("P4VT.PAS",    "P4VT",          "P4VT"),
     "PART4_LEMMINGS.PAS": ("P4LEMS.PAS",  "Part4Lemmings", "P4Lems"),
     "PART5_ROTOZOOM.PAS": ("P5ROTO.PAS",  "Part5Rotozoom", "P5Roto"),
     "PART6_CREDITS.PAS":  ("P6CRED.PAS",  "Part6Credits",  "P6Cred"),
