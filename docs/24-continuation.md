@@ -54,7 +54,8 @@ not listed there is meant to match the binary — if it does not, that is a bug.
 | 001 | five scene units + `P1Intro` driver. Scenes 1–5 all tested and working. **Audit done**, five routines back to verbatim — needs a retest. |
 | 002 | `P2S1`, `P2S2`, five shared units, `P2Main` driver. Both scenes tested and working. **Audit done**, twenty-two routines back to verbatim — needs a retest. |
 | 003 | seven scene units + `P3Main` driver. **Audit done, and every unit now passes `tools/asmaudit.py`.** S1, S3, S4, S5 confirmed working. S2 and S7 rewritten from the binary and building, neither re-run yet. |
-| 004–007 | single files, never run, no harnesses. All 17 stubs, 3 inferred and 4 empty bodies live here. |
+| 004 | `P4VGA`, `P4VT` and `PART4_LEMMINGS`, all transcribed in full — no stubs, nothing inferred. `TP4S1` builds. **Not yet run.** See `docs/25-part4-notes.md`. |
+| 005–007 | single files, never run, no harnesses. The remaining stubs, inferred routines and empty bodies live here. |
 
 All 17 harnesses build (`python tools/dosbox/dosbuild.py`).
 

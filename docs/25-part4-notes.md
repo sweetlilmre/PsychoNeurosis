@@ -3,7 +3,10 @@
 Raw findings, written down as they are read so the work survives a context
 reset. Everything here is off `NEUROSIS_004.exe`; nothing is inferred.
 
-`src/P4VGA.PAS` and `src/P4VT.PAS` are **done**. The scene unit is not.
+**Part 004 is done.** `P4VGA.PAS`, `P4VT.PAS` and `PART4_LEMMINGS.PAS` are all
+transcribed in full, with no inference and no stubs, and `TP4S1` builds. These
+notes are kept as the working record of how it was read; the source is the
+authority.
 
 ---
 
@@ -275,37 +278,76 @@ That identifies block 13.
 
 ---
 
-## Still to read
+## What the last ten routines turned out to be
 
-Everything in the state machine and the frame loop:
+All read; nothing outstanding.
 
-`Effect_ColumnSlideIn 1005:0000`, `Lemmings_Intro 1005:0a86`,
-`LemState5_Builder 0d1a`, `LemState4_Basher 0df5`, `LemState10_Miner 1166`,
-`LemState1_Walker 14d6`, `Scroller_DrawChar 0853`, `Scroller_Step 08ad`,
-`FUN_1005_1c9a`, `FUN_1005_1d3a`.
+- **`1005:0000 ColumnSlideIn`** — gives every one of 200 columns a random head
+  start of `Random(200) - 400` and then runs 400 passes, each copying the
+  columns whose offset has reached zero. The title screen assembles out of
+  vertical strips arriving at staggered times.
+- **`1005:0853 ScrollChar`** — writes ONE column of one glyph into buffer
+  column 320, the off-screen edge. The font is 62 glyphs of 21 columns x 18
+  rows stored column-major; the index is `Ch*378 + Col*18 + Row + 1 - 12115`
+  and 12115 is `32*378 + 18 + 1`, so the character is 32-based and the column
+  one-based.
+- **`1005:08ad ScrollStep`** — advances the column counter by **two** because
+  the bitmap slides two pixels a frame, so every other column of every glyph
+  is never written and the message is drawn at half horizontal resolution.
+  That is the original, not a slip. It also runs the two side animations from
+  one six-frame bank read in opposite directions, and rotates the eight-entry
+  colour cycle **twice** per frame.
+- **`1005:14d6 Walker`** — ground scan, then a wall check at head height that
+  reverses it, then a step check that lets it climb. Colour 3 kills one way,
+  `$20..$29` another, and **colour `$12` sends it to state 9, for which there
+  is no handler at all** — the lemming stops being simulated. Left in.
+- **`1005:0b68 Faller`** — lands as a walker under 11 pixels of fall; past
+  that the FIRST hard landing is survived and counted and the second splats.
+  Drifts one pixel sideways for the first two rows of a fall only.
+- **`1005:0df5 Digger`** (state 4) — diagonal: two pixels along and one down
+  every sixth frame. **`1005:1166 Tunneller`** (state 10) — horizontal, never
+  changes Y. Ghidra's "Basher" and "Miner" labels are the wrong way round.
+- **`1005:0d1a Builder`** — lays a five-pixel brick in colour `$4D` into the
+  hillside every sixth frame, stepping up and right. Gives up after 500 ticks
+  and sets a 20-frame timer, which becomes a fuse.
+- **`1005:1954 Explode`** — while the fireball is young it bumps DAC entries
+  `$E0..$E9` up toward the scene palette, which `LoadAssets` deliberately
+  blacked. The explosion is already on screen in colours nobody can see until
+  the flash brings them up.
+- **`1005:0a86 Intro`** — blanks the DAC, shows the hillside, fades up, then
+  runs a seven-frame 65x24 animation BACKWARDS at (5, 50) 150 ms apart, and
+  starts the music.
+- **`1005:1c9a Setup`** — the work screen and the scroll buffer.
+  **`1005:1d3a`** is an empty unit initialisation.
 
-Also outstanding:
+## The two terrain sets
 
-- the 32-byte SET constant at `DS:$0B48` that decides what counts as solid
-  ground, and whatever second set the walker uses;
-- what the 24-byte table at `DS:$00F5` is;
-- BlockReads 1 (`$5B8C` to a GetMem'd block), 17 (`$2AA8` to `DS:$91A7`) and
-  18 (`$348` to `DS:$BC4F`);
-- `LemState2_Faller`'s outer loop reads as though it can only ever run once
-  -- confirm against the raw disassembly rather than the decompiler.
-
-`Demo_Main` (`1005:1cd6`) is:
+Read out of the code segment at `1005:0B48` / `1005:1496` (ground) and
+`1005:0DD5` / `1005:1146` / `1005:14B6` (wall) — five references, two
+distinct constants:
 
 ```
-    MusicDetect                 11d9:0000
-    FUN_1005_1c9a
-    LoadAssets
-    Intro
-    Saved := GetVolume
-    MainLoop
-    FreeMem 64000  @DS:$0305        the second screen
-    FreeMem $17FA  @DS:$0309        the scroll buffer
-    MusicStop                   11d9:004E
-    SetVolume(Saved)
-    ...
+    ground  [4,5, $0F, $15..$18, $1D, $1F, $33, $36,
+             $3E..$40, $42..$47, $4D..$52]
+    wall    the same PLUS [$20..$29]
 ```
+
+so `$20..$29` blocks movement but cannot be stood on, and touching it kills.
+`$4D` is in both, which is the builder's brick colour — bricks are walkable.
+This confirms the plate comment already on `LemState1_Walker` independently.
+
+## The message
+
+Compiled into DGROUP at `DS:$0005`, 237 bytes, which is exactly the `< $ED`
+bound `ScrollStep` tests:
+
+> FOR THOSE OF YOU THAT REALLY HATE LONG, BORING SCROLLIES, WE DECIDED TO PUT
+> A NEW TWIST ON IT \*\*\* BUT IF YOU DONT LIKE LEMMINGS, THEN THERE IS NO
+> HOPE, HIT ANY KEY NOW. THE ANY KEY? THE ONE ON THE SIDE MARKED -POWER-
+> \*\*\*
+
+## All twenty asset blocks identified
+
+The four that were open resolved as: **1** the 62-glyph scroller font,
+**13** the hillside's own 43x24 animation, **17** the intro's 65x24
+animation, **18** the two 14x10 animations either side of the message.

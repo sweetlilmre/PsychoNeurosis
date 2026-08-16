@@ -1,26 +1,52 @@
 { ===========================================================================
-  Psycho Neurosis (Asphyxia, 1994) -- NEUROSIS.004, the Lemmings game
-  Reconstructed from NEUROSIS_004.exe.
+  Psycho Neurosis (Asphyxia, 1994) -- NEUROSIS.004, "Lemmings"
+  Reconstructed from NEUROSIS_004.exe, segment 1005, in full.
 
-  A WORKING LEMMINGS ENGINE -- pixel-accurate terrain collision, destructible
-  terrain and a ten-state skill machine -- playing a scripted level that
-  solves itself, with the scroll text running alongside. That is the "new
-  twist" the text promises.
+  A hillside with up to 25 lemmings walking, falling, tunnelling, building
+  and exploding across it, a message scrolling underneath, and two little
+  animations either side of it. It runs until you press a key -- and then it
+  keeps running until the music has faded out.
 
-  No floating point at all; the only effect part that never touches the x87
-  emulator.
+  THE TERRAIN IS THE ARTWORK. There is no separate collision map: a lemming
+  decides whether to walk, climb, turn, fall or die by READING PIXELS out of
+  the background screen with GetPixel, and two 32-byte colour sets say what
+  each pixel means. Which is why part 004's VGA unit is the only one in the
+  demo with a pixel read in it.
+
+  It follows that everything which digs or builds does so by DRAWING into
+  that background: the basher and the miner erase with colour 0, the builder
+  lays bricks in colour $4D, and a lemming that splats stamps its last frame
+  permanently into the hillside. The level is progressively destroyed and the
+  destruction is the collision state.
 
   ADDRESS MAP
-    Demo_Main            1005:1cd6   Lemmings_LoadAssets  1005:00a6
-    Lemmings_Intro       1005:0a86   Lemmings_MainLoop    1005:1bbb
-    Lem_UpdateAll        1005:1a4c   Lem_Spawn            1005:06e7
-    Lem_SetState         1005:0b22   Lem_Remove           1005:07d8
-    LemState1_Walker     1005:14d6   LemState2_Faller     1005:0b68
-    LemState4_Basher     1005:0df5   LemState10_Miner     1005:1166
-    LemState8_Splat      1005:17ff   LemState11_Countdown 1005:1954
-    VGA_GetPixel         11e3:0048   Scroller_Step        1005:08ad
-    Effect_ColumnSlideIn 1005:0000
+    Demo_Main            1005:1cd6   Setup                1005:1c9a
+    LoadAssets           1005:00a6   Intro                1005:0a86
+    MainLoop             1005:1bbb   UpdateAll            1005:1a4c
+    ColumnSlideIn        1005:0000   BackdropAnim         1005:0a4f
+    InitAll              1005:06c8   Spawn                1005:06e7
+    Remove               1005:07d8   SetState             1005:0b22
+    DrawSprite           1005:03b9   Blit                 1005:037a
+    VLine                1005:0328   HLine                1005:0354
+    CopyScreen           1005:0835   ScrollRender         1005:07f9
+    ScrollChar           1005:0853   ScrollStep           1005:08ad
+    Walker    (state 1)  1005:14d6   Faller    (state 2)  1005:0b68
+    Fuse      (state 3)  1005:18fc   Digger    (state 4)  1005:0df5
+    Builder   (state 5)  1005:0d1a   DeathA    (state 6)  1005:1850
+    DeathB    (state 7)  1005:18a6   Splat     (state 8)  1005:17ff
+    Tunneller (state 10) 1005:1166   Explode   (state 11) 1005:1954
+
+  A NOTE ON TWO NAMES. Ghidra calls state 4 "Basher" and state 10 "Miner".
+  Read against what they do, they are the other way round: state 4 advances
+  X by two AND Y by one per bite, so it digs DIAGONALLY -- a Lemmings miner;
+  state 10 advances X only, so it tunnels HORIZONTALLY -- a Lemmings basher.
+  They are called Digger and Tunneller here to avoid inheriting the mix-up.
+
+  There is no 386 code anywhere in part 004, so unlike parts 001, 002 and 005
+  there is no TASM object to link.
   =========================================================================== }
+
+{$G+}   { 286 instructions: SHL BX,1 with an immediate in the blits. }
 
 unit Part4Lemmings;
 
@@ -30,527 +56,525 @@ procedure RunPart4;
 
 implementation
 
-uses VGA, Crt, DemoVT;
+uses Crt, P4VGA, P4VT;
 
 const
-  { The scroll text is 237 characters, and the code bounds-checks against
-    $ED = 237 exactly. }
-  ScrollLen   = 237;
+  MaxLem     = 25;            { 1005:06c8 clears 1..25 }
+  SpawnLimit = $50;           { 80 -- 1005:06ee, then Spawn does nothing }
+  SpawnEvery = 20;            { 1005:1c33 -- a spawn every 20th frame }
 
-  CharStep    = 2;        { columns advanced per frame }
-  CharWrap    = 21;       { $15 -- about 11 characters visible at a time }
-  WalkStates  = 11;       { the walk counter cycles 1..11 }
-  BigSprite   = 1032;     { $408 bytes per walk frame }
-  SmallSprite = 140;      { $8C  bytes per walk frame }
-  IntroSprite = 1560;     { $618 bytes per intro frame }
-  CycleFirst  = $80;      { palette entries $80..$87 colour-cycle }
-  CycleCount  = 8;
+  { 1005:06e7 -- where they come out of the hatch. }
+  SpawnX     = $23;           { 35 }
+  SpawnY     = $3C;           { 60 }
 
+  { The states, as the byte at record +13. State 9 is reachable and has NO
+    handler -- see Walker. }
+  StWalker    = 1;
+  StFaller    = 2;
+  StFuse      = 3;
+  StDigger    = 4;            { diagonal }
+  StBuilder   = 5;
+  StDeathA    = 6;
+  StDeathB    = 7;
+  StSplat     = 8;
+  StStuck     = 9;            { no handler exists }
+  StTunneller = 10;           { horizontal }
+  StExplode   = 11;
 
-const
-  MaxLems   = 25;         { $19 concurrent slots }
-  TotalLems = 80;         { $50 released in all }
-  LemRec    = 21;         { $15 bytes per lemming, based at DS:$02FC }
-  HatchX    = 35;         { $23 }
-  HatchY    = 60;         { $3C }
-  SplatDrop = 11;         { fall further than this and the lemming splats }
+  BrickColour = $4D;          { 1005:0d5e -- and it is in both terrain sets }
+  ScrollRows  = 18;           { the scroller is 18 pixels tall }
+  ScrollPitch = $155;         { 341 bytes per row: 320 visible + 21 ahead }
+  ScrollSize  = ScrollRows * ScrollPitch;      { $17FA = 6138 }
+  ScrollEdge  = 320;          { new pixels are fed in at column 320 }
+  GlyphPitch  = $17A;         { 378 bytes per character = 21 columns of 18 }
+  GlyphCols   = 21;
+  FirstChar   = 32;           { the font starts at space }
+  GlyphCount  = 62;           { 23436 / 378 -- space to ']' }
+  TextLen     = $ED;          { 237 -- ScrollStep's own bound }
+
+  DataOfs     = $001228CE;    { NEUROSIS.DAT -- 1,189,070 }
 
 type
-  { Terrain solidity is a SET of colours tested against the pixel read back
-    from the virtual screen -- the level artwork IS the collision data, and
-    digging just draws colour 0 over it.
-
-    Both sets are 32-byte constants in the CODE segment (CS:$1496 and
-    CS:$14B6 in segment 1005), reached through a CS: override -- Borland puts
-    constant sets next to the code that tests them, not in DGROUP. }
-  TColourSet = set of Byte;
-
-const
-  { Can a lemming stand on it? }
-  Ground : TColourSet =
-    [$04..$05, $0F, $15..$18, $1D, $1F, $33, $36,
-     $3E..$40, $42..$47, $4D..$52];
-
-  { Does it block a lemming? Ground plus the hazard stripe. You cannot stand
-    on $20..$29 and touching it kills you, but it still stops you walking. }
-  Wall : TColourSet =
-    [$04..$05, $0F, $15..$18, $1D, $1F..$29, $33, $36,
-     $3E..$40, $42..$47, $4D..$52];
-
-  BrickColour = $4D;      { the builder's bricks -- note $4D is IN Ground,
-                            so a laid brick is walkable the moment it exists }
-
-type
-  { Offsets are what Lem_Spawn and Lem_SetState actually write. }
-  TLemming = record
-    X, Y      : Integer;    { +0  +2  }
-    { +4 is NOT unused: LemState2_Faller counts hard landings in it, and
-      splats on the second. }
-    HardLandings : Integer; { +4 }
-    Frame     : Integer;    { +6   reset to 1 by Lem_SetState }
-    Tick      : Integer;    { +8   reset to 0 by Lem_SetState }
-    Countdown : Integer;    { +10  ticks DOWN to 1 -> state 3
-                                   ticks UP to -1 -> removed }
-    Alive     : Byte;       { +12  the free-slot test }
-    State     : Byte;       { +13  written by Lem_SetState }
-    Dir       : ShortInt;   { +14  +1 or -1 }
-    FallDist  : Byte;       { +15 }
-    TargetX   : Integer;    { +16 }
-    TargetY   : Integer;    { +18 }
-    TargetSt  : Byte;       { +20 }
+  { 21 bytes -- DS:$0311, indices 1..25, running to DS:$051D. }
+  TLem = record
+    X, Y       : Integer;     { +0, +2  }
+    Bounces    : Integer;     { +4  -- a second hard landing splats }
+    Frame      : Integer;     { +6  -- one-based, indexes the sprite banks }
+    Tick       : Integer;     { +8  -- sub-frame counter }
+    Timer      : Integer;     { +10 -- >0 counts down to a fuse,
+                                       <0 counts up to removal }
+    Active     : Byte;        { +12 -- 0 means the slot is free }
+    State      : Byte;        { +13 }
+    Dir        : ShortInt;    { +14 -- +1 right, -1 left }
+    FallDist   : Byte;        { +15 -- 4+ switches to the tumbling sprite,
+                                       11+ makes the landing fatal }
+    TrigX      : Integer;     { +16 } { reach (TrigX, TrigY) and the lemming }
+    TrigY      : Integer;     { +18 } {   is forced into TrigState           }
+    TrigState  : Byte;        { +20 }
   end;
 
+  TPal768 = array[0..767] of Byte;
+
 var
-  Lem      : array[1..MaxLems] of TLemming;
-  Released : Integer;
+  { DS:$0311 }
+  Lem        : array[1..MaxLem] of TLem;
+  { DS:$051E and DS:$0520 }
+  LiveCount  : Integer;
+  Spawned    : Integer;
 
-{ ===========================================================================
-  RECONSTRUCTION SCAFFOLDING -- see the note in PART1_INTRO.PAS.
-    [transcribed] read out of the binary   [inferred] implied by call sites
-    [stub] signature only
-  =========================================================================== }
+  { The two screens. VirtScrSeg (P4VGA, DS:$CF8C) holds the hillside and is
+    what GetPixel reads; this one is composed into each frame. DS:$0305 and
+    DS:$030D. }
+  WorkScr    : Pointer;
+  WorkSeg    : Word;
 
+  { DS:$0309 -- 18 rows of 341, the scroller's own bitmap. }
+  ScrollBuf  : Pointer;
+
+  { DS:$00F2 the column within the current glyph, DS:$00F4 the index into
+    the message. }
+  ScrollCol  : Integer;
+  ScrollIdx  : Byte;
+
+  { DS:$00F5 -- eight RGB triples, rotated one entry per frame and written
+    to DAC entries $80..$87. That is the colour cycling on the message. }
+  ScrollPal  : array[0..7, 0..2] of Byte;
+
+  { DS:$030F and DS:$0310 -- the two background animations' counters. }
+  SideTick   : Byte;
+  HillTick   : Byte;
+
+  { DS:$0304 -- the tracker volume as we found it. }
+  SavedVol   : Byte;
+
+  { DS:$0172 -- ColumnSlideIn's per-column start offset, 201 entries. }
+  ColOfs     : array[0..200] of Integer;
+
+  { DS:$CC07 -- the scene palette, which Explode fades entries $E0..$E9 up
+    towards. }
+  ScenePal   : TPal768;
+
+{ --------------------------------------------------------------------------
+  THE ASSETS.  Lemmings_LoadAssets (1005:00a6) seeks $001228CE and reads
+  twenty blocks. Every sprite bank is indexed ONE-BASED, which is why the
+  original's instructions carry base - stride and the addresses look wrong
+  until you allow for it.
+
+    assets/part004/scroll_font.bin        23436  62 glyphs of 21 x 18
+    assets/part004/title_screen.pal          768
+    assets/part004/title_screen.bin        64000  the picture the columns
+                                                  slide in to make
+    assets/part004/hillside.bin            64000  the level, and the
+                                                  collision map
+    assets/part004/hillside.pal              768
+    assets/part004/scene.pal                 768  DS:$CC07
+    assets/part004/lem_walk.bin              432  8 frames of 6 x 9
+    assets/part004/lem_tumble.bin            400  4 frames of 10 x 10
+    assets/part004/lem_splat.bin             480  4 frames of 12 x 10
+    assets/part004/lem_dig.bin              1326  6 frames of 17 x 13
+    assets/part004/lem_tunnel.bin            420  3 frames of 14 x 10
+    assets/part004/lem_deathb.bin            800  5 frames of 16 x 10
+    assets/part004/hill_anim.bin            3096  3 frames of 43 x 24
+    assets/part004/lem_deatha.bin            648  6 frames of 9 x 12
+    assets/part004/lem_build.bin             720  6 frames of 12 x 10
+    assets/part004/deatha_still.png         3180  one 53 x 60 picture
+    assets/part004/intro_anim.bin          10920  7 frames of 65 x 24
+    assets/part004/side_anim.bin             840  6 frames of 14 x 10
+    assets/part004/explosion.bin           24255  7 frames of 63 x 55
+    assets/part004/lem_fuse.bin              750  5 frames of 10 x 15
+  -------------------------------------------------------------------------- }
+type
+  TFont     = array[0..GlyphCount * GlyphPitch - 1] of Byte;   { DS:$CC03 }
+var
+  Font      : ^TFont;
+  WalkBank  : array[1..8]  of array[0..53]   of Byte;   { DS:$0522 }
+  TumbleBk  : array[1..4]  of array[0..99]   of Byte;   { DS:$06D2 }
+  SplatBank : array[1..4]  of array[0..119]  of Byte;   { DS:$12B8 }
+  DigBank   : array[1..6]  of array[0..220]  of Byte;   { DS:$1498 }
+  TunnelBk  : array[1..3]  of array[0..139]  of Byte;   { DS:$19C6 }
+  DeathBBk  : array[1..5]  of array[0..159]  of Byte;   { DS:$1B6A }
+  HillAnim  : array[1..3]  of array[0..1031] of Byte;   { DS:$858F }
+  DeathABk  : array[1..6]  of array[0..107]  of Byte;   { DS:$1E8A }
+  BuildBank : array[1..6]  of array[0..119]  of Byte;   { DS:$2112 }
+  DeathAPic : array[0..3179] of Byte;                   { DS:$BF97 }
+  IntroAnim : array[1..7]  of array[0..1559] of Byte;   { DS:$91A7 }
+  SideAnim  : array[1..6]  of array[0..139]  of Byte;   { DS:$BC4F }
+  Explosion : array[1..7]  of array[0..3464] of Byte;   { DS:$26D0 }
+  FuseBank  : array[1..5]  of array[0..149]  of Byte;   { DS:$23E2 }
+
+{ --------------------------------------------------------------------------
+  THE TWO TERRAIN SETS, read out of the code segment at 1005:0B48 / 1005:1496
+  (ground) and 1005:0DD5 / 1005:1146 / 1005:14B6 (wall). Five references, two
+  distinct 32-byte constants, and they differ by exactly one run:
+
+      ground  [4,5, $0F, $15..$18, $1D, $1F, $33, $36,
+               $3E..$40, $42..$47, $4D..$52]
+      wall    the same PLUS [$20..$29]
+
+  So $20..$29 is a hazard stripe: it BLOCKS you but you cannot STAND on it,
+  and the walker and faller both kill on touching it. $4D is in both, which
+  is the builder's brick colour -- bricks are solid and walkable.
+  -------------------------------------------------------------------------- }
 const
-  BigBank    = 0;            { offset of the 1032-byte walk frames }
-  SmallBank  = 0;            { offset of the 140-byte carrier frames }
-  LastColour = 0;
+  Ground : set of Byte =
+    [4, 5, $0F, $15..$18, $1D, $1F, $33, $36, $3E..$40, $42..$47, $4D..$52];
+  Wall   : set of Byte =
+    [4, 5, $0F, $15..$18, $1D, $1F, $20..$29, $33, $36, $3E..$40, $42..$47,
+     $4D..$52];
 
-  { Sprite bank offsets within the asset block, from Lem_DrawSprite. }
-  WalkBank   = $04EC;        { walker and faller share it, 8 frames }
-  FallBank   = $066E;
-  MinerBank  = $13BB;
-  SplatBank  = $1240;
-  BashBank   = $193A;
-  DeathBBank = $1ACA;
-  DeathABank = $1E1E;
-  BuildBank  = $209A;
-  TimerBank  = $234C;
+  { 1005:14fa and 1005:0b8e -- two single colours the walker treats specially,
+    outside either set. }
+  DeathAColour = 3;
+  StuckColour  = $12;
 
-var
-  BackdropSeg : Word;
-  FrameCounter: LongInt;
-  { the PART-level countdown that ends the scene, not a lemming field }
-  Countdown   : Integer;
-  Virt, Aux   : Pointer;
-  BackSeg     : Word;        { DS:$030D -- the draw target }
-  LiveCount   : Integer;     { DS:$051E }
-  { DS:$CC07 -- the target palette the explosion flash walks toward }
-  FlashTarget : array[0..255, 0..2] of Byte;
-  Cycle       : array[0..23] of Byte;    { the 8-entry colour band, RGB }
-  ScrollText  : String;
-  SignOff     : String;
+{ DS:$0005 -- the message, compiled into DGROUP. Element 0 is a zero byte and
+  ScrollStep indexes from 1; the $ED bound it tests is exactly this length. }
+const
+  Message : array[0..TextLen - 1] of Char = (
+    #0,
+    ' ','F','O','R',' ','T','H','O','S','E',' ','O','F',' ','Y','O','U',' ',
+    'T','H','A','T',' ','R','E','A','L','L','Y',' ','H','A','T','E',' ','L',
+    'O','N','G',',',' ','B','O','R','I','N','G',' ','S','C','R','O','L','L',
+    'I','E','S',',',' ','W','E',' ','D','E','C','I','D','E','D',' ','T','O',
+    ' ','P','U','T',' ','A',' ','N','E','W',' ','T','W','I','S','T',' ','O',
+    'N',' ','I','T',' ','*','*','*',' ',' ',' ',' ',' ',' ','B','U','T',' ',
+    'I','F',' ','Y','O','U',' ','D','O','N','T',' ','L','I','K','E',' ','L',
+    'E','M','M','I','N','G','S',',',' ','T','H','E','N',' ','T','H','E','R',
+    'E',' ','I','S',' ','N','O',' ','H','O','P','E',',',' ','H','I','T',' ',
+    'A','N','Y',' ','K','E','Y',' ','N','O','W','.',' ','T','H','E',' ','A',
+    'N','Y',' ','K','E','Y','?',' ','T','H','E',' ','O','N','E',' ','O','N',
+    ' ','T','H','E',' ','S','I','D','E',' ','M','A','R','K','E','D',' ','-',
+    'P','O','W','E','R','-',' ',' ',' ',' ',' ',' ','*','*','*',' ',' ',' ',
+    ' ',' ');
 
-{ [transcribed] VGA_GetPixel 11e3:0048 -- reads the VIRTUAL screen. This is
-  the whole collision system: the level artwork is the collision data. }
-function GetPixel(X, Y : Integer; Segment : Word) : Byte;
-begin
-  if (X < 0) or (X > 319) or (Y < 0) or (Y > 199) then
-    GetPixel := 0
-  else
-    GetPixel := Mem[Segment : Y * 320 + X];
-end;
-
-{ [transcribed] VGA_FillRect 1005:0328 and VGA_FillTri 1005:0354.
-
-  Both names are misnomers -- they are SPAN fills, one pixel thick:
-
-    FillRect  vertical   column X, rows YTop..YBottom   (STOSB, DI += 319)
-    FillTri   horizontal row Y,    columns X1..X2       (REP STOSB)
-
-  Both index the same row table the sprite blitter uses, at DS:$CF8E. The
-  original pushes its arguments in the opposite order to this declaration
-  (X innermost, Segment last); the behaviour is identical. }
-procedure FillRect(X, YTop, YBottom : Integer; Colour : Byte; Segment : Word);
-var
-  Y : Integer;
-begin
-  for Y := YTop to YBottom do
-    if (Y >= 0) and (Y < 200) and (X >= 0) and (X < 320) then
-      Mem[Segment : Y * 320 + X] := Colour;
-end;
-
-procedure FillTri(X1, X2, Y : Integer; Colour : Byte; Segment : Word);
-var
-  X : Integer;
-begin
-  if (Y < 0) or (Y > 199) then Exit;
-  for X := X1 to X2 do
-    if (X >= 0) and (X < 320) then
-      Mem[Segment : Y * 320 + X] := Colour;
-end;
-
-{ Forward declarations -- Lem_UpdateAll dispatches to all of these before any
-  of them is defined. }
-procedure Remove(N : Integer); forward;
 procedure SetState(S : Byte; N : Integer); forward;
-procedure Faller(N : Integer); forward;
-procedure Miner(N : Integer); forward;      { state 4  -- diagonal }
-procedure Basher(N : Integer); forward;     { state 10 -- horizontal }
-procedure DeathA(N : Integer); forward;
-procedure DeathB(N : Integer); forward;
-procedure Splat(N : Integer); forward;
-procedure Countdown11(N : Integer); forward;
-procedure Walker(N : Integer); forward;
-procedure ColumnSlideIn; forward;      { 1005:0000 }
-procedure FadeStep; forward;
-procedure TimerState(N : Integer); forward;
-procedure Builder(N : Integer); forward;
+procedure Remove(N : Integer); forward;
+
+{ ==========================================================================
+  The drawing layer. Five routines, all hand assembler in the binary.
+  ========================================================================== }
 
 { --------------------------------------------------------------------------
-  The sprite banks live at FIXED DGROUP ADDRESSES, not in one heap block.
-  Lemmings_LoadAssets reads each one straight to its own DS offset -- $0522,
-  $06D2, $12B8, $1498, $19C6, $1B6A, $1E8A, $2112, $23E2, $26D0, $858F,
-  $91A7, $BC4F, $BF97 -- so DrawSprite's constants are data-segment addresses.
+  1005:0328 -- a one-pixel-wide VERTICAL run. HAND ASSEMBLER, verbatim.
 
-  That also disposes of an earlier worry about the 202,007-byte total not
-  fitting a single GetMem: it never was one allocation. The total is one
-  23,436-byte heap block, two 64,000-byte screen loads, three 768-byte
-  palettes and these fourteen DGROUP arrays.
+  Ghidra calls this VGA_FillRect and it is nothing of the kind: there is one
+  STOSB per row and the pointer then advances by $13F, which with the store's
+  own +1 is 320. The width is always one.
 
-  Modelled as one array indexed by the original DS offset, so the bank
-  constants below read exactly as they do in the binary.
+  RET $A, five words: X at BP+$C, YTop at BP+$A, YBottom at BP+8, Colour at
+  BP+6, Segment at BP+4. Note the count is YBottom - YTop + 1 and a zero
+  count returns without drawing -- it does NOT wrap round to 65536.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      D := YOfs[YTop] + X;
+      for I := 1 to YBottom - YTop + 1 do
+      begin
+        Mem[Segment : D] := Colour;
+        Inc(D, 320);
+      end;
   -------------------------------------------------------------------------- }
-var
-  SpriteMem : array[$0400..$CBFF] of Byte;
-
-function Bank(At : LongInt) : Pointer;
-begin
-  Bank := @SpriteMem[At];
-end;
-
-{ [transcribed] Sprite_Blit 1005:037a -- transparent blit, zero bytes skipped.
-  H rows of W columns, stepping DI by 320 - W between rows. }
-procedure Blit(Src : Pointer; X, Y, W, H : Integer; Segment : Word);
-var
-  Row, Col : Integer;
-  P        : ^Byte;
-  V        : Byte;
-begin
-  P := Src;
-  for Row := 0 to H - 1 do
-    for Col := 0 to W - 1 do
-    begin
-      V := P^;
-      Inc(LongInt(P));
-      if (V <> 0) and (Y + Row >= 0) and (Y + Row < 200)
-         and (X + Col >= 0) and (X + Col < 320) then
-        Mem[Segment : (Y + Row) * 320 + X + Col] := V;
-    end;
+procedure VLine(X, YTop, YBottom : Integer;
+                Colour : Byte; Segment : Word); assembler;
+asm
+  MOV  AX, Segment      { which screen                                      }
+  MOV  ES, AX           { ES:DI is the destination                          }
+  MOV  BX, YTop         { the first row                                     }
+  SHL  BX, 1            { * 2, a word index into the row table              }
+  MOV  DI, [BX + OFFSET YOfs]   { DI := YOfs[YTop] -- P4VGA's table         }
+  ADD  DI, X            { + the column                                      }
+  MOV  CX, YBottom      { the last row                                      }
+  SUB  CX, YTop         { how many rows between them                        }
+  INC  CX               { both ends inclusive                               }
+  JZ   @@Out            { none -- draw nothing rather than wrap CX          }
+  MOV  AX, WORD PTR Colour   { the pixel value. The original reads the whole }
+                        {   word slot, not the byte -- AH is scratch here.   }
+@@Row:                  { <- once per row                                   }
+  STOSB                 { plot; DI advances one                             }
+  ADD  DI, $13F         { 319 more, so 320 in all -- straight down          }
+  DEC  CX               { one row done                                      }
+  JNZ  @@Row            { round again                                       }
+@@Out:                  { <- a zero count draws nothing and returns        }
 end;
 
 { --------------------------------------------------------------------------
-  Lem_DrawSprite (1005:03b9) -- one blit per state, from a different bank.
+  1005:0354 -- a HORIZONTAL run. HAND ASSEMBLER, verbatim.
 
-  Offsets are into the asset block loaded by LoadAssets; the frame stride is
-  always H * W, which is what fixes each sprite's dimensions:
+  Ghidra calls this VGA_FillTri; it is a REP STOSB along one row.
 
-      walker/faller   9 x 6   stride $36   bank $04EC
-      splat          10 x 12  stride $78   bank $1240
-      builder        10 x 12  stride $78   bank $209A
-      long fall      10 x 10  stride 100   bank $066E
-      basher         10 x 14  stride $8C   bank $193A
-      death B        10 x 16  stride $A0   bank $1ACA
-      miner          13 x 17  stride $DD   bank $13BB
-      timer          10 x 15  stride $96   bank $234C
-      death A        12 x  9  stride $6C   bank $1E1E
-      explosion      55 x 63  stride $D89  bank $1947 / $26D0
+  RET $A: X1 at BP+$C, X2 at BP+$A, Y at BP+8, Colour at BP+6, Segment at
+  BP+4. Both ends inclusive, and a zero count returns without drawing.
 
-  The walker and faller share a bank: frames 1..4 face one way and frames
-  5..8 the other, which is why a leftward lemming indexes (Frame + 4).
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      FillChar(Mem[Segment : YOfs[Y] + X1], X2 - X1 + 1, Colour);
   -------------------------------------------------------------------------- }
-procedure DrawSprite(N : Integer);
-begin
-  with Lem[N] do
-    case State of
-      1 : if Dir < 1 then                                   { walker }
-            Blit(Bank(WalkBank + (Frame + 4) * 54), X - 3, Y - 8, 6, 9, BackSeg)
-          else
-            Blit(Bank(WalkBank + Frame * 54), X - 3, Y - 8, 6, 9, BackSeg);
-
-      2 : if FallDist < 4 then                              { faller, short }
-          begin
-            if Dir < 1 then
-              Blit(Bank(WalkBank + (Frame + 4) * 54), X - 3, Y - 8, 6, 9, BackSeg)
-            else
-            begin
-              Blit(Bank(WalkBank + Frame * 54), X - 3, Y - 8, 6, 9, BackSeg);
-              Frame := (Frame + 1) mod 4 + 1;
-            end;
-          end
-          else                                              { faller, long }
-            Blit(Bank(FallBank + Frame * 100), X - 3, Y - 10, 10, 10, BackSeg);
-
-      3 : Blit(Bank(TimerBank + Frame * 150), X - 4, Y - 9, 15, 10, BackSeg);
-      4 : Blit(Bank(MinerBank + Frame * 221), X - 8, Y - 12, 17, 13, BackSeg);
-      5 : Blit(Bank(BuildBank + Frame * 120), X - 4, Y - 8, 12, 10, BackSeg);
-
-      6 : begin                                             { death A }
-            if Frame = 1 then
-              Blit(Bank($BF97), 95, 50, 60, 53, BackSeg);   { the flash }
-            Blit(Bank(DeathABank + Frame * 108), X - 4, Y - 11, 9, 12, BackSeg);
-          end;
-
-      7 : Blit(Bank(DeathBBank + Frame * 160), X - 5, Y - 8, 16, 10, BackSeg);
-      8 : Blit(Bank(SplatBank + Frame * 120), X - 4, Y - 8, 12, 10, BackSeg);
-     10 : Blit(Bank(BashBank + Frame * 140), X - 8, Y - 9, 14, 10, BackSeg);
-
-     11 : if Frame < 10 then                                { explosion }
-            Blit(Bank($26D0), X - 31, Y - 48, 63, 55, BackSeg)
-          else
-            Blit(Bank($1947 + (Frame - 8) * $D89), X - 31, Y - 48, 63, 55, BackSeg);
-    end;
+procedure HLine(X1, X2, Y : Integer;
+                Colour : Byte; Segment : Word); assembler;
+asm
+  MOV  AX, Segment      { which screen                                      }
+  MOV  ES, AX           { ES:DI is the destination                          }
+  MOV  BX, Y            { the row                                           }
+  SHL  BX, 1            { * 2, a word index into the row table              }
+  MOV  DI, [BX + OFFSET YOfs]   { DI := YOfs[Y]                             }
+  ADD  DI, X1           { + the left end                                    }
+  MOV  CX, X2           { the right end                                     }
+  SUB  CX, X1           { the span                                          }
+  INC  CX               { both ends inclusive                               }
+  JZ   @@Out            { none -- draw nothing rather than wrap CX          }
+  MOV  AX, WORD PTR Colour   { the pixel value, whole word slot as above    }
+  REP  STOSB            { the whole run in one instruction                  }
+@@Out:                  { <- a zero count draws nothing and returns        }
 end;
 
-{ [transcribed] the spawn script writes a target and skill into a SLOT. }
-procedure Script(Slot, TX, TY : Integer; St : Byte);
-begin
-  Lem[Slot].TargetX  := TX;
-  Lem[Slot].TargetY  := TY;
-  Lem[Slot].TargetSt := St;
+{ --------------------------------------------------------------------------
+  1005:037a -- the sprite blit. HAND ASSEMBLER, verbatim.
+
+  Transparent: a source byte of zero advances the destination without
+  storing, so the lemmings composite over the hillside. That test is why
+  this cannot be a REP MOVSB.
+
+  RET $E, so a pointer and five words: Src at BP+$E, X at BP+$C, Y at BP+$A,
+  W at BP+8, H at BP+6, Segment at BP+4.
+
+  There is NO clipping. Every caller keeps its sprites on screen, and a
+  lemming that walks off the edge would wrap onto the next row -- but
+  UpdateAll removes anything below row 199 before it can.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      P := Src;  D := YOfs[Y] + X;
+      for Row := 1 to H do
+      begin
+        for Col := 1 to W do
+        begin
+          if P^ <> 0 then Mem[Segment : D] := P^;
+          Inc(LongInt(P));  Inc(D);
+        end;
+        Inc(D, 320 - W);
+      end;
+  -------------------------------------------------------------------------- }
+procedure Blit(Src : Pointer; X, Y, W, H : Integer;
+               Segment : Word); assembler;
+asm
+  PUSH DS               { DS is about to point at the sprite                }
+  MOV  AX, Segment      { which screen                                      }
+  MOV  ES, AX           { ES:DI is the destination                          }
+  MOV  BX, Y            { the top row                                       }
+  SHL  BX, 1            { * 2, a word index into the row table              }
+  MOV  DI, [BX + OFFSET YOfs]   { DI := YOfs[Y]                             }
+  ADD  DI, X            { + the left column                                 }
+  MOV  CX, H            { CX counts rows                                    }
+  MOV  BX, W            { the width...                                      }
+  MOV  DX, BX           {   ...kept in DX for the whole call                }
+  LDS  SI, Src          { DS:SI := the sprite, read straight through        }
+@@Row:                  { <- once per row                                   }
+  MOV  BX, DX           { BX counts the pixels across this row              }
+@@Pixel:                { <- once per pixel                                 }
+  LODSB                 { AL := the source pixel; SI moves on               }
+  OR   AL, AL           { colour 0?                                         }
+  JZ   @@Skip           {   transparent -- leave the screen alone           }
+  STOSB                 { plot it; DI moves on                              }
+  DEC  BX               { one pixel done                                    }
+  JNZ  @@Pixel          { round again                                       }
+  JMP  @@NextRow        { row finished                                      }
+@@Skip:                 { <- the transparent case                           }
+  INC  DI               { step the destination by hand instead              }
+  DEC  BX               { one pixel done                                    }
+  JNZ  @@Pixel          { round again                                       }
+@@NextRow:              { <- both paths join here                           }
+  ADD  DI, $140         { 320 -- down one screen row...                     }
+  SUB  DI, DX           {   ...less the width just drawn                    }
+  DEC  CX               { one row done                                      }
+  JNZ  @@Row            { round again                                       }
+  POP  DS               { restore our data segment                          }
 end;
 
-{ [stub] one column of Effect_ColumnSlideIn. }
-{ [transcribed] one column of Effect_ColumnSlideIn: move the column up by
-  Amount pixels and blank what it leaves behind. The stride is $140 = 320, so
-  it works on the linear mode-13h buffer. }
-procedure ShiftColumnUp(Col, Amount : Integer);
+{ --------------------------------------------------------------------------
+  1005:0835 -- 64,000-byte screen copy. HAND ASSEMBLER, verbatim.
+  RET 4: SrcSeg at BP+6, DestSeg at BP+4.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      Move(Mem[SrcSeg : 0], Mem[DestSeg : 0], 64000);
+  -------------------------------------------------------------------------- }
+procedure CopyScreen(SrcSeg, DestSeg : Word); assembler;
+asm
+  PUSH DS               { DS becomes the source segment below               }
+  MOV  AX, DestSeg      { the second declared parameter                     }
+  MOV  ES, AX           { ES: is the destination                            }
+  MOV  AX, SrcSeg       { the first                                         }
+  MOV  DS, AX           { DS: is the source                                 }
+  MOV  SI, 0            { both start at offset 0 -- whole screens           }
+  MOV  DI, 0            {                                                   }
+  MOV  CX, $7D00        { 32,000 words = 64,000 bytes                       }
+  REP  MOVSW            { the blit, one instruction                         }
+  POP  DS               { restore our data segment                          }
+end;
+
+{ --------------------------------------------------------------------------
+  1005:07f9 -- show the scroller and shift it. HAND ASSEMBLER, verbatim.
+  No parameters at all; it works entirely off two globals.
+
+  The buffer is 18 rows of 341 bytes. Only the first 320 of each row are
+  visible; the remaining 21 are the run-up that ScrollChar writes into. Each
+  call copies the visible part to the work screen, then slides the WHOLE
+  6,138 bytes left by two.
+
+  That shift is LINEAR, not per row -- one REP MOVSW straight across the
+  buffer -- so the two bytes that fall off the left of a row reappear at the
+  right of the row above. With the run-up being blank most of the time that
+  is invisible, and it is what the original does.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      P := ScrollBuf;
+      for Row := 0 to 17 do
+      begin
+        Move(P^, Mem[WorkSeg : Row * 320], 320);
+        Inc(LongInt(P), 341);
+      end;
+      for Row := 0 to 17 do
+        Mem[Seg(ScrollBuf^) : Row * 341] := 0;
+      Move(Mem[Seg(ScrollBuf^) : 2], Mem[Seg(ScrollBuf^) : 0], 6136);
+  -------------------------------------------------------------------------- }
+procedure ScrollRender; assembler;
+asm
+  PUSH DS               { DS is about to point at the scroll buffer         }
+  MOV  AX, [WorkSeg]    { DS:$030D -- the frame being composed              }
+  MOV  ES, AX           { ES:DI is the destination                          }
+  XOR  DI, DI           { the scroller sits at the TOP of the screen        }
+  LDS  SI, ScrollBuf    { DS:SI := the 341 x 18 bitmap                      }
+  MOV  AX, 18           { 18 rows to show                                   }
+@@Row:                  { <- once per row                                   }
+  MOV  CX, $A0          { 160 words = 320 bytes, the visible part           }
+  REP  MOVSW            { copy the row out                                  }
+  ADD  SI, $15          { skip the 21-byte run-up to the next row           }
+  DEC  AX               { one row done                                      }
+  JNZ  @@Row            { round again                                       }
+
+  MOV  BX, 18           { now blank the first byte of every row...          }
+  XOR  SI, SI           { ...starting at the top of the buffer              }
+  XOR  CL, CL           { the value: black                                  }
+@@Clear:                { <- once per row                                   }
+  MOV  [SI], CL         { clear it                                          }
+  ADD  SI, $155         { down one 341-byte row                             }
+  DEC  BX               { one row done                                      }
+  JNZ  @@Clear          { round again                                       }
+
+  MOV  AX, DS           { source and destination are the same buffer        }
+  MOV  ES, AX           {                                                   }
+  XOR  DI, DI           { write from offset 0                               }
+  XOR  SI, SI           { read from...                                      }
+  ADD  SI, 2            {   ...offset 2 -- a two-pixel shift                }
+  MOV  CX, $BFC         { 3,068 words = 6,136 of the 6,138 bytes            }
+  REP  MOVSW            { slide the whole bitmap left                       }
+  POP  DS               { restore our data segment                          }
+end;
+
+{ ==========================================================================
+  The scroller
+  ========================================================================== }
+
+{ --------------------------------------------------------------------------
+  1005:0853 -- write ONE column of one glyph into the buffer's run-up.
+
+  The font is 62 glyphs from space upward, each 378 bytes = 21 columns of 18
+  rows stored column-major, so a column is 18 consecutive bytes. Each call
+  drops one such column into buffer column 320 -- the right-hand edge, just
+  off screen -- and ScrollRender then slides it into view.
+
+  RET 4: Ch at BP+6, Col at BP+4. The original's index is
+  Ch * 378 + Col * 18 + Row + 1 - 12115, and 12115 is 32 * 378 + 18 + 1, so
+  the character is 32-based and the column one-based.
+  -------------------------------------------------------------------------- }
+procedure ScrollChar(Ch, Col : Byte);
 var
   Row : Integer;
+  P   : ^Byte;
 begin
-  for Row := 0 to 199 - Amount do
-    Mem[VirtScrSeg : Row * ScrWidth + Col] :=
-      Mem[VirtScrSeg : (Row + Amount) * ScrWidth + Col];
-  for Row := 200 - Amount to 199 do
-    Mem[VirtScrSeg : Row * ScrWidth + Col] := 0;
-end;
-
-{ [stub] one scroller character. }
-procedure DrawChar(Pos : Integer; Ch : Char);
-begin
-end;
-
-{ [stub] level setup and the periodic refresh every 20 frames. }
-procedure Setup;
-begin
-end;
-
-procedure SetupPeriodic;
-begin
-end;
-
-{ [stub] one step of the closing palette fade. }
-{ [inferred] one step of the closing fade: every channel down by one until
-  the whole DAC is black. }
-{ [transcribed] 11e3:0260 -- one step of the 64-step fade IN, run while the
-  column slide-in is on screen. }
-procedure FadeStep;
-var
-  I       : Integer;
-  R, G, B : Byte;
-begin
-  WaitRetrace;
-  for I := 0 to 255 do
+  for Row := 0 to ScrollRows - 1 do
   begin
-    GetRGB(I, R, G, B);
-    if R < Palette[I, 0] then Inc(R);
-    if G < Palette[I, 1] then Inc(G);
-    if B < Palette[I, 2] then Inc(B);
-    SetRGB(I, R, G, B);
+    P := @Font^[(Ch - FirstChar) * GlyphPitch
+                + (Col - 1) * ScrollRows + Row];
+    Mem[Seg(ScrollBuf^) : Ofs(ScrollBuf^) + Row * ScrollPitch + ScrollEdge]
+      := P^;
   end;
 end;
 
-procedure FadePaletteStep;
+{ --------------------------------------------------------------------------
+  1005:08ad -- one frame of the scroller.
+
+  The column counter advances by TWO because the bitmap slides two pixels a
+  frame, so every other column of each glyph is simply never written. The
+  message is therefore drawn at half its horizontal resolution -- which is
+  the original's behaviour, not a transcription slip.
+
+  It also runs the two 14 x 10 animations either side of the message, from
+  the same six-frame bank read in opposite directions, and rotates the
+  eight-entry colour cycle that DAC entries $80..$87 take.
+  -------------------------------------------------------------------------- }
+procedure ScrollStep;
 var
-  I       : Integer;
-  R, G, B : Byte;
+  I    : Integer;
+  Last : Byte;
 begin
-  WaitRetrace;
-  for I := 0 to 255 do
+  Inc(ScrollCol, 2);                             { 1005:08b1 }
+  if ScrollCol > GlyphCols then
   begin
-    GetRGB(I, R, G, B);
-    if B > 0 then Dec(B);
-    if G > 0 then Dec(G);
-    if R > 0 then Dec(R);
-    SetRGB(I, R, G, B);
+    ScrollCol := 1;
+    Inc(ScrollIdx);
+  end;
+
+  if ScrollIdx < TextLen then                    { 1005:08c8 }
+    ScrollChar(Ord(Message[ScrollIdx]), ScrollCol)
+  else
+    ScrollChar(Ord(' '), ScrollCol);
+
+  ScrollRender;                                  { 1005:08f4 }
+
+  { 1005:08f7 -- the two side animations, three frames each shown four ticks
+    apart, one counting up and the other down so they mirror. }
+  SideTick := (SideTick mod 11) + 1;
+  Blit(@SideAnim[4 - ((SideTick shr 2) + 1)], $116, $1B, 14, 10, WorkSeg);
+  Blit(@SideAnim[(SideTick shr 2) + 4],       $1E,  $1B, 14, 10, WorkSeg);
+
+  { 1005:093f -- rotate the eight-entry cycle and show it. The original does
+    the whole thing TWICE per frame, so the colours run at double speed. }
+  for I := 1 to 2 do
+  begin
+    Last := ScrollPal[7, 2];
+    Move(ScrollPal[0, 0], ScrollPal[1, 0], 21);
+    FillChar(ScrollPal[0, 0], 3, Last);
+    for I := 0 to 7 do
+      SetRGB($80 + I, ScrollPal[I, 0], ScrollPal[I, 1], ScrollPal[I, 2]);
   end;
 end;
 
-{ [stub] the twenty asset reads from NEUROSIS.DAT $1228CE. }
-{ [inferred] Lemmings_LoadAssets 1005:00a6 -- twenty reads from NEUROSIS.DAT
-  $1228CE totalling 202,007 bytes: three palettes, two 320x200 screens and
-  fourteen sprite banks between 400 and 24,255 bytes. The banks are the
-  per-skill animation sets DrawSprite indexes. }
-{ --------------------------------------------------------------------------
-  Lemmings_LoadAssets (1005:00a6) -- transcribed.
+{ ==========================================================================
+  The lemmings
+  ========================================================================== }
 
-  Not a single bulk load: it interleaves reading with the opening effect, so
-  the column slide-in plays while the rest of the level is still on disk.
-  -------------------------------------------------------------------------- }
-procedure LoadAssets;
+{ 1005:06c8 -- free every slot. }
+procedure InitAll;
 var
-  F   : file;
-  Pal : TPalette;
-  I   : Integer;
+  N : Integer;
 begin
-  Assign(F, 'neurosis.dat');
-  Reset(F, 1);
-  Seek(F, $1228CE);
-
-  GetMem(Aux, $5B8C);                          { 23,436-byte block }
-  BlockRead(F, Aux^, $5B8C);
-
-  ClearScreen($A000, 0);
-  BlockRead(F, Pal, 768);
-  SetPalette;
-  BlockRead(F, Mem[VirtScrSeg : 0], 64000);
-
-  ColumnSlideIn;                               { plays before the rest loads }
-  Delay($514);
-  GetPalette;
-  for I := 1 to 64 do FadeStep;
-
-  ClearScreen($A000, 0);
-  BlockRead(F, Mem[VirtScrSeg : 0], 64000);
-  BlockRead(F, Pal, 768);
-  BlockRead(F, FlashTarget, 768);              { DS:$CC07 -- the explosion }
-
-  { the fourteen sprite banks, each to its own fixed DGROUP address }
-  BlockRead(F, SpriteMem[$0522], $01B0);
-  BlockRead(F, SpriteMem[$06D2], 400);
-  BlockRead(F, SpriteMem[$12B8], $01E0);
-  BlockRead(F, SpriteMem[$1498], $052E);
-  BlockRead(F, SpriteMem[$19C6], $01A4);
-  BlockRead(F, SpriteMem[$1B6A], 800);
-  BlockRead(F, SpriteMem[$858F], $0C18);
-  BlockRead(F, SpriteMem[$1E8A], $0288);
-  BlockRead(F, SpriteMem[$2112], $02D0);
-  BlockRead(F, SpriteMem[$BF97], $0C6C);
-  BlockRead(F, SpriteMem[$91A7], $2AA8);
-  BlockRead(F, SpriteMem[$BC4F], $0348);
-  BlockRead(F, SpriteMem[$26D0], $5EBF);
-  BlockRead(F, SpriteMem[$23E2], $02EE);
-
-  Close(F);
-  SetPalette;
-  for I := $E0 to $E9 do SetRGB(I, 0, 0, 0);   { the explosion band starts black }
+  for N := 1 to MaxLem do
+    Lem[N].Active := 0;
 end;
 
-{ [stub] six frames played backwards with Delay(150). }
-{ [inferred] six frames played BACKWARDS with Delay(150) between them -- the
-  level assembles itself before the simulation starts. }
-procedure Intro;
-var
-  Frame : Integer;
-begin
-  for Frame := 6 downto 1 do
-  begin
-    Blit(Bank(LongInt(Frame - 1) * 64000), 0, 0, 320, 200, BackSeg);
-    CopyScreen(BackSeg, $A000);
-    Delay(150);
-  end;
-end;
-
-procedure RestoreTextMode;
-begin
-  SetTextMode;
-end;
-
-{ --------------------------------------------------------------------------
-  Lem_UpdateAll (1005:1a4c) -- one frame of the simulation.
-
-  Terrain trigger colours, tested by the walker:
-      3          -> death animation A (state 6)
-      $12        -> state 9
-      $20..$29   -> death animation B (state 7)
-  -------------------------------------------------------------------------- }
-procedure UpdateAll;
-var
-  I : Integer;
-begin
-  for I := 1 to MaxLems do
-    with Lem[I] do
-    begin
-      if Y > 199 then Remove(I);           { fell off the bottom }
-      if Alive = 0 then Continue;
-
-      { a scripted skill fires when this lemming reaches its target }
-      if (TargetX >= 0) and (TargetX = X) and
-         (TargetY >= 0) and (TargetY = Y) then
-      begin
-        SetState(TargetSt, I);
-        TargetX := 0;  TargetY := 0;
-      end;
-
-      if Countdown > 0  then Dec(Countdown);
-      if Countdown = 1  then SetState(3, I);
-      if Countdown < 0  then Inc(Countdown);
-      if Countdown = -1 then Remove(I);
-
-      DrawSprite(I);
-
-      case State of
-        1  : Walker(I);       2  : Faller(I);
-        3  : TimerState(I);   4  : Miner(I);
-        5  : Builder(I);      6  : DeathA(I);
-        7  : DeathB(I);       8  : Splat(I);
-        10 : Basher(I);      11  : Countdown11(I);
-      end;
-    end;
-end;
-
-{ --------------------------------------------------------------------------
-  Lem_Spawn (1005:06e7)
-
-  Releases from the hatch, and scripts the level: the Nth lemming released is
-  handed a target position and the skill to use when it gets there, which is
-  what makes the level solve itself with nobody at the controls.
-  -------------------------------------------------------------------------- }
-procedure Spawn;
-var
-  I : Integer;
-begin
-  if Released = TotalLems then Exit;
-  for I := 1 to MaxLems do
-    if Lem[I].Alive = 0 then
-    begin
-      with Lem[I] do
-      begin
-        X := HatchX;  Y := HatchY;
-        TargetX := HatchX;  TargetY := HatchY;  TargetSt := 2;
-        Tick := 0;  Alive := 1;  State := 2;  Dir := 1;
-        Frame := 1;  Countdown := 0;  FallDist := 0;
-      end;
-      Inc(Released);
-      { The release count is used purely as a clock -- the script writes into a
-        chosen SLOT, and with only 25 slots the last two both target slot 1. }
-      case Released of
-         3 : Script(3, 50, 102, 10);       { slot 3 -> miner   }
-         5 : Script(5, 49, 102,  4);       { slot 5 -> basher  }
-        65 : Script(1, 181, 158, 10);      { slot 1 -> miner   }
-        80 : Script(1, 223, 158,  5);      { slot 1 -> builder }
-      end;
-      Exit;
-    end;
-end;
-
-
-
-{ --------------------------------------------------------------------------
-  Bodies for the forward declarations above.
-  -------------------------------------------------------------------------- }
-
-{ [transcribed] Lem_Remove 1005:07d8 -- clears the alive flag and decrements
-  the live count, but only if the slot WAS alive. }
+{ 1005:07d8 -- free one, and only count it down if it was live. }
 procedure Remove(N : Integer);
 begin
-  if Lem[N].Alive <> 0 then
+  if Lem[N].Active <> 0 then
   begin
-    Lem[N].Alive := 0;
+    Lem[N].Active := 0;
     Dec(LiveCount);
   end;
 end;
 
-{ [transcribed] Lem_SetState 1005:0b22 -- state at +13, frame := 1, tick := 0. }
+{ 1005:0b22 -- change state, and restart the animation. }
 procedure SetState(S : Byte; N : Integer);
 begin
   Lem[N].State := S;
@@ -559,535 +583,758 @@ begin
 end;
 
 { --------------------------------------------------------------------------
-  LemState2_Faller (1005:0b68)
+  1005:06e7 -- put one lemming in the first free slot.
 
-  Scans the row directly below for ground. Landing depends on FallDist:
+  The four `if Spawned = ...` arms are the choreography: at the 3rd, 5th,
+  65th and 80th lemming a SPECIFIC slot is given a trigger, so that when
+  whoever is in it reaches that pixel it is forced into a state. Slot 3
+  (DS:$034B) is sent tunnelling and then exploding, slot 1 (DS:$0321) does
+  the same later, and slot 5 (DS:$0375) is set digging.
 
-    < 11        land and walk, FallDist := 0
-    >= 11       increment the hard-landing counter at +4; on the SECOND one
-                the lemming splats, otherwise it lands normally
+  That is how the set piece is staged: the lemmings are otherwise autonomous.
+  -------------------------------------------------------------------------- }
+procedure Spawn;
+var
+  N : Integer;
+begin
+  if Spawned = SpawnLimit then Exit;             { 1005:06ee }
+  for N := 1 to MaxLem do
+    if Lem[N].Active = 0 then
+    begin
+      Lem[N].X         := SpawnX;
+      Lem[N].Y         := SpawnY;
+      Lem[N].TrigX     := SpawnX;
+      Lem[N].TrigY     := SpawnY;
+      Lem[N].TrigState := StFaller;
+      Lem[N].Tick      := 0;
+      Lem[N].Active    := 1;
+      Lem[N].State     := StFaller;
+      Lem[N].Dir       := 1;
+      Lem[N].Frame     := 1;
+      Lem[N].Timer     := 0;
+      Lem[N].FallDist  := 0;
+      Lem[N].Bounces   := 0;
+      Inc(Spawned);
 
-  While falling it drifts sideways for the first two rows only, which is what
-  makes a lemming step off a ledge rather than drop vertically.
+      case Spawned of                            { 1005:0761 }
+        3    : begin Lem[3].TrigX := $32; Lem[3].TrigY := $66;
+                     Lem[3].TrigState := StTunneller end;
+        5    : begin Lem[5].TrigX := $31; Lem[5].TrigY := $66;
+                     Lem[5].TrigState := StDigger end;
+        $41  : begin Lem[1].TrigX := $B5; Lem[1].TrigY := $9E;
+                     Lem[1].TrigState := StTunneller end;
+        $50  : begin Lem[1].TrigX := $DF; Lem[1].TrigY := $9E;
+                     Lem[1].TrigState := StBuilder end;
+      end;
+
+      Inc(LiveCount);
+      Exit;                                      { one per call }
+    end;
+end;
+
+{ --------------------------------------------------------------------------
+  1005:03b9 -- one blit per state, each from its own bank.
+
+  The sprite is drawn relative to the lemming's feet, which is what all the
+  small negative offsets are. States 1 and 2 add FOUR to the frame index when
+  facing left, so their banks hold the same animation twice, mirrored.
+  -------------------------------------------------------------------------- }
+procedure DrawSprite(N : Integer);
+var
+  F : Integer;
+begin
+  F := Lem[N].Frame;
+  case Lem[N].State of
+    StSplat:
+      Blit(@SplatBank[F], Lem[N].X - 4, Lem[N].Y - 8, 12, 10, WorkSeg);
+    StBuilder:
+      Blit(@BuildBank[F], Lem[N].X - 4, Lem[N].Y - 8, 12, 10, WorkSeg);
+    StFaller:
+      if Lem[N].FallDist < 4 then
+      begin
+        if Lem[N].Dir < 1 then
+          Blit(@WalkBank[F + 4], Lem[N].X - 3, Lem[N].Y - 8, 6, 9, WorkSeg)
+        else
+        begin
+          Blit(@WalkBank[F], Lem[N].X - 3, Lem[N].Y - 8, 6, 9, WorkSeg);
+          { 1005:0489 -- the only place DrawSprite changes state }
+          Lem[N].Frame := (F mod 4) + 1;
+        end;
+      end
+      else
+        Blit(@TumbleBk[F], Lem[N].X - 3, Lem[N].Y - 10, 10, 10, WorkSeg);
+    StWalker:
+      if Lem[N].Dir < 1 then
+        Blit(@WalkBank[F + 4], Lem[N].X - 3, Lem[N].Y - 8, 6, 9, WorkSeg)
+      else
+        Blit(@WalkBank[F], Lem[N].X - 3, Lem[N].Y - 8, 6, 9, WorkSeg);
+    StTunneller:
+      Blit(@TunnelBk[F], Lem[N].X - 8, Lem[N].Y - 9, 14, 10, WorkSeg);
+    StDeathB:
+      Blit(@DeathBBk[F], Lem[N].X - 5, Lem[N].Y - 8, 16, 10, WorkSeg);
+    StDigger:
+      Blit(@DigBank[F], Lem[N].X - 8, Lem[N].Y - 12, 17, 13, WorkSeg);
+    StFuse:
+      Blit(@FuseBank[F], Lem[N].X - 4, Lem[N].Y - 9, 10, 15, WorkSeg);
+    StExplode:
+      { 1005:05d1 -- frames 1..9 all show the first picture; only from 10
+        does it start stepping the bank. }
+      if F < 10 then
+        Blit(@Explosion[1], Lem[N].X - $1F, Lem[N].Y - $30, 63, 55, WorkSeg)
+      else
+        Blit(@Explosion[F - 8], Lem[N].X - $1F, Lem[N].Y - $30,
+             63, 55, WorkSeg);
+    StDeathA:
+      begin
+        { 1005:0664 -- on the first frame only, a fixed 53 x 60 picture }
+        if F = 1 then
+          Blit(@DeathAPic, $32, $5F, 53, 60, WorkSeg);
+        Blit(@DeathABk[F], Lem[N].X - 4, Lem[N].Y - $B, 9, 12, WorkSeg);
+      end;
+  end;
+end;
+
+{ ==========================================================================
+  The state handlers
+  ========================================================================== }
+
+{ --------------------------------------------------------------------------
+  1005:14d6 -- state 1, walking.
+
+    1. look one row down, seven columns wide, for something to stand on
+         colour 3        -> DeathA
+         colour $12      -> state 9, FOR WHICH THERE IS NO HANDLER
+         colour $20..$29 -> DeathB
+         in Ground       -> stop looking, we are standing
+         nothing at all  -> Faller
+    2. rows Y-9..Y-4, three columns ahead: anything in Wall turns it round
+    3. rows Y-4..Y,   two columns ahead: anything in Wall is a step, and the
+       lemming climbs to just above it
+    4. move one pixel, and advance the animation every second tick
+
+  STATE 9 IS A DEAD END and it is the original's. UpdateAll's dispatch has no
+  arm for it, so a lemming that walks onto colour $12 stops being simulated
+  and stands there being drawn by whatever DrawSprite does with an unknown
+  state -- which is nothing. It is left in.
+  -------------------------------------------------------------------------- }
+procedure Walker(N : Integer);
+var
+  DX_, Row, Col, RowTo, ColTo : Integer;
+  Pix                         : Byte;
+  Standing                    : Boolean;
+begin
+  Standing := False;
+  for DX_ := -3 to 3 do
+  begin
+    Pix := GetPixel(Lem[N].X + DX_, Lem[N].Y + 1, VirtScrSeg);
+    if (Pix = DeathAColour) or (Pix = StuckColour)
+       or ((Pix > $1F) and (Pix < $2A)) then
+    begin
+      if (Pix > $1F) and (Pix < $2A) then SetState(StDeathB, N);
+      if Pix = DeathAColour then SetState(StDeathA, N);
+      if Pix = StuckColour  then SetState(StStuck,  N);
+      Exit;
+    end;
+    if Pix in Ground then
+    begin
+      Standing := True;
+      Break;
+    end;
+    if DX_ = 3 then
+    begin
+      SetState(StFaller, N);
+      Exit;
+    end;
+  end;
+
+  if Standing then
+  begin
+    { 1005:1608 -- the wall ahead, head height }
+    for Row := Lem[N].Y - 9 to Lem[N].Y - 4 do
+    begin
+      if Lem[N].Dir < 1 then
+      begin
+        ColTo := Lem[N].X - 3;  Col := Lem[N].X - 5;
+      end
+      else
+      begin
+        ColTo := Lem[N].X + 5;  Col := Lem[N].X + 3;
+      end;
+      while Col <= ColTo do
+      begin
+        if GetPixel(Col, Row, VirtScrSeg) in Wall then
+        begin
+          Lem[N].Dir := -Lem[N].Dir;
+          Exit;
+        end;
+        Inc(Col);
+      end;
+    end;
+
+    { 1005:16d0 -- a step it can climb rather than a wall }
+    for Row := Lem[N].Y - 4 to Lem[N].Y do
+    begin
+      if Lem[N].Dir < 1 then
+      begin
+        ColTo := Lem[N].X - 3;  Col := Lem[N].X - 4;
+      end
+      else
+      begin
+        ColTo := Lem[N].X + 4;  Col := Lem[N].X + 3;
+      end;
+      while Col <= ColTo do
+      begin
+        if GetPixel(Col, Row, VirtScrSeg) in Wall then
+        begin
+          Lem[N].Y := Row - 1;
+          RowTo := Lem[N].Y;      { fall through to the move below }
+          Col := ColTo;
+          Row := Lem[N].Y;
+        end;
+        Inc(Col);
+      end;
+    end;
+  end;
+
+  Inc(Lem[N].X, Lem[N].Dir);                     { 1005:1791 }
+  Lem[N].Tick := (Lem[N].Tick mod 2) + 1;
+  if Lem[N].Tick mod 2 = 0 then
+    Lem[N].Frame := (Lem[N].Frame mod 4) + 1;
+end;
+
+{ --------------------------------------------------------------------------
+  1005:0b68 -- state 2, falling.
+
+  Looks one row down across seven columns. Landing on Ground turns it back
+  into a walker unless it has fallen 11 pixels or more, in which case the
+  SECOND such landing splats it -- the first is survived and counted.
+  Landing on the $20..$29 hazard stripe is always fatal.
+
+  While it has nothing under it, it drifts one pixel in its facing direction
+  for the first two rows of the fall only, then drops straight.
   -------------------------------------------------------------------------- }
 procedure Faller(N : Integer);
 var
-  Dx : Integer;
-  C  : Byte;
+  DX_ : Integer;
+  Pix : Byte;
 begin
-  with Lem[N] do
+  for DX_ := -3 to 3 do
   begin
-    for Dx := -3 to 3 do
+    Pix := GetPixel(Lem[N].X + DX_, Lem[N].Y + 1, VirtScrSeg);
+    if Pix in Ground then
     begin
-      C := GetPixel(X + Dx, Y + 1, VirtScrSeg);
-      if C in Ground then
+      if Lem[N].FallDist < 11 then
       begin
-        if FallDist < SplatDrop then
-        begin
-          SetState(1, N);
-          FallDist := 0;
-        end
+        SetState(StWalker, N);
+        Lem[N].FallDist := 0;
+      end
+      else
+      begin
+        Inc(Lem[N].Bounces);
+        if Lem[N].Bounces = 2 then
+          SetState(StSplat, N)
         else
         begin
-          Inc(HardLandings);
-          if HardLandings = 2 then
-            SetState(8, N)                   { splat }
-          else
-          begin
-            SetState(1, N);
-            FallDist := 0;
-          end;
+          SetState(StWalker, N);
+          Lem[N].FallDist := 0;
         end;
-        Frame := (Frame mod 4) + 1;
-        Exit;
       end;
-      if C in [$20..$29] then begin SetState(7, N); Exit end;
+      Lem[N].Frame := (Lem[N].Frame mod 4) + 1;
+      Exit;
     end;
-
-    if FallDist < 2 then Inc(X, Dir);        { drift, first two rows only }
-    Inc(Y);
-    Inc(FallDist);
-    Frame := (Frame mod 4) + 1;
+    if (Pix > $1F) and (Pix < $2A) then
+    begin
+      SetState(StDeathB, N);
+      Exit;
+    end;
   end;
+
+  if Lem[N].FallDist < 2 then Inc(Lem[N].X, Lem[N].Dir);
+  Inc(Lem[N].Y);
+  Inc(Lem[N].FallDist);
+  Lem[N].Frame := (Lem[N].Frame mod 4) + 1;
 end;
 
 { --------------------------------------------------------------------------
-  LemState4_Miner (1005:0df5) -- digs DIAGONALLY down-forward.
+  1005:0df5 -- state 4, the DIAGONAL digger.
 
-  Erases terrain by drawing colour 0, then every third tick advances a 6-frame
-  cycle; on the frame wrap it moves TWO across and ONE down. Reverts to walker
-  the moment nothing solid remains ahead.
+  Erases a bite out of the hillside with colour 0 and, every sixth frame,
+  moves two pixels along and one down -- so it cuts a slope. It keeps going
+  only while there is still something in the WALL set in front of it; the
+  moment there is not, it becomes a walker again and the tunnel ends.
+
+  The two facings are not mirror images: leftward uses three DrawLine
+  strokes, rightward five VLines and an HLine. That asymmetry is the
+  original's.
   -------------------------------------------------------------------------- }
-procedure Miner(N : Integer);
+procedure Digger(N : Integer);
 var
-  Col  : Integer;
-  Hit  : Boolean;
+  Col, ColTo : Integer;
+  Hit        : Boolean;
 begin
   Hit := False;
-  with Lem[N] do
+  if Lem[N].Dir < 1 then
   begin
-    if Dir < 1 then
-    begin
-      for Col := X - 3 to X + 3 do
-        if GetPixel(Col, Y + 1, VirtScrSeg) in Ground then Hit := True;
-      DrawLine(X - 2, Y + 1, X - 2, Y - 11, 0, VirtScrSeg);
-      DrawLine(X - 1, Y + 1, X - 1, Y - 11, 0, VirtScrSeg);
-      DrawLine(X + 5, Y + 1, X - 5, Y + 1, 0, VirtScrSeg);
-    end
-    else
-    begin
-      for Col := X - 3 to X + 4 do
-        if GetPixel(Col, Y + 1, VirtScrSeg) in Ground then Hit := True;
-      FillRect(X + 4, Y, Y - 10, 0, VirtScrSeg);
-      FillRect(X + 5, Y, Y -  9, 0, VirtScrSeg);
-      FillRect(X + 6, Y - 1, Y -  8, 0, VirtScrSeg);
-      FillRect(X + 7, Y - 2, Y -  7, 0, VirtScrSeg);
-      FillRect(X + 8, Y - 3, Y -  6, 0, VirtScrSeg);
-      FillTri(X - 3, X + 5, Y, 0, VirtScrSeg);
-    end;
-
-    Tick := (Tick mod 3) + 1;
-    if Tick mod 3 = 0 then
-    begin
-      Frame := (Frame mod 6) + 1;
-      if Frame mod 6 = 0 then
-      begin
-        Inc(X, Dir * 2);                     { two across ... }
-        Inc(Y);                              { ... one down }
-      end;
-    end;
-
-    if not Hit then SetState(1, N);
+    ColTo := Lem[N].X + 3;
+    for Col := Lem[N].X - 3 to ColTo do
+      if GetPixel(Col, Lem[N].Y + 1, VirtScrSeg) in Wall then Hit := True;
+    DrawLine(Lem[N].X - 2, Lem[N].Y - 11, Lem[N].X - 2, Lem[N].Y + 1,
+             0, VirtScrSeg);
+    DrawLine(Lem[N].X - 1, Lem[N].Y - 11, Lem[N].X - 1, Lem[N].Y + 1,
+             0, VirtScrSeg);
+    DrawLine(Lem[N].X - 5, Lem[N].Y + 1,  Lem[N].X + 5, Lem[N].Y + 1,
+             0, VirtScrSeg);
+  end
+  else
+  begin
+    ColTo := Lem[N].X + 4;
+    for Col := Lem[N].X - 3 to ColTo do
+      if GetPixel(Col, Lem[N].Y + 1, VirtScrSeg) in Wall then Hit := True;
+    VLine(Lem[N].X + 4, Lem[N].Y - 10, Lem[N].Y,     0, VirtScrSeg);
+    VLine(Lem[N].X + 5, Lem[N].Y - 9,  Lem[N].Y,     0, VirtScrSeg);
+    VLine(Lem[N].X + 6, Lem[N].Y - 8,  Lem[N].Y - 1, 0, VirtScrSeg);
+    VLine(Lem[N].X + 7, Lem[N].Y - 7,  Lem[N].Y - 2, 0, VirtScrSeg);
+    VLine(Lem[N].X + 8, Lem[N].Y - 6,  Lem[N].Y - 3, 0, VirtScrSeg);
+    HLine(Lem[N].X - 3, Lem[N].X + 5,  Lem[N].Y,     0, VirtScrSeg);
   end;
+
+  Lem[N].Tick := (Lem[N].Tick mod 3) + 1;
+  if Lem[N].Tick mod 3 = 0 then
+  begin
+    Lem[N].Frame := (Lem[N].Frame mod 6) + 1;
+    if Lem[N].Frame mod 6 = 0 then
+    begin
+      Inc(Lem[N].X, Lem[N].Dir * 2);
+      Inc(Lem[N].Y);
+    end;
+  end;
+
+  if not Hit then SetState(StWalker, N);
 end;
 
 { --------------------------------------------------------------------------
-  LemState10_Basher (1005:1166) -- digs HORIZONTALLY.
+  1005:1166 -- state 10, the HORIZONTAL tunneller.
 
-  Scans a vertical column ahead rather than the ground below, erases a slab,
-  and moves ONE across every third frame with no vertical movement at all.
+  Same idea as the digger but it never changes Y, so it bores straight
+  through. It tests a two-column by ten-row block ahead against the WALL set
+  and stops the moment that block is empty.
   -------------------------------------------------------------------------- }
-procedure Basher(N : Integer);
+procedure Tunneller(N : Integer);
 var
-  Col, Row : Integer;
-  Hit      : Boolean;
+  Col, ColTo, Row, RowTo : Integer;
+  Hit                    : Boolean;
 begin
   Hit := False;
-  with Lem[N] do
+  RowTo := Lem[N].Y;
+  if Lem[N].Dir < 1 then
   begin
-    if Dir < 1 then
-    begin
-      for Col := X - 5 to X - 4 do
-        for Row := Y - 9 to Y do
-          if GetPixel(Col, Row, VirtScrSeg) in Ground then Hit := True;
-      FillRect(X - 4, Y, Y - 9, 0, VirtScrSeg);
-      FillRect(X - 5, Y - 2, Y - 7, 0, VirtScrSeg);
-      FillRect(X - 6, Y - 3, Y - 6, 0, VirtScrSeg);
-    end
-    else
-    begin
-      for Col := X + 4 to X + 5 do
-        for Row := Y - 9 to Y do
-          if GetPixel(Col, Row, VirtScrSeg) in Ground then Hit := True;
-      FillRect(X + 1, Y, Y - 10, 0, VirtScrSeg);
-      FillRect(X + 2, Y - 1, Y -  9, 0, VirtScrSeg);
-      FillRect(X + 3, Y - 2, Y -  8, 0, VirtScrSeg);
-      FillRect(X + 4, Y - 3, Y -  7, 0, VirtScrSeg);
-      FillRect(X + 5, Y - 4, Y -  6, 0, VirtScrSeg);
-      FillRect(X + 6, Y - 5, Y -  5, 0, VirtScrSeg);
-    end;
-
-    Frame := (Frame mod 3) + 1;
-    if Frame mod 3 = 0 then Inc(X, Dir);     { one across, no Y change }
-
-    if not Hit then SetState(1, N);
+    ColTo := Lem[N].X - 4;
+    for Col := Lem[N].X - 5 to ColTo do
+      for Row := Lem[N].Y - 9 to RowTo do
+        if GetPixel(Col, Row, VirtScrSeg) in Wall then Hit := True;
+    VLine(Lem[N].X - 4, Lem[N].Y - 9, Lem[N].Y,     0, VirtScrSeg);
+    VLine(Lem[N].X - 5, Lem[N].Y - 7, Lem[N].Y - 2, 0, VirtScrSeg);
+    VLine(Lem[N].X - 6, Lem[N].Y - 6, Lem[N].Y - 3, 0, VirtScrSeg);
+  end
+  else
+  begin
+    ColTo := Lem[N].X + 5;
+    for Col := Lem[N].X + 4 to ColTo do
+      for Row := Lem[N].Y - 9 to RowTo do
+        if GetPixel(Col, Row, VirtScrSeg) in Wall then Hit := True;
+    VLine(Lem[N].X + 1, Lem[N].Y - 10, Lem[N].Y,     0, VirtScrSeg);
+    VLine(Lem[N].X + 2, Lem[N].Y - 9,  Lem[N].Y - 1, 0, VirtScrSeg);
+    VLine(Lem[N].X + 3, Lem[N].Y - 8,  Lem[N].Y - 2, 0, VirtScrSeg);
+    VLine(Lem[N].X + 4, Lem[N].Y - 7,  Lem[N].Y - 3, 0, VirtScrSeg);
+    VLine(Lem[N].X + 5, Lem[N].Y - 6,  Lem[N].Y - 4, 0, VirtScrSeg);
+    VLine(Lem[N].X + 6, Lem[N].Y - 5,  Lem[N].Y - 5, 0, VirtScrSeg);
   end;
+
+  Lem[N].Frame := (Lem[N].Frame mod 3) + 1;
+  if Lem[N].Frame mod 3 = 0 then
+    Inc(Lem[N].X, Lem[N].Dir);
+
+  if not Hit then SetState(StWalker, N);
 end;
 
 { --------------------------------------------------------------------------
-  The three terminal animations. Transcribed -- the first reconstruction of
-  these was inferred and got every detail wrong except the frame counts.
+  1005:0d1a -- state 5, building.
 
-  Each removes the slot DIRECTLY when it runs out of frames. None of them uses
-  the negative countdown, which is what an earlier version assumed.
+  Every third tick advances the animation, and on the sixth frame it steps up
+  and to the right and lays a five-pixel brick in colour $4D INTO THE
+  HILLSIDE -- so the staircase it builds is real terrain that other lemmings
+  can then walk on.
+
+  It only ever builds to the right: the step is +2 X regardless of facing.
+  After 500 ticks it gives up, becomes a walker and sets a 20-frame timer,
+  which UpdateAll turns into a fuse.
   -------------------------------------------------------------------------- }
-
-{ [transcribed] LemState6_DeathA 1005:1850 -- 7 frames, one every 5th tick. }
-procedure DeathA(N : Integer);
+procedure Builder(N : Integer);
 begin
-  with Lem[N] do
+  Inc(Lem[N].Tick);
+  if Lem[N].Tick mod 3 = 0 then
   begin
-    Tick := (Tick mod 5) + 1;
-    if Tick mod 5 = 0 then
+    Lem[N].Frame := (Lem[N].Frame mod 6) + 1;
+    if Lem[N].Frame = 6 then
     begin
-      Inc(Frame);
-      if Frame > 6 then Remove(N);
+      Inc(Lem[N].X, 2);
+      Dec(Lem[N].Y);
+      HLine(Lem[N].X - 2, Lem[N].X + 2, Lem[N].Y + 2,
+            BrickColour, VirtScrSeg);
     end;
+  end;
+  if Lem[N].Tick = 500 then
+  begin
+    SetState(StWalker, N);
+    Lem[N].Timer := $14;
   end;
 end;
 
-{ [transcribed] LemState7_DeathB 1005:18a6 -- 6 frames, one every 3rd tick.
-  Faster than death A. }
-procedure DeathB(N : Integer);
-begin
-  with Lem[N] do
-  begin
-    Tick := (Tick mod 3) + 1;
-    if Tick mod 3 = 0 then
-    begin
-      Inc(Frame);
-      if Frame > 5 then Remove(N);
-    end;
-  end;
-end;
-
-{ [transcribed] LemState8_Splat 1005:17ff -- 4 frames, ungated, and then the
-  detail that makes it worth reading: the splat mark is blitted into the
-  VIRTUAL screen, not the back buffer. That buffer is also the collision map,
-  so the stain is permanent -- it stays on the level for the rest of the part
-  and every later lemming walks over it. }
+{ 1005:17ff -- state 8. On the fourth frame it stamps the last splat picture
+  PERMANENTLY into the hillside and removes itself, so the mark stays. }
 procedure Splat(N : Integer);
 begin
-  with Lem[N] do
+  Inc(Lem[N].Frame);
+  if Lem[N].Frame = 4 then
   begin
-    Inc(Frame);
-    if Frame = 4 then
-    begin
-      Blit(Bank($1420), X - 4, Y - 9, 12, 10, VirtScrSeg);
-      Remove(N);
-    end;
+    Blit(@SplatBank[4], Lem[N].X - 4, Lem[N].Y - 9, 12, 10, VirtScrSeg);
+    Remove(N);
+  end;
+end;
+
+{ 1005:1850 -- state 6. Six frames, one every fifth tick, then gone. }
+procedure DeathA(N : Integer);
+begin
+  Lem[N].Tick := (Lem[N].Tick mod 5) + 1;
+  if Lem[N].Tick mod 5 = 0 then
+  begin
+    Inc(Lem[N].Frame);
+    if Lem[N].Frame > 6 then Remove(N);
+  end;
+end;
+
+{ 1005:18a6 -- state 7. Five frames, one every third tick, then gone. }
+procedure DeathB(N : Integer);
+begin
+  Lem[N].Tick := (Lem[N].Tick mod 3) + 1;
+  if Lem[N].Tick mod 3 = 0 then
+  begin
+    Inc(Lem[N].Frame);
+    if Lem[N].Frame > 5 then Remove(N);
+  end;
+end;
+
+{ 1005:18fc -- state 3, the lit fuse. Five frames, then it explodes. }
+procedure Fuse(N : Integer);
+begin
+  Lem[N].Tick := (Lem[N].Tick mod 3) + 1;
+  if Lem[N].Tick mod 3 = 0 then
+  begin
+    Inc(Lem[N].Frame);
+    if Lem[N].Frame > 5 then SetState(StExplode, N);
   end;
 end;
 
 { --------------------------------------------------------------------------
-  LemState11_Countdown (1005:1954) -- the explosion.
+  1005:1954 -- state 11, the explosion.
 
-  Tick cycles 1..5 and the work happens on every third tick. While the frame
-  is under 10 it runs FIVE passes of a one-step fade over palette entries
-  $E0..$E9, each channel walking up towards a target palette held in DGROUP --
-  so the flash builds rather than being a computed colour ramp.
+  While the fireball is in its first nine frames it runs five passes bumping
+  DAC entries $E0..$E9 one step up toward the scene palette. LoadAssets
+  deliberately BLACKED those ten entries after loading, so this is what
+  lights the explosion: the picture is already on screen in colours nobody
+  can see until the flash brings them up.
 
-  Past frame 15 it arms the countdown at -60 (only if it is not already
-  negative) and then DECREMENTS the frame, which pins it at 15 while the
-  countdown runs up to -1 and Lem_UpdateAll removes the slot.
-
-  NOTE: in the original all three channel comparisons appear to test the same
-  variable -- the red one -- rather than one each. That is either a decompiler
-  artefact or a genuine bug in the 1994 code; it is written the natural way
-  here, per channel.
+  Past frame 15 it sets the timer to -60 and holds the frame, and UpdateAll
+  counts that back up to -1 and removes the lemming.
   -------------------------------------------------------------------------- }
-procedure Countdown11(N : Integer);
+procedure Explode(N : Integer);
 var
-  Pass, I : Integer;
-  R, G, B : Byte;
+  Pass, C : Integer;
+  RGB     : array[0..2] of Byte;
 begin
-  with Lem[N] do
+  Lem[N].Tick := (Lem[N].Tick mod 5) + 1;
+  if Lem[N].Tick mod 3 = 0 then
   begin
-    Tick := (Tick mod 5) + 1;
-    if Tick mod 3 <> 0 then Exit;
-
-    Inc(Frame);
-    if Frame < 10 then
+    Inc(Lem[N].Frame);
+    if Lem[N].Frame < 10 then
       for Pass := 1 to 5 do
-        for I := $E0 to $E9 do
+        for C := $E0 to $E9 do
         begin
-          GetRGB(I, R, G, B);
-          if R < FlashTarget[I, 0] then Inc(R);
-          if G < FlashTarget[I, 1] then Inc(G);
-          if B < FlashTarget[I, 2] then Inc(B);
-          SetRGB(I, R, G, B);
+          GetRGBTo(C, @RGB);
+          if RGB[0] < ScenePal[C * 3    ] then Inc(RGB[0]);
+          if RGB[1] < ScenePal[C * 3 + 1] then Inc(RGB[1]);
+          if RGB[2] < ScenePal[C * 3 + 2] then Inc(RGB[2]);
+          SetRGBFrom(C, @RGB);
         end;
-
-    if Frame > 15 then
+    if Lem[N].Frame > 15 then
     begin
-      if Countdown >= 0 then Countdown := -60;
-      Dec(Frame);
+      if Lem[N].Timer >= 0 then Lem[N].Timer := -60;
+      Dec(Lem[N].Frame);
     end;
   end;
 end;
 
 { --------------------------------------------------------------------------
-  LemState1_Walker (1005:14d6)
+  1005:1a4c -- one pass over every slot.
+
+  The trigger test, the timer and the draw all happen BEFORE the state
+  handler runs, so a lemming is drawn in the state it was in at the start of
+  the frame and moves afterwards.
   -------------------------------------------------------------------------- }
-procedure Walker;
-{ The goto mirrors the original's control flow -- LemState1_Walker jumps to
-  LAB_1005_1791 from inside the step-climb scan -- so it is kept rather than
-  restructured. }
-label
-  Step;
+procedure UpdateAll;
 var
-  Dx, Row, Col : Integer;
-  C            : Byte;
+  N : Integer;
 begin
-  with Lem[N] do
+  for N := 1 to MaxLem do
   begin
-    { 1 -- is there ground under us, and is any of it lethal? }
-    for Dx := -3 to 3 do
+    if Lem[N].Y > 199 then Remove(N);            { off the bottom }
+    if Lem[N].Active <> 0 then
     begin
-      C := GetPixel(X + Dx, Y + 1, VirtScrSeg);
-      if C = 3            then begin SetState(6, N); Exit end;   { death A }
-      if C = $12          then begin SetState(9, N); Exit end;   { see NOTES }
-      if C in [$20..$29]  then begin SetState(7, N); Exit end;   { death B }
-      if C in Ground      then Break;
-      if Dx = 3           then begin SetState(2, N); Exit end;   { no ground }
-    end;
-
-    { 2 -- a wall taller than about five pixels turns us around }
-    for Row := Y - 9 to Y - 4 do
-      for Col := X + 3 * Dir to X + 5 * Dir do
-        if GetPixel(Col, Row, VirtScrSeg) in Wall then
-        begin
-          Dir := -Dir;
-          Exit;
-        end;
-
-    { 3 -- otherwise a step up to five pixels is climbed }
-    for Row := Y - 4 to Y do
-      for Col := X + 3 * Dir to X + 4 * Dir do
-        if GetPixel(Col, Row, VirtScrSeg) in Wall then
-        begin
-          Y := Row - 1;
-          Goto Step;
-        end;
-
-  Step:
-    Inc(X, Dir);
-    Tick := (Tick mod 2) + 1;
-    if Tick mod 2 = 0 then
-      Frame := (Frame mod 4) + 1;          { 4-frame cycle at half rate }
-  end;
-end;
-
-{ --------------------------------------------------------------------------
-  LemState2_Faller (1005:0b68) -- the shape shared by the digging states.
-
-    for Step := 1 to .. do
-      for Dx := -3 to 3 do
-        if GetPixel(X + Dx, Y + Step, VirtScrSeg) in Ground then
-        begin
-          if FallDist < SplatDrop then SetState(1, N)    (* land and walk *)
-          else                         SetState(8, N);   (* splat *)
-          Exit;
-        end;
-    Inc(Y);  Inc(FallDist);
-
-  LemState4_Basher and LemState10_Miner share that shape but ERASE terrain --
-  drawing colour 0 with VGA_DrawLine / VGA_FillRect / VGA_FillTri, horizontally
-  for the basher and diagonally down-forward for the miner. Both revert to
-  walker once nothing solid remains ahead.
-  -------------------------------------------------------------------------- }
-
-{ --------------------------------------------------------------------------
-  LemState3_Timer (1005:18fc) -- the "oh no" animation.
-
-  Five frames at one per three ticks, then straight into the explosion.
-  -------------------------------------------------------------------------- }
-procedure TimerState;
-begin
-  with Lem[N] do
-  begin
-    Tick := (Tick mod 3) + 1;
-    if Tick mod 3 = 0 then
-    begin
-      Inc(Frame);
-      if Frame > 5 then SetState(11, N);
-    end;
-  end;
-end;
-
-{ --------------------------------------------------------------------------
-  LemState5_Builder (1005:0d1a)
-
-  Every third tick advances a 6-frame cycle; frame 6 lays a brick. The
-  staircase climbs two pixels across for every one up, and because BrickColour
-  ($4D) is in the Ground set the brick is walkable the instant it is drawn.
-
-  After 500 ticks the builder reverts to a walker AND arms its countdown at 20
-  -- so twenty frames later the countdown reaches 1, which triggers state 3,
-  which triggers state 11. The builder finishes its staircase and then blows
-  itself up.
-  -------------------------------------------------------------------------- }
-procedure Builder;
-begin
-  with Lem[N] do
-  begin
-    Inc(Tick);
-    if Tick mod 3 = 0 then
-    begin
-      Frame := (Frame mod 6) + 1;
-      if Frame = 6 then
+      { 1005:1a70 -- the scripted trigger }
+      if (Lem[N].TrigX >= 0) and (Lem[N].TrigX = Lem[N].X)
+         and (Lem[N].TrigY >= 0) and (Lem[N].TrigY = Lem[N].Y) then
       begin
-        Inc(X, 2);
-        Dec(Y);
-        FillTri(X + 2, X - 2, Y + 2, BrickColour, VirtScrSeg);
+        SetState(Lem[N].TrigState, N);
+        Lem[N].TrigX := 0;
+        Lem[N].TrigY := 0;
+      end;
+
+      if Lem[N].Timer > 0 then Dec(Lem[N].Timer);
+      if Lem[N].Timer = 1 then SetState(StFuse, N);
+      if Lem[N].Timer < 0 then Inc(Lem[N].Timer);
+      if Lem[N].Timer = -1 then Remove(N);
+
+      DrawSprite(N);                             { 1005:1ae3 }
+
+      case Lem[N].State of                       { 1005:1aec }
+        StWalker    : Walker(N);
+        StFaller    : Faller(N);
+        StTunneller : Tunneller(N);
+        StDigger    : Digger(N);
+        StSplat     : Splat(N);
+        StBuilder   : Builder(N);
+        StDeathA    : DeathA(N);
+        StDeathB    : DeathB(N);
+        StFuse      : Fuse(N);
+        StExplode   : Explode(N);
+        { state 9 has no arm -- see Walker }
       end;
     end;
-
-    if Tick = 500 then
-    begin
-      SetState(1, N);
-      Countdown := 20;                     { ... and self-destruct }
-    end;
   end;
 end;
 
 { --------------------------------------------------------------------------
-  LemState11_Countdown (1005:1954)
-  Flashes palette entries $E0..$E9 over five steps, then arms the countdown at
-  -60, which counts UP to -1 and removes the lemming.
+  1005:0a4f -- the hillside's own animation, three frames of 43 x 24 at
+  (113, 50), stepping every fourth tick. Nothing to do with the lemmings; it
+  just shares the frame loop.
   -------------------------------------------------------------------------- }
+procedure BackdropAnim;
+begin
+  HillTick := (HillTick mod 11) + 1;
+  Blit(@HillAnim[(HillTick shr 2) + 1], $71, $32, 43, 24, WorkSeg);
+end;
 
-var
-  CharPos, CharIndex, WalkCounter, WalkPhase : Integer;
-  Band : array[1..24] of Byte;
+{ ==========================================================================
+  The scene
+  ========================================================================== }
 
 { --------------------------------------------------------------------------
-  Effect_ColumnSlideIn (1005:0000)
+  1005:0000 -- the title screen slides in one column at a time.
 
-  200 columns spanning x = 60..259 each scroll into place at the same rate but
-  with a random head start, so the image assembles as a ragged vertical wipe.
-  The stride $140 = 320 confirms it works on the linear mode-13h buffer.
+  Every column of the screen gets a random head start of Random(200) - 400,
+  so they all begin off the top by different amounts. Each of 400 passes
+  walks the 200 columns and, for any whose offset has reached zero, copies
+  that column down the screen; the rest just count up. The result is 200
+  vertical strips arriving at staggered times.
   -------------------------------------------------------------------------- }
 procedure ColumnSlideIn;
 var
-  Offs          : array[0..200] of Integer;
-  I, Frame, Col : Integer;
+  Pass, C, Ofs_ : Integer;
+  Src, Dst      : Word;
 begin
-  for I := 0 to 200 do
-    Offs[I] := Random(200) - 400;        { all negative: -400..-201 }
+  for C := 0 to 200 do
+    ColOfs[C] := Random(200) - 400;              { 1005:0004 }
 
-  for Frame := 1 to 400 do
-    for Col := 200 downto 1 do
+  for Pass := 1 to 400 do
+    for C := 200 downto 1 do
     begin
-      if Offs[Col] <= 0 then
-        ShiftColumnUp(Col + 60, -Offs[Col]);
-      Inc(Offs[Col]);
+      Ofs_ := ColOfs[C];
+      if Ofs_ < 1 then
+      begin
+        Dst := C + $3C;                          { the column, + 60 }
+        Src := Dst;
+        while (Ofs_ <> 0) and (Src < 64001) do
+        begin
+          Inc(Ofs_);
+          Inc(Src, 320);
+        end;
+        if Ofs_ = 0 then
+          while Src < 64001 do
+          begin
+            Mem[VirtScrSeg : Dst] := Mem[VirtScrSeg : Src];
+            Inc(Dst, 320);
+            Inc(Src, 320);
+          end;
+      end;
+      Inc(ColOfs[C]);
     end;
 end;
 
 { --------------------------------------------------------------------------
-  Lemming_Walk (1005:0a4f)
-  A 3-frame walk cycle running at a quarter of the frame rate, taken off an
-  11-state counter: frame := (counter shr 2) + 1.
+  1005:00a6 -- everything off NEUROSIS.DAT, and the title sequence.
   -------------------------------------------------------------------------- }
-procedure LemmingWalk;
-begin
-  WalkCounter := (WalkCounter mod WalkStates) + 1;
-  Blit(Bank(BigBank + LongInt((WalkCounter shr 2) + 1) * BigSprite), 113, 50, 43, 24, BackSeg);
-end;
-
-{ --------------------------------------------------------------------------
-  Scroller_Step (1005:08ad)
-
-  Advances the text, draws the two carrying lemmings -- one facing each way,
-  indexed (4 - frame) and (frame + 4) into the same bank -- then rotates the
-  8-entry colour band twice per frame.
-
-  ASSETS  assets/part004/ -- twenty reads from NEUROSIS.DAT $1228CE totalling
-          202,007 bytes: sprite banks, three palettes and two 320x200 screens.
-  -------------------------------------------------------------------------- }
-procedure ScrollerStep;
+procedure LoadAssets;
 var
-  I, J : Integer;
+  F   : file;
+  Pal : TPal768;
+  I   : Integer;
 begin
-  Inc(CharPos, CharStep);
-  if CharPos > CharWrap then
-  begin
-    CharPos := 1;
-    Inc(CharIndex);
-  end;
+  Assign(F, 'neurosis.dat');
+  Reset(F, 1);
+  Seek(F, DataOfs);
 
-  if CharIndex < ScrollLen then
-    DrawChar(CharPos, ScrollText[CharIndex])
-  else
-    DrawChar(CharPos, ' ');
+  GetMem(Font, SizeOf(TFont));                   { 1005:00BE }
+  BlockRead(F, Font^, SizeOf(TFont));
 
-  WalkPhase := (WalkPhase mod WalkStates) + 1;
-  Blit(Bank(SmallBank + LongInt(4 - ((WalkPhase shr 2) + 1)) * SmallSprite), 278, 27, 14, 10, BackSeg);
-  Blit(Bank(SmallBank + LongInt((WalkPhase shr 2) + 4) * SmallSprite), 30, 27, 14, 10, BackSeg);
+  ClearScreen($A000, 0);
+  BlockRead(F, Pal, SizeOf(Pal));
+  SetPalette768(@Pal);
+  BlockRead(F, Mem[VirtScrSeg : 0], 64000);      { the title screen }
 
-  for I := 1 to 2 do
-  begin
-    Move(Cycle[1], Cycle[0], 21);          { rotate the band }
-    FillChar(Cycle[20], 3, LastColour);
-    for J := 0 to CycleCount - 1 do
-      SetRGB(CycleFirst + J, Cycle[J * 3], Cycle[J * 3 + 1], Cycle[J * 3 + 2]);
-  end;
+  ColumnSlideIn;                                 { 1005:0116 }
+  Delay($514);                                   { 1300 }
+  GetPalette768(@Pal);
+  for I := 1 to $40 do FadeStep;                 { 1005:0132 }
+
+  ClearScreen($A000, 0);
+  BlockRead(F, Mem[VirtScrSeg : 0], 64000);      { the hillside }
+  BlockRead(F, Pal, SizeOf(Pal));
+  BlockRead(F, ScenePal, SizeOf(ScenePal));      { DS:$CC07 }
+
+  BlockRead(F, WalkBank,  SizeOf(WalkBank));
+  BlockRead(F, TumbleBk,  SizeOf(TumbleBk));
+  BlockRead(F, SplatBank, SizeOf(SplatBank));
+  BlockRead(F, DigBank,   SizeOf(DigBank));
+  BlockRead(F, TunnelBk,  SizeOf(TunnelBk));
+  BlockRead(F, DeathBBk,  SizeOf(DeathBBk));
+  BlockRead(F, HillAnim,  SizeOf(HillAnim));
+  BlockRead(F, DeathABk,  SizeOf(DeathABk));
+  BlockRead(F, BuildBank, SizeOf(BuildBank));
+  BlockRead(F, DeathAPic, SizeOf(DeathAPic));
+  BlockRead(F, IntroAnim, SizeOf(IntroAnim));
+  BlockRead(F, SideAnim,  SizeOf(SideAnim));
+  BlockRead(F, Explosion, SizeOf(Explosion));
+  BlockRead(F, FuseBank,  SizeOf(FuseBank));
+  Close(F);
+
+  SetPalette768(@Pal);                           { 1005:0304 }
+  { 1005:030F -- black out the ten entries the explosion will light. }
+  for I := $E0 to $E9 do SetRGB(I, 0, 0, 0);
 end;
 
 { --------------------------------------------------------------------------
-  Lemmings_MainLoop (1005:1bbb)
+  1005:0a86 -- blank the DAC, put the hillside up, fade it in, then run a
+  seven-frame animation BACKWARDS at (5, 50) and start the music.
+  -------------------------------------------------------------------------- }
+procedure Intro;
+var
+  Pal : TPal768;
+  I   : Integer;
+begin
+  GetPalette768(@Pal);                           { 1005:0A8A }
+  for I := 0 to 255 do SetRGB(I, 0, 0, 0);
+  CopyScreen(VirtScrSeg, $A000);
+  PaletteFadeUp(@Pal, 0);                        { 1005:0AB6 }
+
+  for I := 6 downto 1 do                         { 1005:0ABF }
+  begin
+    FillRect(5, $32, $46, $4A, 0, VirtScrSeg);
+    Blit(@IntroAnim[I], 5, $32, 65, 24, VirtScrSeg);
+    CopyScreen(VirtScrSeg, $A000);
+    Delay($96);                                  { 150 }
+  end;
+
+  MusicStart;                                    { 1005:0B1D }
+end;
+
+{ 1005:1c9a -- the two heap blocks the scene needs beyond the virtual screen. }
+procedure Setup;
+begin
+  GetMem(WorkScr, 64000);
+  GetMem(ScrollBuf, ScrollSize);
+  FillChar(ScrollBuf^, ScrollSize, 0);
+  WorkSeg := Seg(WorkScr^);
+end;
+
+{ --------------------------------------------------------------------------
+  1005:1bbb -- the frame loop.
+
+  IT DOES NOT EXIT ON A KEY. A keypress -- or the last lemming dying -- only
+  starts the ending: from then on every frame fades the palette one step and
+  drops the tracker volume TWICE, and the loop ends when the volume reaches
+  zero. So how long the scene runs past the keypress depends on how loud the
+  music was, and with no tracker resident GetVolume returns 0 and it stops on
+  the first frame.
   -------------------------------------------------------------------------- }
 procedure MainLoop;
 var
-  Frame : LongInt;
-  I     : Integer;
-  Done  : Boolean;
+  Frame, I : Integer;
+  V        : Byte;
+  Done     : Boolean;
 begin
-  Frame := 0;
-  Done  := False;
-  Setup;
-  SetupPeriodic;
+  LiveCount := 0;
+  Spawned   := 0;
+  Frame     := 0;
+  HillTick  := 1;                                { 1005:1BCD }
+  InitAll;
+  Spawn;
+  Done := False;
   repeat
-    CopyScreen(VirtScrSeg, BackSeg);
-    LemmingWalk;                           { the two text carriers }
-    UpdateAll;                             { the game simulation }
-    ScrollerStep;
-    Inc(FrameCounter);                     { 32-bit }
-    CopyScreen(BackSeg, $A000);
+    CopyScreen(VirtScrSeg, WorkSeg);             { the clean hillside }
+    BackdropAnim;
+    UpdateAll;
+    ScrollStep;
+    CopyScreen(WorkSeg, $A000);
 
     Inc(Frame);
-    if Frame mod 20 = 0 then SetupPeriodic;
+    if Frame mod SpawnEvery = 0 then Spawn;
 
-    if KeyPressed or (Countdown = 0) then
+    if KeyPressed or (LiveCount = 0) then        { 1005:1C46 }
     begin
-      FadePaletteStep;
-      for I := 1 to 24 do
-        if Band[I] <> 0 then Dec(Band[I]);
-      { step the music volume down twice per frame; zero means finished }
-      if GetVolume = 0 then Done := True else SetVolume(GetVolume - 1);
-      if GetVolume = 0 then Done := True else SetVolume(GetVolume - 1);
+      FadeStep;
+      { 1005:1C5B -- fade the scroller's colour cycle out with it }
+      for I := 0 to 7 do
+      begin
+        if ScrollPal[I, 0] <> 0 then Dec(ScrollPal[I, 0]);
+        if ScrollPal[I, 1] <> 0 then Dec(ScrollPal[I, 1]);
+        if ScrollPal[I, 2] <> 0 then Dec(ScrollPal[I, 2]);
+      end;
+
+      V := GetVolume;
+      if V = 0 then Done := True else SetVolume(V - 1);
+      V := GetVolume;
+      if V = 0 then Done := True else SetVolume(V - 1);
     end;
   until Done;
 end;
 
+{ --------------------------------------------------------------------------
+  1005:1cd6 -- Demo_Main.
+  -------------------------------------------------------------------------- }
 procedure RunPart4;
 begin
-  SetMode13h;
-  VirtScrAlloc;
+  MusicDetect;                                   { 11d9:0000 }
+  Setup;
   LoadAssets;
-  Intro;                                   { six frames backwards, Delay(150) }
+  Intro;
+  SavedVol := GetVolume;                         { 1005:1CE7 }
   MainLoop;
-  FreeMem(Virt, 64000);
-  FreeMem(Aux, 6138);
-  RestoreTextMode;
-  WriteLn(SignOff);
+  FreeMem(WorkScr, 64000);
+  FreeMem(ScrollBuf, ScrollSize);
+  MusicStop;                                     { 11d9:004E }
+  SetVolume(SavedVol);                           { put it back as we found it }
 end;
 
+{ 1005:1d3a -- the unit's initialisation body is empty. }
+begin
 end.
-
-{ ===========================================================================
-  THE SCROLL TEXT (1005:$3926 in the image)
-
-    FOR THOSE OF YOU THAT REALLY HATE LONG, BORING SCROLLIES, WE DECIDED TO
-    PUT A NEW TWIST ON IT ***      BUT IF YOU DONT LIKE LEMMINGS, THEN THERE
-    IS NO HOPE, HIT ANY KEY NOW. THE ANY KEY? THE ONE ON THE SIDE MARKED
-    -POWER-      ***
-
-  237 characters, matching the bound the code tests against.
-  =========================================================================== }
-
-{ ===========================================================================
-  NOTES
-
-  STATE 9 DOES NOT EXIST.
-  The dispatch chain in Lem_UpdateAll handles exactly ten states: 1, 2, 3, 4,
-  5, 6, 7, 8, 10 and 11. The walker sets state 9 when it reads terrain colour
-  $12, and nothing ever handles it -- the lemming is still drawn every frame
-  but never moves, never ages its countdown, and never frees its slot. It
-  freezes on the spot for the rest of the part.
-
-  Whether $12 was meant to be the level's exit or this is simply an oversight
-  cannot be told from the code. The behaviour is deterministic either way, and
-  since the level is fully scripted it does not matter to what you see.
-  =========================================================================== }

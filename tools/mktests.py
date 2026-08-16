@@ -49,6 +49,12 @@ P2S2_USES = "Crt, P2VGA, P2View, P2Fix, P2VT"
 P2S2_OPEN = ""
 P2S2_CLOSE = "  Port[$3C8] := 0;\n  TextMode(CO80);\n"
 
+# Part 004 is a single scene with its own units, and its driver does the
+# VirtScrAlloc itself, so the harness only has to hand it NEUROSIS.DAT.
+P4_USES  = "Crt, P4VGA, P4VT"
+P4_OPEN  = "  VirtScrAlloc;       { 11e3:0006 -- the hillside lives here }\n"
+P4_CLOSE = "  VirtScrFree;\n  TextMode(CO80);\n"
+
 # prog, unit, entry, uses, open, close, description
 SCENES = [
     ("TP1S1", "P1S1", "Scene1", VGA_USES, VGA_OPEN, VGA_CLOSE,
@@ -81,6 +87,9 @@ SCENES = [
      "part 003 scene 6 -- the waves"),
     ("TP3S7", "Part3Sprites", "Scene7", VGA_USES, VGA_OPEN, VGA_CLOSE,
      "part 003 scene 7 -- the spinning portraits"),
+
+    ("TP4S1", "Part4Lemmings", "RunPart4", P4_USES, P4_OPEN, P4_CLOSE,
+     "part 004 -- the lemmings"),
 ]
 
 # prog, driver unit, entry, uses (WITHOUT the driver -- the template appends
