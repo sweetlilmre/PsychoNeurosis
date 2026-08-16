@@ -154,22 +154,38 @@ end;
   table's segment, another from the second, then move a byte between two
   further segments.
   -------------------------------------------------------------------------- }
-procedure RenderFrame; assembler;
-asm
-  { ---- pass 1: precomputed scatter blit ---- }
+procedure RenderFrame;
+begin
+  { 119d:018f -- the frame is abandoned the moment a key is down. }
+  if KeyPressed then Exit;
+
+  asm
+  { ---- pass 1: precomputed scatter blit ----
+
+    DS IS REPOINTED THREE TIMES PER PIXEL, so the segment values have to be in
+    registers before the loop starts. Reading them by name inside it --
+    `MOV DS,[DstSeg]` -- looks like Pascal and compiles, but by the second
+    iteration DS is the virtual screen, so it fetches the "segment" out of
+    video memory and the blit scatters bytes at random. 119d:01be caches both
+    in CX and DX ahead of the loop for exactly this reason.
+
+    The source offset is loaded straight into SI rather than through CX, which
+    saves the reload the original needs at 119d:01d2 after using CX as
+    scratch. }
   PUSH DS
   MOV  AX, $A000
   MOV  ES, AX                  { destination is always video }
   MOV  BX, 2                   { entry 0 is skipped }
-  MOV  AX, [VirtScrSeg]
+  MOV  AX, [VirtScrSeg]        { DS is still DGROUP here -- read them now }
+  MOV  CX, [SrcSeg]
+  MOV  DX, [DstSeg]
 @Blit:
-  MOV  DS, [DstSeg]
+  MOV  DS, DX                  { DS := the destination-offset table }
   MOV  SI, BX
   MOV  DI, [SI]                { DI := DstOfs[i] }
-  MOV  DS, [SrcSeg]
-  MOV  CX, [SI]                { CX := SrcOfs[i] }
+  MOV  DS, CX                  { DS := the source-offset table }
+  MOV  SI, [SI]                { SI := SrcOfs[i] }
   MOV  DS, AX                  { DS := virtual screen }
-  MOV  SI, CX
   ADD  BX, 2
   MOVSB                        { ES:[DI] <- DS:[SI] }
   CMP  BX, TableSize
@@ -191,6 +207,7 @@ asm
   DEC  BX
   JNZ  @Row
   POP  DS
+  end;
 end;
 
 { --------------------------------------------------------------------------

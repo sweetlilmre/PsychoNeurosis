@@ -461,7 +461,8 @@ end;
 
   The three blended components are handed to Morph_TransformPoint in
   REGISTERS -- X in BX, Y in CX, Z in DX -- not on the stack. That is a
-  register-convention call and has to be preserved as assembler.
+  register-convention call. DrawMorph used to be assembler for that reason
+  and is now Pascal -- see the note on it.
 
   Once MorphStep passes MorphSteps the morph is complete: it copies MorphTo
   over CurShape and just draws the destination shape from then on.
@@ -669,7 +670,7 @@ end.
     integer linear interpolation, P := A + (B - A) * Step div Steps, done with
     IMUL/IDIV through a 32-bit intermediate -- no floating point anywhere in
     the morph. Coordinates reach Morph_TransformPoint in BX, CX and DX, so it
-    is a register-convention call and is kept as assembler.
+    is a register-convention call in the original. DrawMorph is Pascal here.
 
   OPEN
   * Nothing outstanding.
