@@ -294,21 +294,48 @@ end;
   Registers on entry: BX = X, CX = Y, DX = Z (read straight from the 6-byte
   record). On exit DI = screen X, BX = screen Y, for ModeX_PlotPixel.
   -------------------------------------------------------------------------- }
+{ --------------------------------------------------------------------------
+  The rotation's fixed-point scaling, as the original writes it.
+
+  After each IMUL the 32-bit product sits in DX:AX, and 1139:00bd does
+
+      SHL AX,1 / RCL DX,1        twice, then keeps DX
+
+  -- the top word of the product times four, i.e. an arithmetic shift right by
+  14. No divide. Turbo Pascal has no signed shift operator, but DX is just the
+  high half of the shifted product, so casting the LongInt over a two-Integer
+  record gets at it exactly, sign and all, with two shifts and no arithmetic:
+
+      -16384 -> shl 2 = $FFFF0000 -> Hi = $FFFF = -1        ( -1.0 )
+   16384000 -> shl 2 = $03E80000 -> Hi = $03E8 =  1000      ( 1000.0 )
+
+  An earlier version of this used `div 16384`, which is numerically close but
+  is not what the code does and rounds the other way on negatives.
+  -------------------------------------------------------------------------- }
+type
+  TSplit = record Lo, Hi : Integer end;
+
+function Scale14(P : LongInt) : Integer;
+begin
+  P := P shl 2;
+  Scale14 := TSplit(P).Hi;
+end;
+
 procedure TransformPoint(X, Y, Z : Integer; var SX, SY : Integer);
 var
   T, U, V, D : LongInt;
 begin
   { rotate about the first axis }
-  T := (LongInt(Z) * SinX + LongInt(Y) * CosX) div FixedOne;
-  U := (LongInt(Z) * CosX - LongInt(Y) * SinX) div FixedOne;
+  T := Scale14(LongInt(Z) * SinX + LongInt(Y) * CosX);
+  U := Scale14(LongInt(Z) * CosX - LongInt(Y) * SinX);
 
   { second axis }
-  V := (LongInt(X) * CosY - U * SinY) div FixedOne;
-  U := (U * CosY + LongInt(X) * SinY) div FixedOne;
+  V := Scale14(LongInt(X) * CosY - U * SinY);
+  U := Scale14(U * CosY + LongInt(X) * SinY);
 
   { third axis }
-  X := (V * CosZ + T * SinZ) div FixedOne;
-  Y := (T * CosZ - V * SinZ) div FixedOne;
+  X := Scale14(V * CosZ + T * SinZ);
+  Y := Scale14(T * CosZ - V * SinZ);
 
   D := ViewDist - U;
   if D >= 0 then
