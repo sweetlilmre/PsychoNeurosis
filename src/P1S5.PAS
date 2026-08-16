@@ -494,11 +494,39 @@ begin
     the picture never moved. The source is the WORK buffer, always from
     offset 0, so the final frame slides down off the bottom with black
     filling in above it. 640 bytes a step is two rows.
+
+    HAND ASSEMBLER, verbatim -- it is an asm block inside compiled Pascal,
+    not a routine of its own, which is why it is inline here too. The frame
+    loop and the W counter around it are the compiler's.
+
+    EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+        FillChar(Mem[$A000 : 0], W, 0);
+        Move(Mem[WorkSeg : 0], Mem[$A000 : W], 64000 - W);
+
+    and that really is equivalent. It is written out because the original
+    writes it out: one pair of segment registers serves both halves, so the
+    blank and the copy run back to back with DI already in the right place.
     -------------------------------------------------------------------- }
   W := 0;
   repeat
-    FillChar(Mem[$A000 : 0], W, 0);
-    Move(Mem[WorkSeg : 0], Mem[$A000 : W], 64000 - W);
+    asm
+      PUSH DS               { DS becomes the work buffer below              }
+      MOV  AX, $A000        { video memory                                  }
+      MOV  ES, AX           { ES:DI is the destination for both halves      }
+      MOV  AX, [WorkSeg]    { the finished frame                            }
+      MOV  DS, AX           { DS:SI is the source for the copy              }
+      XOR  SI, SI           { always from the top of the work buffer        }
+      XOR  DI, DI           { and to the top of the screen                  }
+      MOV  BX, W            { how far down the picture has slid             }
+      XOR  AX, AX           { the fill value: black                         }
+      MOV  CX, BX           { that many bytes of black                      }
+      REP  STOSB            { blank the top of the screen; DI ends at W     }
+      MOV  CX, $FA00        { 64,000 -- the whole screen                    }
+      SUB  CX, BX           {   less what was just blanked                  }
+      REP  MOVSB            { and the picture follows, starting at row W/320 }
+      POP  DS               { restore our data segment                      }
+    end;
     Inc(W, 640);
   until W >= 64000;
 end;

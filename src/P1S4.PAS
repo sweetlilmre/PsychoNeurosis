@@ -21,6 +21,9 @@
   one point per character. Eight rows of eighteen is exactly the 144.
   =========================================================================== }
 
+{$G+}   { 286 instructions: REP OUTSB in SetPalette768 (1107:0011). The
+          original targets 386 and above. }
+
 unit P1S4;
 
 interface
@@ -30,6 +33,34 @@ procedure Scene4;
 implementation
 
 uses VGA, Crt, DemoVT;
+
+{ --------------------------------------------------------------------------
+  1107:0000 -- SetPalette768(P). HAND ASSEMBLER, verbatim.
+
+  Byte for byte the same routine as part 002's P2VGA.SetPalette (1436:0083):
+  point the DAC write index at colour 0 and let REP OUTSB stream all 768
+  components at it, the hardware auto-incrementing between entries.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      Port[$3C8] := 0;
+      for I := 0 to 767 do Port[$3C9] := TPal768(P^)[I];
+
+  Scene 4 is the only part 001 scene with its own copy; the others go through
+  VGA.SetPalette.
+  -------------------------------------------------------------------------- }
+procedure SetPalette768(P : Pointer); assembler;
+asm
+  PUSH DS                 { DS is about to point at the caller's buffer    }
+  LDS  SI, P              { DS:SI := the 768-byte palette                  }
+  MOV  DX, $3C8           { the DAC WRITE index register                   }
+  MOV  AL, 0              { start at colour 0                              }
+  OUT  DX, AL             { select it -- the DAC auto-increments from here }
+  INC  DX                 { DX := $3C9, the DAC data register              }
+  MOV  CX, $300           { 768 bytes = 256 entries of R, G, B             }
+  REP  OUTSB              { write them all out from DS:SI                  }
+  POP  DS                 { restore our data segment                       }
+end;
 
 const
   TrailRows  = 8;
@@ -605,10 +636,7 @@ begin
   ClearScreen(VirtScrSeg, 0);
   WaitRetrace;
 
-  { 1107:0000 -- port $3C8 := 0, then 768 bytes out of $3C9 }
-  Port[$3C8] := 0;
-  for I := 0 to 767 do
-    Port[$3C9] := Pal[I];
+  SetPalette768(@Pal);                { 1107:0000 }
 end;
 
 { --------------------------------------------------------------------------

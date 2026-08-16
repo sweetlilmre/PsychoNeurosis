@@ -68,31 +68,126 @@ end;
 
   Erasing in REVERSE order is what makes overlapping sprites restore
   correctly, and is only necessary because of the save/restore scheme.
+
+  HAND ASSEMBLER, verbatim. Instruction for instruction it is SaveUnder with
+  LDS/LES swapped and DI walking the screen instead of SI -- see the notes
+  there for the shift-based row offset.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      P := Src;
+      for Row := 0 to 39 do
+      begin
+        Move(P^, Mem[Segment : (Y - 20 + Row) * 320 + X - 20], 40);
+        Inc(LongInt(P), 40);
+      end;
   -------------------------------------------------------------------------- }
-procedure BlitSprite(X, Y : Integer; Src : Pointer; Segment : Word);
-var
-  Row : Integer;
-  P   : ^Byte;
-begin
-  P := Src;
-  for Row := 0 to BounceH - 1 do
-  begin
-    Move(P^, Mem[Segment : (Y - 20 + Row) * ScrWidth + X - 20], BounceW);
-    Inc(LongInt(P), BounceW);
-  end;
+procedure BlitSprite(X, Y : Integer; Src : Pointer; Segment : Word); assembler;
+asm
+  PUSH DS                 { DS becomes the source buffer's segment below    }
+  LDS  SI, Src            { DS:SI := the 40 x 40 block to draw              }
+  MOV  AX, X              { the sprite's centre X                           }
+  MOV  BX, Y              {   and Y                                         }
+  MOV  CX, $14            { 20 -- half of 40                                }
+  SUB  AX, CX             { AX := the LEFT edge                             }
+  SUB  BX, CX             { BX := the TOP edge                              }
+  MOV  CX, Segment        { the screen to write to                          }
+  MOV  ES, CX             { ES := it                                        }
+  MOV  CX, AX             { park the left edge                              }
+  MOV  AX, BX             { AX := the top row                               }
+  MOV  BH, BL             { BX := row * 256                                 }
+  XOR  BL, BL             {                                                 }
+  SHL  AX, 1              { row * 2                                         }
+  SHL  AX, 1              { row * 4                                         }
+  SHL  AX, 1              { row * 8                                         }
+  SHL  AX, 1              { row * 16                                        }
+  SHL  AX, 1              { row * 32                                        }
+  SHL  AX, 1              { row * 64                                        }
+  ADD  BX, AX             { row * 320                                       }
+  MOV  AX, CX             { the left edge back                              }
+  ADD  AX, BX             { + the row offset                                }
+  MOV  DI, AX             { ES:DI := the first screen byte to write         }
+  MOV  DL, $28            { 40 rows to go                                   }
+  XOR  CH, CH             {                                                 }
+  MOV  CL, DL             { CX := 40, the bytes per row                     }
+  CLD                     { forwards                                        }
+  MOV  AX, CX             { keep the row length -- REP destroys CX          }
+@@Row:                    { <- once per row of the block                    }
+  MOV  BX, DI             { keep the row's start -- REP moves DI on         }
+  MOV  CX, AX             { CX := 40 again                                  }
+  REP  MOVSB              { draw the row                                    }
+  MOV  DI, BX             { back to where the row started                   }
+  DEC  DL                 { one row done                                    }
+  JZ   @@Out              { all forty drawn                                 }
+  ADD  DI, $140           { 320 -- down one screen row                      }
+  JMP  @@Row              { round again                                     }
+@@Out:                  { <- all forty rows done                          }
+  POP  DS                 { restore our data segment                        }
 end;
 
-procedure SaveUnder(X, Y : Integer; Dest : Pointer; Segment : Word);
-var
-  Row : Integer;
-  P   : ^Byte;
-begin
-  P := Dest;
-  for Row := 0 to BounceH - 1 do
-  begin
-    Move(Mem[Segment : (Y - 20 + Row) * ScrWidth + X - 20], P^, BounceW);
-    Inc(LongInt(P), BounceW);
-  end;
+{ --------------------------------------------------------------------------
+  1012:02bc -- SaveUnder(X, Y, Dest, Segment). HAND ASSEMBLER, verbatim.
+
+  Copies the 40 x 40 block centred on (X, Y) out of Segment into Dest. The
+  matching write is 1012:0311 below; the two are the same routine with the
+  source and destination swapped.
+
+  The screen offset is built with shifts, not a multiply: BX takes the row
+  shifted up a byte (row * 256) and AX the row shifted left six (row * 64),
+  and the two are added to give row * 320.
+
+  RET $A: X at BP+$C, Y at BP+$A, Dest at BP+6, Segment at BP+4.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      P := Dest;
+      for Row := 0 to 39 do
+      begin
+        Move(Mem[Segment : (Y - 20 + Row) * 320 + X - 20], P^, 40);
+        Inc(LongInt(P), 40);
+      end;
+  -------------------------------------------------------------------------- }
+procedure SaveUnder(X, Y : Integer; Dest : Pointer; Segment : Word); assembler;
+asm
+  PUSH DS                 { DS becomes the screen's segment below           }
+  LES  DI, Dest           { ES:DI := the save buffer                        }
+  MOV  AX, X              { the sprite's centre X                           }
+  MOV  BX, Y              {   and Y                                         }
+  MOV  CX, $14            { 20 -- half of 40                                }
+  SUB  AX, CX             { AX := the LEFT edge                             }
+  SUB  BX, CX             { BX := the TOP edge -- the sprite is centred     }
+  MOV  CX, Segment        { the screen to read from                         }
+  MOV  DS, CX             { DS := it                                        }
+  MOV  CX, AX             { park the left edge                              }
+  MOV  AX, BX             { AX := the top row                               }
+  MOV  BH, BL             { BX := row * 256, by moving the byte up          }
+  XOR  BL, BL             {                                                 }
+  SHL  AX, 1              { row * 2                                         }
+  SHL  AX, 1              { row * 4                                         }
+  SHL  AX, 1              { row * 8                                         }
+  SHL  AX, 1              { row * 16                                        }
+  SHL  AX, 1              { row * 32                                        }
+  SHL  AX, 1              { row * 64                                        }
+  ADD  BX, AX             { row*256 + row*64 = row * 320, and no MUL        }
+  MOV  AX, CX             { the left edge back                              }
+  ADD  AX, BX             { + the row offset                                }
+  MOV  SI, AX             { DS:SI := the first screen byte to copy          }
+  MOV  DL, $28            { 40 rows to go                                   }
+  XOR  CH, CH             {                                                 }
+  MOV  CL, DL             { CX := 40, the bytes per row                     }
+  CLD                     { forwards                                        }
+  MOV  AX, CX             { keep the row length -- REP destroys CX          }
+@@Row:                    { <- once per row of the block                    }
+  MOV  BX, SI             { and keep the row's start -- REP moves SI on     }
+  MOV  CX, AX             { CX := 40 again                                  }
+  REP  MOVSB              { copy the row into the buffer                    }
+  MOV  SI, BX             { back to where the row started                   }
+  DEC  DL                 { one row done                                    }
+  JZ   @@Out              { all forty copied                                }
+  ADD  SI, $140           { 320 -- down one screen row                      }
+  JMP  @@Row              { round again                                     }
+@@Out:                  { <- all forty rows done                          }
+  POP  DS                 { restore our data segment                        }
 end;
 
 { --------------------------------------------------------------------------
@@ -218,19 +313,35 @@ var
   160 scrolling frames at 2 pixels is 320 -- exactly one screen, so the scene
   ends the instant the last of the logo clears the left edge. Leaving this out
   is why the scene simply sat there and bounced forever.
+
+  HAND ASSEMBLER, verbatim. There is no CLD: it relies on the direction flag
+  already being clear, which Turbo Pascal guarantees.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      D := 0;
+      for Row := 0 to 199 do
+      begin
+        Move(Mem[VirtScrSeg : D + 2], Mem[VirtScrSeg : D], 318);
+        Inc(D, 320);
+      end;
   -------------------------------------------------------------------------- }
-procedure ScrollLeft;
-var
-  Row : Integer;
-  D   : Word;
-begin
-  D := 0;
-  for Row := 0 to ScrHeight - 1 do
-  begin
-    Move(Mem[VirtScrSeg : D + ScrollStep], Mem[VirtScrSeg : D],
-         ScrWidth - ScrollStep);
-    Inc(D, ScrWidth);
-  end;
+procedure ScrollLeft; assembler;
+asm
+  PUSH DS                 { DS becomes the virtual screen below             }
+  MOV  ES, [VirtScrSeg]   { source and destination are the same screen      }
+  MOV  DS, [VirtScrSeg]   {                                                 }
+  MOV  DI, 0              { write from column 0                             }
+  MOV  SI, 2              { read from column 2 -- two pixels along          }
+  MOV  BX, $C8            { 200 rows                                        }
+@@Row:                    { <- once per screen row                          }
+  MOV  CX, $9F            { 159 words = 318 bytes, NOT the whole 320        }
+  REP  MOVSW              { slide the row two pixels left                   }
+  ADD  SI, 2              { the two bytes the copy did not touch: skip them }
+  ADD  DI, 2              {   so both pointers land on the next row         }
+  DEC  BX                 { one row done                                    }
+  JNZ  @@Row              { round again                                     }
+  POP  DS                 { restore our data segment                        }
 end;
 
 { --------------------------------------------------------------------------

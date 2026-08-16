@@ -156,7 +156,7 @@ asm
   JZ   @@Out              { no -- do nothing at all                        }
   PUSH 2                  { function 2: poll                               }
   CALL DWORD PTR Entry    { far indirect through DS:$0CD6; it pops the arg }
-@@Out:
+@@Out:                  { <- the not-resident case returns from here    }
 end;
 
 procedure MusicStart; assembler;     { function 0 }
@@ -165,7 +165,7 @@ asm
   JZ   @@Out              { no                                             }
   PUSH 0                  { function 0: start                              }
   CALL DWORD PTR Entry    { far indirect through DS:$0CD6                  }
-@@Out:
+@@Out:                  { <- the not-resident case returns from here    }
 end;
 
 procedure MusicStop; assembler;      { function 1 }
@@ -174,7 +174,7 @@ asm
   JZ   @@Out              { no                                             }
   PUSH 1                  { function 1: stop                               }
   CALL DWORD PTR Entry    { far indirect through DS:$0CD6                  }
-@@Out:
+@@Out:                  { <- the not-resident case returns from here    }
 end;
 
 { --------------------------------------------------------------------------
@@ -235,7 +235,7 @@ asm
   MOV  ES:[SI], AX        { clear the low word                             }
   MOV  ES:[SI+2], AX      { and the high word                              }
   MOV  [CueTarget], AX    { DS:$A694 := 0, the value we spin toward        }
-@@Spin:
+@@Spin:                 { <- poll until the tracker reaches position 25  }
   CALL MusicPoll          { let the tracker advance one step               }
   CALL MusicPos           { where is it now? -- DX:AX                      }
   SUB  AX, CuePosition    { $19 -- low word only, the original ignores DX  }
@@ -246,7 +246,7 @@ asm
   ADD  SI, [PosField]     { + the position field                           }
   MOV  ES:[SI], AX        { clear the low word                             }
   MOV  ES:[SI+2], AX      { and the high word                              }
-@@Out:
+@@Out:                  { <- the not-resident case returns from here    }
 end;
 
 { --------------------------------------------------------------------------
@@ -278,7 +278,7 @@ asm
   MOV  AL, B              { the second parameter                           }
   INC  SI                 { step to the third byte                         }
   MOV  ES:[SI], AL        { store it                                       }
-@@Out:
+@@Out:                  { <- the not-resident case returns from here    }
 end;
 
 { --------------------------------------------------------------------------
@@ -300,7 +300,7 @@ asm
   ADD  SI, [VolField]     { + the volume field's offset                    }
   MOV  AL, V              { the new volume                                 }
   MOV  ES:[SI], AL        { store it                                       }
-@@Out:
+@@Out:                  { <- the not-resident case returns from here    }
 end;
 
 function GetVolume : Byte; assembler;
