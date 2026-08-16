@@ -30,7 +30,7 @@ begin
 
   SetMode13h;
   VirtScrAlloc;
-  MusicInit;          { harmless with no player resident }
+  MusicDetect;          { harmless with no player resident }
   Scene6;
 
   VirtScrFree;

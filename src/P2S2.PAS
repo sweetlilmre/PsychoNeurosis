@@ -31,7 +31,7 @@ procedure Scene2;
 
 implementation
 
-uses Crt, P2VGA, P2View, P2Fix, P2VT;
+uses Crt, VGA, P2View, P2Fix, DemoVT;
 
 {$I gen/P2OBJ.INC}
 
@@ -861,11 +861,11 @@ begin
   { 108b:1941 }
   PA := 0;  PB := 0;  PC := 0;
   SyncPattern(6, 1);
-  GetPalette(@Buf);
-  PaletteFade(10);
+  GetPalette768(@Buf);
+  PaletteFadeOut(10);
   FillRect(0, 0, ScrWidth, Rows, Page0Base, 0);
   FillRect(0, 0, ScrWidth, Rows, Page1Base, 0);
-  SetPalette(@Buf);
+  SetPalette768(@Buf);
   SetColour($18, $1E, $1E, $1E);
 
   for I := 1 to 120 do

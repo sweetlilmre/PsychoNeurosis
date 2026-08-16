@@ -6,11 +6,30 @@
   that player -- it is the thin client side that every effect part links
   against to talk to it.
 
-  Segment 1532 in NEUROSIS_001_fpu.exe, and the same unit appears as 13f9 in
-  part 002 and 136b in part 003. The three are byte for byte identical; only
-  the DGROUP addresses move. This file is the part 001 copy, transcribed in
-  full -- all ten routines, every one of them hand assembler in the binary.
-  P2VT.PAS is its twin and carries the same code against part 002's addresses.
+  ONE UNIT, LINKED BY EVERY PART. Segment 1532 in part 001, 13f9 in part 002,
+  136b in part 003 and 11d9 in part 004. The code is byte for byte identical;
+  only the DGROUP addresses move, and Turbo Pascal's SMART LINKER drops
+  whichever routines a part never calls -- which is why part 004's copy has
+  only five of the nine and they sit at DIFFERENT OFFSETS:
+
+      part 001 / 002 / 003          part 004
+      0000  MusicDetect             0000  MusicDetect
+      0040  MusicPoll    (fn 2)     0040  MusicStart  (fn 0)
+      004E  MusicStart   (fn 0)     004E  MusicStop   (fn 1)
+      005C  MusicStop    (fn 1)     005C  SetVolume
+      0078  MusicPos                0078  GetVolume
+      0093  MusicCue
+      00D8  SyncPattern
+      0100  SetVolume
+      011C  GetVolume
+
+  Part 004 never polls, never reads the position and never syncs a pattern,
+  so those four are absent and everything after them moves up. Reading its
+  addresses across from another part would put start and stop on the wrong
+  entries; the FUNCTION NUMBERS are what stay constant, and they agree
+  everywhere.
+
+  All nine routines are hand assembler in the binary and are verbatim here.
 
   HOW IT WORKS
     Detection is an INT 2Fh handshake with an ASCII signature -- 'VT', 'Tr',
@@ -31,14 +50,15 @@
 
   THE FUNCTION NUMBERS, SETTLED. An earlier version of this file named
   function 0 "MusicPoll" and declared FuncStop = 3, and flagged the
-  disagreement with P2VT. The binary is unambiguous and both copies agree:
+  disagreement with part 002's copy. The binary is unambiguous and every
+  copy agrees:
 
         1532:0040  pushes 2   poll
         1532:004e  pushes 0   start
         1532:005c  pushes 1   stop
 
-  so P2VT was right. The old names are gone rather than aliased, because a
-  wrong name that still compiles is worse than a rename.
+  The old names are gone rather than aliased, because a wrong name that
+  still compiles is worse than a rename.
   =========================================================================== }
 
 {$G+}   { 286 instructions: the dispatch calls at 1532:0047, 0055 and 0063
@@ -48,7 +68,7 @@ unit DemoVT;
 
 interface
 
-procedure MusicInit;                      far;   { 1532:0000 }
+procedure MusicDetect;                      far;   { 1532:0000 }
 procedure MusicPoll;                      far;   { 1532:0040  function 2 }
 procedure MusicStart;                     far;   { 1532:004e  function 0 }
 procedure MusicStop;                      far;   { 1532:005c  function 1 }
@@ -109,7 +129,7 @@ var
   That Pascal needs a Registers record and an Intr call the original does not
   make -- it issues the INT inline with the values already in the registers.
   -------------------------------------------------------------------------- }
-procedure MusicInit; assembler;
+procedure MusicDetect; assembler;
 asm
   MOV  AX, $5654          { 'VT' -- the first third of the magic number     }
   MOV  BX, $5472          { 'Tr'                                            }

@@ -28,7 +28,7 @@ SRC = pathlib.Path("src")
 VGA_USES = "Crt, VGA, DemoVT"
 VGA_OPEN = """  SetMode13h;
   VirtScrAlloc;
-  MusicInit;          { harmless with no player resident }
+  MusicDetect;          { harmless with no player resident }
 """
 # Scene 3 leaves the adapter in unchained 320x400, and the part's own driver
 # calls SetMode13h again afterwards (1000:0097) rather than leaving the scene
@@ -39,19 +39,20 @@ VGA_CLOSE = """  VirtScrFree;
   SetTextMode;
 """
 
-# Part 002 does not use those units at all -- it has its own, and each of its
-# two scenes sets up its own video mode.
-P2S1_USES = "Crt, P2VGA, P2ModeX, P2VT"
+# Part 002 links the same VGA and DemoVT units as everything else -- it just
+# adds P2ModeX, P2View and P2Fix on top, and each of its two scenes sets up
+# its own video mode.
+P2S1_USES = "Crt, VGA, P2ModeX, DemoVT"
 P2S1_OPEN = "  VirtScrAlloc;       { 1436:0006, what the main body does first }\n"
 P2S1_CLOSE = "  VirtScrFree;\n  Port[$3C8] := 0;\n  TextMode(CO80);\n"
 
-P2S2_USES = "Crt, P2VGA, P2View, P2Fix, P2VT"
+P2S2_USES = "Crt, VGA, P2View, P2Fix, DemoVT"
 P2S2_OPEN = ""
 P2S2_CLOSE = "  Port[$3C8] := 0;\n  TextMode(CO80);\n"
 
-# Part 004 is a single scene with its own units, and its driver does the
-# VirtScrAlloc itself, so the harness only has to hand it NEUROSIS.DAT.
-P4_USES  = "Crt, P4VGA, P4VT"
+# Part 004 is a single scene and its driver does the VirtScrAlloc itself, so
+# the harness only has to hand it NEUROSIS.DAT.
+P4_USES  = "Crt, VGA, DemoVT"
 P4_OPEN  = "  VirtScrAlloc;       { 11e3:0006 -- the hillside lives here }\n"
 P4_CLOSE = "  VirtScrFree;\n  TextMode(CO80);\n"
 
@@ -104,7 +105,7 @@ PARTS = [
      "Crt, VGA, DemoVT",
      "part 001 -- all five scenes, through the driver at 1000:003c"),
     ("TPART2", "P2Main", "RunPart2",
-     "Crt, P2VGA, P2ModeX, P2View, P2Fix, P2VT",
+     "Crt, VGA, P2ModeX, P2View, P2Fix, DemoVT",
      "part 002 -- both scenes, through the driver at 1000:0032"),
     ("TPART3", "P3Main", "RunPart3",
      "Crt, VGA, DemoVT",

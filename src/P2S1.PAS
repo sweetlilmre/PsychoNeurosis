@@ -41,7 +41,7 @@ procedure Scene1;
 
 implementation
 
-uses Crt, P2VGA, P2ModeX, P2VT;
+uses Crt, VGA, P2ModeX, DemoVT;
 
 const
   { 1008:023a / 1008:023f -- Scene1_Init stores these into the door bitmap's
@@ -301,7 +301,9 @@ begin
 end;
 
 { --------------------------------------------------------------------------
-  1008:02de -- Palette_FadeOut
+  1008:02de -- Palette_FadeOut. This is the SCENE's own fade, not VGA's
+  PaletteFadeOut (1491:0330) -- it steps five per channel per pass and takes
+  no delay parameter. Named SceneFadeOut here so the two do not collide.
 
       for Pass := 1 to $40 do
         WaitRetrace
@@ -310,7 +312,7 @@ end;
 
   64 passes of -5 per channel.
   -------------------------------------------------------------------------- }
-procedure PaletteFadeOut;
+procedure SceneFadeOut;
 var
   Pass, Col, K : Integer;
   R, G, B      : Byte;
@@ -346,7 +348,7 @@ end;
 
   Four planes of 64,000 bytes is 1280 x 200: 320 bytes per plane-row, 200
   rows. Each plane is read into the staging buffer and pushed across with
-  CopyToPlane while the Map Mask selects that plane.
+  CopyScreen while the Map Mask selects that plane.
   -------------------------------------------------------------------------- }
 procedure LoadFrames;
 var
@@ -360,8 +362,8 @@ begin
   for P := 0 to 3 do
   begin
     SelectPlane(P);
-    BlockRead(F, Buffer^, 64000);
-    CopyToPlane(BufferSeg, VGASeg);
+    BlockRead(F, VirtScr^, 64000);
+    CopyScreen(VirtScrSeg, VGASeg);
   end;
   BlockRead(F, Door, DoorSize);
   Close(F);
@@ -474,13 +476,13 @@ begin
   until Frame = HoldFrames;
 
   { phase 3 -- blank all four planes, then fade the palette out }
-  ClearSeg(BufferSeg, 0);                  { 1008:0619, once }
+  ClearScreen(VirtScrSeg, 0);                  { 1008:0619, once }
   for P := 0 to 3 do
   begin
     SelectPlane(P);
-    CopyToPlane(BufferSeg, VGASeg);
+    CopyScreen(VirtScrSeg, VGASeg);
   end;
-  PaletteFadeOut;
+  SceneFadeOut;
 end;
 
 { --------------------------------------------------------------------------

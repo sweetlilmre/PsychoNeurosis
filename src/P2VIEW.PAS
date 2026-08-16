@@ -420,7 +420,7 @@ end;
 
 { --------------------------------------------------------------------------
   140c:01af -- out $3C8 := Col, then $3C9 := R, G, B. RETF 8, so Col is at
-  BP+$C and is declared first. Identical in shape to P2VGA's SetRGB; part 002
+  BP+$C and is declared first. Identical in shape to VGA's SetRGB; part 002
   simply has one in each unit.
 
   EQUIVALENT PASCAL, for reference -- the assembler below is what runs:

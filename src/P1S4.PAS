@@ -37,7 +37,9 @@ uses VGA, Crt, DemoVT;
 { --------------------------------------------------------------------------
   1107:0000 -- SetPalette768(P). HAND ASSEMBLER, verbatim.
 
-  Byte for byte the same routine as part 002's P2VGA.SetPalette (1436:0083):
+  Byte for byte VGA.SetPalette768 -- 1436:0083 in part 002, 11e3:0230 in
+  part 004. Part 004 scene 4 keeps its own copy because it is a separate
+  unit; the shared one is stripped from this part.
   point the DAC write index at colour 0 and let REP OUTSB stream all 768
   components at it, the hardware auto-incrementing between entries.
 

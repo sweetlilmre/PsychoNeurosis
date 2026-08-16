@@ -9,7 +9,7 @@
 
 program TP4S1;
 
-uses Crt, P4VGA, P4VT, Part4Lemmings;
+uses Crt, VGA, DemoVT, Part4Lemmings;
 
 var
   F : file;

@@ -9,11 +9,11 @@
 
   and the three units they share:
 
-      P2VGA    segment 1436   palette, staging buffer, retrace
+      VGA    segment 1436   palette, staging buffer, retrace
       P2ModeX  segment 107c   unchained 320x200 on a 1280-wide canvas
       P2View   segment 140c   unchained 320x400, two pages
       P2Fix    segment 142a   16.16 fixed point, and SetMode13h
-      P2VT     segment 13f9   the resident tracker client
+      DemoVT     segment 13f9   the resident tracker client
 
   This replaces the old single-file PART2.PAS, which predated the split and
   carried guessed versions of routines that have since been read out of the
@@ -29,7 +29,7 @@ procedure RunPart2;
 
 implementation
 
-uses Crt, P2VGA, P2ModeX, P2View, P2Fix, P2VT, P2S1, P2S2;
+uses Crt, VGA, P2ModeX, P2View, P2Fix, DemoVT, P2S1, P2S2;
 
 { --------------------------------------------------------------------------
   1000:0032 -- the main body.

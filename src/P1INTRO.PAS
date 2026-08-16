@@ -30,7 +30,7 @@ var
 begin
   SetMode13h;
   VirtScrAlloc;
-  MusicInit;
+  MusicDetect;
 
   Scene1;      FlushKeys;
   Scene2;      FlushKeys;

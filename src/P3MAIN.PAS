@@ -45,7 +45,7 @@ end;
 
       SetMode13h        12f8:0000
       VirtScrAlloc      12f8:0006
-      MusicInit         136b:0000     the INT $2F handshake
+      MusicDetect         136b:0000     the INT $2F handshake
       Scene1            1015:098d
       flush
       dispatch 0        136b:004e     see the note below
@@ -82,7 +82,7 @@ var
 begin
   SetMode13h;
   VirtScrAlloc;
-  MusicInit;
+  MusicDetect;
 
   Scene1;   FlushKeys;
 

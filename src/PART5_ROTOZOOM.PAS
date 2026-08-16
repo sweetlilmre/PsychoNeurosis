@@ -362,9 +362,9 @@ end;
 
 { [stub] flat-fill one triangle of the terrain mesh. }
 
-procedure MusicInit;
+procedure MusicDetect;
 begin
-  DemoVT.MusicInit;
+  DemoVT.MusicDetect;
 end;
 
 { --------------------------------------------------------------------------
@@ -597,7 +597,7 @@ end;
 
 procedure RunPart5;
 begin
-  SetMode13h; VirtScrAlloc; MusicInit;
+  SetMode13h; VirtScrAlloc; MusicDetect;
   Scene1;  FlushKeys;
   Scene2;  FlushKeys;
   Scene3;  FlushKeys;

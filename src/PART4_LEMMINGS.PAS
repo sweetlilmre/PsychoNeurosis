@@ -56,7 +56,7 @@ procedure RunPart4;
 
 implementation
 
-uses Crt, P4VGA, P4VT;
+uses Crt, VGA, DemoVT;
 
 const
   MaxLem     = 25;            { 1005:06c8 clears 1..25 }
@@ -122,7 +122,7 @@ var
   LiveCount  : Integer;
   Spawned    : Integer;
 
-  { The two screens. VirtScrSeg (P4VGA, DS:$CF8C) holds the hillside and is
+  { The two screens. VirtScrSeg (VGA, DS:$CF8C here) holds the hillside and is
     what GetPixel reads; this one is composed into each frame. DS:$0305 and
     DS:$030D. }
   WorkScr    : Pointer;
@@ -281,7 +281,7 @@ asm
   MOV  ES, AX           { ES:DI is the destination                          }
   MOV  BX, YTop         { the first row                                     }
   SHL  BX, 1            { * 2, a word index into the row table              }
-  MOV  DI, [BX + OFFSET YOfs]   { DI := YOfs[YTop] -- P4VGA's table         }
+  MOV  DI, [BX + OFFSET YOfs]   { DI := YOfs[YTop] -- VGA's row table       }
   ADD  DI, X            { + the column                                      }
   MOV  CX, YBottom      { the last row                                      }
   SUB  CX, YTop         { how many rows between them                        }

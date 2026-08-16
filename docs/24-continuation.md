@@ -211,7 +211,36 @@ Two things worth knowing from this:
   part 005 has never been run and still has stubs, so there is nothing to
   check the result against yet.
 
-### Resolved: the DemoVT / P2VT disagreement
+### Resolved: there was only ever ONE VGA unit and ONE DemoVT unit
+
+Parts 002 and 004 looked like they had their own copies -- `P2VGA`, `P2VT`,
+`P4VGA`, `P4VT` -- with different routine sets. They did not. Every part links
+the same two source units and **Turbo Pascal's smart linker drops whatever
+that part never calls**, which is why the segments differ in size and the
+addresses differ everywhere.
+
+The proof is the ORDER: routines come out in source order with the unused ones
+simply missing, so the survivors' offsets stay monotonic in all seven parts.
+`SetMode13h` is six bytes at offset 0 of the VGA unit in every one of them,
+and `DrawLine` sits at `1491:0048` in part 001 but `11e3:009c` in part 004
+purely because 004 also links `GetPixel` and `FillRect` ahead of it.
+
+So `FillRect` is not a part 004 peculiarity -- it is in the shared unit, and
+parts 004 and 006 are the only two that call it. Their copies are
+byte-identical. Likewise `GetPixel` (004, 005, 006) and `PutPixel` (003, 005,
+006), which is why part 003's `PutPixel` lands at `12f8:0048`.
+
+The four duplicates are deleted; `VGA.PAS` is now the union of all 21 routines
+and `DEMOVT.PAS` of all nine, with the per-part tables in their headers.
+
+**Still conflated:** `VGA.PAS` also carries `SetMode` and `SelectPlane`, which
+belong to the MODE-X unit -- segment 1192 in part 003, 107c in part 002 (where
+it is `P2ModeX`). The same order argument shows those two are one unit as
+well: part 003's `SetMode` is at `1192:002a` and part 002's at `107c:006d`,
+the difference being exactly the `ShowFrame` part 003 does not link. Worth
+separating next.
+
+### Resolved: the DemoVT function numbers
 
 The old note about the two units disagreeing over dispatch function numbers is
 settled. `1532:0040`, `13f9:0040` and `136b:0040` all push **2**; the `004e`

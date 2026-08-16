@@ -1,6 +1,51 @@
 { ===========================================================================
   Psycho Neurosis (Asphyxia, 1994) -- the shared VGA unit.
-  Reconstructed from NEUROSIS_003_fpu.exe, segments 12f8 and 1192.
+
+  ONE UNIT, SEVEN EXECUTABLES. Every part links this same source and Turbo
+  Pascal's SMART LINKER drops whatever that part never calls, which is why
+  the segment is a different size and the addresses are different in each --
+  and why an earlier pass mistook the subsets for four separate units.
+
+  The proof is the ORDER. Routines come out in source order with the unused
+  ones simply missing, so the survivors' offsets stay monotonic in every
+  part. Reading across the seven binaries recovers the whole unit:
+
+    #   routine          001   002   003   004   005   006   007
+    1   SetMode13h        y     y     y     y     y     y     y
+    2   VirtScrAlloc      y     y     y     y     y     y     .
+    3   VirtScrFree       y     y     y     y     y     y     .
+    4   PutPixel          .     .     y     .     y     y     .
+    5   GetPixel          .     .     .     y     y     y     .
+    6   FillRect          .     .     .     y     .     y     .
+    7   DrawLine          y     .     .     y     .     y     .
+    8   SetRGB            y     y     y     y     y     y     .
+    9   GetRGB            y     y     y     .     .     .     .
+    10  SetRGBFrom        .     .     .     y     .     .     .
+    11  GetRGBTo          .     .     .     y     .     .     .
+    12  SetPalette768     y     y     .     y     y     y     .
+    13  GetPalette768     y     y     .     y     .     .     .
+    14  PaletteDim        y     y     .     .     y     .     .
+    15  FadeStep          .     .     .     y     .     .     .
+    16  PaletteFadeUp     .     .     .     y     .     .     .
+    17  PaletteFadeOut    y     y     .     .     .     .     .
+    18  WaitRetrace       y     y     y     y     .     .     .
+    19  CopyScreen        y     y     y     .     y     y     .
+    20  ClearScreen       y     y     y     y     y     y     .
+    21  BuildRowTable     y     y     y     y     y     y     .
+
+  Anchors: SetMode13h is six bytes at offset 0 of the unit in all seven.
+  Part 001 has DrawLine at 1491:0048 and part 004 at 11e3:009c purely because
+  004 also links GetPixel and FillRect ahead of it. Part 003 gets PutPixel at
+  12f8:0048 for the same reason in reverse.
+
+  So there is no "part 004 FillRect" distinct from anything here -- FillRect
+  is in this unit, and parts 004 and 006 are simply the only two that call
+  it. Their copies are byte-identical.
+
+  SetMode and SelectPlane below are NOT part of this unit. They belong to the
+  Mode-X unit, which is segment 1192 in part 003 and 107c in part 002; the
+  same order argument holds there too. They are left here for now because
+  part 003's scenes reach them through this unit's name.
 
   THIS UNIT IS HAND-WRITTEN ASSEMBLER, not compiled Pascal, and is written
   back as `assembler` procedures so the original instruction sequences are
@@ -102,8 +147,14 @@ procedure PaletteFadeUp(P : Pointer; Pause : Word);  far;   { 1491:0215 }
 procedure PaletteFadeOut(Pause : Word);              far;   { 1491:0330 }
 
 procedure PutPixel(X, Y : Word; Colour : Byte; Segment : Word); far;
+function  GetPixel(X, Y : Integer; Segment : Word) : Byte;      far;
+procedure FillRect(X1, Y1, X2, Y2 : Integer;
+                   Colour : Byte; Segment : Word);              far;
 procedure SetRGB(Col, R, G, B : Byte); far;
 procedure GetRGB(Col : Byte; var R, G, B : Byte); far;
+procedure SetRGBFrom(Col : Byte; P : Pointer);    far;
+procedure GetRGBTo(Col : Byte; P : Pointer);      far;
+procedure FadeStep;                               far;
 procedure WaitRetrace; far;
 procedure CopyScreen(SrcSeg, DestSeg : Word); far;
 procedure ClearScreen(Segment : Word; Colour : Byte); far;
@@ -135,6 +186,79 @@ asm
   ADD  DI, X            { + the column                                      }
   MOV  AL, Colour       { the pixel value                                   }
   STOSB                 { write it                                          }
+end;
+
+{ --------------------------------------------------------------------------
+  11e3:0048 -- read one pixel back. HAND ASSEMBLER, verbatim.
+
+  Only parts 004, 005 and 006 link this; the rest never call it and the
+  smart linker drops it. Part 004 is where it earns its keep: the lemmings
+  read the hillside as their collision map.
+
+  There is no bounds test, and Y indexes the row table straight, so an
+  off-screen Y reads past the table and returns whatever is there.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      GetPixel := Mem[Segment : YOfs[Y] + X];
+  -------------------------------------------------------------------------- }
+function GetPixel(X, Y : Integer; Segment : Word) : Byte; assembler;
+asm
+  MOV  AX, Segment      { which screen to read                              }
+  MOV  ES, AX           { ES:DI addresses the pixel                         }
+  MOV  BX, Y            { the row                                           }
+  SHL  BX, 1            { * 2, a word index into the row table              }
+  MOV  DI, [BX + OFFSET YOfs]   { DI := YOfs[Y] = Y * 320                   }
+  ADD  DI, X            { + the column                                      }
+  MOV  AL, ES:[DI]      { read it -- AL is the function result              }
+end;
+
+{ --------------------------------------------------------------------------
+  11e3:0063 -- filled rectangle. HAND ASSEMBLER, verbatim.
+  Linked only by parts 004 and 006, where the two copies are byte-identical.
+
+  RETF $C, so six words. Highest first: X1 at BP+$10, Y1 at BP+$E, X2 at
+  BP+$C, Y2 at BP+$A, Colour at BP+8, Segment at BP+6. Both edges are
+  INCLUSIVE -- the width is X2 - X1 + 1 and the height Y2 - Y1 + 1.
+
+  The loop is tighter than it looks: the jump at 11e3:0096 goes back to the
+  REP STOSB itself, not to the top. AL keeps the colour and BX the width for
+  the whole call, so a row costs one REP plus four instructions.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      D := YOfs[Y1] + X1;
+      for Row := 1 to Y2 - Y1 + 1 do
+      begin
+        FillChar(Mem[Segment : D], X2 - X1 + 1, Colour);
+        Inc(D, 320);
+      end;
+  -------------------------------------------------------------------------- }
+procedure FillRect(X1, Y1, X2, Y2 : Integer;
+                   Colour : Byte; Segment : Word); assembler;
+asm
+  MOV  AX, Segment      { which screen                                      }
+  MOV  ES, AX           { ES:DI is the destination throughout               }
+  MOV  AX, X1           { the left edge                                     }
+  MOV  CX, X2           { the right edge                                    }
+  MOV  DX, Y2           { the bottom edge                                   }
+  MOV  BX, Y1           { the top edge                                      }
+  SHL  BX, 1            { * 2, a word index into the row table              }
+  MOV  DI, [BX + OFFSET YOfs]   { DI := YOfs[Y1]                            }
+  ADD  DI, AX           { + X1 -- the first byte of the rectangle           }
+  SUB  CX, AX           { X2 - X1                                           }
+  INC  CX               { CX := the width, both edges inclusive             }
+  SUB  DX, Y1           { Y2 - Y1                                           }
+  INC  DX               { DX := the height, likewise                        }
+  MOV  BX, CX           { keep the width -- REP destroys CX                 }
+  MOV  AL, Colour       { the fill byte, kept in AL for the whole call      }
+@@Row:                  { <- once per row; the loop starts HERE, at the REP }
+  REP  STOSB            { fill this row; DI advances by the width           }
+  MOV  CX, BX           { the width back for the next pass                  }
+  ADD  DI, $140         { 320 -- down one screen row...                     }
+  SUB  DI, BX           {   ...less what the fill already advanced          }
+  DEC  DX               { one row done                                      }
+  JNZ  @@Row            { round again                                       }
 end;
 
 { --------------------------------------------------------------------------
@@ -209,9 +333,57 @@ asm
 end;
 
 { --------------------------------------------------------------------------
+  11e3:01F6 and 11e3:0216 -- the same two DAC accessors, but reading and
+  writing a THREE-BYTE RECORD rather than three separate parameters. Only
+  part 004 links them; its explosion walks a local RGB triple up toward the
+  scene palette and these are what it uses.
+  HAND ASSEMBLER, verbatim.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      Port[$3C8] := Col;
+      Port[$3C9] := TRGB(P^)[0];
+      Port[$3C9] := TRGB(P^)[1];
+      Port[$3C9] := TRGB(P^)[2];
+
+      Port[$3C7] := Col;
+      TRGB(P^)[0] := Port[$3C9];  ... and so on
+  -------------------------------------------------------------------------- }
+procedure SetRGBFrom(Col : Byte; P : Pointer); assembler;
+asm
+  LES  DI, P            { ES:DI := the three bytes                          }
+  MOV  DX, $3C8         { the DAC WRITE index register                      }
+  MOV  AL, Col          { which entry                                       }
+  OUT  DX, AL           { select it                                         }
+  INC  DX               { DX := $3C9, the DAC data register                 }
+  MOV  AL, ES:[DI]      { red                                               }
+  OUT  DX, AL           {                                                   }
+  MOV  AL, ES:[DI+1]    { green                                             }
+  OUT  DX, AL           {                                                   }
+  MOV  AL, ES:[DI+2]    { blue                                              }
+  OUT  DX, AL           {                                                   }
+end;
+
+procedure GetRGBTo(Col : Byte; P : Pointer); assembler;
+asm
+  LES  DI, P            { ES:DI := where the three bytes go                 }
+  MOV  DX, $3C7         { the DAC READ index register -- $3C7, not $3C8     }
+  MOV  AL, Col          { which entry                                       }
+  OUT  DX, AL           { select it                                         }
+  ADD  DX, 2            { DX := $3C9, the DAC data register                 }
+  IN   AL, DX           { red                                               }
+  STOSB                 { store it; DI moves on                             }
+  IN   AL, DX           { green                                             }
+  STOSB                 {                                                   }
+  IN   AL, DX           { blue                                              }
+  STOSB                 {                                                   }
+end;
+
+{ --------------------------------------------------------------------------
   1491:01C2 -- out $3C8 := 0 then REP OUTSB 768 bytes from P^.
 
-  Byte for byte P2VGA's 1436:0083. Note it does NOT wait for retrace; the
+  1436:0083 in part 002, 11e3:0230 in part 004 -- the same bytes. Note it
+  does NOT wait for retrace; the
   callers that care do that themselves, which is why both fades below have an
   explicit WaitRetrace in the loop.
 
@@ -290,6 +462,32 @@ asm
   JNZ  @@Next           { round again                                       }
 @@Out:                  { <- both exits                                     }
   POP  DS               { restore our data segment                          }
+end;
+
+{ --------------------------------------------------------------------------
+  11e3:0260 -- one step of a fade to black, on the LIVE DAC. Compiled Pascal.
+  Only part 004 links it.
+
+  Not the same routine as PaletteDim above: that one dims a buffer the caller
+  owns, this one reads the hardware back, dims it and writes it out. Both are
+  in the unit; each part keeps whichever it calls.
+
+  THE ORIGINAL'S LOOP RUNS 768 DOWN TO 3 IN THREES, touching [i], [i-1] and
+  [i-2] each pass -- so index 768, one PAST the buffer, is decremented and
+  index 0 never is. The loop here is written over 1..767, which is exactly
+  the components that reach the DAC, so the result is identical and nothing
+  lands on Turbo Pascal's frame. See docs/23-deviations.md.
+  -------------------------------------------------------------------------- }
+procedure FadeStep;
+var
+  Buf : array[0..767] of Byte;
+  I   : Integer;
+begin
+  GetPalette768(@Buf);                     { 11e3:0264 }
+  for I := 767 downto 1 do                 { 11e3:0271 -- see the note above }
+    if Buf[I] <> 0 then Dec(Buf[I]);
+  WaitRetrace;                             { 11e3:02A6 }
+  SetPalette768(@Buf);                     { 11e3:02AC }
 end;
 
 { --------------------------------------------------------------------------

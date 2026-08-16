@@ -488,7 +488,7 @@ end;
 
 procedure RunPart6;
 begin
-  SetMode13h; VirtScrAlloc; MusicInit;
+  SetMode13h; VirtScrAlloc; MusicDetect;
   Scene1;  FlushKeys;                      { line wipe }
   Scene2;  FlushKeys;                      { whooshtext }
   Scene3;  FlushKeys;                      { fire }

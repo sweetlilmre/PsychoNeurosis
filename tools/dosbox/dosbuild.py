@@ -49,9 +49,7 @@ NAMES = {
     # part 002 -- one unit per scene, plus the three units they share.
     # Every one of these is transcribed from NEUROSIS_002_fpu.exe; the
     # segment each came from is in its header comment.
-    "P2VGA.PAS":      ("P2VGA.PAS",    "P2VGA",         "P2VGA"),
     "P2MODEX.PAS":    ("P2MODEX.PAS",  "P2ModeX",       "P2ModeX"),
-    "P2VT.PAS":       ("P2VT.PAS",     "P2VT",          "P2VT"),
     "P2FIX.PAS":      ("P2FIX.PAS",    "P2Fix",         "P2Fix"),
     "P2VIEW.PAS":     ("P2VIEW.PAS",   "P2View",        "P2View"),
     "P2S1.PAS":       ("P2S1.PAS",     "P2S1",          "P2S1"),
@@ -68,10 +66,7 @@ NAMES = {
     "PART3_SPRITES.PAS": ("P3SPRITE.PAS", "Part3Sprites", "P3Sprite"),
     "P3MAIN.PAS":        ("P3MAIN.PAS",   "P3Main",       "P3Main"),
 
-    # part 004 -- its own VGA and music units, not the same builds as any
-    # other part's, plus the one scene.
-    "P4VGA.PAS":          ("P4VGA.PAS",   "P4VGA",         "P4VGA"),
-    "P4VT.PAS":           ("P4VT.PAS",    "P4VT",          "P4VT"),
+    # part 004 -- one scene, on the shared VGA and DemoVT units.
     "PART4_LEMMINGS.PAS": ("P4LEMS.PAS",  "Part4Lemmings", "P4Lems"),
     "PART5_ROTOZOOM.PAS": ("P5ROTO.PAS",  "Part5Rotozoom", "P5Roto"),
     "PART6_CREDITS.PAS":  ("P6CRED.PAS",  "Part6Credits",  "P6Cred"),

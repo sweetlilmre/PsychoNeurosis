@@ -9,7 +9,7 @@
 
 program TP2S2;
 
-uses Crt, P2VGA, P2View, P2Fix, P2VT, P2S2;
+uses Crt, VGA, P2View, P2Fix, DemoVT, P2S2;
 
 var
   F : file;

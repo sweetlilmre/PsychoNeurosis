@@ -2,7 +2,7 @@
 
 Working notes from the disassembly of `NEUROSIS_002_fpu.exe`. Everything here
 was read out of the binary; nothing is inferred. Both scenes are transcribed
-� `src/P2S1.PAS` and `src/P2S2.PAS` � and this is the working record behind
+� `src/P2S1.PAS` and `src/P2S2.PAS` � and this is the working record behind
 the second.
 
 Segment map for the part:
@@ -11,11 +11,11 @@ Segment map for the part:
 |---|---|---|
 | 1008 | scene 1 | transcribed — `P2S1.PAS` |
 | 107c | Mode-X, 1280-wide | transcribed — `P2MODEX.PAS` |
-| 108b | scene 2 | transcribed � `P2S2.PAS` (this document) |
-| 13f9 | resident tracker client | transcribed — `P2VT.PAS` |
+| 108b | scene 2 | transcribed � `P2S2.PAS` (this document) |
+| 13f9 | resident tracker client | transcribed — the shared `DEMOVT.PAS` |
 | 140c | 320x400 two-page unchained | transcribed — `P2VIEW.PAS` |
 | 142a | 16.16 fixed point | transcribed — `P2FIX.PAS` |
-| 1436 | VGA / palette / staging buffer | transcribed — `P2VGA.PAS` |
+| 1436 | VGA / palette / staging buffer | transcribed — the shared `VGA.PAS` |
 | 14b1 | Turbo Pascal RTL | not ours |
 
 ---
@@ -107,7 +107,7 @@ Not an intro. It is the palette and object initialiser.
    `IntToFixed`, faces read as a run of words (count, then that many indices,
    then the colour), then the angles zeroed and a translation and pivot set.
    The per-object differences in how indices and colours are handled are set
-   out under "Object data" below � they are not the same for all four.
+   out under "Object data" below � they are not the same for all four.
 
 | object | base | verts | faces | vertex table | face table | translation | pivot |
 |---|---|---|---|---|---|---|---|
