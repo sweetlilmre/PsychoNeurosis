@@ -164,6 +164,11 @@ end;
 
   Hand assembler. The whole DAC comes back in a single REP INSB rather than a
   counted loop, which is why there is no loop here to transcribe.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      Port[$3C7] := 0;
+      for I := 0 to 767 do B[I] := Port[$3C9];
   -------------------------------------------------------------------------- }
 procedure GetPalette768(var P); assembler;
 asm
@@ -182,6 +187,11 @@ end;
   The write side, likewise a single REP OUTSB. Note there is NO retrace wait
   in the original -- the Pascal version used to add one, which is a change in
   behaviour, not a tidy-up.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      Port[$3C8] := 0;
+      for I := 0 to 767 do Port[$3C9] := B[I];
   -------------------------------------------------------------------------- }
 procedure SetPalette768(var P); assembler;
 asm
@@ -263,6 +273,12 @@ end;
   so the cosine lookup is the same table 90 entries -- 180 bytes -- further
   along. That is why the original quotes two base addresses, $02A8 and $035C,
   for one table. No trig call anywhere in the frame path.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      SinX := SinTab[AngX];  CosX := SinTab[AngX + 90];
+      SinY := SinTab[AngY];  CosY := SinTab[AngY + 90];
+      SinZ := SinTab[AngZ];  CosZ := SinTab[AngZ + 90];
   -------------------------------------------------------------------------- }
 procedure SetAngles; assembler;
 asm
@@ -293,6 +309,13 @@ end;
 
   The wrap is two compares rather than a modulo. That is exact only because
   the step is small: three degrees a frame cannot overshoot by a whole turn.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      AngX := Wrap(AngX + StepX);       -- Wrap: +360 if < 0, -360 if > 360
+      AngY := Wrap(AngY + StepY);
+      AngZ := Wrap(AngZ + StepZ);
+      SetAngles(AngX, AngY, AngZ);
   -------------------------------------------------------------------------- }
 procedure StepAngles; assembler;
 asm
@@ -369,6 +392,27 @@ end;
   convention Turbo Pascal can express, and its fixed-point scaling is the
   SHL AX,1 / RCL DX,1 pair keeping DX -- an arithmetic shift right by 14
   with no divide anywhere.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      T := (Z * SinX + Y * CosX) sar 14;      -- about the first axis
+      U := (Z * CosX - Y * SinX) sar 14;
+      V := (X * CosY - U * SinY) sar 14;      -- second
+      U := (U * CosY + X * SinY) sar 14;
+      X := (V * CosZ + T * SinZ) sar 14;      -- third
+      Y := (T * CosZ - V * SinZ) sar 14;
+      D := ViewDist - U;
+      if D >= 0 then
+      begin
+        SX := (X - XCentre) * ProjScale div D + 160;
+        SY := (Y - YCentre) * ProjScale div D + 200;
+      end
+      else begin SX := -1; SY := -1 end;
+
+  It cannot actually be written that way and still work: the inputs arrive in
+  registers and the results leave in them, and Turbo Pascal has no `sar` --
+  its `shr` on a LongInt is a LOGICAL shift, where SHL/RCL keeping DX is an
+  arithmetic one.
   -------------------------------------------------------------------------- }
 procedure TransformPoint; assembler;
 var
@@ -498,6 +542,14 @@ end;
 { --------------------------------------------------------------------------
   1139:01bb -- PlotPixel.  X in DI, Y in BX.  Clips to 0..319 by 0..399,
   looks the row up, selects the plane from X and 3, and stores colour $0E.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      if (X >= 0) and (X <= 319) and (Y >= 0) and (Y <= 399) then
+      begin
+        PortW[$3C4] := (($01 shl (X and 3)) shl 8) or 2;
+        Mem[$A000 : (X shr 2) + RowOfs[Y] + PageOfs] := $0E;
+      end;
   -------------------------------------------------------------------------- }
 procedure PlotPixel; assembler;
 asm
@@ -534,6 +586,16 @@ end;
 
   Note it runs 399 rows, not 400 -- the last row of the page is never
   cleared. That is the original's count and is kept.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      P := PageOfs;
+      PortW[$3C4] := $0F02;
+      for Y := 1 to 399 do
+      begin
+        for I := 1 to 40 do  MemW[$A000 : P] := 0, then Inc(P, 2);
+        Inc(P, 80);
+      end;
   -------------------------------------------------------------------------- }
 procedure ClearPage; assembler;
 asm
@@ -563,6 +625,12 @@ end;
 
   The two pages are the left and right halves of a 640-pixel logical line, so
   "flipping" is just moving the display start 80 bytes along the row.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      Port[$3D4] := $0C;  Port[$3D5] := Hi(PageOfs);
+      Port[$3D4] := $0D;  Port[$3D5] := Lo(PageOfs);
+      PageOfs := 80 - PageOfs;
   -------------------------------------------------------------------------- }
 procedure FlipPage; assembler;
 asm
@@ -597,6 +665,12 @@ end;
   time and hands each to TransformPoint in BX, CX, DX, whose results go
   straight on to PlotPixel in DI and BX. Assembler in the original; the
   register hand-off between the three is the whole reason.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      S := Ptr(DSeg, CurShape);
+      for I := 1 to 765 do
+        PlotPixel(TransformPoint(S^[I,1], S^[I,2], S^[I,3]));
   -------------------------------------------------------------------------- }
 procedure DrawShape; assembler;
 asm
@@ -623,6 +697,19 @@ end;
 
   Each component is `AX := B-A ; CWD ; IMUL MorphStep ; IDIV MorphSteps ;
   ADD AX,A` -- a 32-bit intermediate between the multiply and the divide.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      if MorphStep > MorphSteps then
+      begin
+        CurShape := MorphTo;  DrawShape;  Exit;
+      end;
+      A := Ptr(DSeg, MorphFrom);  B := Ptr(DSeg, MorphTo);
+      for I := 1 to 765 do
+        PlotPixel(TransformPoint(
+          A^[I,k] + LongInt(B^[I,k] - A^[I,k]) * MorphStep div MorphSteps
+          for k = 1, 2, 3));
+      Inc(MorphStep);
   -------------------------------------------------------------------------- }
 procedure DrawMorph; assembler;
 asm
@@ -742,17 +829,24 @@ procedure Scene3;
     Frame := KeyPressed;
   end;
 
-  procedure Hold(N : Integer);
+  { Each returns True if a key was pressed. Every keypress test in the
+    original is `JMP 1139:0583` -- the scene's own RETF -- so a key abandons
+    the WHOLE scene. These were procedures whose Exit only left the segment,
+    so a keypress skipped to the next shape instead of quitting. }
+  function Hold(N : Integer) : Boolean;
   begin
+    Hold := True;
     Frames := N;
     repeat
       if Frame(False) then Exit;
       Dec(Frames);
     until Frames = 0;
+    Hold := False;
   end;
 
-  procedure MorphTo_(FromShape, ToShape : Word; N : Integer);
+  function MorphTo_(FromShape, ToShape : Word; N : Integer) : Boolean;
   begin
+    MorphTo_ := True;
     MorphFrom := FromShape;
     MorphTo   := ToShape;
     MorphStep := 0;
@@ -762,6 +856,7 @@ procedure Scene3;
       Dec(Frames);
     until Frames = 0;
     CurShape := MorphTo;
+    MorphTo_ := False;
   end;
 
 begin
@@ -774,13 +869,13 @@ begin
   StepX := SpinX;  StepY := SpinY;  StepZ := SpinZ;
   AngX  := 0;      AngY  := 0;      AngZ  := 0;
 
-  Hold(SegFrames);                          { 1: shape 0 }
-  MorphTo_(OfsSphere, OfsCube, SegFrames);      { 2: 0 -> 4  }
-  Hold(SegFrames);                          { 3: shape 4 }
-  MorphTo_(OfsCube, OfsGrid, SegFrames);      { 4: 4 -> 5  }
-  Hold(SegFrames);                          { 5: shape 5 }
-  MorphTo_(OfsGrid, OfsCube, SegFrames);      { 6: 5 -> 4  }
-  Hold(SegFrames);                          { 7: shape 4 }
+  if Hold(SegFrames) then Exit;                          { 1: sphere }
+  if MorphTo_(OfsSphere, OfsCube, SegFrames) then Exit;  { 2: sphere -> cube }
+  if Hold(SegFrames) then Exit;                          { 3: cube }
+  if MorphTo_(OfsCube, OfsGrid, SegFrames) then Exit;    { 4: cube -> grid }
+  if Hold(SegFrames) then Exit;                          { 5: grid }
+  if MorphTo_(OfsGrid, OfsCube, SegFrames) then Exit;    { 6: grid -> cube }
+  if Hold(SegFrames) then Exit;                          { 7: cube }
 
   { 8: morph back to shape 0 while fading the palette out }
   MorphFrom := OfsCube;
