@@ -779,41 +779,25 @@ end;
   -------------------------------------------------------------------------- }
 procedure FadeStep;
 var
-  { THE ORIGINAL'S LOOP RUNS OFF BOTH ENDS OF THE BUFFER.
-
-    1139:0372 loads DI with $300 -- 768, one PAST the last byte of a 768-byte
-    array -- and the body reads, decrements and writes back at DI, DI-1 and
-    DI-2, dropping DI by one after each, then loops while DI is not negative.
-    So it touches 768 down to -2: 771 bytes, of which only 0..767 are the
-    palette.
-
-    In the original the buffer sits at BP-$300, so index 768 is [BP] -- the
-    saved BP itself -- and -1, -2 are dead stack below the frame. It survives
-    because LEAVE reads BP before popping, and Demo_Scene3 keeps nothing in
-    BP. Reproduced literally in Pascal it lands on a different frame layout
-    and, over the closing segment's 63 calls, walks over something that
-    matters: the scene faded to black and then hung.
-
-    Widening the array by one above and two below gives those three accesses
-    real storage. Nothing ever reads them, so the palette result is identical
-    -- this reproduces the behaviour without reproducing the corruption.
-
-    THIS IS A DELIBERATE DEVIATION. See docs/23-deviations.md. }
-  Pal : array[-2..768] of Byte;
+  Pal : array[0..767] of Byte;
   I   : Integer;
 begin
-  GetPalette768(Pal[0]);
-  I := $300;                       { 1139:0372 -- MOV DI,$300 }
-  repeat
-    if Pal[I] <> 0 then Dec(Pal[I]);   { 1139:0375 }
-    Dec(I);                            { 1139:0383 -- DEC DI }
-    if Pal[I] <> 0 then Dec(Pal[I]);   { 1139:0384 }
-    Dec(I);                            { 1139:0392 }
-    if Pal[I] <> 0 then Dec(Pal[I]);   { 1139:0393 }
-    Dec(I);                            { 1139:03a1 }
-  until I < 0;                         { 1139:03a2 -- JNS }
+  GetPalette768(Pal);
+  { 1139:0372 loads DI with $300 -- 768, one PAST the last byte of the buffer
+    -- and steps down three at a time until DI goes negative, so it also
+    touches 768, -1 and -2. Those three are not palette: 768 is [BP], the
+    saved BP, and -1 and -2 are dead stack below the frame. The original gets
+    away with it because LEAVE reads BP before popping and Demo_Scene3 keeps
+    nothing in BP.
+
+    Only 0..767 ever reach the DAC, so the loop is written over exactly those
+    and the result is bit-identical. Reproducing the overrun would mean
+    corrupting this frame instead, which is not the same frame and did in fact
+    hang the scene when it was written literally. }
+  for I := 767 downto 0 do
+    if Pal[I] <> 0 then Dec(Pal[I]);   { 1139:0375 -- saturating, never wraps }
   WaitRetrace;                         { 1139:03a4 }
-  SetPalette768(Pal[0]);               { 1139:03af }
+  SetPalette768(Pal);                  { 1139:03af }
 end;
 
 { --------------------------------------------------------------------------
