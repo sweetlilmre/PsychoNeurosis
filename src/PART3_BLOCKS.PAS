@@ -14,6 +14,8 @@
     Demo_Scene5  11f3:01ac      Blocks_Run  11f3:0017
   =========================================================================== }
 
+{$G+}   { 286 instructions -- the block loops below use them }
+
 unit Part3Blocks;
 
 interface
@@ -74,6 +76,72 @@ end;
           being exactly 91*8*9*2 is what identifies the layout.
           See docs/11-part3-scene5-blocks.md.
   -------------------------------------------------------------------------- }
+{ --------------------------------------------------------------------------
+  11f3:0105 and 11f3:0178 -- the block read-modify-write.
+
+  Blocks_Run itself is compiled Pascal, but the innermost loop is hand
+  assembler embedded in it: ten rows of ten pixels, each read back from video
+  memory, stepped by one and written out again. Because the palette is a ramp
+  over entries 1..221, "add one to the pixel" IS "make it one shade brighter",
+  which is the whole effect. Subtracting one on the way out reverses it.
+
+  $136 is 310 = 320 - 10, the rest of the screen row after ten pixels.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      P := BlockAt;
+      for Y := 1 to 10 do
+      begin
+        for X := 1 to 10 do
+        begin
+          Inc(Mem[$A000 : P]);      -- or Dec, for StepBlockDown
+          Inc(P);
+        end;
+        Inc(P, 310);
+      end;
+  -------------------------------------------------------------------------- }
+procedure StepBlockUp(BlockAt : Word); assembler;
+asm
+  PUSH ES               { the original saves ES around the block             }
+  MOV  AX, $A000
+  MOV  ES, AX           { ES := video memory                                 }
+  MOV  DI, BlockAt      { DI := this block's screen offset, from the table   }
+  MOV  CX, 10           { CX counts the ten rows                             }
+  MOV  DX, 10           { DX counts the ten pixels across a row              }
+@@Pixel:
+  MOV  AL, ES:[DI]      { read the pixel back out of video memory            }
+  INC  AL               { one shade brighter along the ramp                  }
+  STOSB                 { write it back; DI advances one pixel               }
+  DEC  DX               { one pixel done                                     }
+  JNZ  @@Pixel
+  ADD  DI, $136         { 310 = the rest of the 320-byte row                 }
+  MOV  DX, 10           { reload the across-count for the next row           }
+  DEC  CX               { one row done                                       }
+  JNZ  @@Pixel
+  POP  ES               { restore ES                                         }
+end;
+
+procedure StepBlockDown(BlockAt : Word); assembler;
+asm
+  PUSH ES               { as above, but stepping the other way              }
+  MOV  AX, $A000
+  MOV  ES, AX           { ES := video memory                                 }
+  MOV  DI, BlockAt      { DI := this block's screen offset                   }
+  MOV  CX, 10           { ten rows                                           }
+  MOV  DX, 10           { ten pixels across                                  }
+@@Pixel:
+  MOV  AL, ES:[DI]      { read the pixel back                                }
+  DEC  AL               { one shade darker along the ramp                    }
+  STOSB                 { write it back; DI advances                         }
+  DEC  DX
+  JNZ  @@Pixel
+  ADD  DI, $136         { rest of the row                                    }
+  MOV  DX, 10
+  DEC  CX
+  JNZ  @@Pixel
+  POP  ES
+end;
+
 procedure Run;
 var
   F          : file;
@@ -101,16 +169,7 @@ begin
     for C := 1 to BlocksX do
       for R := 1 to BlocksY do
       begin
-        P := Order[I, C, R];
-        for Y := 1 to BlockH do
-        begin
-          for X := 1 to BlockW do
-          begin
-            Inc(Mem[VGASeg : P]);
-            Inc(P);
-          end;
-          Inc(P, RowStride - BlockW);
-        end;
+        StepBlockUp(Order[I, C, R]);
       end;
 
   Delay(HoldMs);
@@ -120,16 +179,7 @@ begin
     for C := BlocksX downto 1 do
       for R := BlocksY downto 1 do
       begin
-        P := Order[I, C, R];
-        for Y := 1 to BlockH do
-        begin
-          for X := 1 to BlockW do
-          begin
-            Dec(Mem[VGASeg : P]);
-            Inc(P);
-          end;
-          Inc(P, RowStride - BlockW);
-        end;
+        StepBlockDown(Order[I, C, R]);
       end;
 end;
 
