@@ -49,8 +49,9 @@ const
   above it by however far the projection says. Substituting ScrHeight div 2
   here -- which is the obvious thing to assume, and what this file did --
   lifts the whole scene exactly 100 rows and floats it off the top. }
-  CentreX = 320;           { DS:$0280 }
-  CentreY = 0;             { DS:$0282 }
+  { DS:$0280 and DS:$0282, initialised data. They are declared as typed
+    constants below rather than here, because Project reads them FROM MEMORY
+    and the shared maths object resolves them by name. }
 
 type
   TScreenPt = record
@@ -67,21 +68,59 @@ var
   WorkSeg : Word;
 
   PtCount : Integer;                                { DS:$AAC8 }
-  { Model coordinates. The original holds these as 16.16 and rotates with a
-    32x32->64 multiply taking the middle 32 bits; Turbo Pascal has no 64-bit
-    type, so 32x32->32 would overflow catastrophically. The coordinates are
-    small (+/-50), so plain integers multiplied by the 16.16 trig give the
-    same screen result and fit. }
-  Pt      : array[1..MaxPoints, 1..3] of Integer;   { DS:$A106, 12 bytes each }
+  { Model coordinates, 16.16 fixed point -- which is why the records are
+    TWELVE bytes and not six. An earlier version held these as plain Integers
+    because a Turbo Pascal LongInt multiply overflows before it can take the
+    middle 32 bits of a 32x32 product; the rotation now goes through the
+    shared 386 maths object, which does that properly, so the coordinates are
+    the original's again. }
+  Pt      : array[1..MaxPoints, 1..3] of LongInt;   { DS:$A106, 12 bytes each }
   Scr     : array[1..MaxPoints * 2] of TScreenPt;   { DS:$A5F0 }
   { DS:$A5B6/$A5BA/$A5BE -- object + $4B0, the translation. }
   PosX, PosY, PosZ : LongInt;
   { DS:$A5C2 -- the 52-byte point sprite: a 2-byte (W, H) header and 50 px. }
   ObjMeta : array[0..51] of Byte;
+{ --------------------------------------------------------------------------
+  THE SHARED 386 MATHS MODULE.
+
+  SinCos, RotatePoint and Project are 386 code and cannot be written in Turbo
+  Pascal's built-in assembler, which stops at the 286. They live in
+  src/asm/DEMOMATH.ASM, are assembled by TASM and linked in here with the $L directive --
+  which is what the original does: 12c5:192D, 12c5:19DF and 12c5:1B2D are the
+  same code as scene 4's and part 002 scene 2's, once per unit.
+
+  The nine names below are the module's EXTRNs, so they have to be declared
+  BEFORE the $L directive and spelled exactly this way.
+  -------------------------------------------------------------------------- }
+var
   { DS:$AAA6..$AABD -- cos then sin, per axis, as SinCos leaves them. }
-  CosA, SinA, CosB, SinB, CosC, SinC : LongInt;
+  MCos1, MSin1, MCos2, MSin2, MCos3, MSin3 : LongInt;
   { DS:$AABE -- the projection scale, 16.16. }
-  Scale   : LongInt;
+  MScale : LongInt;
+
+const
+  { DS:$0280 = 320, so the horizontal centre is 160.
+    DS:$0282 = 0, so the vertical centre is ZERO.
+
+    That zero is not a mistake to be tidied away. With it, sy = -round(Y/Z*S),
+    and the caller's mirror at 12c5:0248 turns that into
+
+        object      133 + round(Y/Z*S)
+        reflection  134 - round(Y/Z*S)
+
+    so the 133/134 line does ALL the vertical placement and the object hangs
+    above it by however far the projection says. Substituting ScrHeight here
+    -- the obvious thing to assume, and what this file once did -- lifts the
+    whole scene exactly 100 rows and floats it off the top.
+
+    Project halves both, so these are the FULL view size, not the centre. }
+  MViewW : Word = 320;
+  MViewH : Word = 0;
+
+{$L DEMOMATH.OBJ}
+procedure SinCos(A : Integer; var C, S : LongInt);        external; { 12c5:192D }
+procedure RotatePoint(var X, Y, Z : LongInt);             external; { 12c5:19DF }
+procedure Project(var X, Y, Z : LongInt);                 external; { 12c5:1B2D }
 
 { --------------------------------------------------------------------------
   1483:0000 -- Math_IntToReal is MISNAMED. It converts an Integer to 16.16
@@ -93,6 +132,12 @@ var
 function IntToFixed(V : Integer) : LongInt;
 begin
   IntToFixed := LongInt(V) shl 16;
+end;
+
+{ 1483:0071 -- the other way: add a half and take the whole part. }
+function FixedToInt(V : LongInt) : Integer;
+begin
+  FixedToInt := (V + $8000) shr 16;
 end;
 
 { [transcribed] Vector_Run's object copy, 12c5:088b and 12c5:098a -- integer
@@ -109,9 +154,9 @@ begin
   PtCount := Count;
   for I := 1 to Count do
   begin
-    Pt[I, 1] := Src^[I, 1];
-    Pt[I, 2] := Src^[I, 2];
-    Pt[I, 3] := Src^[I, 3];
+    Pt[I, 1] := IntToFixed(Src^[I, 1]);
+    Pt[I, 2] := IntToFixed(Src^[I, 2]);
+    Pt[I, 3] := IntToFixed(Src^[I, 3]);
   end;
 end;
 
@@ -123,9 +168,9 @@ end;
   -------------------------------------------------------------------------- }
 procedure ObjTranslate(DX_, DY_, DZ_ : Integer);
 begin
-  Inc(PosX, DX_);
-  Inc(PosY, DY_);
-  Inc(PosZ, DZ_);
+  Inc(PosX, IntToFixed(DX_));
+  Inc(PosY, IntToFixed(DY_));
+  Inc(PosZ, IntToFixed(DZ_));
 end;
 
 { --------------------------------------------------------------------------
@@ -159,51 +204,42 @@ end;
   -------------------------------------------------------------------------- }
 procedure ObjTransformAll(A1, A2, A3 : Integer);
 var
-  I          : Integer;
-  X, Y, Z, T : LongInt;
-  FX, FY, FZ : Real;
-  Sx, Sy     : Integer;
+  I       : Integer;
+  X, Y, Z : LongInt;
+  Sx, Sy  : Integer;
 begin
-  { 12c5:02f4 -- Math_SinCos(angle, var C, var S). The FIRST var parameter
-    takes the COSINE; see the note in P1S4. }
-  CosA := Round(Cos(A1 / 10 * Pi / 180) * 65536.0);
-  SinA := Round(Sin(A1 / 10 * Pi / 180) * 65536.0);
-  CosB := Round(Cos(A2 / 10 * Pi / 180) * 65536.0);
-  SinB := Round(Sin(A2 / 10 * Pi / 180) * 65536.0);
-  CosC := Round(Cos(A3 / 10 * Pi / 180) * 65536.0);
-  SinC := Round(Sin(A3 / 10 * Pi / 180) * 65536.0);
+  { 12c5:02f4 -- SinCos(angle, var C, var S). The FIRST var parameter takes
+    the COSINE. }
+  SinCos(A1, MCos1, MSin1);
+  SinCos(A2, MCos2, MSin2);
+  SinCos(A3, MCos3, MSin3);
 
   for I := 1 to PtCount do
   begin
+    { 12c5:01bb -- the twelve-byte point is copied into locals first, so the
+      model is left untouched and can be transformed again next frame. }
     X := Pt[I, 1];  Y := Pt[I, 2];  Z := Pt[I, 3];
 
-    T := (Y * CosA + Z * SinA) div 65536;         { about X }
-    Z := (Z * CosA - Y * SinA) div 65536;
-    Y := T;
-    T := (X * CosB - Z * SinB) div 65536;         { about Y }
-    Z := (Z * CosB + X * SinB) div 65536;
-    X := T;
-    T := (X * CosC + Y * SinC) div 65536;         { about Z }
-    Y := (Y * CosC - X * SinC) div 65536;
-    X := T;
+    RotatePoint(X, Y, Z);                         { 12c5:01d7 }
 
-    Inc(X, PosX);  Inc(Y, PosY);  Inc(Z, PosZ);
+    Inc(X, PosX);                                 { 12c5:01da }
+    Inc(Y, PosY);
+    Inc(Z, PosZ);
 
-    { The original would divide by zero here; Z passes near it because
-      Obj_Translate accumulates a large Z swing. Guarded rather than faithful. }
-    if Z = 0 then Z := 1;
+    Project(X, Y, Z);                             { 12c5:021f }
 
-    FX := X;  FY := Y;  FZ := Z;
-    Sx := Round(FX / FZ * (Scale / 65536.0)) + CentreX div 2;
-    Sy := CentreY div 2 - Round(FY / FZ * (Scale / 65536.0));
+    { 12c5:0222 -- both come back zero-extended, so the low word carries the
+      sign and CWD is what puts it back. }
+    Sx := Integer(X);
+    Sy := Integer(Y);
 
     Scr[I].X := Sx;                     { the object }
     Scr[I].Y := Horizon - Sy;
-    Scr[I].D := Z;
+    Scr[I].D := FixedToInt(Z);          { 12c5:0268 }
 
     Scr[I + PtCount].X := Sx;           { and its reflection }
     Scr[I + PtCount].Y := Sy + Horizon + 1;
-    Scr[I + PtCount].D := Z;
+    Scr[I + PtCount].D := FixedToInt(Z);
   end;
 end;
 
@@ -460,13 +496,13 @@ var
 begin
   LoadObject(@VecGlobe, GlobePoints);          { 12c5:0874 }
 
-  PosX := 0;                                   { 12c5:0918 }
-  PosY := -70;                                 { 12c5:091e }
-  PosZ := 1600;                                { 12c5:092c }
+  PosX := IntToFixed(0);                       { 12c5:0918 }
+  PosY := IntToFixed(-70);                     { 12c5:091e }
+  PosZ := IntToFixed(1600);                    { 12c5:092c }
 
   { 12c5:093b -- Scale := (ScreenWidth / 2.0) * 10.0, as 16.16.
     CS:$0868 = 2.0, CS:$086C = 10.0. }
-  Scale := Round((ScrWidth / 2.0) * 10.0 * 65536.0);
+  MScale := Round((ScrWidth / 2.0) * 10.0 * 65536.0);
 
   OrbitAngle := -2042;                         { 12c5:096a }
   Animate;

@@ -45,9 +45,9 @@ const
   FaceVerts   = 8;
 
   { 108b:1bbd -- DS:$046A and DS:$046C, initialised data. The projection
-    centre is (160, 120), the 320x240 field, NOT (160, 100). }
-  CentreX     = 320;
-  CentreY     = 240;
+    centre is (160, 120), the 320x240 field, NOT (160, 100). They are typed
+    constants further down rather than consts here, because Project reads
+    them FROM MEMORY and the shared maths object resolves them by name. }
   { Scale := RealToFixed(CentreX / 2.0 * 0.9), from CS:$1BAF = 2.0 and the
     extended at CS:$1BB3 = 0.9. That is 144.0. }
   ScaleDivisor = 2.0;
@@ -72,7 +72,7 @@ const
   DataOfs   = $0007D9B2;          { 108b:247a }
 
 type
-  TVertex = record X, Y, Z : Real end;
+  TVertex = record X, Y, Z : LongInt end;    { 16.16, hence 12 bytes }
   TScreen = record X, Y, D : Integer end;
   { 23 bytes in the original: count, eight indices, colour, two spare bytes,
     then the average depth the sort writes at +$15. }
@@ -115,10 +115,22 @@ var
   Rewind : TRewind;
   Pal    : array[0..767] of Byte;               { DS:$5148 }
 
-  { DS:$87AC..$87C3 -- cos then sin per axis, as Math_SinCos leaves them. }
-  C1, S1, C2, S2, C3, S3 : Real;
-  { DS:$87C4 }
-  Scale  : Real;
+{ --------------------------------------------------------------------------
+  THE SHARED 386 MATHS MODULE.
+
+  SinCos, RotatePoint and Project are 386 code and cannot be written in Turbo
+  Pascal's built-in assembler, which stops at the 286. They live in
+  src/asm/DEMOMATH.ASM, are assembled by TASM and linked in here with the $L
+  directive -- which is what the original does: 108b:342F, 108b:34E1 and
+  108b:362F are the same code as part 001 scenes 4 and 5, once per unit.
+
+  The nine names below are the module's EXTRNs, so they have to be declared
+  BEFORE the $L directive and spelled exactly this way.
+  -------------------------------------------------------------------------- }
+  { DS:$87AC..$87C3 -- cos then sin per axis, as SinCos leaves them. }
+  MCos1, MSin1, MCos2, MSin2, MCos3, MSin3 : LongInt;
+  { DS:$87C4 -- the projection scale, 16.16 }
+  MScale : LongInt;
   { DS:$8ED1 -- a LongInt frame counter, and what drives the text. }
   Frame  : LongInt;
   { DS:$A0CA -- RowOfs80[I] = I * 80. }
@@ -143,69 +155,44 @@ begin
     RowOfs[I] := I * PlaneWidth;
 end;
 
-{ --------------------------------------------------------------------------
-  108b:342f -- Math_SinCos(Angle; var C, S)
+const
+  { DS:$046A = 320 and DS:$046C = 240. Project halves both, so these are the
+    FULL view size and not the centre -- which is why the vertical centre is
+    120 and not the 100 a 320x200 assumption would give. }
+  MViewW : Word = 320;
+  MViewH : Word = 240;
 
-  A 901-entry 16.16 COSINE table at CS:$261B, quadrant-folded exactly as part
-  001's 1107:1804 does it. Angles are in tenths of a degree and wrap at $E10.
-  The FIRST var parameter takes the cosine.
-  -------------------------------------------------------------------------- }
-procedure SinCos(A : LongInt; var C, S : Real);
-var
-  R : Real;
-begin
-  while A < 0 do Inc(A, 3600);
-  while A >= 3600 do Dec(A, 3600);
-  R := A / 10 * Pi / 180;
-  C := Cos(R);
-  S := Sin(R);
-end;
+{$L DEMOMATH.OBJ}
 
 { --------------------------------------------------------------------------
-  108b:34e1 -- Math_RotatePoint(var X, Y, Z)
+  108b:342f -- SinCos(Angle : Integer; var C, S : LongInt)
 
-  Three concatenated 2-D rotations, X then Y then Z, `(a*b) shr 16` each:
+  A 901-entry 16.16 COSINE table at CS:$261B, quadrant-folded. Angles are in
+  tenths of a degree and wrap at $E10. The FIRST var parameter takes the
+  cosine.
+
+  108b:34e1 -- RotatePoint(var X, Y, Z : LongInt)
+
+  Three concatenated 2-D rotations, X then Y then Z:
 
       y1 = y*C1 + z*S1      z1 = z*C1 - y*S1
       x2 = x*C2 - z1*S2     z2 = z1*C2 + x*S2
       x3 = x2*C3 + y1*S3    y3 = y1*C3 - x2*S3
 
-  Held as Real here: the original's multiply is 32x32->64 taking the middle 32
-  bits, which a Turbo Pascal LongInt cannot do without overflowing.
+  108b:362f -- Project(var X, Y, Z : LongInt)
+
+      Sx := Round(X/Z * MScale) + MViewW div 2
+      Sy := MViewH div 2 - Round(Y/Z * MScale)
+
+  All three are in src/asm/DEMOMATH.ASM, commented there. An earlier version
+  of this file had them as Pascal over Reals, which is a different program:
+  the original's multiply is 32x32->64 taking the MIDDLE 32 bits, and its
+  divide builds a 48-bit dividend so the quotient comes out 16.16. Neither
+  fits in a Turbo Pascal LongInt.
   -------------------------------------------------------------------------- }
-procedure RotatePoint(var X, Y, Z : Real);
-var
-  X2, X3, Y1, Y3, Z1, Z2 : Real;
-begin
-  Y1 := Y * C1 + Z * S1;
-  Z1 := Z * C1 - Y * S1;
-  X2 := X * C2 - Z1 * S2;
-  Z2 := Z1 * C2 + X * S2;
-  X3 := X2 * C3 + Y1 * S3;
-  Y3 := Y1 * C3 - X2 * S3;
-  X := X3;  Y := Y3;  Z := Z2;
-end;
-
-{ --------------------------------------------------------------------------
-  108b:362f -- Math_Project(var X, Y, Z)
-
-  The same routine as part 001's. Divides by the THIRD parameter:
-
-      Sx := round(X/Z * Scale) + [$046A] div 2      = +160
-      Sy := [$046C] div 2 - round(Y/Z * Scale)      = 120 - ...
-
-  Both centres are initialised data; 240 is the real value, so the vertical
-  centre is 120 and not the 100 a 320x200 assumption would give.
-  -------------------------------------------------------------------------- }
-procedure Project(var X, Y, Z : Real);
-var
-  D : Real;
-begin
-  D := Z;
-  if D = 0 then D := 1;             { the original would divide by zero }
-  X := Round(X / D * Scale) + CentreX div 2;
-  Y := CentreY div 2 - Round(Y / D * Scale);
-end;
+procedure SinCos(A : Integer; var C, S : LongInt);      external; { 108b:342F }
+procedure RotatePoint(var X, Y, Z : LongInt);           external; { 108b:34E1 }
+procedure Project(var X, Y, Z : LongInt);               external; { 108b:362F }
 
 { --------------------------------------------------------------------------
   108b:03be -- Obj_AddRotation(var Obj; DX, DY, DZ)
@@ -240,8 +227,8 @@ end;
 procedure ObjTransform(var O : TObj; A1, A2, A3 : LongInt);
 var
   I          : Integer;
-  PX, PY, PZ : Real;
-  X, Y, Z    : Real;
+  PX, PY, PZ : LongInt;
+  X, Y, Z    : LongInt;
 
   procedure Wrap(var V : LongInt);
   begin
@@ -250,32 +237,33 @@ var
 
 begin
   Wrap(O.Accum[1]);  Wrap(O.Accum[2]);  Wrap(O.Accum[3]);
-  SinCos(O.Accum[1], C1, S1);
-  SinCos(O.Accum[2], C2, S2);
-  SinCos(O.Accum[3], C3, S3);
+  SinCos(O.Accum[1], MCos1, MSin1);
+  SinCos(O.Accum[2], MCos2, MSin2);
+  SinCos(O.Accum[3], MCos3, MSin3);
 
-  PX := O.Pivot[1] / 65536.0;
-  PY := O.Pivot[2] / 65536.0;
-  PZ := O.Pivot[3] / 65536.0;
+  PX := O.Pivot[1];
+  PY := O.Pivot[2];
+  PZ := O.Pivot[3];
   RotatePoint(PX, PY, PZ);
 
   Wrap(A1);  Wrap(A2);  Wrap(A3);
   O.Angle[1] := A1;  O.Angle[2] := A2;  O.Angle[3] := A3;
-  SinCos(A1, C1, S1);
-  SinCos(A2, C2, S2);
-  SinCos(A3, C3, S3);
+  SinCos(A1, MCos1, MSin1);
+  SinCos(A2, MCos2, MSin2);
+  SinCos(A3, MCos3, MSin3);
 
   for I := 1 to O.VertCount do
   begin
     X := O.Vert[I].X;  Y := O.Vert[I].Y;  Z := O.Vert[I].Z;
     RotatePoint(X, Y, Z);
-    X := X + PX + O.Trans[1] / 65536.0;
-    Y := Y + PY + O.Trans[2] / 65536.0;
-    Z := Z + PZ + O.Trans[3] / 65536.0;
-    O.Scr[I].D := Trunc(Z);                    { 108b:0393, FixedToInt }
+    X := X + PX + O.Trans[1];
+    Y := Y + PY + O.Trans[2];
+    Z := Z + PZ + O.Trans[3];
+    O.Scr[I].D := FixedToInt(Z);               { 108b:0393 }
     Project(X, Y, Z);
-    O.Scr[I].X := Trunc(X);
-    O.Scr[I].Y := Trunc(Y);
+    { both come back zero-extended, so the low word carries the sign }
+    O.Scr[I].X := Integer(X);
+    O.Scr[I].Y := Integer(Y);
   end;
 end;
 
@@ -678,14 +666,14 @@ begin
   SetColour($D5, $28, $1E, $14);
 
   { 108b:1cb3 -- Scale := CentreX / 2.0 * 0.9 = 144.0 }
-  Scale := CentreX / ScaleDivisor * ScaleFactor;
+  MScale := Round(MViewW / ScaleDivisor * ScaleFactor * 65536.0);
 
   BuildObject(1, EnterpriseVertCount, EnterpriseFaceCount);
   for I := 1 to EnterpriseVertCount do
   begin
-    Obj[1]^.Vert[I].X := EnterpriseVerts[I, 1];
-    Obj[1]^.Vert[I].Y := EnterpriseVerts[I, 2];
-    Obj[1]^.Vert[I].Z := EnterpriseVerts[I, 3];
+    Obj[1]^.Vert[I].X := IntToFixed(EnterpriseVerts[I, 1]);
+    Obj[1]^.Vert[I].Y := IntToFixed(EnterpriseVerts[I, 2]);
+    Obj[1]^.Vert[I].Z := IntToFixed(EnterpriseVerts[I, 3]);
   end;
   for I := 1 to EnterpriseFaceCount do
   begin
@@ -700,9 +688,9 @@ begin
   BuildObject(2, RevolverVertCount, RevolverFaceCount);
   for I := 1 to RevolverVertCount do
   begin
-    Obj[2]^.Vert[I].X := RevolverVerts[I, 1];
-    Obj[2]^.Vert[I].Y := RevolverVerts[I, 2];
-    Obj[2]^.Vert[I].Z := RevolverVerts[I, 3];
+    Obj[2]^.Vert[I].X := IntToFixed(RevolverVerts[I, 1]);
+    Obj[2]^.Vert[I].Y := IntToFixed(RevolverVerts[I, 2]);
+    Obj[2]^.Vert[I].Z := IntToFixed(RevolverVerts[I, 3]);
   end;
   for I := 1 to RevolverFaceCount do
   begin
@@ -718,9 +706,9 @@ begin
   BuildObject(3, SailboatVertCount, SailboatFaceCount);
   for I := 1 to SailboatVertCount do
   begin
-    Obj[3]^.Vert[I].X := SailboatVerts[I, 1];
-    Obj[3]^.Vert[I].Y := SailboatVerts[I, 2];
-    Obj[3]^.Vert[I].Z := SailboatVerts[I, 3];
+    Obj[3]^.Vert[I].X := IntToFixed(SailboatVerts[I, 1]);
+    Obj[3]^.Vert[I].Y := IntToFixed(SailboatVerts[I, 2]);
+    Obj[3]^.Vert[I].Z := IntToFixed(SailboatVerts[I, 3]);
   end;
   for I := 1 to SailboatFaceCount do
   begin
@@ -737,9 +725,9 @@ begin
   BuildObject(4, QuadVertCount, QuadFaceCount);
   for I := 1 to QuadVertCount do
   begin
-    Obj[4]^.Vert[I].X := QuadVerts[I, 1];
-    Obj[4]^.Vert[I].Y := QuadVerts[I, 2];
-    Obj[4]^.Vert[I].Z := QuadVerts[I, 3];
+    Obj[4]^.Vert[I].X := IntToFixed(QuadVerts[I, 1]);
+    Obj[4]^.Vert[I].Y := IntToFixed(QuadVerts[I, 2]);
+    Obj[4]^.Vert[I].Z := IntToFixed(QuadVerts[I, 3]);
   end;
   for I := 1 to QuadFaceCount do
   begin

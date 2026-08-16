@@ -88,7 +88,7 @@ type
     Entry 0 is not a point -- it is the object's TRANSLATION vector, which is
     why 1107:0446 adds it to every rotated point and never rotates it. }
   TTrail = record
-    X, Y, Z : Real;
+    X, Y, Z : LongInt;          { 16.16 fixed point -- hence 13 bytes }
     Flag    : Byte;
   end;
 
@@ -130,94 +130,77 @@ var
   { DS:$672D }
   Pal   : array[0..767] of Byte;
 
+{ --------------------------------------------------------------------------
+  THE SHARED 386 MATHS MODULE.
+
+  SinCos, Rotate and Project are 386 code and cannot be written in Turbo
+  Pascal's built-in assembler, which stops at the 286. They live in
+  src/asm/DEMOMATH.ASM, are assembled by TASM and linked in here with the $L directive --
+  which is what the original does: 1107:1804, 1107:18B6 and 1107:1A04 are the
+  same code as scene 5's and part 002 scene 2's, once per unit.
+
+  The nine names below are the module's EXTRNs, so they have to be declared
+  BEFORE the $L directive and spelled exactly this way.
+  -------------------------------------------------------------------------- }
   { DS:$5B52/$5B56, $5B5A/$5B5E, $5B62/$5B66 -- cos then sin, per axis }
-  C1, S1, C2, S2, C3, S3 : Real;
-  { DS:$0018 -- the projection scale, computed in Demo_Scene4 }
-  Scale : Real;
+  MCos1, MSin1, MCos2, MSin2, MCos3, MSin3 : LongInt;
+  { DS:$0018 -- the projection scale, 16.16, set by Demo_Scene4 }
+  MScale : LongInt;
   { DS:$80F3 }
   Angle : Integer;
 
-{ --------------------------------------------------------------------------
-  1107:1804 -- Math_SinCos(Angle : Integer; var C, S : Real)
+const
+  { DS:$0014 = 320 and DS:$0016 = 200, initialised data. Project halves both,
+    so these are the FULL view size and not the centre. }
+  MViewW : Word = 320;
+  MViewH : Word = 200;
 
-  The angle is in tenths of a degree and is wrapped into 0..3599 ($E10). The
-  table at CS:$09F0 is 901 entries of 16.16 COSINE, indexed by tenths, and the
-  four quadrant branches read it forwards or backwards with the signs flipped:
-
-      0..900       C := T[a]            S := T[900-a]
-      900..1800    C := -T[1800-a]      S := T[a-900]
-      1800..2700   C := -T[a-1800]      S := -T[2700-a]
-      2700..3600   C := T[3600-a]       S := -T[a-2700]
-
-  which is cos and sin throughout. The FIRST var parameter (BP+8) receives the
-  cosine and the second (BP+4) the sine -- checked against the rotation in
-  1107:18b6, which needs [$5B52] in the cosine position for the matrix to come
-  out orthogonal.
-
-  Reproduced here with the library Sin/Cos; the difference against the table is
-  below half a pixel at this projection scale.
-  -------------------------------------------------------------------------- }
-procedure SinCos(A : Integer; var C, S : Real);
-var
-  R : Real;
-begin
-  while A < 0 do Inc(A, AngleWrap);
-  while A >= AngleWrap do Dec(A, AngleWrap);
-  R := A / 10 * Pi / 180;
-  C := Cos(R);
-  S := Sin(R);
-end;
+{$L DEMOMATH.OBJ}
 
 { --------------------------------------------------------------------------
-  1107:18b6 -- Rotate(var X, Y, Z)
+  1107:1804 -- SinCos(Angle : Integer; var C, S : LongInt)
+
+  The angle is in tenths of a degree, wrapped into 0..3600. The table is 901
+  entries of 16.16 COSINE and one quadrant of it serves both functions, read
+  forwards or backwards with the signs flipped per quadrant. The FIRST var
+  parameter receives the COSINE -- checked against 1107:18b6, which needs
+  DS:$5B52 in the cosine position for the matrix to come out orthogonal.
+
+  1107:18b6 -- Rotate(var X, Y, Z : LongInt)
 
   Three concatenated 2-D rotations in 16.16, using the six values SinCos left
-  in DS:$5B52..$5B69. Read straight off the IMULs:
+  in DS:$5B52..$5B69:
 
       about X, by A1       Y1 := Y*C1 + Z*S1        Z1 := Z*C1 - Y*S1
       about Y, by A2       X2 := X*C2 - Z1*S2       Z2 := Z1*C2 + X*S2
       about Z, by A3       X3 := X2*C3 + Y1*S3      Y3 := Y1*C3 - X2*S3
 
-  Held as Real here rather than 16.16: the original's `IMUL / SHR 16 / SHL 16 /
-  OR` is a 32x32->64 multiply taking the middle 32 bits, which a Turbo Pascal
-  LongInt cannot do without overflowing -- the same trap that bit P1S5.
+  1107:1a04 -- Project(var X, Y, Z : LongInt)
+
+      Sx := Round(X/Z * Scale) + MViewW div 2
+      Sy := MViewH div 2 - Round(Y/Z * Scale)
+
+  All three are in src/asm/DEMOMATH.ASM, commented there. An earlier version
+  of this file had them as Pascal over Reals, which is a different program:
+  the original's multiply is 32x32->64 taking the MIDDLE 32 bits, and its
+  divide builds a 48-bit dividend so the quotient comes out 16.16.
   -------------------------------------------------------------------------- }
-procedure Rotate(var X, Y, Z : Real);
-var
-  X2, X3, Y1, Y3, Z1, Z2 : Real;
+procedure SinCos(A : Integer; var C, S : LongInt);      external; { 1107:1804 }
+procedure RotatePoint(var X, Y, Z : LongInt);           external; { 1107:18B6 }
+procedure Project(var X, Y, Z : LongInt);               external; { 1107:1A04 }
+
+{ 1483:0000 -- Math_IntToReal is MISNAMED: it converts an Integer to 16.16
+  FIXED POINT. That is why the point records are THIRTEEN bytes -- three
+  32-bit fixed values and a flag -- not the nineteen three Borland Reals and
+  a flag would need. 1483:0071 is the other direction. }
+function IntToFixed(V : Integer) : LongInt;
 begin
-  Y1 := Y * C1 + Z * S1;
-  Z1 := Z * C1 - Y * S1;
-
-  X2 := X * C2 - Z1 * S2;
-  Z2 := Z1 * C2 + X * S2;
-
-  X3 := X2 * C3 + Y1 * S3;
-  Y3 := Y1 * C3 - X2 * S3;
-
-  X := X3;  Y := Y3;  Z := Z2;
+  IntToFixed := LongInt(V) shl 16;
 end;
 
-{ --------------------------------------------------------------------------
-  1107:1a04 -- Project(var X, Y, Z)
-
-  Z is the depth divisor. (Note this differs from part 001 scene 5, whose
-  projection at 12c5:1b2d divides by X -- they are not the same routine.)
-
-      Sx := round((X/Z) * Scale) + ScreenWidth  div 2
-      Sy := ScreenHeight div 2 - round((Y/Z) * Scale)
-
-  The rounding is the `ADD 0x8000 / SHR 16` pair on the 16.16 quotient. Z is
-  left alone, and the caller then truncates it for the depth sort.
-  -------------------------------------------------------------------------- }
-procedure Project(var X, Y, Z : Real);
-var
-  D : Real;
+function FixedToInt(V : LongInt) : Integer;
 begin
-  D := Z;
-  if D = 0 then D := 1;                     { the original would divide by 0 }
-  X := Round(X / D * Scale) + ScrWidth div 2;
-  Y := ScrHeight div 2 - Round(Y / D * Scale);
+  FixedToInt := (V + $8000) shr 16;
 end;
 
 { --------------------------------------------------------------------------
@@ -233,23 +216,24 @@ end;
 procedure Transform(A1, A2, A3 : Integer);
 var
   I       : Integer;
-  X, Y, Z : Real;
+  X, Y, Z : LongInt;
 begin
-  SinCos(A1, C1, S1);                       { -> DS:$5B52, $5B56 }
-  SinCos(A2, C2, S2);                       { -> DS:$5B5A, $5B5E }
-  SinCos(A3, C3, S3);                       { -> DS:$5B62, $5B66 }
+  SinCos(A1, MCos1, MSin1);                 { -> DS:$5B52, $5B56 }
+  SinCos(A2, MCos2, MSin2);                 { -> DS:$5B5A, $5B5E }
+  SinCos(A3, MCos3, MSin3);                 { -> DS:$5B62, $5B66 }
 
   for I := 1 to LastEntry do
   begin
     X := Trail[I].X;  Y := Trail[I].Y;  Z := Trail[I].Z;
-    Rotate(X, Y, Z);
+    RotatePoint(X, Y, Z);
     X := X + Trail[0].X;
     Y := Y + Trail[0].Y;
     Z := Z + Trail[0].Z;
-    Outp[I].D := Trunc(Z);                  { 1107:052e, the far Real->Int }
+    Outp[I].D := FixedToInt(Z);             { 1107:052e }
     Project(X, Y, Z);
-    Outp[I].X    := Trunc(X);
-    Outp[I].Y    := Trunc(Y);
+    { both come back zero-extended, so the low word carries the sign }
+    Outp[I].X    := Integer(X);
+    Outp[I].Y    := Integer(Y);
     Outp[I].Flag := Trail[I].Flag;
   end;
 end;
@@ -576,9 +560,9 @@ begin
       C := Rows[Row][Col];
       if (C = MarkerA) or (C = MarkerB) then
       begin
-        Trail[Idx].X    := (Col - 1) * 10 - 90;
-        Trail[Idx].Y    := 32 - (Row - 1) * 8;
-        Trail[Idx].Z    := 0;
+        Trail[Idx].X    := IntToFixed((Col - 1) * 10 - 90);
+        Trail[Idx].Y    := IntToFixed(32 - (Row - 1) * 8);
+        Trail[Idx].Z    := IntToFixed(0);
         Trail[Idx].Flag := 0;
         Inc(Idx);
         if Idx > TrailCount then
@@ -590,9 +574,9 @@ begin
     end;
   end;
 
-  Trail[0].X := 0;
-  Trail[0].Y := 0;
-  Trail[0].Z := 2000;
+  Trail[0].X := IntToFixed(0);
+  Trail[0].Y := IntToFixed(0);
+  Trail[0].Z := IntToFixed(2000);
 end;
 
 { --------------------------------------------------------------------------
@@ -654,7 +638,7 @@ end;
 procedure Scene4;
 begin
   New(Font);
-  Scale := (ScrWidth / 2.0) * 10.0;
+  MScale := Round((ScrWidth / 2.0) * 10.0 * 65536.0);
   Angle := 0;
 
   StarInit(8, 9, 10, 1);

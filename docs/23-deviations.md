@@ -105,6 +105,44 @@ than in the scene:
 
 ---
 
+## The 386 maths is a TASM object, and it is byte-exact
+
+`src/asm/DEMOMATH.ASM` holds `SinCos`, `RotatePoint` and `Project` -- the three
+routines the 3-D scenes share -- plus the 901-entry 16.16 cosine table they
+read. It is assembled by TASM and linked into `P1S4`, `P1S5` and `P2S2` with
+`{$L DEMOMATH.OBJ}`, which is what the original does: the same code appears
+three times, once per unit's code segment, and all three copies in the two
+binaries are byte-identical to each other.
+
+This is **not** a deviation. `python tools/asmverify.py` finds each routine in a
+freshly built executable and diffs it against the binary it was read from:
+
+```
+SinCos       177 bytes, 8 masked displacement(s) -- IDENTICAL
+RotatePoint  334 bytes, 12 masked displacement(s) -- IDENTICAL
+Project      167 bytes, 4 masked displacement(s) -- IDENTICAL
+```
+
+The masked bytes are the only ones that *cannot* match: 16-bit displacements
+into DGROUP (the six sin/cos values, the scale, the two view dimensions) and
+into the cosine table, because Turbo Pascal chooses where its data lands. Every
+other byte, including all the branch displacements, is the original's.
+
+Three things had to be got right for that, and each was caught by the diff
+rather than by reading:
+
+- **`USE16` on the segments.** After `.386` TASM defaults to `USE32`, which
+  emits 32-bit OMF records; TP7 answers those with "Error 47: Invalid object
+  file record".
+- **The EXTRNs must sit in a `DATA` segment inside `DGROUP`, with
+  `ASSUME DS:DGROUP`.** Declared at the top level instead, TASM assumes they
+  live in `CODE` and puts a `CS:` override in front of every reference -- five
+  bytes where the original has four, reading the wrong segment.
+- **The NOPs in `SinCos` are the original assembler's forward-jump padding**,
+  and TASM 4.1 pads in *almost* the same places. Every jump is therefore
+  written `short` explicitly and the padding written out as `nop`, so the
+  layout is deterministic rather than a function of the assembler's pass count.
+
 ## Comparing against the original
 
 The `NEUROSIS.00x` files are plain MZ executables, so each part can be run

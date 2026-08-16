@@ -153,27 +153,28 @@ eleven. `python tools/asmaudit.py` now reports every unit in those three parts
 clean; only `PART5_ROTOZOOM` is outstanding, and it has never been checked
 against its binary at all.
 
-**One thing is still outstanding inside parts 001 and 002**, and it is the
-same thing in both. Each has three 386 fixed-point maths routines that are
-written here as floating point:
+**The 386 fixed-point maths is done too.** `SinCos`, `RotatePoint` and
+`Project` are now `src/asm/DEMOMATH.ASM`, assembled by TASM and linked into
+`P1S4`, `P1S5` and `P2S2` with `{$L}` -- which is what the original does. All
+three are byte-identical to the binary; `python tools/asmverify.py` proves it
+on every build. See `docs/23-deviations.md` for the three TASM settings that
+had to be right and why.
 
-| part 001 | part 002 | what |
-|---|---|---|
-| `1107:1804` | `108b:342f` | `SinCos` — a 901-entry 16.16 **cosine** table in the code segment, quadrant-folded, angles in tenths of a degree |
-| `1107:18b6` | `108b:34e1` | `RotatePoint` — three concatenated 2-D rotations, `IMUL dword` / `SHR EAX,16` / `SHL EDX,16` / `OR` per term |
-| `1107:1a04` | `108b:362f` | `Project` — `SHRD`/`SAR`/`IDIV EDX:EAX`, then the screen centre added |
+That required converting all three scenes from `Real` to 16.16 `LongInt`
+throughout -- `TVertex`/`TTrail`, the six sin/cos globals, the scale, the view
+dimensions and every vertex load. **None of the three scenes has been re-run
+since; they all need retesting.**
 
-They are identified, not transcribed, and that is deliberate. Putting them
-back verbatim means changing the scene's whole numeric representation from
-`Real` to 16.16 `LongInt` — `TVertex`, `C1..S3`, `Scale`, `ObjTransform` and
-the object loader all move with it — and extracting the 901-entry table out of
-the code segment into a generated include. Both scenes render correctly today;
-a half-finished conversion would break them. It is a clean, well-scoped next
-job rather than something to squeeze in.
+TP7's *built-in* assembler stops at the 286 -- `{$G+}` is documented as
+"Generate 80286 Code Switch", the shipped help file has no mention of the 386,
+and `MOV EAX, EBX` is rejected outright. 386 code comes in through `{$L}` and
+`external`, and the binary shows that is what the original did: the `NOP NOP`
+padding after forward conditional jumps is an assembler artifact, and
+`1107:1A66 ADD EBX,8000h` is a full seven-byte 32-bit-immediate encoding.
 
-Note the multiply is the reason they cannot simply be re-typed: the original
-takes the MIDDLE 32 bits of a 32x32→64 product, which a Turbo Pascal `LongInt`
-overflows. Only the verbatim assembler gets it right.
+**The toolchain now needs TASM** at `C:\TASM\BIN\TASM.EXE` inside the DOSBox
+image (`tools/dosbox/dosbuild.py`, `TASM` constant). `dosbuild.py` assembles
+every `src/asm/*.ASM` before compiling.
 
 ### Resolved: the DemoVT / P2VT disagreement
 

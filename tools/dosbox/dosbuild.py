@@ -24,6 +24,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 BUILD = ROOT / "build"
 CONF = ROOT / "tools" / "dosbox" / "psycho.conf"
+# Where TASM lives inside the DOSBox image. TP7's built-in assembler is 286
+# only ({$G+} is documented as "Generate 80286 Code Switch"), so the demo's
+# 386 fixed-point maths comes in through {$L DEMOMATH.OBJ}, and that object
+# has to be assembled first.
+TASM = r"C:\TASM\BIN\TASM.EXE"
 DOSBOX = Path(r"D:\DOSBox-X\dosbox-x.exe")
 
 # Reconstruction source -> 8.3 DOS name. The unit name inside each file is the
@@ -121,6 +126,13 @@ def prepare(selftest=False):
     for inc in (ROOT / "src" / "gen").glob("*.INC"):
         shutil.copy(inc, gen / inc.name)
 
+    # The 386 maths module and its table. Both go in the build ROOT, not GEN:
+    # TASM resolves INCLUDE relative to the current directory, and TPC looks
+    # for the .OBJ next to the unit that links it.
+    for f in sorted((ROOT / "src" / "asm").glob("*")):
+        if f.suffix.upper() in (".ASM", ".INC"):
+            shutil.copy(f, BUILD / f.name.upper())
+
     staged = []
     for src, (name83, _, _) in NAMES.items():
         p = ROOT / "src" / src
@@ -186,7 +198,16 @@ def write_batch(targets):
        path to it is what produced "Error 130: Error in initial conditional
        defines" on the first attempt. .TPU files land next to the source.
     """
-    lines = ["@echo off", "echo === TPC build > D:\\BUILD.LOG"]
+    lines = ["@echo off", "echo === build > D:\\BUILD.LOG"]
+    # TASM first: TP7's built-in assembler stops at the 286, so the demo's 386
+    # fixed-point maths is a .ASM linked with {$L}. /ML keeps the PUBLIC names
+    # case-sensitive, which is how TPC matches them to the Pascal identifiers.
+    for asm in sorted(p.name for p in BUILD.glob("*.ASM")):
+        lines.append("echo. >> D:\\BUILD.LOG")
+        lines.append(f"echo ---- {asm} >> D:\\BUILD.LOG")
+        lines.append(f"{TASM} /ML /Z {asm} >> D:\\BUILD.LOG")
+        lines.append("if errorlevel 1 echo ** FAILED >> D:\\BUILD.LOG")
+        lines.append("if not errorlevel 1 echo ** OK >> D:\\BUILD.LOG")
     for t in targets:
         lines.append("echo. >> D:\\BUILD.LOG")
         lines.append(f"echo ---- {t} >> D:\\BUILD.LOG")
