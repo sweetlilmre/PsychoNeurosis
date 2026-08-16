@@ -59,6 +59,21 @@ const
   SinTable   = $02A8;      { 450 entries, 16.14 fixed point }
   CosTable   = $035C;      { = SinTable + 90 entries }
   FixedBits  = 14;         { products are shifted right by 14 }
+  { The scaling has to be a DIVIDE, not `shr FixedBits`.
+
+    The original does `IMUL` then `SHL AX,1 / RCL DX,1` twice and keeps DX --
+    the top word of the product times four, which is an ARITHMETIC shift right
+    by 14 and preserves the sign. Turbo Pascal's `shr` on a LongInt is a
+    LOGICAL shift, so any point whose intermediate went negative came out as a
+    huge positive, landed far off screen and was dropped by PlotPixel's bounds
+    test. What survived was the handful of points that stayed non-negative
+    throughout -- a small block of dots near the centre instead of a rotating
+    solid.
+
+    `div` truncates toward zero where the shift floors, so the two differ by
+    one unit on negative values. That is well under a pixel after the
+    perspective divide. }
+  FixedOne   = 16384;      { 1 shl FixedBits }
   ScreenCentreX = 160;     { $A0 -- 1139:019c }
   ScreenCentreY = 200;     { $C8 -- 1139:01ac, half of 400 rows }
 
@@ -283,16 +298,16 @@ var
   T, U, V, D : LongInt;
 begin
   { rotate about the first axis }
-  T := (LongInt(Z) * SinX + LongInt(Y) * CosX) shr FixedBits;
-  U := (LongInt(Z) * CosX - LongInt(Y) * SinX) shr FixedBits;
+  T := (LongInt(Z) * SinX + LongInt(Y) * CosX) div FixedOne;
+  U := (LongInt(Z) * CosX - LongInt(Y) * SinX) div FixedOne;
 
   { second axis }
-  V := (LongInt(X) * CosY - U * SinY) shr FixedBits;
-  U := (U * CosY + LongInt(X) * SinY) shr FixedBits;
+  V := (LongInt(X) * CosY - U * SinY) div FixedOne;
+  U := (U * CosY + LongInt(X) * SinY) div FixedOne;
 
   { third axis }
-  X := (V * CosZ + T * SinZ) shr FixedBits;
-  Y := (T * CosZ - V * SinZ) shr FixedBits;
+  X := (V * CosZ + T * SinZ) div FixedOne;
+  Y := (T * CosZ - V * SinZ) div FixedOne;
 
   D := ViewDist - U;
   if D >= 0 then
