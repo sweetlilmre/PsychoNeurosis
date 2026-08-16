@@ -514,7 +514,7 @@ var
   X, Y, Col : Integer;
 begin
   for Col := 100 to 200 do
-    SetColour(Col, Pal[Col * 3], Pal[Col * 3 + 1], Pal[Col * 3 + 2]);
+    SetRGB(Col, Pal[Col * 3], Pal[Col * 3 + 1], Pal[Col * 3 + 2]);
 
   for X := 0 to ScrWidth - 1 do
     for Y := BannerTop to Rows - 1 do
@@ -648,22 +648,22 @@ var
 begin
   { 108b:1bc1 -- a grey ramp with a period of 53 }
   for Col := 1 to 255 do
-    SetColour(Col, (Col mod 53) + 10, (Col mod 53) + 10, (Col mod 53) + 10);
+    SetRGB(Col, (Col mod 53) + 10, (Col mod 53) + 10, (Col mod 53) + 10);
 
   { 108b:1c05 -- the thirteen overrides, in the order the code writes them }
-  SetColour($18, $0A, $00, $3C);
-  SetColour($30, $0A, $00, $3C);
-  SetColour($42, $00, $32, $00);
-  SetColour($D5, $32, $28, $1E);
-  SetColour($D6, $3C, $32, $28);
-  SetColour($D7, $37, $2D, $23);
-  SetColour($D8, $2D, $23, $19);
-  SetColour($D9, $28, $1E, $14);
-  SetColour($D1, $32, $28, $1E);
-  SetColour($D2, $3C, $32, $28);
-  SetColour($D3, $37, $2D, $23);
-  SetColour($D4, $2D, $23, $19);
-  SetColour($D5, $28, $1E, $14);
+  SetRGB($18, $0A, $00, $3C);
+  SetRGB($30, $0A, $00, $3C);
+  SetRGB($42, $00, $32, $00);
+  SetRGB($D5, $32, $28, $1E);
+  SetRGB($D6, $3C, $32, $28);
+  SetRGB($D7, $37, $2D, $23);
+  SetRGB($D8, $2D, $23, $19);
+  SetRGB($D9, $28, $1E, $14);
+  SetRGB($D1, $32, $28, $1E);
+  SetRGB($D2, $3C, $32, $28);
+  SetRGB($D3, $37, $2D, $23);
+  SetRGB($D4, $2D, $23, $19);
+  SetRGB($D5, $28, $1E, $14);
 
   { 108b:1cb3 -- Scale := CentreX / 2.0 * 0.9 = 144.0 }
   MScale := Round(MViewW / ScaleDivisor * ScaleFactor * 65536.0);
@@ -806,7 +806,7 @@ var
 begin
   { 108b:11c5 -- a blue ramp into colours 70..90 }
   for I := $46 to $5A do
-    SetColour(I, 0, 0, (I - $46) * 3);
+    SetRGB(I, 0, 0, (I - $46) * 3);
 
   { 108b:11ef }
   for I := 1 to StarCount do
@@ -866,7 +866,7 @@ begin
   FillRect(0, 0, ScrWidth, Rows, Page0Base, 0);
   FillRect(0, 0, ScrWidth, Rows, Page1Base, 0);
   SetPalette768(@Buf);
-  SetColour($18, $1E, $1E, $1E);
+  SetRGB($18, $1E, $1E, $1E);
 
   for I := 1 to 120 do
   begin
@@ -887,7 +887,7 @@ begin
   end;
 
   { 108b:1af2 }
-  SetColour($20, $3F, $3F, $3F);
+  SetRGB($20, $3F, $3F, $3F);
   PA := 0;  PB := 0;  PC := 0;
   FillRect(0, 0, ScrWidth, Rows, Page0Base, 0);
   FillRect(0, 0, ScrWidth, Rows, Page1Base, 0);

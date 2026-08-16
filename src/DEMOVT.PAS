@@ -12,22 +12,34 @@
   whichever routines a part never calls -- which is why part 004's copy has
   only five of the nine and they sit at DIFFERENT OFFSETS:
 
-      part 001 / 002 / 003          part 004
-      0000  MusicDetect             0000  MusicDetect
-      0040  MusicPoll    (fn 2)     0040  MusicStart  (fn 0)
-      004E  MusicStart   (fn 0)     004E  MusicStop   (fn 1)
-      005C  MusicStop    (fn 1)     005C  SetVolume
-      0078  MusicPos                0078  GetVolume
-      0093  MusicCue
-      00D8  SyncPattern
-      0100  SetVolume
-      011C  GetVolume
+      #   routine        001        002        004
+      1   MusicDetect    1532:0000  13f9:0000  11d9:0000
+      2   MusicPoll (2)  1532:0040  13f9:0040  --
+      3   MusicStart(0)  1532:004E  13f9:004E  11d9:0040
+      4   MusicStop (1)  1532:005C  13f9:005C  11d9:004E
+      5   MusicFunc3(3)  1532:006A  --         --
+      6   MusicPos       1532:0078  13f9:006A  --
+      7   MusicCue       1532:0093  13f9:0085  --
+      8   SyncPattern    --         13f9:00CA  --
+      9   SetVolume      1532:00D8  13f9:00F2  11d9:005C
+      10  GetVolume      1532:00F4  13f9:010E  11d9:0078
+      11  (empty init)   1532:0109  13f9:0123  11d9:008D
 
-  Part 004 never polls, never reads the position and never syncs a pattern,
-  so those four are absent and everything after them moves up. Reading its
-  addresses across from another part would put start and stop on the wrong
-  entries; the FUNCTION NUMBERS are what stay constant, and they agree
+  Every part keeps a different subset and the offsets shift to suit. The
+  arithmetic checks out both ways: part 001's MusicPos is $0E past part 002's
+  because 001 also links MusicFunc3, which is $0E bytes; and part 001's
+  SetVolume is $1A BELOW part 002's because 002 additionally links
+  SyncPattern, which is $28 -- $28 - $0E = $1A.
+
+  Reading one part's addresses across to another puts the routines on the
+  wrong entries; the FUNCTION NUMBERS are what stay constant, and they agree
   everywhere.
+
+  FUNCTION 3 IS REAL and only part 001 uses it: its driver calls 1532:006A at
+  1000:004E, immediately after detection and before MusicCue and MusicStart.
+  What it asks the tracker to do is not established, so it is named by its
+  number rather than guessed at. (An early version of this file declared
+  `FuncStop = 3`, which was the wrong meaning attached to a real number.)
 
   All nine routines are hand assembler in the binary and are verbatim here.
 
@@ -68,15 +80,16 @@ unit DemoVT;
 
 interface
 
-procedure MusicDetect;                      far;   { 1532:0000 }
+procedure MusicDetect;                    far;   { 1532:0000 }
 procedure MusicPoll;                      far;   { 1532:0040  function 2 }
 procedure MusicStart;                     far;   { 1532:004e  function 0 }
 procedure MusicStop;                      far;   { 1532:005c  function 1 }
+procedure MusicFunc3;                     far;   { 1532:006a  function 3 }
 function  MusicPos : LongInt;             far;   { 1532:0078 }
 procedure MusicCue;                       far;   { 1532:0093 }
-procedure SyncPattern(A, B : Byte);       far;   { 1532:00d8 }
-procedure SetVolume(V : Byte);            far;   { 1532:0100 }
-function  GetVolume : Byte;               far;   { 1532:011c }
+procedure SyncPattern(A, B : Byte);       far;   { 13f9:00ca -- part 002 only }
+procedure SetVolume(V : Byte);            far;   { 1532:00d8 }
+function  GetVolume : Byte;               far;   { 1532:00f4 }
 
 type
   { A far pointer with the two halves named, so the assembler below can test
@@ -154,11 +167,13 @@ asm
 end;
 
 { --------------------------------------------------------------------------
-  1532:0040, 1532:004e and 1532:005c -- the three dispatch calls.
+  1532:0040, 004e, 005c and 006a -- the four dispatch calls.
 
   Each is four instructions: bail out if the player is not there, push a
   function number, and call its entry point far and indirect. There is no
   stack fixup afterwards, so the player cleans up its own argument.
+
+  Function 3 is part 001's alone -- see the note in the header.
 
   EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
 
@@ -190,6 +205,15 @@ asm
   CMP  Block.Sgmt, 0      { resident?                                       }
   JZ   @@Out              { no                                              }
   PUSH 1                  { function 1: stop                                }
+  CALL DWORD PTR Entry    { far indirect through DS:$028A                   }
+@@Out:                    { <- the not-resident case returns from here      }
+end;
+
+procedure MusicFunc3; assembler;     { function 3 -- part 001 only }
+asm
+  CMP  Block.Sgmt, 0      { resident?                                       }
+  JZ   @@Out              { no                                              }
+  PUSH 3                  { function 3 -- purpose not established           }
   CALL DWORD PTR Entry    { far indirect through DS:$028A                   }
 @@Out:                    { <- the not-resident case returns from here      }
 end;
@@ -301,7 +325,7 @@ asm
 end;
 
 { --------------------------------------------------------------------------
-  1532:0100 and 1532:011c -- the volume byte at block + VolField.
+  1532:00d8 and 1532:00f4 -- the volume byte at block + VolField.
 
   EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
 

@@ -282,8 +282,42 @@ deliberately -- part 001 scene 4 rounds (`1107:052E` -> `1483:0099`), scene 5
 truncates (`12C5:0268` -> `1483:0071`). Both scenes had a local rounding copy,
 so scene 5's depth-sort key was off by up to one. Fixed.
 
-Like `SetMode13h` appearing in both this unit and VGA, that is the original's
-duplication, not a transcription artefact.
+### Ghidra's segment ranges OVERLAP, and I read the overlap as duplication
+
+I claimed `SetMode13h` appears in both the fixed-point unit and VGA, and that
+the original simply duplicated small routines. **That was wrong.** A unit's
+real extent is `(next unit's base - this base) * 16`, and both "duplicates"
+sit exactly one byte past the end:
+
+    1483:00E0  and  1491:0000  are the SAME SIX BYTES at linear $04910
+    142A:00C0  and  1436:0000  are the SAME SIX BYTES at linear $04360
+
+Ghidra lists a routine under two segment bases when the ranges overlap, and I
+took the second listing as a second routine. `SetMode13h` belongs to VGA and
+to nothing else; the copy is gone from `FIXMATH.PAS`.
+
+Sweeping every transcribed unit the same way -- is any routine at or past
+`(next base - base) * 16`? -- found four such artefacts, and one of them was
+hiding a real error: **part 001's DemoVT addresses in `DEMOVT.PAS` had been
+derived from part 002 by analogy rather than read.** Part 001 has a FOURTH
+dispatch call, function 3 at `1532:006A`, which part 002 does not, and does
+NOT have `SyncPattern`, which part 002 does. Everything after them was
+therefore off. The table in that file is now read from both binaries and the
+arithmetic checks both ways.
+
+Function 3 is real and part 001's driver calls it at `1000:004E`, between
+detection and the cue. What it asks the tracker to do is not established, so
+it is named by its number. `P1Intro` now makes that call, and `MusicCue` and
+`MusicStart`, which it had been missing entirely.
+
+**The one genuine duplication** is `P2View`'s `SetColour` against `VGA.SetRGB`
+-- linear `$0426F` and `$043A8`, two distinct routines with identical bodies.
+Since they are identical the reconstruction keeps one: callers use
+`VGA.SetRGB` and `P2View` no longer declares its own.
+
+RULE FOR NEXT TIME: a Ghidra segment listing is derived, not authoritative.
+Before believing that two parts differ, or that one part duplicates something,
+convert both to LINEAR addresses and compare.
 
 ### Resolved: the DemoVT function numbers
 

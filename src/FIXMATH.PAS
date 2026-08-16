@@ -26,11 +26,14 @@
   earlier pass gave both scenes a local rounding copy, which was wrong for
   scene 5 -- it shifts the depth-sort key by up to one.
 
-  SetMode13h at the end duplicates the VGA unit's, byte for byte, in a second
-  unit. That is the original's doing, not a transcription artefact; the same
-  is true of P2View's SetColour against VGA's SetRGB. Where a scene links both
-  units the later one in the `uses` clause wins, and since the code is
-  identical it makes no difference.
+  THIS UNIT DOES NOT CONTAIN SetMode13h, although Ghidra shows one at
+  1483:00E0 and 142a:00C0. Those are not in this unit at all: the unit is
+  exactly $E0 bytes in part 001 and $C0 in part 002, so both addresses are
+  one past its end -- and 1483:00E0 and 1491:0000 are the SAME SIX BYTES at
+  linear $04910, as are 142a:00C0 and 1436:0000 at $04360. It is the VGA
+  unit's SetMode13h, seen twice because Ghidra's segment ranges overlap.
+  An earlier version of this file carried a copy of it on the strength of
+  that, and reported the overlap as real duplication in the original.
   =========================================================================== }
 
 unit FixMath;
@@ -41,7 +44,6 @@ function IntToFixed(V : Integer) : LongInt;      far;   { 1483:0000 }
 function RealToFixed(X : Real) : LongInt;        far;   { 1483:0034 }
 function FixedToIntTrunc(V : LongInt) : Integer; far;   { 1483:0071 }
 function FixedToInt(V : LongInt) : Integer;      far;   { 1483:0099 }
-procedure SetMode13h;                            far;   { 1483:00E0 }
 
 implementation
 
@@ -94,21 +96,6 @@ begin
   FixedToInt := (V + RealToFixed(0.5)) shr 16;
 end;
 
-{ --------------------------------------------------------------------------
-  142a:00c0 -- MOV AX,$0013 / INT $10 and nothing else, with no stack frame.
-  Sits past the unit's initialisation, which is empty.
-
-  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
-
-      (none). Setting a video mode is a BIOS call; Turbo Pascal has no way to
-      make one without an asm block or an Intr() call, and Intr() would push
-      a Registers record the original does not have.
-  -------------------------------------------------------------------------- }
-procedure SetMode13h; assembler;
-asm
-  MOV  AX, $0013          { BIOS function 0, mode $13: 320x200, 256 colours }
-  INT  $10                { the video BIOS                                  }
-end;
 
 { 142a:00a7 -- the unit's initialisation body is empty. }
 begin

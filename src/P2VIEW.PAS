@@ -46,7 +46,6 @@ procedure Plot(X, Y : Integer; Colour : Byte);               far;   { 140c:00b1 
 procedure FlipPage(StartAddr : Word);                        far;   { 140c:00f4 }
 procedure FillRect(X1, Y1, X2, Y2 : Integer;
                    Page : Word; Colour : Byte);              far;   { 140c:011e }
-procedure SetColour(Col, R, G, B : Byte);                    far;   { 140c:01af }
 
 { The two nibble masks the planar span writers need. Scene 2's triangle filler
   at 108b:0461 reads its own copies from DS:$0676 and DS:$067A, which hold the
@@ -418,31 +417,12 @@ asm
   POP  SI                 {                                                 }
 end;
 
-{ --------------------------------------------------------------------------
-  140c:01af -- out $3C8 := Col, then $3C9 := R, G, B. RETF 8, so Col is at
-  BP+$C and is declared first. Identical in shape to VGA's SetRGB; part 002
-  simply has one in each unit.
+{ 140c:01AF IS NOT HERE. Part 002 really does carry a second copy of the DAC
+  poke in this unit -- it sits at linear $0426F where VGA's SetRGB is at
+  $043A8, so they are two distinct thirteen-byte routines in the image, not a
+  segment-range artefact. The bodies are byte for byte identical, so this
+  reconstruction keeps ONE of them: callers use VGA.SetRGB. }
 
-  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
-
-      Port[$3C8] := Col;
-      Port[$3C9] := R;
-      Port[$3C9] := G;
-      Port[$3C9] := B;
-  -------------------------------------------------------------------------- }
-procedure SetColour(Col, R, G, B : Byte); assembler;
-asm
-  MOV  DX, $3C8           { the DAC WRITE index register                    }
-  MOV  AL, Col            { which entry                                     }
-  OUT  DX, AL             { select it                                       }
-  INC  DX                 { DX := $3C9, the DAC data register               }
-  MOV  AL, R              { red, 0..63                                      }
-  OUT  DX, AL             { the DAC latches the entry after the third       }
-  MOV  AL, G              { green                                           }
-  OUT  DX, AL             {                                                 }
-  MOV  AL, B              { blue                                            }
-  OUT  DX, AL             {                                                 }
-end;
 
 { 140c:01ca -- the unit's initialisation. }
 begin

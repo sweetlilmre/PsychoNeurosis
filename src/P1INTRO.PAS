@@ -28,11 +28,14 @@ procedure RunIntro;
 var
   Saved : Byte;
 begin
-  SetMode13h;
+  SetMode13h;                  { 1000:0044 -> 1491:0000 }
   VirtScrAlloc;
-  MusicDetect;
+  MusicDetect;                 { 1000:0049 -> 1532:0000 }
+  MusicFunc3;                  { 1000:004E -> 1532:006A, function 3 }
+  MusicCue;                    { 1000:0053 -> 1532:0093 }
+  MusicStart;                  { 1000:0058 -> 1532:004E, function 0 }
 
-  Scene1;      FlushKeys;
+  Scene1;      FlushKeys;      { 1000:005D -> 1012:0678 }
   Scene2;      FlushKeys;
   Scene3;      FlushKeys;
   Scene4;      FlushKeys;
