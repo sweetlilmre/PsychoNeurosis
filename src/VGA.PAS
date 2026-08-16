@@ -103,17 +103,25 @@ uses Crt;   { FlushKeys needs KeyPressed/ReadKey }
 
 { --------------------------------------------------------------------------
   12f8:0048 -- plot one pixel via the row table.
+
+  There is no multiply and no bounds test. Y indexes the precomputed row
+  table, X is added straight on, and an out-of-range Y simply reads past the
+  table and lands somewhere else in the segment.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      Mem[Segment : YOfs[Y] + X] := Colour;
   -------------------------------------------------------------------------- }
 procedure PutPixel(X, Y : Word; Colour : Byte; Segment : Word); assembler;
 asm
-  MOV  AX, Segment
-  MOV  ES, AX
-  MOV  BX, Y
-  SHL  BX, 1
-  MOV  DI, [BX + OFFSET YOfs]   { DS:$E772 }
-  ADD  DI, X
-  MOV  AL, Colour
-  STOSB
+  MOV  AX, Segment      { which screen -- $A000 or the virtual one          }
+  MOV  ES, AX           { ES:DI addresses the pixel                         }
+  MOV  BX, Y            { the row                                           }
+  SHL  BX, 1            { * 2, a word index into the row table              }
+  MOV  DI, [BX + OFFSET YOfs]   { DI := YOfs[Y] = Y * 320 -- DS:$E772       }
+  ADD  DI, X            { + the column                                      }
+  MOV  AL, Colour       { the pixel value                                   }
+  STOSB                 { write it                                          }
 end;
 
 { --------------------------------------------------------------------------
@@ -134,40 +142,57 @@ end;
   with each other -- and the tunnel's `for I := 0 to 255 do SetRGB(I,0,0,0)`
   set colour ZERO's blue 256 times instead of blanking the palette. That is
   the blue screen.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      Port[$3C8] := Col;
+      Port[$3C9] := R;
+      Port[$3C9] := G;
+      Port[$3C9] := B;
+
+  which compiles to four separate loads of DX; the original loads it once and
+  steps it with a single INC.
   -------------------------------------------------------------------------- }
 procedure SetRGB(Col, R, G, B : Byte); assembler;
 asm
-  MOV  DX, $3C8
-  MOV  AL, Col
-  OUT  DX, AL
-  INC  DX
-  MOV  AL, R
-  OUT  DX, AL
-  MOV  AL, G
-  OUT  DX, AL
-  MOV  AL, B
-  OUT  DX, AL
+  MOV  DX, $3C8         { the DAC WRITE index register                      }
+  MOV  AL, Col          { which entry                                       }
+  OUT  DX, AL           { select it                                         }
+  INC  DX               { DX := $3C9, the DAC data register                 }
+  MOV  AL, R            { red, 0..63                                        }
+  OUT  DX, AL           { the DAC takes the three in order and latches      }
+  MOV  AL, G            { green                                             }
+  OUT  DX, AL           {   the entry after the third                       }
+  MOV  AL, B            { blue                                              }
+  OUT  DX, AL           {                                                   }
 end;
 
 { --------------------------------------------------------------------------
   12f8:007f -- read one DAC entry back. Index to $3C7, three reads from $3C9.
   Results go straight to the var parameters with LES/STOSB.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      Port[$3C7] := Col;
+      R := Port[$3C9];
+      G := Port[$3C9];
+      B := Port[$3C9];
   -------------------------------------------------------------------------- }
 procedure GetRGB(Col : Byte; var R, G, B : Byte); assembler;
 asm
-  MOV  DX, $3C7
-  MOV  AL, Col
-  OUT  DX, AL
-  ADD  DX, 2
-  IN   AL, DX
-  LES  DI, R
-  STOSB
-  IN   AL, DX
-  LES  DI, G
-  STOSB
-  IN   AL, DX
-  LES  DI, B
-  STOSB
+  MOV  DX, $3C7         { the DAC READ index register -- $3C7, not $3C8     }
+  MOV  AL, Col          { which entry                                       }
+  OUT  DX, AL           { select it                                         }
+  ADD  DX, 2            { DX := $3C9, the DAC data register                 }
+  IN   AL, DX           { red                                               }
+  LES  DI, R            { ES:DI := @R                                       }
+  STOSB                 { store it                                          }
+  IN   AL, DX           { green                                             }
+  LES  DI, G            { ES:DI := @G                                       }
+  STOSB                 { store it                                          }
+  IN   AL, DX           { blue                                              }
+  LES  DI, B            { ES:DI := @B                                       }
+  STOSB                 { store it                                          }
 end;
 
 { --------------------------------------------------------------------------
@@ -176,18 +201,23 @@ end;
   No prologue and no epilogue beyond RETF: this one is unmistakably hand
   assembler. It waits for retrace to END first, then for it to BEGIN, so the
   caller always gets a full frame of blanking rather than joining one late.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      while (Port[$3DA] and 8) <> 0 do ;
+      while (Port[$3DA] and 8)  = 0 do ;
   -------------------------------------------------------------------------- }
 procedure WaitRetrace; assembler;
 asm
-  MOV  DX, $3DA
-@WaitEnd:
-  IN   AL, DX
-  TEST AL, 8
-  JNZ  @WaitEnd
-@WaitStart:
-  IN   AL, DX
-  TEST AL, 8
-  JZ   @WaitStart
+  MOV  DX, $3DA         { input status register 1                           }
+@WaitEnd:               { <- spin while a retrace is already running        }
+  IN   AL, DX           { read the status                                   }
+  TEST AL, 8            { bit 3 is vertical retrace                         }
+  JNZ  @WaitEnd         { one is running -- wait it out                     }
+@WaitStart:             { <- then spin until the next one begins            }
+  IN   AL, DX           { read again                                        }
+  TEST AL, 8            { still bit 3                                       }
+  JZ   @WaitStart       { not yet -- keep waiting                           }
 end;
 
 { --------------------------------------------------------------------------
@@ -196,107 +226,143 @@ end;
   Used two different ways: as a mode 13h page flip (virtual screen -> $A000),
   and in Scene 1 to push one 64000-byte Mode-X plane into video memory with
   the Map Mask already set.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      Move(Mem[SrcSeg : 0], Mem[DestSeg : 0], 64000);
+
+  and that really is equivalent -- Move is itself a REP MOVSW. It is written
+  out because the original writes it out, with no call.
   -------------------------------------------------------------------------- }
 procedure CopyScreen(SrcSeg, DestSeg : Word); assembler;
 asm
-  PUSH DS
-  MOV  AX, DestSeg
-  MOV  ES, AX
-  MOV  AX, SrcSeg
-  MOV  DS, AX
-  XOR  SI, SI
-  XOR  DI, DI
-  MOV  CX, 32000
-  REP  MOVSW
-  POP  DS
+  PUSH DS               { DS becomes the source segment below               }
+  MOV  AX, DestSeg      { the second declared parameter                     }
+  MOV  ES, AX           { ES: is the destination                            }
+  MOV  AX, SrcSeg       { the first                                         }
+  MOV  DS, AX           { DS: is the source                                 }
+  XOR  SI, SI           { both start at offset 0 -- these are whole         }
+  XOR  DI, DI           {   64,000-byte screens, not sub-rectangles         }
+  MOV  CX, 32000        { words, so 64,000 bytes = 320 x 200                }
+  REP  MOVSW            { the blit, one instruction                         }
+  POP  DS               { restore our data segment                          }
 end;
 
 { --------------------------------------------------------------------------
   12f8:00c9 -- fill 64000 bytes with a colour (STOSW, so the byte is doubled).
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      FillChar(Mem[Segment : 0], 64000, Colour);
   -------------------------------------------------------------------------- }
 procedure ClearScreen(Segment : Word; Colour : Byte); assembler;
 asm
-  MOV  CX, 32000
-  MOV  ES, Segment
-  XOR  DI, DI
-  MOV  AL, Colour
-  MOV  AH, AL
-  REP  STOSW
+  MOV  CX, 32000        { words, so 64,000 bytes                            }
+  MOV  ES, Segment      { ES: is what gets filled                           }
+  XOR  DI, DI           { from offset 0                                     }
+  MOV  AL, Colour       { the fill byte                                     }
+  MOV  AH, AL           { doubled into AX, so one STOSW does two pixels     }
+  REP  STOSW            { the fill, one instruction                         }
 end;
 
 { --------------------------------------------------------------------------
   1192:002a -- mode 13h, then unchain to Mode-X at 640 logical width.
+
+  Note what is NOT here: part 002's equivalent (107c:006d) clears all 64K
+  after enabling the four planes. This one enables them and moves straight on,
+  so the mode-13h screen underneath survives into Mode X.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      asm mov ax,$13; int $10 end;          -- no Pascal equivalent at all
+      Port[$3C4] := 4;  Port[$3C5] := (Port[$3C5] and $F7) or $04;
+      Port[$3CE] := 5;  Port[$3CF] :=  Port[$3CF] and $EF;
+      Port[$3CE] := 6;  Port[$3CF] :=  Port[$3CF] and $FD;
+      PortW[$3C4] := $0F02;
+      Port[$3D4] := $14; Port[$3D5] := Port[$3D5] and $BF;
+      Port[$3D4] := $17; Port[$3D5] := Port[$3D5] or  $40;
+      Port[$3D4] := $13; Port[$3D5] := LogicalWidth;
+
+  The mode set itself cannot be written in Pascal without an asm block for
+  the INT.
   -------------------------------------------------------------------------- }
 procedure SetMode; assembler;
 asm
-  MOV  AX, $0013
-  INT  $10
+  MOV  AX, $0013        { BIOS mode $13: 320x200, 256 colours, chained      }
+  INT  $10              { set it -- everything below un-chains it           }
 
-  MOV  DX, $3C4          { Sequencer 4: chain-4 off, extended memory on }
-  MOV  AL, 4
-  OUT  DX, AL
-  INC  DX
-  IN   AL, DX
-  AND  AL, $F7
-  OR   AL, 4
-  OUT  DX, AL
+  MOV  DX, $3C4         { Sequencer address register                        }
+  MOV  AL, 4            { register 4 -- Memory Mode                         }
+  OUT  DX, AL           { select it                                         }
+  INC  DX               { DX := $3C5, the Sequencer data register           }
+  IN   AL, DX           { read what is there                                }
+  AND  AL, $F7          { clear bit 3: Chain-4 off -- this is the un-chain  }
+  OR   AL, 4            { set bit 2: odd/even addressing off                }
+  OUT  DX, AL           { write it back                                     }
 
-  MOV  DX, $3CE          { Graphics 5: odd/even off }
-  MOV  AL, 5
-  OUT  DX, AL
-  INC  DX
-  IN   AL, DX
-  AND  AL, $EF
-  OUT  DX, AL
+  MOV  DX, $3CE         { Graphics Controller address register              }
+  MOV  AL, 5            { register 5 -- Mode                                }
+  OUT  DX, AL           { select it                                         }
+  INC  DX               { DX := $3CF, the GC data register                  }
+  IN   AL, DX           { read it                                           }
+  AND  AL, $EF          { clear bit 4: host odd/even off                    }
+  OUT  DX, AL           { write it back                                     }
 
-  MOV  DX, $3CE          { Graphics 6: chain odd/even off }
-  MOV  AL, 6
-  OUT  DX, AL
-  INC  DX
-  IN   AL, DX
-  AND  AL, $FD
-  OUT  DX, AL
+  MOV  DX, $3CE         { GC address register again -- reloaded, not DEC'd  }
+  MOV  AL, 6            { register 6 -- Miscellaneous                       }
+  OUT  DX, AL           { select it                                         }
+  INC  DX               { DX := $3CF                                        }
+  IN   AL, DX           { read it                                           }
+  AND  AL, $FD          { clear bit 1: chain odd/even off                   }
+  OUT  DX, AL           { write it back                                     }
 
-  MOV  DX, $3C4          { Map Mask: enable all four planes... }
-  MOV  AX, $0F02
-  OUT  DX, AX
-  { ...then clear all 64K, which with all planes live wipes the whole 256K }
+  MOV  DX, $3C4         { Sequencer address register                        }
+  MOV  AX, $0F02        { register 2 (Map Mask) := $0F, all four planes     }
+  OUT  DX, AX           { so every plane is writable from here on           }
 
-  MOV  DX, $3D4          { CRTC $14: doubleword mode off }
-  MOV  AL, $14
-  OUT  DX, AL
-  INC  DX
-  IN   AL, DX
-  AND  AL, $BF
-  OUT  DX, AL
+  MOV  DX, $3D4         { CRTC address register                             }
+  MOV  AL, $14          { register $14 -- Underline Location                }
+  OUT  DX, AL           { select it                                         }
+  INC  DX               { DX := $3D5, the CRTC data register                }
+  IN   AL, DX           { read it                                           }
+  AND  AL, $BF          { clear bit 6: doubleword addressing off            }
+  OUT  DX, AL           { write it back                                     }
 
-  MOV  DX, $3D4          { CRTC $17: byte mode on }
-  MOV  AL, $17
-  OUT  DX, AL
-  INC  DX
-  IN   AL, DX
-  OR   AL, $40
-  OUT  DX, AL
+  MOV  DX, $3D4         { CRTC address register                             }
+  MOV  AL, $17          { register $17 -- Mode Control                      }
+  OUT  DX, AL           { select it                                         }
+  INC  DX               { DX := $3D5                                        }
+  IN   AL, DX           { read it                                           }
+  OR   AL, $40          { set bit 6: byte addressing on. With $14 bit 6     }
+  OUT  DX, AL           {   cleared, that is what makes the mode linear     }
 
-  MOV  DX, $3D4          { CRTC $13: logical width = 80*8 = 640 pixels }
-  MOV  AL, $13
-  OUT  DX, AL
-  INC  DX
-  MOV  AL, [LogicalWidth]      { DS:$76B6, set to 80 by the caller }
-  OUT  DX, AL
+  MOV  DX, $3D4         { CRTC address register                             }
+  MOV  AL, $13          { register $13 -- Offset, the logical line width    }
+  OUT  DX, AL           { select it                                         }
+  INC  DX               { DX := $3D5                                        }
+  MOV  AL, [LogicalWidth]   { DS:$76B6 -- 80, so 640 logical pixels: the    }
+                        {   visible 320 is a window that can be panned      }
+  OUT  DX, AL           { write it, and the mode is set                     }
 end;
 
 { --------------------------------------------------------------------------
   1192:0087 -- Mode-X plane select (Sequencer register 2, Map Mask).
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      PortW[$3C4] := ((Word(1) shl Plane) shl 8) or $02;
+
+  Note there is no mask with 3: a Plane above 7 just shifts the bit out and
+  disables every plane. Nothing calls it that way.
   -------------------------------------------------------------------------- }
 procedure SelectPlane(Plane : Byte); assembler;
 asm
-  MOV  CL, Plane
-  MOV  AH, 1
-  SHL  AH, CL
-  MOV  AL, 2
-  MOV  DX, $3C4
-  OUT  DX, AX
+  MOV  CL, Plane        { the plane wanted                                  }
+  MOV  AH, 1            { one bit, for plane 0                              }
+  SHL  AH, CL           { moved to that plane's position                    }
+  MOV  AL, 2            { Sequencer register 2 -- Map Mask                  }
+  MOV  DX, $3C4         { Sequencer address register                        }
+  OUT  DX, AX           { index in AL, mask in AH, one 16-bit OUT           }
 end;
 
 { ===========================================================================
@@ -316,20 +382,24 @@ begin
     YOfs[Y] := Y * ScrWidth;
 end;
 
+{ 12f8:0000 -- mode 13h and nothing else, then the row table. The asm block
+  is two instructions because a BIOS call has no Pascal equivalent; Intr()
+  would push a Registers record the original does not have. }
 procedure SetMode13h;
 begin
   asm
-    MOV  AX, $0013
-    INT  $10
+    MOV  AX, $0013      { BIOS function 0, mode $13: 320x200, 256 colours   }
+    INT  $10            { the video BIOS                                    }
   end;
   BuildRowTable;
 end;
 
+{ 12f8:0033 -- back to 80-column colour text. Same note as above. }
 procedure SetTextMode;
 begin
   asm
-    MOV  AX, $0003
-    INT  $10
+    MOV  AX, $0003      { BIOS function 0, mode 3: 80x25 colour text        }
+    INT  $10            { the video BIOS                                    }
   end;
 end;
 

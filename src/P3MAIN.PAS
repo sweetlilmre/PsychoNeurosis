@@ -86,7 +86,7 @@ begin
 
   Scene1;   FlushKeys;
 
-  MusicPoll;                { 136b:004e -- see the note above }
+  MusicStart;               { 136b:004e -- dispatch function 0 }
 
   Scene2;   FlushKeys;
   Scene3;   FlushKeys;

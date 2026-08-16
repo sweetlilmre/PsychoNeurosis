@@ -51,8 +51,8 @@ not listed there is meant to match the binary — if it does not, that is a bug.
 
 | part | state |
 |---|---|
-| 001 | five scene units + `P1Intro` driver. Scenes 1–5 all tested and working. **Assembler audit NOT done.** |
-| 002 | `P2S1`, `P2S2`, five shared units, `P2Main` driver. Both scenes tested and working. **Assembler audit NOT done.** |
+| 001 | five scene units + `P1Intro` driver. Scenes 1–5 all tested and working. **Audit done**, five routines back to verbatim — needs a retest. |
+| 002 | `P2S1`, `P2S2`, five shared units, `P2Main` driver. Both scenes tested and working. **Audit done**, twenty-two routines back to verbatim — needs a retest. |
 | 003 | seven scene units + `P3Main` driver. **Audit done, and every unit now passes `tools/asmaudit.py`.** S1, S3, S4, S5 confirmed working. S2 and S7 rewritten from the binary and building, neither re-run yet. |
 | 004–007 | single files, never run, no harnesses. All 17 stubs, 3 inferred and 4 empty bodies live here. |
 
@@ -144,10 +144,48 @@ needs a 386 even though nothing else in the part does.
 
 ---
 
-## Outstanding: the assembler audit for every other part
+## The assembler audit: parts 001, 002 and 003 are done
 
-**Only part 003 has been swept.** Parts 001, 002 and 004–007 have not, and
-part 003 turned up eleven Pascal-ised routines, so expect more.
+All three have been swept against their binaries. Parts 004–007 have not.
+
+Part 001 turned up five Pascal-ised routines, part 002 twenty-two, part 003
+eleven. `python tools/asmaudit.py` now reports every unit in those three parts
+clean; only `PART5_ROTOZOOM` is outstanding, and it has never been checked
+against its binary at all.
+
+**One thing is still outstanding inside parts 001 and 002**, and it is the
+same thing in both. Each has three 386 fixed-point maths routines that are
+written here as floating point:
+
+| part 001 | part 002 | what |
+|---|---|---|
+| `1107:1804` | `108b:342f` | `SinCos` — a 901-entry 16.16 **cosine** table in the code segment, quadrant-folded, angles in tenths of a degree |
+| `1107:18b6` | `108b:34e1` | `RotatePoint` — three concatenated 2-D rotations, `IMUL dword` / `SHR EAX,16` / `SHL EDX,16` / `OR` per term |
+| `1107:1a04` | `108b:362f` | `Project` — `SHRD`/`SAR`/`IDIV EDX:EAX`, then the screen centre added |
+
+They are identified, not transcribed, and that is deliberate. Putting them
+back verbatim means changing the scene's whole numeric representation from
+`Real` to 16.16 `LongInt` — `TVertex`, `C1..S3`, `Scale`, `ObjTransform` and
+the object loader all move with it — and extracting the 901-entry table out of
+the code segment into a generated include. Both scenes render correctly today;
+a half-finished conversion would break them. It is a clean, well-scoped next
+job rather than something to squeeze in.
+
+Note the multiply is the reason they cannot simply be re-typed: the original
+takes the MIDDLE 32 bits of a 32x32→64 product, which a Turbo Pascal `LongInt`
+overflows. Only the verbatim assembler gets it right.
+
+### Resolved: the DemoVT / P2VT disagreement
+
+The old note about the two units disagreeing over dispatch function numbers is
+settled. `1532:0040`, `13f9:0040` and `136b:0040` all push **2**; the `004e`
+entry pushes **0** and `005c` pushes **1**. So poll is 2, start is 0, stop is
+1, and `P2VT` had it right. `DEMOVT.PAS` has been rewritten as a verbatim
+transcription of segment 1532 — it is the same unit as `P2VT`, only at
+different DGROUP addresses — and its wrong names (`FuncStop = 3`, function 0
+called `MusicPoll`) are gone rather than aliased. `P3Main` now calls
+`MusicStart` where it used to call `MusicPoll`, and `PART3_TUNNEL` calls
+`MusicCue` where it used to call the stubbed `MusicSync`.
 
 `python tools/asmaudit.py` reports which units still fail rules 1.2 and 1.3 —
 a comment on every assembler line, and an equivalent-Pascal block above each
@@ -204,16 +242,6 @@ them. Worth adding markers as each routine is verified.
 
 ---
 
-## One open inconsistency
-
-`DemoVT` and `P2VT` disagree about the tracker's dispatch function numbers.
-`P2VT` was read from part 002's `13f9:*` and has start = 0, stop = 1, poll = 2.
-`DemoVT` names function 0 `MusicPoll` and declares `FuncStop = 3`. `P3Main`
-calls the `136b:004e` slot through `DemoVT`'s name with a comment flagging this.
-One of them is wrong; resolve it against the binaries rather than by picking.
-
----
-
 ## Practical notes
 
 - **Build:** `python tools/dosbox/dosbuild.py [TARGET]`. It runs `paslint.py`
@@ -228,7 +256,15 @@ One of them is wrong; resolve it against the binaries rather than by picking.
   the original too.
 - **`paslint.py` earns its keep.** It has caught nested `{ }` comments (TP7 does
   not nest), identifiers shadowing built-ins (`Ofs`, `Offset`, `Mem`, `Port`),
-  and empty procedure bodies. Add to it when a new class of trap appears.
+  and empty procedure bodies. It now also rejects `Mem[DSeg:$XXXX]` and
+  `Ptr(DSeg, $XXXX)` — a hard-coded address in our OWN data segment, which is
+  the bug that cost part 003 scene 2. Add to it when a new class of trap
+  appears.
+- **Two BASM traps found during the audit.** `SEG` is an operator, so a record
+  field called `Seg` is a syntax error inside an `asm` block (hence `Sgmt` in
+  `DemoVT`/`P2VT`); and `[SomeConst]` on an untyped const assembles as an
+  absolute address, not a variable read, so anything the original reads FROM
+  MEMORY has to be a typed constant.
 - **`{$G+}`** is needed in any unit whose assembler uses 286 encodings such as
   `SHR reg, imm`.
 

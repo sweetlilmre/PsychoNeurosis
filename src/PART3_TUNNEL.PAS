@@ -344,7 +344,8 @@ begin
   Angle  := StartAngle;
   Radius := StartRadius;
 
-  MusicSync;                                  { DemoVT 136b:0085 }
+  MusicCue;                                   { DemoVT 136b:0085 -- spin
+                                                the module to position 25 }
   repeat
     MusicPoll;                                { DemoVT 136b:0040 }
     RotateBandsFine;
