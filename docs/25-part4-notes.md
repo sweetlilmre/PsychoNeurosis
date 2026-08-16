@@ -166,18 +166,133 @@ Blocks 1, 13, 17 and 18 are not yet identified.
 
 ---
 
+## The frame loop
+
+`Lemmings_MainLoop` (`1005:1bbb`):
+
+```
+    LiveCount := 0;  TotalSpawned := 0;  Frame := 0
+    Mem[DS:$0310] := 1              -- element 0's +20, reused as the
+                                       background animation's counter
+    Lem_InitAll;  Lem_Spawn
+    repeat
+      CopyScreen(VirtScrSeg, WorkSeg)     -- the clean background
+      Lemming_Walk                        -- the background animation
+      Lem_UpdateAll
+      Scroller_Step
+      Inc(LongInt at DS:$0002)            -- a 32-bit frame counter
+      CopyScreen(WorkSeg, $A000)
+      Inc(Frame)
+      if Frame mod 20 = 0 then Lem_Spawn
+      if KeyPressed or (LiveCount = 0) then
+      begin
+        FadeStep
+        for I := 1 to 24 do
+          if Mem[DS:$00F4 + I] <> 0 then Dec(Mem[DS:$00F4 + I])
+        twice:  V := GetVolume
+                if V = 0 then Done := True else SetVolume(V - 1)
+      end
+    until Done
+```
+
+So the exit is driven by the VOLUME, not by a key: once a key is down (or
+the last lemming is gone) the palette fades a step and the volume drops TWO
+per frame, and the loop ends when the volume reaches zero. The 24-byte table
+at `DS:$00F5..$010C` is decremented alongside; what it is has not been
+established.
+
+There are two screens: `VirtScrSeg` (`DS:$CF8C`) holds the clean background
+and is what `GetPixel` reads as the collision map, and `DS:$030D` is a second
+64,000-byte buffer that each frame is composed into. `Demo_Main` frees both.
+
+## Lem_UpdateAll (`1005:1a4c`)
+
+For N := 1 to 25:
+
+```
+    if Lem[N].Y > 199 then Remove(N)
+    if Lem[N].Active <> 0 then
+    begin
+      if (TrigX >= 0) and (TrigX = X) and (TrigY >= 0) and (TrigY = Y) then
+      begin
+        SetState(TrigState, N);  TrigX := 0;  TrigY := 0
+      end
+      if Timer > 0 then Dec(Timer)
+      if Timer = 1 then SetState(3, N)          -- 3 = Timer/fuse
+      if Timer < 0 then Inc(Timer)
+      if Timer = -1 then Remove(N)
+      DrawSprite(@Lem[N])
+      case State of 1,2,10,4,8,5,6,7,3,11 -> the ten state routines
+    end
+```
+
+That fixes three more fields: **+16 TrigX, +18 TrigY, +20 TrigState** are the
+scripted event `Lem_Spawn` pokes at totals 3, 5, `$41` and `$50`, and
+**+10 is a signed timer** — positive counts down to a fuse, negative counts
+up to removal.
+
+## The states that are decoded
+
+| addr | state | what it does |
+|---|---|---|
+| `1005:17ff` | 8 Splat | `Inc(Frame)`; at frame 4 stamps splat frame 4 (`$1420`) permanently into **VirtScrSeg** — the background — then `Remove`. So a splat leaves a mark on the terrain. |
+| `1005:1850` | 6 DeathA | tick mod 5; every 5th, `Inc(Frame)`; `Remove` after 6 |
+| `1005:18a6` | 7 DeathB | tick mod 3; every 3rd, `Inc(Frame)`; `Remove` after 5 |
+| `1005:18fc` | 3 Timer | tick mod 3; every 3rd, `Inc(Frame)`; after 5 → `SetState(11)` |
+| `1005:1954` | 11 Countdown | tick mod 5, act on mod 3. While frame < 10, five passes bumping DAC entries `$E0`..`$E9` up toward the loaded palette at `DS:$CC07` — which `LoadAssets` deliberately blacked, so this is the explosion lighting them. Past frame 15 it sets the timer to **-60** and holds the frame. |
+
+`LemState2_Faller` (`1005:0b68`) is the interesting one:
+
+```
+    for DX := -3 to 3
+      Pix := GetPixel(X + DX, Y + 1, VirtScrSeg)
+      if Pix in <32-byte set at DS:$0B48> then       -- solid ground
+      begin
+        if FallDist < 11 then
+          SetState(1); Y := Y + 0; FallDist := 0     -- land and walk
+        else
+          Inc(f4);  if f4 = 2 then SetState(8)       -- splat
+                    else land and walk as above
+        Frame := (Frame mod 4) + 1;  exit
+      end
+      if (Pix > $1F) and (Pix < $2A) then            -- colours 32..41
+        SetState(7);  exit                           -- DeathB
+    { nothing under it }
+    if FallDist < 2 then X := X + Dir
+    Y := Y + 1
+    Inc(FallDist)
+    Frame := (Frame mod 4) + 1
+```
+
+so **the terrain is read out of the background screen** and two colour ranges
+mean different things: one set is solid, and colours 32..41 kill. That is why
+part 004's VGA unit is the only one with `GetPixel`.
+
+`Lemming_Walk` (`1005:0a4f`) is NOT a lemming — it is a 43 x 24 background
+animation at (113, 50), three frames of 1032 bytes from `DS:$858F`
+(BlockRead #13), stepping every fourth tick off the counter in `DS:$0310`.
+That identifies block 13.
+
+---
+
 ## Still to read
 
 Everything in the state machine and the frame loop:
 
-`Effect_ColumnSlideIn 1005:0000`, `Lemming_Walk 1005:0a4f`,
-`Lemmings_Intro 1005:0a86`, `LemState2_Faller 0b68`,
+`Effect_ColumnSlideIn 1005:0000`, `Lemmings_Intro 1005:0a86`,
 `LemState5_Builder 0d1a`, `LemState4_Basher 0df5`, `LemState10_Miner 1166`,
-`LemState1_Walker 14d6`, `LemState8_Splat 17ff`, `LemState6_DeathA 1850`,
-`LemState7_DeathB 18a6`, `LemState3_Timer 18fc`,
-`LemState11_Countdown 1954`, `Lem_UpdateAll 1a4c`,
-`Lemmings_MainLoop 1bbb`, `Scroller_DrawChar 0853`, `Scroller_Step 08ad`,
+`LemState1_Walker 14d6`, `Scroller_DrawChar 0853`, `Scroller_Step 08ad`,
 `FUN_1005_1c9a`, `FUN_1005_1d3a`.
+
+Also outstanding:
+
+- the 32-byte SET constant at `DS:$0B48` that decides what counts as solid
+  ground, and whatever second set the walker uses;
+- what the 24-byte table at `DS:$00F5` is;
+- BlockReads 1 (`$5B8C` to a GetMem'd block), 17 (`$2AA8` to `DS:$91A7`) and
+  18 (`$348` to `DS:$BC4F`);
+- `LemState2_Faller`'s outer loop reads as though it can only ever run once
+  -- confirm against the raw disassembly rather than the decompiler.
 
 `Demo_Main` (`1005:1cd6`) is:
 
