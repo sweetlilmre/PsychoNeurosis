@@ -59,7 +59,8 @@ clauses and `{$I}` directives are rewritten to match:
 | `VGA.PAS` | 399 | 953 | 1,176 |
 | `DEMOVT.PAS` | 187 | 346 | 12 |
 | `P1INTRO` | 617 | 2,726 | 35,622 |
-| `P2HOUSE` | 659 | 2,107 | 19,640 |
+| `P2S1` | 452 | — | — |
+| `P2S2` | 1,353 | — | — |
 | `P3TUNNEL` | 425 | 1,457 | 2,934 |
 | `P3STARS` | 256 | 1,796 | 2,816 |
 | `P3MORPH` | 1,753 | 2,098 | 20,110 |
@@ -138,7 +139,8 @@ core is copied.
 
 ## Notes on specific fixes
 
-- **`{$G+}`** is set in `PART2.PAS`: `SHR reg, imm` is a 286 encoding, not 8086.
+- **`{$G+}`** is set where a unit uses `SHR reg, imm`, a 286 encoding rather
+  than 8086 -- the part 002 units among them.
 - **`FillChar` counts are `Word`**, so clearing 65,536 bytes takes two calls.
 - **A 64,000-byte array cannot be global** â€” DGROUP is 64K, so `PART5`'s source
   image stays on the heap as `Screen^`.

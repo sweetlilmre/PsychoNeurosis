@@ -41,8 +41,6 @@ NAMES = {
     "P1S5.PAS":       ("P1S5.PAS",     "P1S5",          "P1S5"),
     "P1INTRO.PAS":    ("P1INTRO.PAS",  "P1Intro",       "P1Intro"),
 
-    "PART2.PAS":      ("P2HOUSE.PAS",  "Part2",         "P2House"),
-
     # part 002 -- one unit per scene, plus the three units they share.
     # Every one of these is transcribed from NEUROSIS_002_fpu.exe; the
     # segment each came from is in its header comment.
@@ -53,6 +51,7 @@ NAMES = {
     "P2VIEW.PAS":     ("P2VIEW.PAS",   "P2View",        "P2View"),
     "P2S1.PAS":       ("P2S1.PAS",     "P2S1",          "P2S1"),
     "P2S2.PAS":       ("P2S2.PAS",     "P2S2",          "P2S2"),
+    "P2MAIN.PAS":     ("P2MAIN.PAS",   "P2Main",        "P2Main"),
     "TP2S1.PAS":      ("TP2S1.PAS",    "TP2S1",         "TP2S1"),
     "TP2S2.PAS":      ("TP2S2.PAS",    "TP2S2",         "TP2S2"),
 
