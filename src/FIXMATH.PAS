@@ -1,22 +1,47 @@
 { ===========================================================================
-  Psycho Neurosis (Asphyxia, 1994) -- NEUROSIS.002, the fixed-point unit.
+  Psycho Neurosis (Asphyxia, 1994) -- the shared fixed-point unit.
 
-  Segment 142a in NEUROSIS_002_fpu.exe, transcribed in full -- all five
-  routines, nothing inferred.
+  ONE UNIT AGAIN. Segment 1483 in part 001, 142a in part 002, and present in
+  part 005; the code is identical apart from the far-call fixups into the RTL.
+  Turbo Pascal's smart linker drops what a part never calls, so:
 
-  Everything in scene 2's geometry is 16.16 fixed point. These are the three
-  conversions between that and the ordinary types, plus the mode-13h setter
-  that sits at the end of the segment.
+      #  routine           001        002
+      1  IntToFixed        1483:0000  142a:0000
+      2  RealToFixed       1483:0034  142a:0034
+      3  FixedToIntTrunc   1483:0071  --
+      4  FixedToInt        1483:0099  142a:0071
+      5  SetMode13h        1483:00E0  142a:00C0
+
+  Part 002 never calls the truncating conversion, so it is absent and the
+  rounding one moves up by exactly its length -- $99 - $71 = $28, and 142a's
+  FixedToInt sits $28 below 1483's.
+
+  THERE ARE TWO CONVERSIONS BACK TO INTEGER AND THEY ARE NOT THE SAME:
+
+      FixedToIntTrunc(V) = V shr 16                     truncates
+      FixedToInt(V)      = (V + RealToFixed(0.5)) shr 16  rounds
+
+  and the callers pick deliberately. Part 001 scene 4 rounds (1107:052E calls
+  1483:0099); part 001 scene 5 truncates (12C5:0268 calls 1483:0071). An
+  earlier pass gave both scenes a local rounding copy, which was wrong for
+  scene 5 -- it shifts the depth-sort key by up to one.
+
+  SetMode13h at the end duplicates the VGA unit's, byte for byte, in a second
+  unit. That is the original's doing, not a transcription artefact; the same
+  is true of P2View's SetColour against VGA's SetRGB. Where a scene links both
+  units the later one in the `uses` clause wins, and since the code is
+  identical it makes no difference.
   =========================================================================== }
 
-unit P2Fix;
+unit FixMath;
 
 interface
 
-function IntToFixed(V : Integer) : LongInt;      far;   { 142a:0000 }
-function RealToFixed(X : Real) : LongInt;        far;   { 142a:0034 }
-function FixedToInt(V : LongInt) : Integer;      far;   { 142a:0071 }
-procedure SetMode13h;                            far;   { 142a:00c0 }
+function IntToFixed(V : Integer) : LongInt;      far;   { 1483:0000 }
+function RealToFixed(X : Real) : LongInt;        far;   { 1483:0034 }
+function FixedToIntTrunc(V : LongInt) : Integer; far;   { 1483:0071 }
+function FixedToInt(V : LongInt) : Integer;      far;   { 1483:0099 }
+procedure SetMode13h;                            far;   { 1483:00E0 }
 
 implementation
 
@@ -45,8 +70,16 @@ begin
   RealToFixed := Round(X * FixedOne + RoundBias);
 end;
 
+{ 1483:0071 -- the TRUNCATING conversion: no bias, just a 32-bit shift right
+  by 16. Part 002 never calls it and it is absent from that build. }
+function FixedToIntTrunc(V : LongInt) : Integer;
+begin
+  FixedToIntTrunc := V shr 16;
+end;
+
 { --------------------------------------------------------------------------
-  142a:0071 -- despite sitting between the two conversions, this is not a
+  1483:0099 / 142a:0071 -- the ROUNDING conversion. Despite sitting between
+  the two conversions in part 002's build, this is not a
   perspective divide. It builds the Real48 $000000000080 -- which is 0.5 --
   pushes it through RealToFixed to get $8000, adds that to the parameter, and
   shifts the 32-bit result right by 16:

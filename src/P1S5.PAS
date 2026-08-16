@@ -16,7 +16,7 @@ procedure Scene5;
 
 implementation
 
-uses VGA, Crt, DemoVT;
+uses VGA, Crt, DemoVT, FixMath;
 
 {$I gen/P1VECT.INC}      { const VecLogoA, VecGlobe : array[.., 1..3] of Integer }
 
@@ -129,16 +129,9 @@ procedure Project(var X, Y, Z : LongInt);                 external; { 12c5:1B2D 
   That is why the point records are TWELVE bytes -- three 32-bit fixed values
   -- and not the eighteen three 6-byte Borland Reals would need.
   -------------------------------------------------------------------------- }
-function IntToFixed(V : Integer) : LongInt;
-begin
-  IntToFixed := LongInt(V) shl 16;
-end;
-
-{ 1483:0071 -- the other way: add a half and take the whole part. }
-function FixedToInt(V : LongInt) : Integer;
-begin
-  FixedToInt := (V + $8000) shr 16;
-end;
+{ IntToFixed and the two conversions back come from FixMath (segment 1483).
+  This scene had local copies, and its FixedToInt was the ROUNDING one -- but
+  12C5:0268 calls 1483:0071, which TRUNCATES. The calls below say so. }
 
 { [transcribed] Vector_Run's object copy, 12c5:088b and 12c5:098a -- integer
   triples out of DGROUP, IntToFixed into the 12-byte records. It does NOT
@@ -235,11 +228,11 @@ begin
 
     Scr[I].X := Sx;                     { the object }
     Scr[I].Y := Horizon - Sy;
-    Scr[I].D := FixedToInt(Z);          { 12c5:0268 }
+    Scr[I].D := FixedToIntTrunc(Z);     { 12c5:0268 -> 1483:0071 }
 
     Scr[I + PtCount].X := Sx;           { and its reflection }
     Scr[I + PtCount].Y := Sy + Horizon + 1;
-    Scr[I + PtCount].D := FixedToInt(Z);
+    Scr[I + PtCount].D := FixedToIntTrunc(Z);
   end;
 end;
 

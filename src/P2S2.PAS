@@ -31,7 +31,7 @@ procedure Scene2;
 
 implementation
 
-uses Crt, VGA, P2View, P2Fix, DemoVT;
+uses Crt, VGA, P2View, FixMath, DemoVT;
 
 {$I gen/P2OBJ.INC}
 

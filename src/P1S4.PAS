@@ -32,7 +32,7 @@ procedure Scene4;
 
 implementation
 
-uses VGA, Crt, DemoVT;
+uses VGA, Crt, DemoVT, FixMath;
 
 { --------------------------------------------------------------------------
   1107:0000 -- SetPalette768(P). HAND ASSEMBLER, verbatim.
@@ -191,19 +191,8 @@ procedure SinCos(A : Integer; var C, S : LongInt);      external; { 1107:1804 }
 procedure RotatePoint(var X, Y, Z : LongInt);           external; { 1107:18B6 }
 procedure Project(var X, Y, Z : LongInt);               external; { 1107:1A04 }
 
-{ 1483:0000 -- Math_IntToReal is MISNAMED: it converts an Integer to 16.16
-  FIXED POINT. That is why the point records are THIRTEEN bytes -- three
-  32-bit fixed values and a flag -- not the nineteen three Borland Reals and
-  a flag would need. 1483:0071 is the other direction. }
-function IntToFixed(V : Integer) : LongInt;
-begin
-  IntToFixed := LongInt(V) shl 16;
-end;
-
-function FixedToInt(V : LongInt) : Integer;
-begin
-  FixedToInt := (V + $8000) shr 16;
-end;
+{ IntToFixed and FixedToInt come from FixMath (segment 1483) -- this scene
+  had local copies of both. 1107:052E calls 1483:0099, the ROUNDING one. }
 
 { --------------------------------------------------------------------------
   1107:0446 -- Transform(Base; A1, A2, A3)

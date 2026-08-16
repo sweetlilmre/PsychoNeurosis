@@ -254,6 +254,37 @@ Two smaller things fell out of the same comparison: `VGA.VirtScrAlloc` was
 missing its `FillChar` (`11e3:0027`, `1436:0027`), and `SetTextMode` had no
 equivalent-Pascal block.
 
+### P2View is genuinely part-002-only; P2Fix was not
+
+Running the same byte comparison over `P2View` (segment 140c) settles it:
+seven of its eight routines appear in NO other part. It stays as it is.
+
+The eighth, `SetColour` (`140c:01AF`), matches in five parts -- but that is
+because it is byte-for-byte identical to `VGA.SetRGB`, so the signature is
+finding VGA's copy elsewhere, not a P2View one. Part 002 really does carry
+the same thirteen-byte DAC poke twice, in two units. (It is also what made
+part 002 look out of order in the VGA scan.)
+
+That scan did turn up a FOURTH shared unit, though: **`P2Fix` is part 001's
+`1483`**, identical but for two far-call fixups into the RTL. It is now
+`FIXMATH.PAS`:
+
+    #  routine           001        002
+    1  IntToFixed        1483:0000  142a:0000
+    2  RealToFixed       1483:0034  142a:0034
+    3  FixedToIntTrunc   1483:0071  --
+    4  FixedToInt        1483:0099  142a:0071
+    5  SetMode13h        1483:00E0  142a:00C0
+
+**There are two conversions back to Integer and they differ**, which had been
+missed: `1483:0071` truncates and `1483:0099` rounds. Callers pick
+deliberately -- part 001 scene 4 rounds (`1107:052E` -> `1483:0099`), scene 5
+truncates (`12C5:0268` -> `1483:0071`). Both scenes had a local rounding copy,
+so scene 5's depth-sort key was off by up to one. Fixed.
+
+Like `SetMode13h` appearing in both this unit and VGA, that is the original's
+duplication, not a transcription artefact.
+
 ### Resolved: the DemoVT function numbers
 
 The old note about the two units disagreeing over dispatch function numbers is

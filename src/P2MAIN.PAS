@@ -12,7 +12,7 @@
       VGA    segment 1436   palette, staging buffer, retrace
       ModeX  segment 107c   unchained 320x200 on a 1280-wide canvas
       P2View   segment 140c   unchained 320x400, two pages
-      P2Fix    segment 142a   16.16 fixed point, and SetMode13h
+      FixMath    segment 142a   16.16 fixed point, and SetMode13h
       DemoVT     segment 13f9   the resident tracker client
 
   This replaces the old single-file PART2.PAS, which predated the split and
@@ -29,14 +29,14 @@ procedure RunPart2;
 
 implementation
 
-uses Crt, VGA, ModeX, P2View, P2Fix, DemoVT, P2S1, P2S2;
+uses Crt, VGA, ModeX, P2View, FixMath, DemoVT, P2S1, P2S2;
 
 { --------------------------------------------------------------------------
   1000:0032 -- the main body.
 
       1000:0035   SetMode13h        1436:0000, which is the same physical
                                     bytes as 142a:00c0 -- the two segments
-                                    overlap, so P2Fix already has it
+                                    overlap, so FixMath already has it
       1000:003a   VirtScrAlloc      1436:0006
       1000:003f   Demo_Scene1       1008:0724
       1000:0044   flush the keyboard

@@ -38,6 +38,7 @@ NAMES = {
     "VGA.PAS":        ("VGA.PAS",      "VGA",           "VGA"),
     "DEMOVT.PAS":     ("DEMOVT.PAS",   "DemoVT",        "DemoVT"),
     "MODEX.PAS":      ("MODEX.PAS",    "ModeX",         "ModeX"),
+    "FIXMATH.PAS":    ("FIXMATH.PAS",  "FixMath",       "FixMath"),
 
     # part 001 -- one unit per scene, plus a driver
     "P1S1.PAS":       ("P1S1.PAS",     "P1S1",          "P1S1"),
@@ -50,7 +51,6 @@ NAMES = {
     # part 002 -- one unit per scene, plus the three units they share.
     # Every one of these is transcribed from NEUROSIS_002_fpu.exe; the
     # segment each came from is in its header comment.
-    "P2FIX.PAS":      ("P2FIX.PAS",    "P2Fix",         "P2Fix"),
     "P2VIEW.PAS":     ("P2VIEW.PAS",   "P2View",        "P2View"),
     "P2S1.PAS":       ("P2S1.PAS",     "P2S1",          "P2S1"),
     "P2S2.PAS":       ("P2S2.PAS",     "P2S2",          "P2S2"),

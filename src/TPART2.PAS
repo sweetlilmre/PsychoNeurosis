@@ -9,7 +9,7 @@
 
 program TPART2;
 
-uses Crt, VGA, ModeX, P2View, P2Fix, DemoVT, P2Main;
+uses Crt, VGA, ModeX, P2View, FixMath, DemoVT, P2Main;
 
 var
   F : file;
