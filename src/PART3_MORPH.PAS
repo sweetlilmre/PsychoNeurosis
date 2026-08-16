@@ -70,9 +70,10 @@ const
     throughout -- a small block of dots near the centre instead of a rotating
     solid.
 
-    `div` truncates toward zero where the shift floors, so the two differ by
-    one unit on negative values. That is well under a pixel after the
-    perspective divide. }
+    `div` truncates toward zero where an arithmetic shift floors, so the two
+    differ by one unit on negative values -- well under a pixel after the
+    perspective divide. The original really does shift; there is simply no
+    signed shift operator in Turbo Pascal to write it with. }
   FixedOne   = 16384;      { 1 shl FixedBits }
   ScreenCentreX = 160;     { $A0 -- 1139:019c }
   ScreenCentreY = 200;     { $C8 -- 1139:01ac, half of 400 rows }
@@ -320,8 +321,18 @@ begin
       the coordinate before the divide, and InitScene sets both to zero. Using
       them as the screen centre left every point projected about (0, 0), which
       is what clustered the shape into the left edge. }
-    SX := ((X - XCentre) * ProjScale) div D + ScreenCentreX;
-    SY := ((Y - YCentre) * ProjScale) div D + ScreenCentreY;
+    { The LongInt cast is load-bearing. 1139:0191 is
+
+          MOV AX,[BP-2] / SUB AX,[$BEAE] / IMUL CX / IDIV BX
+
+      -- IMUL leaves a 32-BIT product in DX:AX and IDIV then divides that by
+      BX. Written as `(X - XCentre) * ProjScale` with three Integers, Turbo
+      Pascal evaluates the multiply in 16 bits, so any coordinate past +/-127
+      overflows and wraps: the shapes reach +/-1000 and ProjScale is 256, so
+      almost every point wrapped to a more or less arbitrary value. That is
+      what scattered the scene into a rectangle of random dots. }
+    SX := (LongInt(X - XCentre) * ProjScale) div D + ScreenCentreX;
+    SY := (LongInt(Y - YCentre) * ProjScale) div D + ScreenCentreY;
   end
   else
   begin
