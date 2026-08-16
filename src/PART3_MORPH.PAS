@@ -50,7 +50,7 @@ procedure Scene3;
 
 implementation
 
-uses VGA, Crt;
+uses VGA, ModeX, Crt;
 
 const
   NumPoints  = 765;        { $2FD -- points actually drawn per shape }
@@ -219,9 +219,8 @@ var
   PageOfs             : Word;      { DS:$BEC0 -- 0 or 80 }
   Count               : Word;      { DS:$BEC4 -- the point counter }
   Frames              : Integer;   { DS:$BEC2 }
-  { DS:$BEC6 -- EIGHT HUNDRED entries, not PageHeight. 1192:0000 fills
-    0..$31F regardless of how many rows the mode actually shows. }
-  RowOfs              : array[0..799] of Word;
+  { RowOfs is the Mode-X unit's own table (1192:0000 fills it), not this
+    scene's -- see MODEX.PAS. It is imported, not declared here. }
 
 { --------------------------------------------------------------------------
   VGA_Set400Lines (1139:02f2)
@@ -246,13 +245,6 @@ var
   The code lives in segment 1192 with the rest of the VGA unit, but the table
   it fills is at DS:$BEC6, in this scene's own data, which is why it is here.
   -------------------------------------------------------------------------- }
-procedure BuildModeXRows;
-var
-  I : Integer;
-begin
-  for I := 0 to 799 do
-    RowOfs[I] := Word(LogicalWidth) * Word(I) shl 1;
-end;
 
 { --------------------------------------------------------------------------
   VGA_Set400Lines (1139:02f2)
@@ -832,9 +824,9 @@ end;
 procedure InitScene;
 begin
   LogicalWidth := 80;          { DS:$76B6 -- 640 logical pixels per row }
-  SetMode;                     { mode 13h -> Mode-X }
+  SetModeX;                    { 1192:002a -- mode 13h -> Mode-X }
   Set400Lines;                 { and now 320x400 }
-  BuildModeXRows;              { 1192:0000 -- NOT VGA's BuildRowTable }
+  ModeX.BuildRowTable;         { 1192:0000 -- NOT VGA's BuildRowTable }
   MorphStep := 0;
   MorphSteps := 45;
   XCentre := 0;  YCentre := 0;

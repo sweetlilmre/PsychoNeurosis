@@ -1,31 +1,39 @@
 { ===========================================================================
-  Psycho Neurosis (Asphyxia, 1994) -- NEUROSIS.002, the Mode-X unit.
+  Psycho Neurosis (Asphyxia, 1994) -- the shared Mode-X unit.
 
-  Segment 107c in NEUROSIS_002_fpu.exe, transcribed in full -- all four
-  routines and the unit initialisation, nothing inferred.
+  ONE UNIT, LINKED BY THE PARTS THAT NEED IT. Segment 107c in part 002 and
+  1192 in part 003, and as with VGA and DemoVT the two are the same source
+  with Turbo Pascal's smart linker dropping whatever a part never calls:
 
-  WHAT MAKES THIS UNIT UNUSUAL
+      #  routine          002        003
+      1  BuildRowTable    107c:0000  1192:0000
+      2  ShowFrame        107c:002a  --
+      3  SetModeX         107c:006d  1192:002a
+      4  SelectPlane      107c:00ca  1192:0087
 
-  It is not 320x200 Mode X. The CRTC Offset register ($13) is loaded from the
-  byte at DS:$0002, and Demo_Scene1 sets that to $A0 = 160 before calling in.
-  The Offset register counts in units of two bytes per plane, so a logical
-  scanline is 320 bytes PER PLANE -- four planes of 320 bytes, which is
+  Part 003 never pans, so ShowFrame is absent and everything after it moves
+  up by exactly its length -- $6D - $2A = $43, and 1192's SelectPlane sits
+  $43 below 107c's. SetModeX is 93 bytes in both and the two are byte for
+  byte identical apart from the one address the last instruction reads
+  LogicalWidth from.
 
-      320 * 4 = 1280 pixels wide
+  THAT COMPARISON FOUND A BUG. VGA.PAS used to carry its own transcription of
+  this routine as `SetMode`, read from part 003, and it was wrong in three
+  places: it reloaded DX with an immediate twice where the original does
+  DEC DX, and -- the one that matters -- it left out the REP STOSW that
+  clears all 64K of video memory. The bytes at 1192:002a plainly contain it.
+  Part 003 scene 3 was therefore starting in whatever the previous scene had
+  left in VRAM. That transcription is gone; this is the routine.
 
-  and the row table is built to match: 800 entries of LogicalWidth * I * 2 =
-  320 * I. Video memory holds 65,536 bytes per plane, so about 204 of those
-  rows actually fit and the table wraps in 16-bit arithmetic beyond that; the
-  scene only ever uses row 0.
-
-  That is what the scene pans across: one 1280 x 200 image spread over the
-  four planes, 64,000 bytes each.
+  Mode X here is the unchained 256-colour mode: Chain-4 off so the four
+  planes are addressed separately, byte addressing rather than doubleword,
+  and CRTC Offset set from LogicalWidth to give a canvas wider than the
+  visible 320 so it can be panned.
   =========================================================================== }
 
-{$G+}   { 286 instructions: 107c:0039 is SHR AX,2 in ShowFrame. The original
-          targets 386 and above. }
+{$G+}   { 286 instructions: 107c:0039 is SHR AX,2 in ShowFrame. }
 
-unit P2ModeX;
+unit ModeX;
 
 interface
 

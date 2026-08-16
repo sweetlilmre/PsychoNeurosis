@@ -4,7 +4,7 @@
   Segment 140c in NEUROSIS_002_fpu.exe, transcribed in full -- all seven
   routines and the unit initialisation, nothing inferred.
 
-  This is the OTHER video unit in part 002, and it is nothing like P2ModeX.
+  This is the OTHER video unit in part 002, and it is nothing like ModeX.
   Scene 2 runs unchained 320 x 400 with two pages stacked in the same 64K:
 
       page 0   offset $0000        DS:$A696

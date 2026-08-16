@@ -9,7 +9,7 @@
 
 program TP2S1;
 
-uses Crt, VGA, P2ModeX, DemoVT, P2S1;
+uses Crt, VGA, ModeX, DemoVT, P2S1;
 
 var
   F : file;

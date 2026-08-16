@@ -233,12 +233,26 @@ byte-identical. Likewise `GetPixel` (004, 005, 006) and `PutPixel` (003, 005,
 The four duplicates are deleted; `VGA.PAS` is now the union of all 21 routines
 and `DEMOVT.PAS` of all nine, with the per-part tables in their headers.
 
-**Still conflated:** `VGA.PAS` also carries `SetMode` and `SelectPlane`, which
-belong to the MODE-X unit -- segment 1192 in part 003, 107c in part 002 (where
-it is `P2ModeX`). The same order argument shows those two are one unit as
-well: part 003's `SetMode` is at `1192:002a` and part 002's at `107c:006d`,
-the difference being exactly the `ShowFrame` part 003 does not link. Worth
-separating next.
+### And the Mode-X unit, which is where the bug was
+
+`P2ModeX` is now `MODEX.PAS`, the shared unit — 107c in part 002, 1192 in
+part 003. The same order argument: part 003 never pans, so `ShowFrame` is
+absent and everything after it moves up by exactly its length (`$6D - $2A =
+$43`, and 1192's `SelectPlane` sits `$43` below 107c's).
+
+**Comparing the two copies found a real defect.** `SetModeX` is 93 bytes in
+both and byte-for-byte identical apart from the one address the last
+instruction reads `LogicalWidth` from. `VGA.PAS` had carried its own
+transcription of it as `SetMode`, read from part 003, and it was wrong in
+three places: two `DEC DX` written as immediate reloads, and — the one that
+matters — **the `REP STOSW` that clears all 64K of video memory was missing
+entirely**, with a comment claiming part 003's version deliberately omits it.
+It does not; the bytes at `1192:002a` plainly contain it. Part 003 scene 3 was
+starting in whatever the previous scene had left in VRAM.
+
+Two smaller things fell out of the same comparison: `VGA.VirtScrAlloc` was
+missing its `FillChar` (`11e3:0027`, `1436:0027`), and `SetTextMode` had no
+equivalent-Pascal block.
 
 ### Resolved: the DemoVT function numbers
 

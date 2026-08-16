@@ -40,9 +40,9 @@ VGA_CLOSE = """  VirtScrFree;
 """
 
 # Part 002 links the same VGA and DemoVT units as everything else -- it just
-# adds P2ModeX, P2View and P2Fix on top, and each of its two scenes sets up
+# adds ModeX, P2View and P2Fix on top, and each of its two scenes sets up
 # its own video mode.
-P2S1_USES = "Crt, VGA, P2ModeX, DemoVT"
+P2S1_USES = "Crt, VGA, ModeX, DemoVT"
 P2S1_OPEN = "  VirtScrAlloc;       { 1436:0006, what the main body does first }\n"
 P2S1_CLOSE = "  VirtScrFree;\n  Port[$3C8] := 0;\n  TextMode(CO80);\n"
 
@@ -105,7 +105,7 @@ PARTS = [
      "Crt, VGA, DemoVT",
      "part 001 -- all five scenes, through the driver at 1000:003c"),
     ("TPART2", "P2Main", "RunPart2",
-     "Crt, VGA, P2ModeX, P2View, P2Fix, DemoVT",
+     "Crt, VGA, ModeX, P2View, P2Fix, DemoVT",
      "part 002 -- both scenes, through the driver at 1000:0032"),
     ("TPART3", "P3Main", "RunPart3",
      "Crt, VGA, DemoVT",

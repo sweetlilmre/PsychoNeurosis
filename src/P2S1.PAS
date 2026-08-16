@@ -41,7 +41,7 @@ procedure Scene1;
 
 implementation
 
-uses Crt, VGA, P2ModeX, DemoVT;
+uses Crt, VGA, ModeX, DemoVT;
 
 const
   { 1008:023a / 1008:023f -- Scene1_Init stores these into the door bitmap's
@@ -169,7 +169,7 @@ asm
   MOV  ES, AX             { ES:DI is the destination throughout             }
   MOV  BX, Y              { the top row                                     }
   SHL  BX, 1              { * 2, a word index                               }
-  MOV  DI, [BX + OFFSET RowOfs]   { DI := RowOfs[Y] -- P2ModeX's table      }
+  MOV  DI, [BX + OFFSET RowOfs]   { DI := RowOfs[Y] -- ModeX's table      }
   MOV  AX, XBase          { the pan base, $3C0                              }
   ADD  AX, XOfs           { + the bitmap's own X                            }
   LDS  SI, Src            { DS:SI := the bitmap, header first               }

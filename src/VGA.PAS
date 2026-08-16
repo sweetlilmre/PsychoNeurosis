@@ -42,10 +42,8 @@
   is in this unit, and parts 004 and 006 are simply the only two that call
   it. Their copies are byte-identical.
 
-  SetMode and SelectPlane below are NOT part of this unit. They belong to the
-  Mode-X unit, which is segment 1192 in part 003 and 107c in part 002; the
-  same order argument holds there too. They are left here for now because
-  part 003's scenes reach them through this unit's name.
+  The Mode-X routines that used to be in this file have moved to MODEX.PAS,
+  where they belong -- segment 1192 in part 003, 107c in part 002.
 
   THIS UNIT IS HAND-WRITTEN ASSEMBLER, not compiled Pascal, and is written
   back as `assembler` procedures so the original instruction sequences are
@@ -98,14 +96,6 @@ const
   ScrHeight = 200;
   VGASeg    = $A000;
 
-const
-  { DS:$76B6 -- the Mode-X plane stride: 80 bytes per row = 320 pixels.
-    SetMode writes it straight to CRTC register $13 (Offset), and
-    BuildRowTable doubles it, giving a 640-pixel LOGICAL width so the visible
-    320 is a window that can be panned. It sits in the executable's
-    initialised data, so it was a typed constant -- which in Borland Pascal is
-    writable, and that is what lets a scene change the stride at run time. }
-  LogicalWidth : Byte = 80;
 
 var
   { Row offset lookup, DS:$E772 -- YOfs[y] = y * 320. PutPixel indexes this
@@ -158,8 +148,6 @@ procedure FadeStep;                               far;
 procedure WaitRetrace; far;
 procedure CopyScreen(SrcSeg, DestSeg : Word); far;
 procedure ClearScreen(Segment : Word; Colour : Byte); far;
-procedure SetMode; far;
-procedure SelectPlane(Plane : Byte); far;
 
 implementation
 
@@ -560,105 +548,11 @@ asm
   REP  STOSW            { the fill, one instruction                         }
 end;
 
-{ --------------------------------------------------------------------------
-  1192:002a -- mode 13h, then unchain to Mode-X at 640 logical width.
+{ SetMode, SelectPlane and LogicalWidth used to be here. They are not part of
+  this unit -- they belong to the Mode-X unit (segment 1192 in part 003, 107c
+  in part 002), which is src/MODEX.PAS. The SetMode transcription that lived
+  here was also missing the 64K video-memory clear; see that file. }
 
-  Note what is NOT here: part 002's equivalent (107c:006d) clears all 64K
-  after enabling the four planes. This one enables them and moves straight on,
-  so the mode-13h screen underneath survives into Mode X.
-
-  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
-
-      asm mov ax,$13; int $10 end;          -- no Pascal equivalent at all
-      Port[$3C4] := 4;  Port[$3C5] := (Port[$3C5] and $F7) or $04;
-      Port[$3CE] := 5;  Port[$3CF] :=  Port[$3CF] and $EF;
-      Port[$3CE] := 6;  Port[$3CF] :=  Port[$3CF] and $FD;
-      PortW[$3C4] := $0F02;
-      Port[$3D4] := $14; Port[$3D5] := Port[$3D5] and $BF;
-      Port[$3D4] := $17; Port[$3D5] := Port[$3D5] or  $40;
-      Port[$3D4] := $13; Port[$3D5] := LogicalWidth;
-
-  The mode set itself cannot be written in Pascal without an asm block for
-  the INT.
-  -------------------------------------------------------------------------- }
-procedure SetMode; assembler;
-asm
-  MOV  AX, $0013        { BIOS mode $13: 320x200, 256 colours, chained      }
-  INT  $10              { set it -- everything below un-chains it           }
-
-  MOV  DX, $3C4         { Sequencer address register                        }
-  MOV  AL, 4            { register 4 -- Memory Mode                         }
-  OUT  DX, AL           { select it                                         }
-  INC  DX               { DX := $3C5, the Sequencer data register           }
-  IN   AL, DX           { read what is there                                }
-  AND  AL, $F7          { clear bit 3: Chain-4 off -- this is the un-chain  }
-  OR   AL, 4            { set bit 2: odd/even addressing off                }
-  OUT  DX, AL           { write it back                                     }
-
-  MOV  DX, $3CE         { Graphics Controller address register              }
-  MOV  AL, 5            { register 5 -- Mode                                }
-  OUT  DX, AL           { select it                                         }
-  INC  DX               { DX := $3CF, the GC data register                  }
-  IN   AL, DX           { read it                                           }
-  AND  AL, $EF          { clear bit 4: host odd/even off                    }
-  OUT  DX, AL           { write it back                                     }
-
-  MOV  DX, $3CE         { GC address register again -- reloaded, not DEC'd  }
-  MOV  AL, 6            { register 6 -- Miscellaneous                       }
-  OUT  DX, AL           { select it                                         }
-  INC  DX               { DX := $3CF                                        }
-  IN   AL, DX           { read it                                           }
-  AND  AL, $FD          { clear bit 1: chain odd/even off                   }
-  OUT  DX, AL           { write it back                                     }
-
-  MOV  DX, $3C4         { Sequencer address register                        }
-  MOV  AX, $0F02        { register 2 (Map Mask) := $0F, all four planes     }
-  OUT  DX, AX           { so every plane is writable from here on           }
-
-  MOV  DX, $3D4         { CRTC address register                             }
-  MOV  AL, $14          { register $14 -- Underline Location                }
-  OUT  DX, AL           { select it                                         }
-  INC  DX               { DX := $3D5, the CRTC data register                }
-  IN   AL, DX           { read it                                           }
-  AND  AL, $BF          { clear bit 6: doubleword addressing off            }
-  OUT  DX, AL           { write it back                                     }
-
-  MOV  DX, $3D4         { CRTC address register                             }
-  MOV  AL, $17          { register $17 -- Mode Control                      }
-  OUT  DX, AL           { select it                                         }
-  INC  DX               { DX := $3D5                                        }
-  IN   AL, DX           { read it                                           }
-  OR   AL, $40          { set bit 6: byte addressing on. With $14 bit 6     }
-  OUT  DX, AL           {   cleared, that is what makes the mode linear     }
-
-  MOV  DX, $3D4         { CRTC address register                             }
-  MOV  AL, $13          { register $13 -- Offset, the logical line width    }
-  OUT  DX, AL           { select it                                         }
-  INC  DX               { DX := $3D5                                        }
-  MOV  AL, [LogicalWidth]   { DS:$76B6 -- 80, so 640 logical pixels: the    }
-                        {   visible 320 is a window that can be panned      }
-  OUT  DX, AL           { write it, and the mode is set                     }
-end;
-
-{ --------------------------------------------------------------------------
-  1192:0087 -- Mode-X plane select (Sequencer register 2, Map Mask).
-
-  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
-
-      PortW[$3C4] := ((Word(1) shl Plane) shl 8) or $02;
-
-  Note there is no mask with 3: a Plane above 7 just shifts the bit out and
-  disables every plane. Nothing calls it that way.
-  -------------------------------------------------------------------------- }
-procedure SelectPlane(Plane : Byte); assembler;
-asm
-  MOV  CL, Plane        { the plane wanted                                  }
-  MOV  AH, 1            { one bit, for plane 0                              }
-  SHL  AH, CL           { moved to that plane's position                    }
-  MOV  AL, 2            { Sequencer register 2 -- Map Mask                  }
-  MOV  DX, $3C4         { Sequencer address register                        }
-  OUT  DX, AX           { index in AL, mask in AH, one 16-bit OUT           }
-end;
 
 { ===========================================================================
   Shared screen management.
@@ -689,7 +583,15 @@ begin
   BuildRowTable;
 end;
 
-{ 12f8:0033 -- back to 80-column colour text. Same note as above. }
+{ --------------------------------------------------------------------------
+  12f8:0033 -- back to 80-column colour text.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      (none). Setting a video mode is a BIOS call, and Turbo Pascal has no way
+      to make one without an asm block or an Intr(), which would push a
+      Registers record the original does not have.
+  -------------------------------------------------------------------------- }
 procedure SetTextMode;
 begin
   asm
@@ -698,10 +600,16 @@ begin
   end;
 end;
 
+{ The unit's own 64,000-byte staging screen: GetMem, keep the segment out
+  separately because everything addresses it as a bare segment, then BLANK it.
+  The FillChar is in the binary -- 11e3:0027 in part 004, 1436:0027 in part
+  002 -- and was missing from this transcription until the units were
+  consolidated. }
 procedure VirtScrAlloc;
 begin
   GetMem(VirtScr, 64000);
   VirtScrSeg := Seg(VirtScr^);
+  FillChar(VirtScr^, 64000, 0);
 end;
 
 procedure VirtScrFree;
