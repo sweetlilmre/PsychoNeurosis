@@ -17,7 +17,7 @@
       Scene2_Choreography 108b:11c1      Obj_SortFaces       108b:0e03
       BuildRowTable80     108b:0a09      Obj_RenderA/B/C     108b:0b42/0ca1/0a2d
       DrawText            108b:0000      Poly_FillFan        108b:09b1
-      DrawSprite          108b:0422      Tri_Fill            108b:0461
+      DrawRewind          108b:0422      Tri_Fill            108b:0461
       DrawBanner          108b:1101      Present             108b:0f66
       Math_SinCos         108b:342f      Math_RotatePoint    108b:34e1
       Math_Project        108b:362f
@@ -61,8 +61,8 @@ const
   TextY1    = 210;                { $D2 }
   TextY2    = 217;                { $D9 }
   TextCol   = $42;                { 108b:0097, the green set by Scene2_Setup }
-  SpriteW   = 34;                 { $22 }
-  SpriteH   = 43;                 { $2B }
+  RewindW   = 34;                 { $22 }
+  RewindH   = 43;                 { $2B }
   BannerTop = 200;                { $C8 }
   BannerH   = 40;
   FontFirst = 32;                 { the glyph table starts at char $20 }
@@ -102,8 +102,8 @@ type
   TFont = array[0..FontCount * 25 - 1] of Byte;
   { the GetMem'd 12,800 bytes -- assets/part002/banner_320x40.png }
   TBanner = array[0..BannerH * ScrWidth - 1] of Byte;
-  { DS:$8ED5, 1,462 bytes -- assets/part002/sprite_34x43.bin }
-  TSprite = array[1..SpriteW * SpriteH] of Byte;
+  { DS:$8ED5, 1,462 bytes -- assets/part002/rewind_button.bin }
+  TRewind = array[1..RewindW * RewindH] of Byte;
 
 var
   { The four objects. In the original they are four fixed DGROUP blocks $B51
@@ -112,7 +112,7 @@ var
   Star   : array[1..StarCount] of TStar;
   Font   : ^TFont;
   Banner : ^TBanner;                            { the GetMem'd 12,800 bytes }
-  Sprite : TSprite;
+  Rewind : TRewind;
   Pal    : array[0..767] of Byte;               { DS:$5148 }
 
   { DS:$87AC..$87C3 -- cos then sin per axis, as Math_SinCos leaves them. }
@@ -475,13 +475,13 @@ end;
   1,462-byte block the loader puts at DS:$8ED5. The indexing at 108b:0443 is
   `Y * $22 + X` off a base $23 lower, which makes it one-based in both axes.
   -------------------------------------------------------------------------- }
-procedure DrawSprite;
+procedure DrawRewind;
 var
   X, Y : Integer;
 begin
-  for Y := 1 to SpriteH do
-    for X := 1 to SpriteW do
-      Plot(X, Y, Sprite[(Y - 1) * SpriteW + X]);
+  for Y := 1 to RewindH do
+    for X := 1 to RewindW do
+      Plot(X, Y, Rewind[(Y - 1) * RewindW + X]);
 end;
 
 { --------------------------------------------------------------------------
@@ -614,7 +614,7 @@ end;
 procedure RenderB(var O : TObj);
 begin
   DrawStars;
-  DrawSprite;                          { 108b:0d18 }
+  DrawRewind;                          { 108b:0d18 }
   RenderFaces(O);
   FlipAndSwap;
 end;
@@ -952,7 +952,7 @@ begin
 
   BlockRead(F, Pal, 768);
   Setup;                               { 108b:24f0 }
-  BlockRead(F, Sprite, SizeOf(TSprite));
+  BlockRead(F, Rewind, SizeOf(TRewind));
   Close(F);
 
   { 108b:2513 -- six fixed colours before the choreography }

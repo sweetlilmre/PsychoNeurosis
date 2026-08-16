@@ -30,7 +30,7 @@ data compiled into the executables' DGROUP. See
 | 002 | `$07D9B2` | 0 | 12,800 | `part002/banner_strip.bin` | 320x40, drawn into rows 200..239 of both pages by `108b:1101` |
 | 002 | `$07D9B2` | 1 | 1,550 | `part002/font_5x5.bin` | 62 glyphs of 5x5, chars $20..$5D, column-major; drawn by `108b:0000` |
 | 002 | `$07D9B2` | 2 | 768 | `part002/objects_palette.pal` | VGA palette, 6-bit |
-| 002 | `$07D9B2` | 3 | 1,462 | `part002/sprite_34x43.bin` | 34x43, drawn at the top-left corner by `108b:0422` |
+| 002 | `$07D9B2` | 3 | 1,462 | `part002/rewind_button.bin` | 34x43 REWIND button, top-left corner, drawn by `108b:0422`; uses colours 1..6 only |
 | 003 | `$081A76` | 0 | 64,000 | `part003/tunnel_plane0.raw` | Mode-X plane; see the composite below |
 | 003 | `$081A76` | 1 | 64,000 | `part003/tunnel_plane1.raw` | Mode-X plane; see the composite below |
 | 003 | `$081A76` | 2 | 64,000 | `part003/tunnel_plane2.raw` | Mode-X plane; see the composite below |
@@ -95,7 +95,7 @@ data compiled into the executables' DGROUP. See
 | 003 | `$1A047D` | 0 | 13,104 | `part003/blocks_order.bin` |  |
 | 002 | (embedded) |  | 12,410 | `part002/garage_door.png` | 146x85, dimensions from code not header |
 | 002 | (embedded) |  | 12,800 | `part002/banner_320x40.png` | 320x40, dimensions from code not header |
-| 002 | (embedded) |  | 1,462 | `part002/sprite_34x43_img.png` | 34x43, dimensions from code not header |
+| 002 | (embedded) |  | 1,462 | `part002/rewind_button.png` | 34x43, dimensions from code not header |
 | 003 | (embedded) |  | 3,136 | `part003/sprite1.png` | 56x56 sprite |
 | 003 | (embedded) |  | 3,136 | `part003/sprite2.png` | 56x56 sprite |
 | 003 | (embedded) |  | 3,136 | `part003/sprite3.png` | 56x56 sprite |

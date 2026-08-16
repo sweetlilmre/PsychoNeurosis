@@ -42,7 +42,7 @@ NAMES = {
     (0x07D9B2, 0): "banner_strip",
     (0x07D9B2, 1): "font_5x5",
     (0x07D9B2, 2): "objects_palette",
-    (0x07D9B2, 3): "sprite_34x43",
+    (0x07D9B2, 3): "rewind_button",
     (0x081A76, 0): "tunnel_plane0",
     (0x081A76, 1): "tunnel_plane1",
     (0x081A76, 2): "tunnel_plane2",
@@ -130,7 +130,7 @@ SPRITE_STRIPS = [
 HEADERED_BITMAPS = [
     ("002", "garage_door",  2, 146, 85, "house_palette",   "garage_door"),
     ("002", "banner_strip", 0, 320, 40, "objects_palette", "banner_320x40"),
-    ("002", "sprite_34x43", 0,  34, 43, "objects_palette", "sprite_34x43_img"),
+    ("002", "rewind_button", 0,  34, 43, "objects_palette", "rewind_button"),
 ]
 
 # Palettes compiled into a part's DGROUP rather than shipped in the blob.
