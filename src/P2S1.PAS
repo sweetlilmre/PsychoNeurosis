@@ -161,6 +161,7 @@ end;
   expressible as one subtraction because it depends on where the mask
   happened to stop.
   -------------------------------------------------------------------------- }
+{ @asm 002 1008:002d }
 procedure BlitBitmapX(Src : Pointer; XOfs, Y, XBase : Integer); assembler;
 asm
   PUSH DS                 { DS points at the source below                   }
@@ -255,6 +256,7 @@ end;
   STOSB. It is assembler because the original is, and because the original
   does both with one pair of pointers instead of two calls.
   -------------------------------------------------------------------------- }
+{ @asm 002 1008:0086 }
 procedure DoorRaiseOneRow(Src : Pointer); assembler;
 asm
   PUSH DS                 { DS points at the bitmap below                   }

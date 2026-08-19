@@ -170,6 +170,7 @@ end;
       Port[$3C7] := 0;
       for I := 0 to 767 do B[I] := Port[$3C9];
   -------------------------------------------------------------------------- }
+{ @asm 003 1139:034d }
 procedure GetPalette768(var P); assembler;
 asm
   LES  DI, P            { ES:DI := the caller's 768-byte buffer, from [BP+4] }
@@ -193,6 +194,7 @@ end;
       Port[$3C8] := 0;
       for I := 0 to 767 do Port[$3C9] := B[I];
   -------------------------------------------------------------------------- }
+{ @asm 003 1139:0335 }
 procedure SetPalette768(var P); assembler;
 asm
   PUSH DS               { OUTSB sources from DS:SI, so DS must be restored   }
@@ -266,6 +268,7 @@ var
   That Pascal is genuinely equivalent here. It is written in assembler
   because the original is, not because Pascal could not express it.
   -------------------------------------------------------------------------- }
+{ @asm 003 1139:02f2 }
 procedure Set400Lines; assembler;
 asm
   MOV  DX, $3D4     { $3D4 is the CRTC index register                        }
@@ -292,6 +295,7 @@ end;
       SinY := SinTab[AngY];  CosY := SinTab[AngY + 90];
       SinZ := SinTab[AngZ];  CosZ := SinTab[AngZ + 90];
   -------------------------------------------------------------------------- }
+{ @asm 003 1139:0000 ? }
 procedure SetAngles; assembler;
 asm
   ADD  BX, BX                          { BX := AngX * 2, a word index        }
@@ -329,6 +333,7 @@ end;
       AngZ := Wrap(AngZ + StepZ);
       SetAngles(AngX, AngY, AngZ);
   -------------------------------------------------------------------------- }
+{ @asm 003 1139:0035 }
 procedure StepAngles; assembler;
 asm
   MOV  BX, [AngX]                { BX := the X angle                        }
@@ -426,9 +431,21 @@ end;
   its `shr` on a LongInt is a LOGICAL shift, where SHL/RCL keeping DX is an
   arithmetic one.
   -------------------------------------------------------------------------- }
+var
+  { DS:$BEAA and DS:$BEA8 -- TransformPoint's two scratch words. Globals in
+    the original, so globals here; making them locals changes the frame size
+    and every displacement in the routine with it. }
+  T1, T2 : Integer;
+
+{ @asm 003 1139:0096 ? }
 procedure TransformPoint; assembler;
 var
-  LX, LY, LZ, T1, T2 : Integer;    { [BP-2..-6], plus [$BEAA] and [$BEA8] }
+  LX, LY, LZ : Integer;            { [BP-2], [BP-4], [BP-6] -- and THAT IS
+                                     ALL: the original's frame is ENTER 6,
+                                     three words. T1 and T2 are not locals,
+                                     they are the DGROUP globals below --
+                                     1139:00b8 is MOV [BEAA],DX, a memory
+                                     store, not MOV [BP-8],DX. }
 asm
   MOV  LX, BX                      { the caller left X in BX                 }
   MOV  LY, CX                      { Y in CX                                 }
@@ -568,6 +585,7 @@ end;
         Mem[$A000 : (X shr 2) + RowOfs[Y] + PageOfs] := $0E;
       end;
   -------------------------------------------------------------------------- }
+{ @asm 003 1139:01bb }
 procedure PlotPixel; assembler;
 asm
   CMP  DI, 0            { X off the left?                                    }
@@ -615,6 +633,7 @@ end;
         Inc(P, 80);
       end;
   -------------------------------------------------------------------------- }
+{ @asm 003 1139:02a2 }
 procedure ClearPage; assembler;
 asm
   MOV  DI, [PageOfs]    { DI := 0 or 80 -- which half of the row to clear    }
@@ -650,6 +669,7 @@ end;
       Port[$3D4] := $0D;  Port[$3D5] := Lo(PageOfs);
       PageOfs := 80 - PageOfs;
   -------------------------------------------------------------------------- }
+{ @asm 003 1139:02c3 }
 procedure FlipPage; assembler;
 asm
   MOV  BX, [PageOfs]    { BX := the offset of the page just drawn            }
@@ -690,6 +710,7 @@ end;
       for I := 1 to 765 do
         PlotPixel(TransformPoint(S^[I,1], S^[I,2], S^[I,3]));
   -------------------------------------------------------------------------- }
+{ @asm 003 1139:01f9 }
 procedure DrawShape; assembler;
 asm
   MOV  SI, [CurShape]              { DS:$BEBA -- the shape's DGROUP offset   }
@@ -729,6 +750,7 @@ end;
           for k = 1, 2, 3));
       Inc(MorphStep);
   -------------------------------------------------------------------------- }
+{ @asm 003 1139:021d ? }
 procedure DrawMorph; assembler;
 asm
   MOV  BX, [MorphStep]             { DS:$BEB8 -- how far through the blend   }

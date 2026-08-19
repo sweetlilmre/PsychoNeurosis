@@ -40,10 +40,14 @@ var
   Crtc : TCrtcTable;
 
 procedure FillCrtcTable(var T : TCrtcTable);                        { 140c:0000 }
+{ @asm 002 140c:0045 }
 procedure SetMode(var T : TCrtcTable);                              { 140c:0045 }
 procedure SetMode400;                                        far;   { 140c:009c }
+{ @asm 002 140c:00b1 }
 procedure Plot(X, Y : Integer; Colour : Byte);               far;   { 140c:00b1 }
+{ @asm 002 140c:00f4 }
 procedure FlipPage(StartAddr : Word);                        far;   { 140c:00f4 }
+{ @asm 002 140c:011e }
 procedure FillRect(X1, Y1, X2, Y2 : Integer;
                    Page : Word; Colour : Byte);              far;   { 140c:011e }
 

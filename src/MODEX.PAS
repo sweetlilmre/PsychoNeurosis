@@ -51,8 +51,11 @@ var
   RowOfs : array[0..RowCount - 1] of Word;
 
 procedure BuildRowTable;                       far;   { 107c:0000 }
+{ @asm 002 107c:002a }
 procedure ShowFrame(X, Row : Integer);         far;   { 107c:002a }
+{ @asm 002 107c:006d }
 procedure SetModeX;                            far;   { 107c:006d }
+{ @asm 002 107c:00ca }
 procedure SelectPlane(P : Byte);               far;   { 107c:00ca }
 
 implementation

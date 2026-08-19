@@ -130,23 +130,36 @@ procedure DrawLine(X1, Y1, X2, Y2 : Integer; Colour : Byte; Segment : Word);
   and are NOT in part 003's (12f8/1192), which is what this file was first
   transcribed from -- so they were missing altogether until part 001 scene 2
   turned out to have no fade at either end. }
+{ @asm 004 11e3:0230 }
 procedure SetPalette768(P : Pointer);                far;   { 1491:01C2 }
+{ @asm 004 11e3:0248 }
 procedure GetPalette768(P : Pointer);                far;   { 1491:01DA }
+{ @asm 001 1491:0202 }
 procedure PaletteDim(P : Pointer);                   far;   { 1491:01F2 }
 procedure PaletteFadeUp(P : Pointer; Pause : Word);  far;   { 1491:0215 }
 procedure PaletteFadeOut(Pause : Word);              far;   { 1491:0330 }
 
+{ @asm 003 12f8:0048 }
 procedure PutPixel(X, Y : Word; Colour : Byte; Segment : Word); far;
+{ @asm 004 11e3:0048 }
 function  GetPixel(X, Y : Integer; Segment : Word) : Byte;      far;
+{ @asm 004 11e3:0063 }
 procedure FillRect(X1, Y1, X2, Y2 : Integer;
                    Colour : Byte; Segment : Word);              far;
+{ @asm 004 11e3:01db }
 procedure SetRGB(Col, R, G, B : Byte); far;
+{ @asm 003 12f8:007f }
 procedure GetRGB(Col : Byte; var R, G, B : Byte); far;
+{ @asm 004 11e3:01f6 }
 procedure SetRGBFrom(Col : Byte; P : Pointer);    far;
+{ @asm 004 11e3:0216 }
 procedure GetRGBTo(Col : Byte; P : Pointer);      far;
 procedure FadeStep;                               far;
+{ @asm 003 12f8:009f }
 procedure WaitRetrace; far;
+{ @asm 003 12f8:00ad }
 procedure CopyScreen(SrcSeg, DestSeg : Word); far;
+{ @asm 003 12f8:00c9 }
 procedure ClearScreen(Segment : Word; Colour : Byte); far;
 
 implementation

@@ -37,9 +37,20 @@
 
   FUNCTION 3 IS REAL and only part 001 uses it: its driver calls 1532:006A at
   1000:004E, immediately after detection and before MusicCue and MusicStart.
-  What it asks the tracker to do is not established, so it is named by its
-  number rather than guessed at. (An early version of this file declared
-  `FuncStop = 3`, which was the wrong meaning attached to a real number.)
+  (An early version of this file declared `FuncStop = 3`, which was the wrong
+  meaning attached to a real number.)
+
+  WHAT IT DOES, read off the server side. The tracker's dispatcher takes
+  function 3 to a short inline block that asks the player core where the
+  hardware has actually reached in the output buffer, rounds that down to a
+  multiple of four, stores it as the PLAY POSITION, and zeroes the counters
+  that were being measured from the previous anchor.
+
+  So it is a RESYNC: it re-anchors "now" to the present and stops nothing.
+  That is consistent with part 001 calling it once at startup, before the
+  music has been started, to zero the clock the position reads are measured
+  against. The name is left as MusicFunc3 because the number is what the
+  binary encodes and every @asm marker below is matched against it.
 
   All nine routines are hand assembler in the binary and are verbatim here.
 
@@ -80,15 +91,23 @@ unit DemoVT;
 
 interface
 
+{ @asm 001 1532:0000 }
 procedure MusicDetect;                    far;   { 1532:0000 }
+{ @asm 001 1532:0040 }
 procedure MusicPoll;                      far;   { 1532:0040  function 2 }
+{ @asm 001 1532:004E }
 procedure MusicStart;                     far;   { 1532:004e  function 0 }
+{ @asm 001 1532:005C }
 procedure MusicStop;                      far;   { 1532:005c  function 1 }
+{ @asm 001 1532:006A }
 procedure MusicFunc3;                     far;   { 1532:006a  function 3 }
+{ @asm 001 1532:0078 }
 function  MusicPos : LongInt;             far;   { 1532:0078 }
 procedure MusicCue;                       far;   { 1532:0093 }
 procedure SyncPattern(A, B : Byte);       far;   { 13f9:00ca -- part 002 only }
+{ @asm 001 1532:00D8 }
 procedure SetVolume(V : Byte);            far;   { 1532:00d8 }
+{ @asm 001 1532:00F4 }
 function  GetVolume : Byte;               far;   { 1532:00f4 }
 
 type
@@ -141,6 +160,14 @@ var
 
   That Pascal needs a Registers record and an Intr call the original does not
   make -- it issues the INT inline with the values already in the registers.
+
+  THE DL FLAG. 1532:0011 clears DL and 1532:0023 sets it once all three halves
+  of the answer have checked out, so DL leaves the routine as 0 or 1. Nothing
+  reads it: every failure path and the success path fall into the same RETF,
+  and Turbo Pascal returns a Boolean in AL, not DL. It is transcribed because
+  it is there -- the two instructions are in the binary, they shift every
+  conditional jump below them by four bytes, and leaving them out is what made
+  tools/asmverify.py fail to line this routine up at all.
   -------------------------------------------------------------------------- }
 procedure MusicDetect; assembler;
 asm
@@ -150,12 +177,14 @@ asm
   XOR  DI, DI             { ES:DI := 0:0, where the answer comes back       }
   MOV  ES, DI             {                                                 }
   INT  $2F                { the DOS multiplex interrupt                     }
+  XOR  DL, DL             { 1532:0011 -- see the note below                  }
   AND  AX, AX             { a resident player clears AX                     }
   JNZ  @@None             {   it did not -- nothing is installed            }
   CMP  BX, $3F17          { second half of the answer                       }
   JNZ  @@None             {   wrong: not our player                         }
   CMP  CX, $1343          { third half                                      }
   JNZ  @@None             {   wrong                                         }
+  INC  DL                 { 1532:0023 -- and here                            }
   LES  DI, ES:[DI-4]      { ES:DI := the far pointer below the handler      }
   MOV  Block.Ofs, DI      { -> DS:$0286                                     }
   MOV  Block.Sgmt, ES     { -> DS:$0288, and this is the "is it there" flag }
@@ -213,7 +242,7 @@ procedure MusicFunc3; assembler;     { function 3 -- part 001 only }
 asm
   CMP  Block.Sgmt, 0      { resident?                                       }
   JZ   @@Out              { no                                              }
-  PUSH 3                  { function 3 -- purpose not established           }
+  PUSH 3                  { function 3 -- resync the play position          }
   CALL DWORD PTR Entry    { far indirect through DS:$028A                   }
 @@Out:                    { <- the not-resident case returns from here      }
 end;

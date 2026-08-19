@@ -220,6 +220,7 @@ var
     There is no frame traffic in the inner loop whatsoever, and the whole
     thing is eleven instructions per pixel in the common case.
   -------------------------------------------------------------------------- }
+{ @asm 003 125e:0388 }
 procedure DrawRotated(Ang, SinA, CosA, X, Y : Integer; Src : Pointer);
   assembler;
 var

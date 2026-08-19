@@ -82,6 +82,7 @@ end;
         Inc(LongInt(P), 40);
       end;
   -------------------------------------------------------------------------- }
+{ @asm 001 1012:02bc }
 procedure BlitSprite(X, Y : Integer; Src : Pointer; Segment : Word); assembler;
 asm
   PUSH DS                 { DS becomes the source buffer's segment below    }
@@ -147,6 +148,7 @@ end;
         Inc(LongInt(P), 40);
       end;
   -------------------------------------------------------------------------- }
+{ @asm 001 1012:0311 }
 procedure SaveUnder(X, Y : Integer; Dest : Pointer; Segment : Word); assembler;
 asm
   PUSH DS                 { DS becomes the screen's segment below           }
@@ -326,7 +328,15 @@ var
         Inc(D, 320);
       end;
   -------------------------------------------------------------------------- }
-procedure ScrollLeft; assembler;
+{ @asm 001 1012:03bd }
+{ NOT `assembler`. The original opens PUSH BP / MOV BP,SP and closes LEAVE,
+  a stack frame it neither needs nor uses -- which is what a plain Pascal
+  procedure whose body happens to be one asm block compiles to. Declared
+  `assembler`, Turbo Pascal drops the frame for a routine with no parameters
+  and no locals, and the transcription then differs from the binary at both
+  ends while being identical in between. }
+procedure ScrollLeft;
+begin
 asm
   PUSH DS                 { DS becomes the virtual screen below             }
   MOV  ES, [VirtScrSeg]   { source and destination are the same screen      }
@@ -342,6 +352,7 @@ asm
   DEC  BX                 { one row done                                    }
   JNZ  @@Row              { round again                                     }
   POP  DS                 { restore our data segment                        }
+end;
 end;
 
 { --------------------------------------------------------------------------

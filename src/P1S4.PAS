@@ -51,6 +51,7 @@ uses VGA, Crt, DemoVT, FixMath;
   Scene 4 is the only part 001 scene with its own copy; the others go through
   VGA.SetPalette.
   -------------------------------------------------------------------------- }
+{ @asm 001 1107:0000 }
 procedure SetPalette768(P : Pointer); assembler;
 asm
   PUSH DS                 { DS is about to point at the caller's buffer    }
