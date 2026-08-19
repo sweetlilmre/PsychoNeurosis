@@ -2,7 +2,7 @@
 
 The shared vocabulary for reverse engineering 16-bit DOS binaries built with Borland Pascal. It covers all three jobs in this tree, because they measure the same things and argue about the same words.
 
-**This file is provisional.** Its final home is decided by [Where the knowledge base lives](https://github.com/sweetlilmre/PsychoNeurosis/issues/6). Terms for how the technique catalogue is organised are not here yet. [Choose the catalogue organising axis](https://github.com/sweetlilmre/PsychoNeurosis/issues/14) adds those.
+**This file is provisional.** Its final home is decided by [Where the knowledge base lives](https://github.com/sweetlilmre/PsychoNeurosis/issues/6). Note one deliberate absence: there is no entry for *axis*. The catalogue is sorted by what a reader already knows, which is the **lookup key**, and "axis" was the word we used while that was still unclear.
 
 ## Language
 
