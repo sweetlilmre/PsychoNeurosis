@@ -10,7 +10,7 @@ Asphyxia's first megademo, 1994. Borland Pascal 7 plus hand-written assembler, r
 | **Build the RE knowledge base** — a Pascal/DOS field manual and a reusable toolkit, extracted from what both efforts learnt | [The Pascal RE knowledge base](https://github.com/sweetlilmre/PsychoNeurosis/issues/1) | charted 19 Aug 2026; work it with `/wayfinder <that url>` |
 | **DemoVT byte-exact rebuild** | `docs/CONTINUATION.md` in the sibling `VangeliSTracker` checkout (`v1.31b/`) | **a different repo.** Complete: byte-identical load image, blocked only on LZEXE |
 
-`docs/README.md` indexes all 28 numbered documents by topic. `docs/research/` holds the resolved research tickets behind the knowledge base — the script classification, a 209-technique inventory, and the ledger audit; they are **inputs**, not conclusions, and its README says how much to trust them. `NEUROSIS.008` is **not** Asphyxia code — it is third-party, and its reconstruction moved out to the sibling `VangeliSTracker` checkout.
+**`CONTEXT.md` at the root is the shared glossary** -- artefact, instrument, tier, gate, rung, strand, stance, provenance. Read it before arguing about any of those words; it was written because a session generated vocabulary faster than it agreed on it. `docs/README.md` indexes the numbered documents by topic. `docs/research/` holds the resolved research tickets behind the knowledge base — the script classification, a 209-technique inventory, and the ledger audit; they are **inputs**, not conclusions, and its README says how much to trust them. `NEUROSIS.008` is **not** Asphyxia code — it is third-party, and its reconstruction moved out to the sibling `VangeliSTracker` checkout.
 
 ## The state of this working tree, as of 19 Aug 2026
 
