@@ -31,7 +31,7 @@ EMPTY = re.compile(
 def scan():
     rows = []
     for p in sorted((ROOT / "src").glob("*.PAS")):
-        for kind, note, decl in MARK.findall(p.read_text(errors="replace")):
+        for kind, note, decl in MARK.findall(p.read_text(encoding="ascii", errors="replace")):
             m = ADDR.search(note)
             rows.append({
                 "unit": p.name.replace(".PAS", ""),
@@ -69,7 +69,7 @@ def main(argv):
 
     empties = []
     for f in sorted((ROOT / "src").glob("*.PAS")):
-        for m in EMPTY.finditer(f.read_text(errors="replace")):
+        for m in EMPTY.finditer(f.read_text(encoding="ascii", errors="replace")):
             name = m.group(1).split("(")[0].split()[-1]
             empties.append((f.stem, name))
     if empties:

@@ -95,7 +95,7 @@ def main():
 
     lines.append("")
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text("\n".join(lines))
+    OUT.write_text("\n".join(lines), encoding="ascii", newline="\r\n")
     print("  wrote %s (%d entries)" % (OUT.relative_to(ROOT), ENTRIES))
 
 

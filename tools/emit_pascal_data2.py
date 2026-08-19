@@ -252,7 +252,7 @@ def main():
     ]
     for name, n, unit in results:
         p = OUT / name
-        print(f"  {name:<14} {n:>7,} {unit:<8} {len(p.read_text().splitlines()):>6,} lines")
+        print(f"  {name:<14} {n:>7,} {unit:<8} {len(p.read_text(encoding="ascii", errors="replace").splitlines()):>6,} lines")
 
 
 if __name__ == "__main__":

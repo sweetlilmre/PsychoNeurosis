@@ -22,6 +22,15 @@ It is a wayfinder map on GitHub Issues: tickets are sub-issues, blocking is nati
 - **A measurement beats an argument.** Every confident claim about the compiler in this project's history has a roughly one-in-six survival rate; put the claimed difference in a probe and let a build settle it.
 - **Distrust the verifier before the transcription.** The verify tooling has been wrong more often than the code it judged. Check a surprising measurement a second way.
 - Prose in markdown is never hard-wrapped. Commits carry `Co-authored-by: Claude <noreply@anthropic.com>`.
+- **Encoding and line endings split by who reads the file, and every script must say which it means.** Never rely on the locale: Windows' is cp1252, so a bare `open`/`read_text`/`write_text`, or a `subprocess` with `text=True`, silently decodes UTF-8 as cp1252. That has already mojibaked two documents and produced two false comparisons.
+
+| the file is read by | encoding | line ending |
+|---|---|---|
+| humans and modern tools — `.md` | `utf-8` | LF, so pass `newline='\n'`; Python defaults to CRLF on Windows |
+| a 1990s DOS tool — `.PAS` `.ASM` `.INC` `.MAP` `.BAT` `.CFG` | **`ascii`**, and strictly on write | CRLF |
+| our own scripts' stdout via `subprocess` | `utf-8` | — |
+
+  `ascii` on a DOS file is a **guard**, not a codec preference: it raises rather than quietly encoding an em dash as two bytes into a file Turbo Pascal will read. `paslint.py` checks for non-ASCII bytes and `build.py` refuses to compile when lint fails, so **write `--` not `—`, and `"` not `“`, in any `.PAS` comment.** `.gitattributes` in both repos enforces the line-ending half.
 - Do not fetch period third-party binaries (LZEXE and friends). That is the user's call.
 
 ## Environment traps that have each cost real time

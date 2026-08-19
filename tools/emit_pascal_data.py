@@ -98,7 +98,7 @@ def main():
     OUT.mkdir(parents=True, exist_ok=True)
     n1, n2, n3 = emit_palette(), emit_sine(), emit_shapes()
     for f in sorted(OUT.iterdir()):
-        print(f"{f}  {len(f.read_text().splitlines()):>5} lines")
+        print(f"{f}  {len(f.read_text(encoding="ascii", errors="replace").splitlines()):>5} lines")
     print(f"\n{n1 + n2 + n3:,} values emitted")
 
 

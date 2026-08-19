@@ -16,7 +16,7 @@ is what makes the units independent.
 import pathlib
 
 SRC = pathlib.Path("src")
-W = (SRC / "PART1_INTRO.PAS").read_text()
+W = (SRC / "PART1_INTRO.PAS").read_text(encoding="ascii", errors="replace")
 
 
 def at(anchor):
@@ -204,5 +204,5 @@ end.
 '''
 
 for name, text in U.items():
-    (SRC / name).write_text(text)
+    (SRC / name).write_text(text, encoding="ascii", newline="\r\n")
     print("  wrote %-13s %4d lines" % (name, text.count("\n")))

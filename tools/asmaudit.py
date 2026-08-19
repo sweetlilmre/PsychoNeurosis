@@ -26,7 +26,7 @@ LOOKBACK = 50          # lines above `asm` to search for the equivalent-Pascal b
 
 
 def audit(path):
-    lines = path.read_text(errors="replace").split("\n")
+    lines = path.read_text(encoding="ascii", errors="replace").split("\n")
     in_asm = False
     uncommented = []
     missing_equiv = []

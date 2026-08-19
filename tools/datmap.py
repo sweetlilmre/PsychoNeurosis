@@ -75,7 +75,7 @@ def main():
 
     Path("work/dat_records.json").write_text(json.dumps(
         [{"part": p, "host": h, "seek": r, "reads": s} for p, h, r, s in RECORDS],
-        indent=1))
+        indent=1), encoding="utf-8", newline="\n")
 
 
 if __name__ == "__main__":

@@ -85,7 +85,7 @@ def main():
 
     Path("work/sites/rtlnames.json").write_text(
         json.dumps({k: {f"{o:x}": n for o, n in v.items()} for k, v in out.items()},
-                   indent=1))
+                   indent=1), encoding="utf-8", newline="\n")
 
 
 if __name__ == "__main__":

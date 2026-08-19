@@ -72,14 +72,14 @@ def declared_in(text):
 
 def exported(path):
     """Identifiers a unit's interface section exports."""
-    text = COMMENT.sub(" ", Path(path).read_text(errors="replace"))
+    text = COMMENT.sub(" ", Path(path).read_text(encoding="ascii", errors="replace"))
     i = text.lower().find("interface")
     j = text.lower().find("implementation")
     return declared_in(text[i:j if j > 0 else len(text)])
 
 
 def scan(path, extra):
-    raw = Path(path).read_text(errors="replace")
+    raw = Path(path).read_text(encoding="ascii", errors="replace")
     text = HEX.sub(" ", STRING.sub(" ", COMMENT.sub(" ", raw)))
     # asm blocks use register names and labels; skip them wholesale
     text = re.sub(r"(?is)\basm\b.*?\bend\b", " ", text)

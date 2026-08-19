@@ -68,9 +68,25 @@ NAMES = {
 
     # part 004 -- one scene, on the shared VGA and DemoVT units.
     "PART4_LEMMINGS.PAS": ("P4LEMS.PAS",  "Part4Lemmings", "P4Lems"),
-    "PART5_ROTOZOOM.PAS": ("P5ROTO.PAS",  "Part5Rotozoom", "P5Roto"),
-    "PART6_CREDITS.PAS":  ("P6CRED.PAS",  "Part6Credits",  "P6Cred"),
-    "PART7_FLIC.PAS":     ("P7FLIC.PAS",  "Part7Flic",     "P7Flic"),
+    # part 005 -- one unit per scene the way the binary has it (segments 100e,
+    # 1096, 1102) plus the main body. Read from NEUROSIS_005_fpu.exe from
+    # scratch; the earlier single-unit PART5_ROTOZOOM pass, which carried
+    # inference and stubs, is gone.
+    "P5S1.PAS":           ("P5S1.PAS",    "P5S1",          "P5S1"),
+    "P5S2.PAS":           ("P5S2.PAS",    "P5S2",          "P5S2"),
+    "P5S3.PAS":           ("P5S3.PAS",    "P5S3",          "P5S3"),
+    "P5MAIN.PAS":         ("P5MAIN.PAS",  "P5Main",        "P5Main"),
+    # part 006 -- one unit per scene the way the binary has it, plus the main
+    # body. The scenes RUN in the order 1095, 100f, 1118, 11bb, which is not
+    # the segment order. Read from NEUROSIS_006_fpu.exe from scratch; the
+    # earlier single-unit PART6_CREDITS pass has been deleted.
+    "P6S1.PAS":           ("P6S1.PAS",    "P6S1",          "P6S1"),
+    "P6S2.PAS":           ("P6S2.PAS",    "P6S2",          "P6S2"),
+    "P6S3.PAS":           ("P6S3.PAS",    "P6S3",          "P6S3"),
+    "P6S4.PAS":           ("P6S4.PAS",    "P6S4",          "P6S4"),
+    "P6MAIN.PAS":         ("P6MAIN.PAS",  "P6Main",        "P6Main"),
+    "P7S1.PAS":           ("P7S1.PAS",    "P7S1",          "P7S1"),
+    "P7MAIN.PAS":         ("P7MAIN.PAS",  "P7Main",        "P7Main"),
 
 }
 
@@ -193,6 +209,15 @@ def write_batch(targets):
          /U<dirs>  where to LOOK for units (semicolon separated)
          /I<dirs>  where to look for {$I} includes
          /M        make -- only recompile what changed
+         /$S-      STACK CHECKING OFF. Turbo Pascal 7 defaults it ON, and with
+                   it on every procedure that has a frame -- INCLUDING an
+                   `assembler` one -- opens with a seven-byte
+                   XOR AX,AX / CALLF <stack check> before the body. The demo
+                   was built with it off: its routines go straight from
+                   PUSH BP / MOV BP,SP into the first real instruction. Leaving
+                   the default alone made every hand-transcribed routine differ
+                   from the binary in its opening bytes, which is how
+                   tools/asmverify.py turned it up.
        There is no /D output switch: /D is conditional DEFINES, and passing a
        path to it is what produced "Error 130: Error in initial conditional
        defines" on the first attempt. .TPU files land next to the source.
@@ -211,7 +236,7 @@ def write_batch(targets):
         lines.append("echo. >> D:\\BUILD.LOG")
         lines.append(f"echo ---- {t} >> D:\\BUILD.LOG")
         lines.append(f"C:\\TP\\BIN\\TPC.EXE {t} /ED: /UD:;C:\\TP\\UNITS /ID:;D:\\GEN "
-                     f">> D:\\BUILD.LOG")
+                     f"/$S- >> D:\\BUILD.LOG")
         lines.append("if errorlevel 1 echo ** FAILED >> D:\\BUILD.LOG")
         lines.append("if not errorlevel 1 echo ** OK >> D:\\BUILD.LOG")
     (BUILD / "BUILD.BAT").write_text("\r\n".join(lines) + "\r\n", encoding="ascii")
@@ -242,7 +267,7 @@ def main(argv):
     if not selftest:
         lint = subprocess.run(
             [sys.executable, str(ROOT / "tools" / "paslint.py")],
-            capture_output=True, text=True)
+            capture_output=True, text=True, encoding="utf-8")
         if lint.returncode:
             print(lint.stdout)
             print("build refused: fix the above first")

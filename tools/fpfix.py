@@ -63,7 +63,7 @@ def main():
 
     h = parse(Path(args.exe))
     raw = bytearray(h["raw"])
-    sites = json.loads(Path(args.sites).read_text())
+    sites = json.loads(Path(args.sites).read_text(encoding="utf-8"))
 
     applied, skipped = 0, []
     for s in sites:

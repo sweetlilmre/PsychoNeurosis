@@ -190,9 +190,9 @@ def main():
 
     p = pathlib.Path(args.path)
     raw = p.read_bytes()
-    # preserve the file's own line ending: this repo's docs are CRLF, and a
-    # silent conversion is exactly the kind of unasked-for change to avoid
-    eol = '\r\n' if raw.count(b'\r\n') > raw.count(b'\n') // 2 else '\n'
+    # DOCUMENTS ARE LF. CRLF is for files a DOS tool reads or is -- .PAS, .ASM,
+    # .INC and friends -- where the bytes are the artifact. Markdown is neither,
+    # so this always writes LF, and converts if it finds otherwise.
     before = raw.decode('utf-8').replace('\r\n', '\n')
     lines = before.split('\n')
     blank = sum(1 for l in lines if not l.strip())
@@ -219,8 +219,8 @@ def main():
     print('  proof: every non-blank line and every non-whitespace character identical')
 
     if args.write:
-        p.write_text(after, encoding='utf-8', newline=eol)
-        print('\nwritten (%s line endings, as found)' % ('CRLF' if eol == '\r\n' else 'LF'))
+        p.write_text(after, encoding='utf-8', newline='\n')
+        print('\nwritten (LF -- documents are LF in this project)')
     else:
         print('\n(dry run -- pass --write to apply)')
     return 0

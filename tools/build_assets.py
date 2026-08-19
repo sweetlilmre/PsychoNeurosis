@@ -324,7 +324,8 @@ def main():
         off = f"`${seek:06X}`" if seek is not None else "(embedded)"
         n = "" if idx is None else str(idx)
         lines.append(f"| {part} | {off} | {n} | {size:,} | `{path}` | {note} |")
-    (OUT / "README.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    (OUT / "README.md").write_text("\n".join(lines) + "\n", encoding="utf-8",
+                                   newline="\n")
 
     print(f"wrote {len(manifest)} assets to {OUT}/")
 

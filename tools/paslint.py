@@ -74,8 +74,24 @@ def strip_comments(src):
 
 
 def check(path):
-    src = path.read_text(errors="replace")
+    # read as BYTES first: a non-ASCII byte is itself a defect here, and
+    # decoding with errors="replace" would hide it behind U+FFFD
+    raw = path.read_bytes()
     problems = []
+
+    # ---- non-ASCII bytes. A DOS file is read by a 1990s tool, so an em dash
+    # or a curly quote pasted in from prose becomes two or three bytes that
+    # Turbo Pascal sees as garbage -- inside a comment it may even close it.
+    # Every .PAS/.ASM/.INC in both repos is pure ASCII today; keep it that way.
+    for n, bline in enumerate(raw.split(b"\n"), 1):
+        hi = [b for b in bline if b > 127]
+        if hi:
+            problems.append((n, "non-ASCII byte%s %s -- DOS sources are ASCII "
+                                "only; write '--' not an em dash, \"\" not curly "
+                                "quotes" % ("s" if len(hi) > 1 else "",
+                                            " ".join(hex(b) for b in hi[:6]))))
+
+    src = raw.decode("ascii", errors="replace")
 
     # ---- comment nesting
     depth, line = 0, 1

@@ -1,0 +1,42 @@
+# Line endings in this repo follow one rule, and it is about who reads the file.
+#
+#   DOCUMENTS ARE LF.  Markdown, and anything else only humans and modern tools
+#   read. There is no reason for a doc to carry CRLF and it makes noisy diffs.
+#
+#   DOS FILES ARE CRLF, BYTE FOR BYTE.  Anything a 1990s DOS tool reads or IS --
+#   .PAS, .ASM, .INC, .BAT, .CFG, and the binaries. This is a reconstruction
+#   project measured by byte comparison against 1994 executables, so git must
+#   never rewrite a single byte of them.
+#
+# `core.autocrlf` is false here, so before this file existed git simply stored
+# whatever was on disk and the rule was a habit rather than a guarantee.
+
+# default: leave every byte alone
+* -text
+
+# documents: normalise to LF on the way in, check out LF everywhere
+*.md    text eol=lf
+
+# DOS sources and configs: never converted, but worth diffing
+*.PAS   -text diff
+*.pas   -text diff
+*.ASM   -text diff
+*.asm   -text diff
+*.INC   -text diff
+*.inc   -text diff
+*.BAT   -text diff
+*.bat   -text diff
+*.CFG   -text diff
+*.conf  -text diff
+*.py    -text diff
+
+# genuinely binary: never try
+*.EXE   binary
+*.exe   binary
+*.TPU   binary
+*.OBJ   binary
+*.DAT   binary
+*.dat   binary
+*.bin   binary
+*.png   binary
+*.gif   binary
