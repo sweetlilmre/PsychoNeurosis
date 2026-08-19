@@ -37,3 +37,6 @@ work/unpack/
 # is not tracked. Its history up to 19 Aug 2026 is in the log as
 # docs/24-continuation.md.
 docs/continuation.md
+
+# uv virtual environment for the knowledge-base tooling.
+.venv/
