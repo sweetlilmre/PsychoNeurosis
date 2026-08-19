@@ -131,14 +131,6 @@ var
   { DS:$0309 -- 18 rows of 341, the scroller's own bitmap. }
   ScrollBuf  : Pointer;
 
-  { DS:$00F2 the column within the current glyph, DS:$00F4 the index into
-    the message. }
-  ScrollCol  : Integer;
-  ScrollIdx  : Byte;
-
-  { DS:$00F5 -- eight RGB triples, rotated one entry per frame and written
-    to DAC entries $80..$87. That is the colour cycling on the message. }
-  ScrollPal  : array[0..7, 0..2] of Byte;
 
   { DS:$030F and DS:$0310 -- the two background animations' counters. }
   SideTick   : Byte;
@@ -146,6 +138,11 @@ var
 
   { DS:$0304 -- the tracker volume as we found it. }
   SavedVol   : Byte;
+
+  { DS:$0002 -- a 32-bit count of frames drawn, bumped by MainLoop with
+    ADD [0002],1 / ADC [0004],0. NOTHING IN PART 004 EVER READS IT, and it is
+    kept because the original keeps it. }
+  FrameCount : LongInt;
 
   { DS:$0172 -- ColumnSlideIn's per-column start offset, 201 entries. }
   ColOfs     : array[0..200] of Integer;
@@ -177,7 +174,7 @@ var
     assets/part004/hill_anim.bin            3096  3 frames of 43 x 24
     assets/part004/lem_deatha.bin            648  6 frames of 9 x 12
     assets/part004/lem_build.bin             720  6 frames of 12 x 10
-    assets/part004/deatha_still.png         3180  one 53 x 60 picture
+    assets/part004/lightning.png            3180  one 60 x 53 picture
     assets/part004/intro_anim.bin          10920  7 frames of 65 x 24
     assets/part004/side_anim.bin             840  6 frames of 14 x 10
     assets/part004/explosion.bin           24255  7 frames of 63 x 55
@@ -196,7 +193,8 @@ var
   HillAnim  : array[1..3]  of array[0..1031] of Byte;   { DS:$858F }
   DeathABk  : array[1..6]  of array[0..107]  of Byte;   { DS:$1E8A }
   BuildBank : array[1..6]  of array[0..119]  of Byte;   { DS:$2112 }
-  DeathAPic : array[0..3179] of Byte;                   { DS:$BF97 }
+  DeathAPic : array[0..3179] of Byte;    { DS:$BF97 -- 60 x 53, the storm
+                                           cloud and its lightning bolt }
   IntroAnim : array[1..7]  of array[0..1559] of Byte;   { DS:$91A7 }
   SideAnim  : array[1..6]  of array[0..139]  of Byte;   { DS:$BC4F }
   Explosion : array[1..7]  of array[0..3464] of Byte;   { DS:$26D0 }
@@ -226,6 +224,34 @@ const
     outside either set. }
   DeathAColour = 3;
   StuckColour  = $12;
+
+{ --------------------------------------------------------------------------
+  DS:$00F2 to DS:$010C -- INITIALISED DATA, twenty-eight bytes read straight
+  out of the image:
+
+    00 00 | 01 | 07 07 07  07 07 07  07 07 07  07 07 07
+                 1E 1E 1E  1E 1E 1E  1E 1E 1E  1E 1E 1E
+
+  They are typed constants rather than variables because the values matter and
+  nothing ever puts them back: ScrollStep rotates the palette in place from the
+  first frame onwards, and MainLoop's ending counts it down towards black.
+
+  ScrollCol starts at 0 and ScrollIdx at 1, so the message starts at character
+  one and not at the #0 sitting in front of it.
+
+  THE EIGHT TRIPLES ARE THE CONVEYOR BELT. They are written to DAC entries
+  $80..$87 every frame, rotated by one, and the belt across the top of the
+  hillside is drawn in exactly those eight colours -- four at intensity 7 and
+  four at 30, so rotating them runs a light band along it and the belt appears
+  to turn. Leaving them at zero, which is what a plain `var` gives you, writes
+  black into $80..$87 and the belt simply is not there.
+  -------------------------------------------------------------------------- }
+const
+  ScrollCol  : Integer = 0;                      { DS:$00F2 }
+  ScrollIdx  : Byte    = 1;                      { DS:$00F4 }
+  ScrollPal  : array[0..7, 0..2] of Byte =       { DS:$00F5 }
+    ((7, 7, 7), (7, 7, 7), (7, 7, 7), (7, 7, 7),
+     (30, 30, 30), (30, 30, 30), (30, 30, 30), (30, 30, 30));
 
 { DS:$0005 -- the message, compiled into DGROUP. Element 0 is a zero byte and
   ScrollStep indexes from 1; the $ED bound it tests is exactly this length. }
@@ -274,6 +300,7 @@ procedure Remove(N : Integer); forward;
         Inc(D, 320);
       end;
   -------------------------------------------------------------------------- }
+{ @asm 004 1005:0328 }
 procedure VLine(X, YTop, YBottom : Integer;
                 Colour : Byte; Segment : Word); assembler;
 asm
@@ -309,6 +336,7 @@ end;
 
       FillChar(Mem[Segment : YOfs[Y] + X1], X2 - X1 + 1, Colour);
   -------------------------------------------------------------------------- }
+{ @asm 004 1005:0354 }
 procedure HLine(X1, X2, Y : Integer;
                 Colour : Byte; Segment : Word); assembler;
 asm
@@ -354,6 +382,7 @@ end;
         Inc(D, 320 - W);
       end;
   -------------------------------------------------------------------------- }
+{ @asm 004 1005:037a }
 procedure Blit(Src : Pointer; X, Y, W, H : Integer;
                Segment : Word); assembler;
 asm
@@ -398,6 +427,7 @@ end;
 
       Move(Mem[SrcSeg : 0], Mem[DestSeg : 0], 64000);
   -------------------------------------------------------------------------- }
+{ @asm 004 1005:0835 }
 procedure CopyScreen(SrcSeg, DestSeg : Word); assembler;
 asm
   PUSH DS               { DS becomes the source segment below               }
@@ -438,6 +468,7 @@ end;
         Mem[Seg(ScrollBuf^) : Row * 341] := 0;
       Move(Mem[Seg(ScrollBuf^) : 2], Mem[Seg(ScrollBuf^) : 0], 6136);
   -------------------------------------------------------------------------- }
+{ @asm 004 1005:07f9 }
 procedure ScrollRender; assembler;
 asm
   PUSH DS               { DS is about to point at the scroll buffer         }
@@ -516,8 +547,9 @@ end;
   -------------------------------------------------------------------------- }
 procedure ScrollStep;
 var
-  I    : Integer;
-  Last : Byte;
+  I, Pass : Integer;      { NOT one variable for both loops -- the inner one
+                            would destroy the outer's count and never end }
+  Last    : Byte;
 begin
   Inc(ScrollCol, 2);                             { 1005:08b1 }
   if ScrollCol > GlyphCols then
@@ -541,7 +573,7 @@ begin
 
   { 1005:093f -- rotate the eight-entry cycle and show it. The original does
     the whole thing TWICE per frame, so the colours run at double speed. }
-  for I := 1 to 2 do
+  for Pass := 1 to 2 do
   begin
     Last := ScrollPal[7, 2];
     Move(ScrollPal[0, 0], ScrollPal[1, 0], 21);
@@ -657,8 +689,9 @@ begin
         else
         begin
           Blit(@WalkBank[F], Lem[N].X - 3, Lem[N].Y - 8, 6, 9, WorkSeg);
-          { 1005:0489 -- the only place DrawSprite changes state }
-          Lem[N].Frame := (F mod 4) + 1;
+          { 1005:0467 -- the only place DrawSprite changes state, and it
+            steps TWICE: MOV AX,Frame / INC AX / DIV 4 / INC AX. }
+          Lem[N].Frame := ((F + 1) mod 4) + 1;
         end;
       end
       else
@@ -675,7 +708,7 @@ begin
     StDigger:
       Blit(@DigBank[F], Lem[N].X - 8, Lem[N].Y - 12, 17, 13, WorkSeg);
     StFuse:
-      Blit(@FuseBank[F], Lem[N].X - 4, Lem[N].Y - 9, 10, 15, WorkSeg);
+      Blit(@FuseBank[F], Lem[N].X - 4, Lem[N].Y - 9, 15, 10, WorkSeg);
     StExplode:
       { 1005:05d1 -- frames 1..9 all show the first picture; only from 10
         does it start stepping the bank. }
@@ -686,9 +719,14 @@ begin
              63, 55, WorkSeg);
     StDeathA:
       begin
-        { 1005:0664 -- on the first frame only, a fixed 53 x 60 picture }
+        { 1005:068a -- on the first frame only, a picture at a FIXED place:
+          the storm cloud with a lightning bolt coming out of it, 60 wide by
+          53 tall at (95, 50). It lands just under the drifting cloud that
+          BackdropAnim animates at (113, 50), which is the point of it. The
+          four immediates are PUSH $5F, $32, $3C, $35 in that order, and Blit
+          takes them as X, Y, W, H. }
         if F = 1 then
-          Blit(@DeathAPic, $32, $5F, 53, 60, WorkSeg);
+          Blit(@DeathAPic, $5F, $32, 60, 53, WorkSeg);
         Blit(@DeathABk[F], Lem[N].X - 4, Lem[N].Y - $B, 9, 12, WorkSeg);
       end;
   end;
@@ -721,7 +759,7 @@ procedure Walker(N : Integer);
 var
   DX_, Row, Col, RowTo, ColTo : Integer;
   Pix                         : Byte;
-  Standing                    : Boolean;
+  Standing, Climbed           : Boolean;
 begin
   Standing := False;
   for DX_ := -3 to 3 do
@@ -771,10 +809,19 @@ begin
       end;
     end;
 
-    { 1005:16d0 -- a step it can climb rather than a wall }
-    for Row := Lem[N].Y - 4 to Lem[N].Y do
+    { 1005:16d0 -- a step it can climb rather than a wall.
+
+      The moment this finds one it writes the new Y and jumps OUT of both
+      loops to the move at 1005:1791 -- see the JMP at 1005:171b. Writing the
+      new Y and letting the row loop carry on is not the same thing: the new Y
+      is one LESS than the current row, so a row loop that kept going would
+      step back onto the row it just left and stay there. }
+    Climbed := False;
+    Row   := Lem[N].Y - 4;                       { 1005:16a8 }
+    RowTo := Lem[N].Y;                           { 1005:169d, read once }
+    while (Row <= RowTo) and not Climbed do
     begin
-      if Lem[N].Dir < 1 then
+      if Lem[N].Dir < 1 then                     { 1005:16bf }
       begin
         ColTo := Lem[N].X - 3;  Col := Lem[N].X - 4;
       end
@@ -782,17 +829,16 @@ begin
       begin
         ColTo := Lem[N].X + 4;  Col := Lem[N].X + 3;
       end;
-      while Col <= ColTo do
+      while (Col <= ColTo) and not Climbed do
       begin
         if GetPixel(Col, Row, VirtScrSeg) in Wall then
         begin
-          Lem[N].Y := Row - 1;
-          RowTo := Lem[N].Y;      { fall through to the move below }
-          Col := ColTo;
-          Row := Lem[N].Y;
-        end;
-        Inc(Col);
+          Lem[N].Y := Row - 1;                   { 1005:170f }
+          Climbed  := True;                      { 1005:171b -- and out }
+        end
+        else Inc(Col);
       end;
+      Inc(Row);
     end;
   end;
 
@@ -1147,37 +1193,97 @@ end;
   that column down the screen; the rest just count up. The result is 200
   vertical strips arriving at staggered times.
   -------------------------------------------------------------------------- }
+{ @asm 004 1005:0029 }
 procedure ColumnSlideIn;
-var
-  Pass, C, Ofs_ : Integer;
-  Src, Dst      : Word;
-begin
-  for C := 0 to 200 do
-    ColOfs[C] := Random(200) - 400;              { 1005:0004 }
+{ --------------------------------------------------------------------------
+  EQUIVALENT PASCAL -- REFERENCE ONLY, not what is compiled.
 
-  for Pass := 1 to 400 do
     for C := 200 downto 1 do
     begin
-      Ofs_ := ColOfs[C];
-      if Ofs_ < 1 then
+      Ofs := ColOfs[C];
+      if Ofs < 1 then
       begin
-        Dst := C + $3C;                          { the column, + 60 }
-        Src := Dst;
-        while (Ofs_ <> 0) and (Src < 64001) do
-        begin
-          Inc(Ofs_);
-          Inc(Src, 320);
-        end;
-        if Ofs_ = 0 then
-          while Src < 64001 do
+        Src := C + 60;  Dst := Src;
+        while (Ofs < 0) and (Src <= 64000) do
+        begin Inc(Ofs); Inc(Src, 320) end;
+        if Ofs = 0 then
+          while Src <= 64000 do
           begin
-            Mem[VirtScrSeg : Dst] := Mem[VirtScrSeg : Src];
-            Inc(Dst, 320);
-            Inc(Src, 320);
+            Mem[$A000 : Dst] := Mem[VirtScrSeg : Src];
+            Inc(Dst, 320); Inc(Src, 320);
           end;
       end;
       Inc(ColOfs[C]);
     end;
+
+  That reads the same but does not RUN the same, and the difference is the
+  whole point of the routine being hand written. Pascal's Mem[Seg:Ofs] reloads
+  a segment register for every byte; the original loads ES and DS ONCE per
+  column and then runs a MOVSB loop, so the title screen assembles at the
+  speed the demo was timed for rather than a crawl.
+  -------------------------------------------------------------------------- }
+var
+  C, Pass : Integer;
+  SrcSeg  : Word;
+begin
+  { 1005:0004 -- this part IS compiled Pascal in the original: it calls
+    Random, so it has to be. }
+  for C := 0 to 200 do
+    ColOfs[C] := Random(200) - 400;              { 1005:000E }
+
+  { 1005:0029 to 1005:0097, transcribed instruction for instruction. }
+  asm
+        MOV     AX, VirtScrSeg  { 1005:0029  the assembled title screen      }
+        MOV     SrcSeg, AX      { 1005:002C                                  }
+        MOV     Pass, 1         { 1005:002F  first of four hundred passes    }
+        JMP     @@PassTop       { 1005:0034                                  }
+    @@NextPass:
+        INC     Pass            { 1005:0036                                  }
+    @@PassTop:
+        MOV     SI, OFFSET ColOfs
+                                { 1005:0039                                  }
+        ADD     SI, 400         { 1005:003C  one past the last entry         }
+        MOV     DX, SI          { 1005:0040  DX walks the table DOWNWARDS    }
+        MOV     CX, 200         { 1005:0042  and doubles as the column index }
+    @@Column:
+        PUSH    DS              { 1005:0045  DS is about to stop being DGROUP}
+        MOV     SI, DX          { 1005:0046                                  }
+        MOV     AX, [SI]        { 1005:0048  this column's offset            }
+        MOV     BX, 0A000h      { 1005:004A                                  }
+        MOV     ES, BX          { 1005:004D  ES is the DISPLAY               }
+        MOV     BX, SrcSeg      { 1005:004F                                  }
+        MOV     DS, BX          { 1005:0052  DS is the picture               }
+        MOV     SI, CX          { 1005:0054                                  }
+        ADD     SI, 3Ch         { 1005:0056  column CX, sixty bytes in       }
+        MOV     DI, SI          { 1005:0059  the column arrives at the TOP   }
+        CMP     AX, 1           { 1005:005B                                  }
+        JGE     @@Done          { 1005:005E  offset reached 1: it is home    }
+    @@Walk:
+        CMP     AX, 0           { 1005:0060                                  }
+        JZ      @@Copy          { 1005:0063  offset is zero: copy it now     }
+        INC     AX              { 1005:0065  still counting up to zero       }
+        ADD     SI, 140h        { 1005:0066  walk the SOURCE down a row --   }
+        CMP     SI, 0FA00h      { 1005:006A    the destination stays put,    }
+        JA      @@Done          { 1005:006E    which is what makes the strip }
+        JMP     @@Walk          { 1005:0070    look like it slides in        }
+    @@Copy:
+        MOVSB                   { 1005:0072  one pixel, ES:DI <- DS:SI       }
+        ADD     DI, 13Fh        { 1005:0073  MOVSB already added one, so     }
+        ADD     SI, 13Fh        { 1005:0077    both steps are 320            }
+        CMP     SI, 0FA00h      { 1005:007B                                  }
+        JA      @@Done          { 1005:007F  off the bottom of the picture   }
+        JMP     @@Copy          { 1005:0081                                  }
+    @@Done:
+        POP     DS              { 1005:0083  DGROUP again                    }
+        MOV     SI, DX          { 1005:0084                                  }
+        MOV     AX, [SI]        { 1005:0086                                  }
+        INC     AX              { 1005:0088  every column, arrived or not,   }
+        MOV     [SI], AX        { 1005:0089    is one step closer            }
+        SUB     DX, 2           { 1005:008B  the previous entry              }
+        LOOP    @@Column        { 1005:008E  200 columns per pass            }
+        CMP     Pass, 190h      { 1005:0090                                  }
+        JNZ     @@NextPass      { 1005:0095                                  }
+  end;
 end;
 
 { --------------------------------------------------------------------------
@@ -1294,6 +1400,7 @@ begin
     BackdropAnim;
     UpdateAll;
     ScrollStep;
+    Inc(FrameCount);                             { 1005:1BF1 }
     CopyScreen(WorkSeg, $A000);
 
     Inc(Frame);

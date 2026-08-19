@@ -80,7 +80,7 @@ into the instruction.
 | 1 | Walker | 6 x 9 | `$36` | `$0522` | `$1B0` | 8 (4 + 4 mirrored) |
 | 2 | Faller, sub < 4 | 6 x 9 | `$36` | `$0522` | shared | |
 | 2 | Faller, sub >= 4 | 10 x 10 | 100 | `$06D2` | 400 | 4 |
-| 3 | Timer | 10 x 15 | `$96` | `$23E2` | `$2EE` | 5 |
+| 3 | Timer | 15 x 10 | `$96` | `$23E2` | `$2EE` | 5 |
 | 4 | Basher | 17 x 13 | `$DD` | `$1498` | `$52E` | 6 |
 | 5 | Builder | 12 x 10 | `$78` | `$2112` | `$2D0` | 6 |
 | 6 | DeathA | 9 x 12 | `$6C` | `$1E8A` | `$288` | 6 |
@@ -91,8 +91,16 @@ into the instruction.
 
 Two specials:
 
-- **state 6 frame 1** also blits a 53 x 60 still from `$BF97` (`$C6C`) at a
-  fixed (50, 95) — a one-off picture, not part of the animation.
+- **state 6 frame 1** also blits a still from `$BF97` (`$C6C`) at a FIXED
+  place, nothing to do with the lemming's own position. The four immediates
+  are `PUSH $5F / $32 / $3C / $35` (`1005:068a`), and `Blit` takes them as
+  X, Y, W, H — so it is **60 wide by 53 tall at (95, 50)**, not 53 x 60 at
+  (50, 95). Both pairs multiply out to the same 3180 bytes, which is why the
+  wrong reading loaded and drew without complaint: it just skewed the picture
+  into diagonal garbage and put it in the wrong place. The picture is the
+  storm cloud with a lightning bolt coming out of it, and it lands directly
+  under the cloud `BackdropAnim` animates at (113, 50). Only the disassembly
+  settles this; the block size does not.
 - **state 11** shows the FIRST frame for frames 1..9 and only starts stepping
   the bank at frame 10, via `$1947 + (Frame-8) * $D89`.
 
@@ -155,7 +163,7 @@ reads twenty blocks in this order:
 | 13 | `$C18` 3096 | `DS:$858F` | |
 | 14 | `$288` 648 | `DS:$1E8A` | death A, 6 frames |
 | 15 | `$2D0` 720 | `DS:$2112` | builder, 6 frames |
-| 16 | `$C6C` 3180 | `DS:$BF97` | the 53 x 60 still |
+| 16 | `$C6C` 3180 | `DS:$BF97` | the lightning still, 60 x 53 |
 | 17 | `$2AA8` 10920 | `DS:$91A7` | |
 | 18 | `$348` 840 | `DS:$BC4F` | |
 | 19 | `$5EBF` 24255 | `DS:$26D0` | countdown, 7 frames of 63 x 55 |
@@ -282,10 +290,104 @@ That identifies block 13.
 
 All read; nothing outstanding.
 
+## The main body
+
+Part 004 has no driver unit -- `1000:0019` is the whole of it, and it is three
+calls plus a tidy-up:
+
+    1000:001c  CALLF 11e3:0000   SetMode13h
+    1000:0021  CALLF 11e3:0006   VirtScrAlloc
+    1000:0026  CALLF 1005:1cd6   RunPart4
+    1000:002b  while KeyPressed do ReadKey
+    1000:003b  CALLF 11e3:0033   VirtScrFree
+    1000:0041  Halt(0)
+
+**Nothing inside `RunPart4` sets a video mode.** `TP4S1` originally allocated
+the virtual screen and called `RunPart4` without the `SetMode13h`, so the whole
+scene ran correctly and invisibly in 80x25 text -- indistinguishable from a
+hang. `tools/mktests.py` now stands in for all six lines.
+
 - **`1005:0000 ColumnSlideIn`** — gives every one of 200 columns a random head
   start of `Random(200) - 400` and then runs 400 passes, each copying the
   columns whose offset has reached zero. The title screen assembles out of
   vertical strips arriving at staggered times.
+
+  Read from the decompiler this looked like a copy *within* the virtual screen,
+  which shows nothing at all. The disassembly has it plainly: `1005:004A` loads
+  `ES := $A000` and `1005:004F` loads `DS := VirtScrSeg`, so `MOVSB` at
+  `1005:0072` reads the assembled picture and writes it to the **display**. Two
+  further details only the disassembly gives: the walk loop at `1005:0065`
+  advances the *source* alone while the destination stays at the top of the
+  column, which is what makes a strip appear to slide down; and the guard at
+  `1005:005B` is `CMP AX,1 / JGE`, so once a column's offset reaches 1 it is
+  finished and never copied again.
+- **`DS:$00F2`..`DS:$010C` is initialised data, and it is the conveyor belt.**
+  Twenty-eight bytes straight out of the image:
+
+      00 00 | 01 | 07 07 07  07 07 07  07 07 07  07 07 07
+                   1E 1E 1E  1E 1E 1E  1E 1E 1E  1E 1E 1E
+
+  `ScrollCol` = 0, `ScrollIdx` = 1, then eight RGB triples. `ScrollStep`
+  rotates those eight by one every frame and writes them to DAC entries
+  `$80`..`$87` (`1005:094d`..`1005:0a4d`, twice per frame). The belt across the
+  top of the hillside is painted in exactly those eight indices — four at
+  intensity 7 and four at 30 — so rotating them runs a light band along it and
+  the belt turns. They are typed constants, not variables: a plain `var` gives
+  zeros, which writes black into `$80`..`$87`, and the belt is then simply not
+  on the screen. Nothing ever restores them, so `MainLoop` must not reset them
+  either — `1005:1bbb` does not.
+
+- **There is no fade-out without a tracker, and that is the original.**
+  `MainLoop`'s ending is driven by the VOLUME, not by a timer: each frame past
+  the keypress does one `FadeStep` and drops the volume twice, ending when the
+  volume hits zero. `GetVolume` (`11d9:0078`) opens with
+
+      11d9:0078  XOR AL,AL
+      11d9:007a  CMP word ptr [0x110],0
+      11d9:007f  JZ  <return>
+
+  — no player resident, answer zero. So the first ending frame sets Done and
+  the scene stops after a single `FadeStep`. Run inside the demo chain, with
+  the player loaded, it fades over as many frames as the music was loud.
+
+- **`1005:0000 ColumnSlideIn` is half compiled, half hand written.** The
+  `Random` fill at `1005:0004` has to be compiled Pascal because it calls the
+  RTL. Everything from `1005:0029` is hand assembler, and it says so plainly:
+  `PUSH DS` / `POP DS` bracketing a block, `MOV ES` from an immediate, `MOVSB`
+  with the pointers stepped by hand, and a `LOOP` — none of which Turbo
+  Pascal's code generator emits.
+
+  It matters for speed, not just fidelity. The segment registers are loaded
+  ONCE per column and the inner loop is bare `MOVSB`; Pascal's
+  `Mem[Seg:Ofs] := Mem[Seg:Ofs]` reloads a segment register per byte, so the
+  Pascal reading assembles the title screen at a visible crawl.
+
+  Transcribed verbatim, the built code is byte-identical to `1005:0029`..`0097`
+  apart from four bytes, all of them data addresses: `VirtScrSeg`'s DGROUP
+  offset, two copies of `SrcSeg`'s frame slot, and `OFFSET ColOfs`. Every
+  opcode, displacement and jump matches.
+
+- **`1005:1bf1`** bumps a 32-bit counter at `DS:$0002` every frame with
+  `ADD [0002],1 / ADC [0004],0`. Nothing in part 004 reads it. Kept anyway.
+
+- **`1005:14d6 Walker`** — the climb block (`1005:16b3`..`1005:177c`) leaves
+  BOTH its loops the instant it finds a wall pixel:
+
+      1005:170f  MOV AX,[BP-2]       ; Row
+      1005:1712  DEC AX
+      1005:1717  MOV [DI+0x2fe],AX   ; Lem[N].Y := Row - 1
+      1005:171b  JMP 1005:1791       ; straight to the move
+
+  That JMP is load-bearing. The new Y is one LESS than the row just tested, so
+  a row loop that carried on would step back onto the row it came from and
+  never advance -- which is exactly what an earlier transcription did, and it
+  froze the frame loop at the first lemming that met a step.
+
+  The two colour sets it tests are `CS:$1496` (Ground) and `CS:$14B6` (Wall).
+  Wall is Ground plus the `$20`..`$29` hazard stripe. The Digger's set at
+  `CS:$0DD5` and the Tunneller's at `CS:$1146` are byte-identical copies of
+  Wall, so one `Wall` constant covers all three.
+
 - **`1005:0853 ScrollChar`** — writes ONE column of one glyph into buffer
   column 320, the off-screen edge. The font is 62 glyphs of 21 columns x 18
   rows stored column-major; the index is `Ch*378 + Col*18 + Row + 1 - 12115`

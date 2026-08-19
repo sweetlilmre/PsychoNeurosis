@@ -21,6 +21,8 @@
     Globe_RenderFrame  119d:018b
   =========================================================================== }
 
+{$G+}   { 286: the original's procedures open with ENTER, a 286 instruction. }
+
 unit Part3Globe;
 
 interface
@@ -60,61 +62,7 @@ type
   TOffsets = array[0..Entries - 1] of Word;
 
 var
-  SrcOfs, DstOfs : ^TOffsets;      { two GetMem'd 45994-byte tables }
-  Target         : array[0..767] of Byte;   { fade-in destination palette }
-  F              : file;           { NEUROSIS.DAT, open for the whole scene }
-
-  { RenderFrame is hand assembler and reloads DS from these each pixel, so the
-    two table segments have to be plain words it can MOV from. }
-  SrcSeg, DstSeg : Word;
-
-{ --------------------------------------------------------------------------
-  Globe_LoadTables (119d:010f)
-
-  ASSETS  NEUROSIS.DAT $0C0E2E, 92,756 bytes in three reads:
-            assets/part003/scene4_palette.pal      768 B, shared by all four
-                                                   images -- see note above
-            assets/part003/globe_src_offsets.bin   45,994 B, source offsets
-            assets/part003/globe_dst_offsets.bin   45,994 B, destination offsets
-          Coverage maps (generated, not in the demo):
-            assets/part003/globe_warp_dst.png      a filled disc, 22,996 px
-            assets/part003/globe_warp_src.png      a 300x150 band, 16,316 px
-          The destination is a disc and the source a rectangle sampled
-          many-to-one at the edges: that is a sphere map.
-          See docs/10-part3-scene4-globe.md.
-  -------------------------------------------------------------------------- }
-procedure LoadTables;
-begin
-  GetMem(SrcOfs, TableSize);
-  GetMem(DstOfs, TableSize);
-  SrcSeg := Seg(SrcOfs^);
-  DstSeg := Seg(DstOfs^);
-  BlockRead(F, Target,  PaletteSize);
-  BlockRead(F, SrcOfs^, TableSize);
-  BlockRead(F, DstOfs^, TableSize);
-end;
-
-{ --------------------------------------------------------------------------
-  Palette_FadeIn (119d:0064)
-  Read each DAC entry back, step any channel that is below its target up by
-  one, write it out. Called 64 times, which is the full 6-bit range.
-  -------------------------------------------------------------------------- }
-procedure FadeIn;
-var
-  I          : Word;
-  R, G, B    : Byte;
-begin
-  if KeyPressed then Exit;
-  WaitRetrace;
-  for I := 0 to 255 do
-  begin
-    GetRGB(I, R, G, B);
-    if R < Target[I * 3 + 0] then Inc(R);
-    if G < Target[I * 3 + 1] then Inc(G);
-    if B < Target[I * 3 + 2] then Inc(B);
-    SetRGB(I, R, G, B);
-  end;
-end;
+  F : file;                        { NEUROSIS.DAT, open for the whole scene }
 
 { --------------------------------------------------------------------------
   Palette_FadeOut (119d:0000)
@@ -136,6 +84,72 @@ begin
     SetRGB(I, R, G, B);
   end;
 end;
+
+{ --------------------------------------------------------------------------
+  Demo_Scene4 (119d:0211)
+
+  The pattern repeats three times: show the title image, fade it up, hold,
+  fade it down; then load the next image into the *virtual* screen, blank the
+  visible screen, and fade in and out again -- this time with the globe
+  running, so the new image is what wraps around the sphere.
+  -------------------------------------------------------------------------- }
+procedure Scene4;
+var
+  I : Integer;
+
+  { Scene4's frame, and the layout is load-bearing: LoadTables and RenderFrame
+    are nested below because they are nested in the original, and they reach
+    these three through a static link.
+        SS:[link-$0A]  SrcOfs        SS:[link-$06]  DstOfs
+        SS:[link-$30A] Target                                                 }
+  SrcOfs, DstOfs : ^TOffsets;      { two GetMem'd 45994-byte tables }
+  Target         : array[0..767] of Byte;   { fade-in destination palette }
+
+  { --------------------------------------------------------------------------
+    Palette_FadeIn (119d:0064)
+    Read each DAC entry back, step any channel that is below its target up by
+    one, write it out. Called 64 times, which is the full 6-bit range.
+    -------------------------------------------------------------------------- }
+  procedure FadeIn;
+  var
+    I          : Word;
+    R, G, B    : Byte;
+  begin
+    if KeyPressed then Exit;
+    WaitRetrace;
+    for I := 0 to 255 do
+    begin
+      GetRGB(I, R, G, B);
+      if R < Target[I * 3 + 0] then Inc(R);
+      if G < Target[I * 3 + 1] then Inc(G);
+      if B < Target[I * 3 + 2] then Inc(B);
+      SetRGB(I, R, G, B);
+    end;
+  end;
+
+{ --------------------------------------------------------------------------
+  Globe_LoadTables (119d:010f)
+
+  ASSETS  NEUROSIS.DAT $0C0E2E, 92,756 bytes in three reads:
+            assets/part003/scene4_palette.pal      768 B, shared by all four
+                                                   images -- see note above
+            assets/part003/globe_src_offsets.bin   45,994 B, source offsets
+            assets/part003/globe_dst_offsets.bin   45,994 B, destination offsets
+          Coverage maps (generated, not in the demo):
+            assets/part003/globe_warp_dst.png      a filled disc, 22,996 px
+            assets/part003/globe_warp_src.png      a 300x150 band, 16,316 px
+          The destination is a disc and the source a rectangle sampled
+          many-to-one at the edges: that is a sphere map.
+          See docs/10-part3-scene4-globe.md.
+  -------------------------------------------------------------------------- }
+  procedure LoadTables;
+  begin
+    GetMem(SrcOfs, TableSize);                 { 119d:0113 -> SS:[link-$0A] }
+    GetMem(DstOfs, TableSize);                 { 119d:0126 -> SS:[link-$06] }
+    BlockRead(F, Target,  PaletteSize);        { 119d:0141, SS:[link-$30A]  }
+    BlockRead(F, SrcOfs^, TableSize);
+    BlockRead(F, DstOfs^, TableSize);
+  end;
 
 { --------------------------------------------------------------------------
   Globe_RenderFrame (119d:018b)
@@ -161,9 +175,12 @@ end;
   memory and the blit scatters bytes at random. 119d:01be caches both in CX
   and DX ahead of the loop for exactly this reason.
 
-  One small liberty: the source offset is loaded straight into SI rather than
-  through CX, which saves the reload the original needs at 119d:01d2 after
-  using CX as scratch. Same bytes moved, one instruction fewer.
+  THE TABLES ARE THE PARENT'S LOCALS, not unit variables. LoadTables and
+  RenderFrame are both nested inside Demo_Scene4 in the original and reach
+  SrcOfs and DstOfs through a static link -- 119d:011b and 119d:019a are both
+  MOV DI,[BP+4] followed by an SS-relative access. Hoisting the tables to unit
+  variables turns every one of those into a DGROUP read, which is what an
+  earlier pass did; the routine then stops matching the binary.
 
   EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
 
@@ -183,63 +200,71 @@ end;
   at each in turn, and the wrap in pass 2 writes back to where DI ended up
   rather than to a recomputed address.
   -------------------------------------------------------------------------- }
-procedure RenderFrame;
-begin
-  { 119d:018f -- the frame is abandoned the moment a key is down. }
-  if KeyPressed then Exit;
+{ @asm 003 119d:018b }
+  procedure RenderFrame;
+  var
+    { 119d:01a3 and 119d:01af -- RenderFrame's OWN two words: the segments of
+      the parent's two tables, copied down here once so the loop can reload DS
+      from a register three times a pixel. }
+    SrcSeg, DstSeg : Word;
+  begin
+    { 119d:018f -- the frame is abandoned the moment a key is down. }
+    if KeyPressed then Exit;
 
-  asm
-  { ---- pass 1: precomputed scatter blit ---- }
-  PUSH DS                      { DS is about to be used as scratch            }
-  MOV  AX, $A000               { video memory                                 }
-  MOV  ES, AX                  { destination is always video                  }
-  MOV  BX, 2                   { entry 0 is skipped -- the tables are 1-based }
-  MOV  AX, [VirtScrSeg]        { DS is still DGROUP here -- read them now     }
-  MOV  CX, [SrcSeg]            { the source-offset table's segment            }
-  MOV  DX, [DstSeg]            { the destination-offset table's segment       }
-@Blit:                         { <- once per pixel of the sphere map          }
-  MOV  DS, DX                  { DS := the destination-offset table           }
-  MOV  SI, BX                  { SI := the byte index of this entry           }
-  MOV  DI, [SI]                { DI := DstOfs[i], the screen offset           }
-  MOV  DS, CX                  { DS := the source-offset table                }
-  MOV  SI, [SI]                { SI := SrcOfs[i], the texture offset          }
-  MOV  DS, AX                  { DS := virtual screen, where the texture is   }
-  ADD  BX, 2                   { step to the next pair of table entries       }
-  MOVSB                        { ES:[DI] <- DS:[SI] -- one warped pixel       }
-  CMP  BX, TableSize           { end of the tables?                           }
-  JNZ  @Blit                   {   no: round again                            }
+    { 119d:019a -- the two table segments. THIS IS PASCAL, not assembler, and
+      it has to be: SrcOfs and DstOfs are Scene4's locals, so reaching them
+      means following the static link, and Turbo Pascal's inline assembler
+      will not do that. Written as `LES DI, SrcOfs` inside the asm block it
+      compiles to LES DI,[BP-6] -- RenderFrame's own frame, the wrong one, and
+      silently wrong at run time. As Pascal it compiles to exactly what the
+      binary has: MOV DI,[BP+4] / LES DI,SS:[DI-$0A] / MOV AX,ES / MOV
+      [BP-2],AX, and the same again for DstOfs. }
+    SrcSeg := Seg(SrcOfs^);      { 119d:019a                                    }
+    DstSeg := Seg(DstOfs^);      { 119d:01a6                                    }
+
+    asm
+    { ---- pass 1: precomputed scatter blit ---- }
+    PUSH DS                      { DS is about to be used as scratch            }
+    MOV  AX, $A000               { video memory                                 }
+    MOV  ES, AX                  { destination is always video                  }
+    MOV  BX, 2                   { entry 0 is skipped -- the tables are 1-based }
+    MOV  AX, [VirtScrSeg]        { DS is still DGROUP here -- read it now       }
+    MOV  CX, SrcSeg              { the source-offset table's segment            }
+    MOV  DX, DstSeg              { the destination-offset table's segment       }
+@Blit:                           { <- once per pixel of the sphere map          }
+    MOV  DS, DX                  { DS := the destination-offset table           }
+    MOV  SI, BX                  { SI := the byte index of this entry           }
+    MOV  DI, [SI]                { DI := DstOfs[i], the screen offset           }
+    MOV  DS, CX                  { DS := the source-offset table                }
+    MOV  CX, [SI]                { CX := SrcOfs[i] -- through CX and not        }
+    MOV  DS, AX                  {   straight into SI, because SI is still the  }
+    MOV  SI, CX                  {   table index until DS has been repointed    }
+    MOV  CX, SrcSeg              { CX held the source segment: put it back      }
+    ADD  BX, 2                   { step to the next pair of table entries       }
+    MOVSB                        { ES:[DI] <- DS:[SI] -- one warped pixel       }
+    CMP  BX, TableSize           { end of the tables?                           }
+    JNZ  @Blit                   {   no: round again                            }
 
   { ---- pass 2: scroll rows 1..150 left by one pixel, with wrap ---- }
-  MOV  ES, AX                  { both source and destination are the          }
-  MOV  DS, AX                  {   virtual screen for this pass               }
-  MOV  DI, 320                 { row 1, column 0 -- the write pointer         }
-  MOV  SI, 321                 { one pixel along -- the read pointer          }
-  MOV  BX, ScrollRows          { 150 rows of texture to shift                 }
-@Row:                          { <- once per row                              }
-  MOV  AX, [SI]                { save the word about to be shifted off        }
-  MOV  CX, ScrollWords         { how many words make up the band              }
-  REP  MOVSW                   { slide the row one pixel left                 }
-  MOV  ES:[DI], AX             { and wrap it to the end of the row -- DI is   }
-                               {   already there after the REP                }
-  ADD  DI, ScrollSkip          { step both pointers to the next row           }
-  ADD  SI, ScrollSkip          {                                              }
-  DEC  BX                      { one row done                                 }
-  JNZ  @Row                    { round again until all 150 are shifted        }
-  POP  DS                      { restore our data segment                     }
+    MOV  ES, AX                  { both source and destination are the          }
+    MOV  DS, AX                  {   virtual screen for this pass               }
+    MOV  DI, 320                 { row 1, column 0 -- the write pointer         }
+    MOV  SI, 321                 { one pixel along -- the read pointer          }
+    MOV  BX, ScrollRows          { 150 rows of texture to shift                 }
+@Row:                            { <- once per row                              }
+    MOV  AX, [SI]                { save the word about to be shifted off        }
+    MOV  CX, ScrollWords         { how many words make up the band              }
+    REP  MOVSW                   { slide the row one pixel left                 }
+    MOV  ES:[DI], AX             { and wrap it to the end of the row -- DI is   }
+                                 {   already there after the REP                }
+    ADD  DI, ScrollSkip          { step both pointers to the next row           }
+    ADD  SI, ScrollSkip          {                                              }
+    DEC  BX                      { one row done                                 }
+    JNZ  @Row                    { round again until all 150 are shifted        }
+    POP  DS                      { restore our data segment                     }
+    end;
   end;
-end;
 
-{ --------------------------------------------------------------------------
-  Demo_Scene4 (119d:0211)
-
-  The pattern repeats three times: show the title image, fade it up, hold,
-  fade it down; then load the next image into the *virtual* screen, blank the
-  visible screen, and fade in and out again -- this time with the globe
-  running, so the new image is what wraps around the sphere.
-  -------------------------------------------------------------------------- }
-procedure Scene4;
-var
-  I : Integer;
 
   procedure ShowFlat(FileOfs : LongInt);      { straight to the visible screen }
   var I : Integer;

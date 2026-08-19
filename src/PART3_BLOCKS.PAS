@@ -100,54 +100,35 @@ end;
         Inc(P, 310);
       end;
   -------------------------------------------------------------------------- }
-procedure StepBlockUp(BlockAt : Word); assembler;
-asm
-  PUSH ES               { the original saves ES around the block             }
-  MOV  AX, $A000        { video memory                                       }
-  MOV  ES, AX           { ES := video memory                                 }
-  MOV  DI, BlockAt      { DI := this block's screen offset, from the table   }
-  MOV  CX, 10           { CX counts the ten rows                             }
-  MOV  DX, 10           { DX counts the ten pixels across a row              }
-@@Pixel:                { <- once per pixel of the block                     }
-  MOV  AL, ES:[DI]      { read the pixel back out of video memory            }
-  INC  AL               { one shade brighter along the ramp                  }
-  STOSB                 { write it back; DI advances one pixel               }
-  DEC  DX               { one pixel done                                     }
-  JNZ  @@Pixel          { across until the row is finished                   }
-  ADD  DI, $136         { 310 = the rest of the 320-byte row                 }
-  MOV  DX, 10           { reload the across-count for the next row           }
-  DEC  CX               { one row done                                       }
-  JNZ  @@Pixel          { down until all ten rows are done                   }
-  POP  ES               { restore ES                                         }
-end;
+{ --------------------------------------------------------------------------
+  STEPPING A BLOCK IS NOT A PROCEDURE IN THE ORIGINAL.
 
-procedure StepBlockDown(BlockAt : Word); assembler;
-asm
-  PUSH ES               { as above, but stepping the other way               }
-  MOV  AX, $A000        { video memory                                       }
-  MOV  ES, AX           { ES := video memory                                 }
-  MOV  DI, BlockAt      { DI := this block's screen offset                   }
-  MOV  CX, 10           { ten rows                                           }
-  MOV  DX, 10           { ten pixels across                                  }
-@@Pixel:                { <- once per pixel of the block                     }
-  MOV  AL, ES:[DI]      { read the pixel back                                }
-  DEC  AL               { one shade darker along the ramp                    }
-  STOSB                 { write it back; DI advances                         }
-  DEC  DX               { one pixel done                                     }
-  JNZ  @@Pixel          { across until the row is finished                   }
-  ADD  DI, $136         { rest of the row                                    }
-  MOV  DX, 10           { reload the across-count                            }
-  DEC  CX               { one row done                                       }
-  JNZ  @@Pixel          { down until all ten rows are done                   }
-  POP  ES               { restore ES                                         }
-end;
+  Part 003's segment 11f3 holds exactly two functions -- Blocks_Run at
+  11f3:0017 and Demo_Scene5 at 11f3:01ac. Both halves of the effect are inline
+  assembler INSIDE Blocks_Run's loop bodies, at 11f3:0105 and 11f3:0178, and
+  the give-away is the operand: 11f3:010b is MOV DI,[BP-6], a local of the
+  enclosing routine that the Pascal above it has just loaded out of the order
+  table. An earlier pass split them into two `assembler` procedures taking the
+  offset as a parameter, which turned that into MOV DI,[BP+4] and added a
+  prologue and a RET the original does not have.
 
+  They are written inline here for that reason, and tools/asmverify.py can
+  check them because Blocks_Run itself now matches end to end.
+  -------------------------------------------------------------------------- }
 procedure Run;
 var
-  F          : file;
+  { DECLARATION ORDER MATTERS HERE. BlockAt has to land within a byte's reach
+    of BP: the original reads it as [BP-6], an 8-bit displacement, and behind
+    the 128-byte file record it would need [BP-8E] and a 16-bit one -- one
+    byte longer, which shifts every instruction after it. So the scalars come
+    first and the file last, as they do in the original, whose frame is
+    BlockAt at [BP-6], the three counters at [BP-8], [BP-A], [BP-C], and the
+    file and the order table right at the bottom of ENTER $343C. }
+  BlockAt    : Word;
   I, C, R    : Integer;
   X, Y       : Integer;
   P          : Word;
+  F          : file;
 begin
   Assign(F, 'neurosis.dat');
   Reset(F, 1);
@@ -173,7 +154,27 @@ begin
     for C := 1 to BlocksX do
       for R := 1 to BlocksY do
       begin
-        StepBlockUp(Order[I, C, R]);
+        BlockAt := Order[I, C, R];              { 11f3:00fe }
+        { @asm 003 11f3:0105 +32 BlockUp }
+        asm
+          PUSH ES               { 11f3:0105 -- the original saves ES around it }
+          MOV  AX, $A000        { video memory                                 }
+          MOV  ES, AX           { ES := video memory                           }
+          MOV  DI, BlockAt      { this block's screen offset, [BP-6]           }
+          MOV  CX, 10           { CX counts the ten rows                       }
+        @@Row:                  { <- 11f3:0111, and the row loop comes BACK to }
+          MOV  DX, 10           {    here: there is no second MOV DX further   }
+        @@Pixel:                {    down. 11f3:0114                           }
+          MOV  AL, ES:[DI]      { read the pixel back out of video memory      }
+          INC  AL               { one shade brighter along the ramp            }
+          STOSB                 { write it back; DI advances one pixel         }
+          DEC  DX               { one pixel done                               }
+          JNZ  @@Pixel          { across until the row is finished             }
+          ADD  DI, $136         { 310 = the rest of the 320-byte row           }
+          DEC  CX               { one row done                                 }
+          JNZ  @@Row            { down until all ten rows are done             }
+          POP  ES               { restore ES                                   }
+        end;
       end;
 
   Delay(HoldMs);
@@ -183,7 +184,27 @@ begin
     for C := BlocksX downto 1 do
       for R := BlocksY downto 1 do
       begin
-        StepBlockDown(Order[I, C, R]);
+        BlockAt := Order[I, C, R];              { 11f3:0171 }
+        { @asm 003 11f3:0178 +32 BlockDown }
+        asm
+          PUSH ES               { 11f3:0178 -- as above, stepping the other way }
+          MOV  AX, $A000        { video memory                                 }
+          MOV  ES, AX           { ES := video memory                           }
+          MOV  DI, BlockAt      { this block's screen offset, [BP-6]           }
+          MOV  CX, 10           { ten rows                                     }
+        @@Row:                  { <- 11f3:0184, the row loop's target          }
+          MOV  DX, 10           { ten pixels across                            }
+        @@Pixel:                { <- 11f3:0187                                 }
+          MOV  AL, ES:[DI]      { read the pixel back                          }
+          DEC  AL               { one shade darker along the ramp              }
+          STOSB                 { write it back; DI advances                   }
+          DEC  DX               { one pixel done                               }
+          JNZ  @@Pixel          { across until the row is finished             }
+          ADD  DI, $136         { rest of the row                              }
+          DEC  CX               { one row done                                 }
+          JNZ  @@Row            { down until all ten rows are done             }
+          POP  ES               { restore ES                                   }
+        end;
       end;
 end;
 
