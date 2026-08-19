@@ -17,3 +17,23 @@ __pycache__/
 # Local tooling config -- machine-specific paths, not part of the project.
 .mcp.json
 .claude/
+
+# ---------------------------------------------------------------------------
+# NEUROSIS.008 is NOT Asphyxia code. It is JCAB / VangeliSTeam's DemoVT v1.31,
+# a third-party mod player that Psycho Neurosis shells out to. Its unpacked
+# image lives here because this is the tree that split it out of the demo.
+#
+# THE RECONSTRUCTION OF IT HAS MOVED and is no longer ignored -- it is its own
+# tracked repository of its own -- a VangeliSTracker checkout alongside
+# this one, which is also where the 1.39b source release now lives. Nothing about DemoVT is under this tree any
+# more except the unpacked image below.
+#
+# tools/unlzexe.py is deliberately NOT excluded: it is original code about the
+# LZEXE container format and contains nothing of DemoVT's.
+work/unpack/
+
+# The marker file for where to go next. A LOCAL working register: it holds
+# real local paths and a running status that is nobody's deliverable, so it
+# is not tracked. Its history up to 19 Aug 2026 is in the log as
+# docs/24-continuation.md.
+docs/continuation.md

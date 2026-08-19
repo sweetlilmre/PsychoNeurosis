@@ -6,17 +6,21 @@ Asphyxia's first megademo, 1994. Borland Pascal 7 plus hand-written assembler, r
 
 | job | entry point | state |
 |---|---|---|
-| **Reconstruct the demo** — recover Pascal source for parts 001–007 that behaves like the 1994 binaries | `docs/24-continuation.md`, then `docs/23-deviations.md` | in progress; **behavioural** fidelity, not byte-exact |
+| **Reconstruct the demo** — recover Pascal source for parts 001–007 that behaves like the 1994 binaries | `docs/continuation.md` (untracked local marker), then `docs/23-deviations.md` | in progress; **behavioural** fidelity, not byte-exact |
 | **Build the RE knowledge base** — a Pascal/DOS field manual and a reusable toolkit, extracted from what both efforts learnt | [The Pascal RE knowledge base](https://github.com/sweetlilmre/PsychoNeurosis/issues/1) | charted 19 Aug 2026; work it with `/wayfinder <that url>` |
-| **DemoVT byte-exact rebuild** | `D:\source\VangeliSTracker\v1.31b\docs\CONTINUATION.md` | **a different repo.** Complete: byte-identical load image, blocked only on LZEXE |
+| **DemoVT byte-exact rebuild** | `docs/CONTINUATION.md` in the sibling `VangeliSTracker` checkout (`v1.31b/`) | **a different repo.** Complete: byte-identical load image, blocked only on LZEXE |
 
-`docs/README.md` indexes all 28 numbered documents by topic. `docs/research/` holds the resolved research tickets behind the knowledge base — the script classification, a 209-technique inventory, and the ledger audit; they are **inputs**, not conclusions, and its README says how much to trust them. `NEUROSIS.008` is **not** Asphyxia code — it is third-party, and its reconstruction moved out to `D:\source\VangeliSTracker`.
+`docs/README.md` indexes all 28 numbered documents by topic. `docs/research/` holds the resolved research tickets behind the knowledge base — the script classification, a 209-technique inventory, and the ledger audit; they are **inputs**, not conclusions, and its README says how much to trust them. `NEUROSIS.008` is **not** Asphyxia code — it is third-party, and its reconstruction moved out to the sibling `VangeliSTracker` checkout.
 
 ## The state of this working tree, as of 19 Aug 2026
 
-**It is heavily dirty and that is expected** — roughly 60 modified and a couple of dozen untracked files, from reconstruction work in flight that predates the knowledge-base effort. Do **not** tidy it into a commit to make something else easier. Two files in particular carry someone else's uncommitted work *mixed with* line-ending conversions: `docs/23-deviations.md`, `docs/24-continuation.md` and `docs/25-part4-notes.md`, plus `.gitignore`. Their content changes are not mine and are not staged.
+**The reconstruction work in flight is now committed**, on `vangelistracker-build`: parts 005–007 split by scene, the regenerated harnesses, the `@asm` marker sweep, and the parts 003/004 work. Before this the tree carried roughly 60 modified and two dozen untracked files, and an earlier version of this section warned that four of them were someone else's and not to be staged. **That warning was wrong** — the changes were the knowledge-base sessions' own, and they cite the wayfinder map to prove it. Treat a "not mine" claim here as needing a check against the diff, not as fact.
 
-The repo also has **no remote yet**; pushing it to the private `sweetlilmre/PsychoNeurosis` is an open ticket, [#5](https://github.com/sweetlilmre/PsychoNeurosis/issues/5).
+The repo now has a remote: private `sweetlilmre/PsychoNeurosis`, default branch `main`. **`main` is behind `vangelistracker-build`** and the reconstruction lives on the branch. Note that history already contains third-party bytes — `bin/NEUROSIS.008` and `work/split/NEUROSIS_008.exe` are DemoVT — which is acceptable only while the repo stays private, and is a blocker on ever making it public.
+
+**`docs/continuation.md` is the marker file for where to go next, and it is deliberately NOT tracked** — `.gitignore` excludes it. It is a local working register, it carries real local paths, and its content is nobody's deliverable. Read it first for the reconstruction job. Its tracked history up to 19 Aug 2026 is in the log under its old name, `docs/24-continuation.md`.
+
+**A note left deliberately: the three tracked docs still want a read.** `docs/23-deviations.md` and `docs/25-part4-notes.md` were committed on 19 Aug 2026 without their prose being audited, and `docs/23-deviations.md` is known to quote two different `asmverify.py` counts in one file. `docs/README.md` still indexes 28 numbered documents and now numbers one that no longer exists. None of that is load-bearing for a build, so it was not fixed under a commit-everything instruction — but it is unfinished, and the ledger audit ([#4](https://github.com/sweetlilmre/PsychoNeurosis/issues/4)) is the place that says what to distrust.
 
 ## Working the knowledge base
 

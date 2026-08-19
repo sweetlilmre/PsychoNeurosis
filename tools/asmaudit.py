@@ -1,6 +1,6 @@
 """Report where the assembler-transcription rule is not yet met.
 
-The rule (docs/24-continuation.md, and project memory as transcribe-asm-verbatim)
+The rule (docs/continuation.md, and project memory as transcribe-asm-verbatim)
 is that hand-written assembler goes in verbatim and carries three things:
 
   1. the assembler itself;
