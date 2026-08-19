@@ -12,6 +12,20 @@ program TP4S1;
 uses Crt, VGA, DemoVT, Part4Lemmings;
 
 var
+  PrevExit : Pointer;
+
+{ Runs on the way out of Halt, of a run-time error, or of a normal end --
+  see the note in mktests.py. }
+procedure RestoreTextMode; far;
+begin
+  ExitProc := PrevExit;
+  asm
+    MOV  AX, $0003      { BIOS mode 3: 80x25 colour text                    }
+    INT  $10            { which also undoes Mode-X's CRTC and sequencer     }
+  end;
+end;
+
+var
   F : file;
 begin
   Assign(F, 'neurosis.dat');
@@ -28,11 +42,15 @@ begin
   WriteLn('Press a key to start.');
   ReadKey;
 
-  VirtScrAlloc;       { 11e3:0006 -- the hillside lives here }
+  PrevExit := ExitProc;
+  ExitProc := @RestoreTextMode;
+
+  SetMode13h;         { 1000:001c -- part 004 sets its own mode }
+  VirtScrAlloc;       { 1000:0021 -- the hillside lives here }
   RunPart4;
 
-  VirtScrFree;
-  TextMode(CO80);
+  while KeyPressed do ReadKey;   { 1000:002b }
+  VirtScrFree;                  { 1000:003b }
 
   WriteLn('Done.');
 end.

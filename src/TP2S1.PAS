@@ -12,6 +12,20 @@ program TP2S1;
 uses Crt, VGA, ModeX, DemoVT, P2S1;
 
 var
+  PrevExit : Pointer;
+
+{ Runs on the way out of Halt, of a run-time error, or of a normal end --
+  see the note in mktests.py. }
+procedure RestoreTextMode; far;
+begin
+  ExitProc := PrevExit;
+  asm
+    MOV  AX, $0003      { BIOS mode 3: 80x25 colour text                    }
+    INT  $10            { which also undoes Mode-X's CRTC and sequencer     }
+  end;
+end;
+
+var
   F : file;
 begin
   Assign(F, 'neurosis.dat');
@@ -27,6 +41,9 @@ begin
   WriteLn('part 002 scene 1 -- the garage: a 1280-wide pan, the door, a starfield');
   WriteLn('Press a key to start.');
   ReadKey;
+
+  PrevExit := ExitProc;
+  ExitProc := @RestoreTextMode;
 
   VirtScrAlloc;       { 1436:0006, what the main body does first }
   Scene1;

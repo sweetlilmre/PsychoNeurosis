@@ -12,6 +12,20 @@ program TPART2;
 uses Crt, VGA, ModeX, P2View, FixMath, DemoVT, P2Main;
 
 var
+  PrevExit : Pointer;
+
+{ Runs on the way out of Halt, of a run-time error, or of a normal end --
+  see the note in mktests.py. }
+procedure RestoreTextMode; far;
+begin
+  ExitProc := PrevExit;
+  asm
+    MOV  AX, $0003      { BIOS mode 3: 80x25 colour text                    }
+    INT  $10            { which also undoes Mode-X's CRTC and sequencer     }
+  end;
+end;
+
+var
   F : file;
 begin
   Assign(F, 'neurosis.dat');
@@ -27,6 +41,9 @@ begin
   WriteLn('part 002 -- both scenes, through the driver at 1000:0032');
   WriteLn('Press a key to start.');
   ReadKey;
+
+  PrevExit := ExitProc;
+  ExitProc := @RestoreTextMode;
 
   RunPart2;
 
