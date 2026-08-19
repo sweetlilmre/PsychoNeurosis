@@ -10,7 +10,13 @@ Asphyxia's first megademo, 1994. Borland Pascal 7 plus hand-written assembler, r
 | **Build the RE knowledge base** — a Pascal/DOS field manual and a reusable toolkit, extracted from what both efforts learnt | [The Pascal RE knowledge base](https://github.com/sweetlilmre/PsychoNeurosis/issues/1) | charted 19 Aug 2026; work it with `/wayfinder <that url>` |
 | **DemoVT byte-exact rebuild** | `D:\source\VangeliSTracker\v1.31b\docs\CONTINUATION.md` | **a different repo.** Complete: byte-identical load image, blocked only on LZEXE |
 
-`docs/README.md` indexes all 28 numbered documents by topic. `NEUROSIS.008` is **not** Asphyxia code — it is third-party, and its reconstruction moved out to `D:\source\VangeliSTracker`.
+`docs/README.md` indexes all 28 numbered documents by topic. `docs/research/` holds the resolved research tickets behind the knowledge base — the script classification, a 209-technique inventory, and the ledger audit; they are **inputs**, not conclusions, and its README says how much to trust them. `NEUROSIS.008` is **not** Asphyxia code — it is third-party, and its reconstruction moved out to `D:\source\VangeliSTracker`.
+
+## The state of this working tree, as of 19 Aug 2026
+
+**It is heavily dirty and that is expected** — roughly 60 modified and a couple of dozen untracked files, from reconstruction work in flight that predates the knowledge-base effort. Do **not** tidy it into a commit to make something else easier. Two files in particular carry someone else's uncommitted work *mixed with* line-ending conversions: `docs/23-deviations.md`, `docs/24-continuation.md` and `docs/25-part4-notes.md`, plus `.gitignore`. Their content changes are not mine and are not staged.
+
+The repo also has **no remote yet**; pushing it to the private `sweetlilmre/PsychoNeurosis` is an open ticket, [#5](https://github.com/sweetlilmre/PsychoNeurosis/issues/5).
 
 ## Working the knowledge base
 
@@ -38,3 +44,13 @@ It is a wayfinder map on GitHub Issues: tickets are sub-issues, blocking is nati
 - Git Bash rewrites an argument starting with a slash into a Windows path, so `--sw=/GS` silently compiles **nothing** and reports `0 unit(s) compiled`. Prefix with `MSYS_NO_PATHCONV=1`, or use PowerShell. The same happens to `gh api /repos/...` — call `gh` from Python's `subprocess`, or use the `gh issue` / `gh label` subcommands.
 - **A DOUBLED backslash in a Bash command is halved before bash sees it.** The `command` parameter carries one level of backslash escaping whose only known escape is the backslash itself: `\\` becomes `\`, every other `\x` passes through. Measured — N backslashes arrive as ceil(N/2) (2→1, 3→2, 4→2), while `\'`, `\"`, `\t`, `\n` are untouched. **A lone backslash is safe, so raw Windows paths are fine**; only doubling breaks, and doubling is what a Python literal needs for one backslash. Two failures follow, and they look unrelated: generated scripts get broken string literals (`'\\n'` arrives as `'\n'` — hence the endless `SyntaxWarning: invalid escape sequence '\s'`), and a `\\` next to a quote becomes `\` + quote, which bash reads as an *escaped* quote, unbalancing the command and reporting `unexpected EOF while looking for matching ''` at the wrong line. **So: write scripts with the Write tool and run them**, build backslashes as `chr(92)`, and pass prose via `--body-file` rather than inline.
 - **Something in this environment has twice multiplied every line break in a markdown file** — `VangeliSTracker`'s `00-map.md` (91% blank lines) and this repo's `docs/README.md` (58%). The cause was never found. `tools/repairdoc.py` diagnoses and repairs it, and proves content preservation before writing.
+
+**Two of those traps now have mechanisms rather than warnings**, which is the only thing that has ever stopped a blind spot recurring here:
+
+    python tools/encaudit.py     any text I/O that leaves the encoding to the locale
+    python tools/paslint.py      non-ASCII bytes in a DOS source, and four other defects
+    python tools/repairdoc.py    diagnose or repair multiplied line breaks in a document
+
+`encaudit.py` parses rather than pattern-matches, and the reason is worth reading in its docstring: a line-based regex reported 32 sites of which 16 were artifacts while missing 4 real ones, and parenthesis-matching then flagged the tool's own docstring. Both trees are currently clean.
+
+**The backslash trap has already cost this project a file.** `tools/emit_p6text.py` sat with a literal newline inside a string literal — written by an earlier session's heredoc, where the intended `\n` was collapsed — so it never compiled and never produced its output. Found by `encaudit.py` refusing to parse it, and repaired on 19 Aug 2026.

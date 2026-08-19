@@ -13,5 +13,4 @@ DS = struct.unpack_from("<H", B, 8)[0] * 16 + (0x164E - 0x1000) * 16
 for L in range(1, 114):
     o = DS + 0x0C8A + L * 256 + 1
     s = B[o:o + 12] if o + 12 <= len(B) else b" " * 12
-    sys.stdout.write("%3d |%s|
-" % (L, s.decode("latin1").replace(chr(0), " ")))
+    sys.stdout.write("%3d |%s|\n" % (L, s.decode("latin1").replace(chr(0), " ")))
