@@ -1,10 +1,10 @@
 ---
 type: Artefact Answer
 title: A zero byte in an .OBJ assembled by TASM
-description: TASM leaves an addend, not a zero, so the zero rule is wrong here -- read the relocation records instead.
+description: What a zero byte means when you are comparing a TASM-assembled object module.
 order: 2
 holding: an `.OBJ` assembled by TASM
-summary: Do not use the zero rule at all. Read the FIXUPP records instead.
+identify: output of TASM -- an OMF object module, not yet linked
 artefact: OBJ
 tier: substrate
 ladder_node: R7

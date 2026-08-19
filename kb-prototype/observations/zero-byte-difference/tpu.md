@@ -1,10 +1,10 @@
 ---
 type: Artefact Answer
 title: A zero byte in a .TPU
-description: In an unlinked Turbo Pascal unit, a zero is where the linker has not filled in a reference yet.
+description: What a zero byte means when you are comparing an unlinked Turbo Pascal unit.
 order: 1
 holding: a `.TPU` from Turbo Pascal
-summary: Forgive it, but only where YOUR byte is the zero one.
+identify: output of TPC that has not been linked yet
 artefact: TPU
 tier: pascal
 ladder_node: R7

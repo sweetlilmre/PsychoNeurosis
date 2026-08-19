@@ -1,10 +1,10 @@
 ---
 type: Artefact Answer
 title: A zero byte in a linked image
-description: After linking there are no placeholders left, so a zero is an ordinary difference and excusing it hides a fault.
+description: What a zero byte means when you are comparing an image the linker has finished with.
 order: 3
 holding: a linked image
-summary: Nothing is pending. A zero is a real difference.
+identify: the linker has already run -- an EXE, or a segment lifted out of one
 artefact: linked image
 tier: substrate
 ladder_node: R7

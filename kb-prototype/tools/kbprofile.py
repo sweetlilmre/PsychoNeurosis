@@ -40,7 +40,7 @@ END = "<!-- /generated:discriminator -->"
 REQUIRED_FRONTMATTER = {
     "Observation": ("type", "title", "description", "tags", "timestamp"),
     "Procedure": ("type", "title", "description", "tags", "timestamp"),
-    "Artefact Answer": ("type", "title", "description", "summary", "holding",
+    "Artefact Answer": ("type", "title", "description", "identify", "holding",
                         "order", "artefact", "tier", "ladder_node", "tags",
                         "timestamp"),
 }
@@ -108,6 +108,19 @@ def check_doc(path, rel):
 
     if kind == "Observation":
         problems.extend(check_hub_states_no_rule(rel, body))
+
+    if kind == "Artefact Answer":
+        # The hub's table is GENERATED from these two keys, so a rule verb
+        # here reaches the hub and bypasses check_hub_states_no_rule, which
+        # deliberately skips the generated block. That was a real hole: the
+        # one place rules ended up was the one place exempt from the check.
+        for key in ("identify", "description"):
+            val = str(fm.get(key, "")).lower()
+            if any(v in val for v in RULE_VERBS):
+                problems.append(
+                    "%s: `%s` feeds the hub's table and states a rule -- it must "
+                    "say how to RECOGNISE this artefact, not what to do about it"
+                    % (rel, key))
     return problems
 
 
@@ -144,14 +157,14 @@ def check_hub_states_no_rule(rel, body):
 
 
 def render_discriminator(children):
-    rows = ["| if you are looking at | the answer is | detail |",
+    rows = ["| if you are looking at | how to tell | detail |",
             "|---|---|---|"]
     for fm, stem in children:
         # `holding` and `summary` are explicit keys. An earlier version derived
         # the first column by stripping a prefix off the title, which was both
         # brittle and LOSSY -- it silently dropped the backticks around `.TPU`.
         rows.append("| %s | %s | [%s](./%s.md) |"
-                    % (fm.get("holding", stem), fm.get("summary", ""),
+                    % (fm.get("holding", stem), fm.get("identify", ""),
                        stem, stem))
     return "\n".join(rows)
 
@@ -191,7 +204,7 @@ def generate(root, write):
                      % split_doc(hub)[0].get("title", "observation"))
         for fm, stem in children:
             lines.append("* [%s](%s.md) - %s" % (fm.get("title", stem), stem,
-                                                 fm.get("summary", "")))
+                                                 fm.get("identify", "")))
         body = "\n".join(lines) + "\n"
         if not idx.exists() or io.open(idx, encoding="utf-8", newline="").read() != body:
             changed.append((idx, "index.md is stale or missing"))

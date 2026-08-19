@@ -15,11 +15,11 @@ You are comparing your bytes against the original. A difference has your `0x00` 
 So the only question this page answers is: **which artefact are you looking at?**
 
 <!-- generated:discriminator -->
-| if you are looking at | the answer is | detail |
+| if you are looking at | how to tell | detail |
 |---|---|---|
-| a `.TPU` from Turbo Pascal | Forgive it, but only where YOUR byte is the zero one. | [tpu](./tpu.md) |
-| an `.OBJ` assembled by TASM | Do not use the zero rule at all. Read the FIXUPP records instead. | [obj-tasm](./obj-tasm.md) |
-| a linked image | Nothing is pending. A zero is a real difference. | [linked-image](./linked-image.md) |
+| a `.TPU` from Turbo Pascal | output of TPC that has not been linked yet | [tpu](./tpu.md) |
+| an `.OBJ` assembled by TASM | output of TASM -- an OMF object module, not yet linked | [obj-tasm](./obj-tasm.md) |
+| a linked image | the linker has already run -- an EXE, or a segment lifted out of one | [linked-image](./linked-image.md) |
 <!-- /generated:discriminator -->
 
 ## Why the answer cannot be general
