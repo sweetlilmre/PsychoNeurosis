@@ -87,7 +87,49 @@ DGROUP  GROUP   DATA
 CODE    SEGMENT BYTE PUBLIC USE16 'CODE'
         ASSUME  CS:CODE, DS:DGROUP
 
-        PUBLIC  SinCos, RotatePoint, Project
+        PUBLIC  FixMul, FixDiv, SinCos, RotatePoint, Project
+
+; ----------------------------------------------------------------------------
+; FixMul -- function FixMul(A, B : LongInt) : LongInt;
+;
+;   A   [BP+08h]    B   [BP+04h]        both 16.16
+;
+; NO SHIFT PAIR IS NEEDED. IMUL leaves the 64-bit product in EDX:EAX, and Turbo
+; Pascal returns a LongInt in DX:AX -- two SEPARATE registers. So shifting EAX
+; alone by 16 puts product bits 16..31 in AX, and DX already holds bits 32..47
+; from EDX. The 16.16 result assembles itself.
+; ----------------------------------------------------------------------------
+FixMul  PROC    NEAR
+        push    bp                      ; 1102:0391
+        mov     bp,sp                   ; 1102:0392
+        mov     eax,[bp+08h]            ; 1102:0394  A
+        imul    dword ptr [bp+04h]      ; 1102:0398  EDX:EAX := A * B
+        shr     eax,16                  ; 1102:039C  AX := bits 16..31
+        pop     bp                      ; 1102:03A0    and DX is bits 32..47
+        ret     8                       ; 1102:03A1
+FixMul  ENDP
+
+; ----------------------------------------------------------------------------
+; FixDiv -- function FixDiv(A, B : LongInt) : LongInt;
+;
+;   A   [BP+08h]    B   [BP+04h]        both 16.16
+;
+; A is widened to 48 bits in EDX:EAX by SHRD/SAR -- that is A shifted left 16
+; without losing the top -- divided, and the quotient put back together with
+; SHLD so that DX:AX is the 16.16 answer.
+; ----------------------------------------------------------------------------
+FixDiv  PROC    NEAR
+        push    bp                      ; 1102:03A5
+        mov     bp,sp                   ; 1102:03A6
+        mov     edx,[bp+08h]            ; 1102:03A8  A
+        xor     eax,eax                 ; 1102:03AC
+        shrd    eax,edx,16              ; 1102:03AF  EDX:EAX := A shl 16
+        sar     edx,16                  ; 1102:03B4    sign-correct the top
+        idiv    dword ptr [bp+04h]      ; 1102:03B8
+        shld    edx,eax,16              ; 1102:03BC  DX := quotient bits 16..31
+        pop     bp                      ; 1102:03C1
+        ret     8                       ; 1102:03C2
+FixDiv  ENDP
 
         INCLUDE COSTAB.INC
 
