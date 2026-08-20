@@ -34,8 +34,12 @@ _Avoid_: effect, section, sequence
 One method. It answers one question about a binary.
 _Avoid_: trick, approach, procedure, recipe
 
+**Wiki**:
+The whole thing a reader browses -- hubs, artefact answers, case studies and orientation together.
+_Avoid_: knowledge base (fine in conversation, but the wiki is the readable thing), manual, site
+
 **Catalogue**:
-The set of all technique pages. It holds 209 techniques today.
+The technique pages inside the wiki, and only those. It draws on 209 techniques found in the source material.
 _Avoid_: manual, library, index
 
 **Tier**:
@@ -75,6 +79,32 @@ _Avoid_: branch, case, variant
 **Cross-index**:
 A list that points at pages already written, sorted a second way. It adds no pages. There are three: the nine classes of withdrawn conclusion, the twelve activities, and the ladder nodes.
 _Avoid_: view, tag, secondary axis
+
+### The toolkit
+
+**Toolkit**:
+The reusable programs, with no project facts in them. Three folders: `substrate`, `pascal`, `wikitools`.
+_Avoid_: tools, library, framework, package
+
+**Core**:
+The part of a program with no project facts in it. The reusable part.
+_Avoid_: engine, kernel, generic layer
+
+**Driver**:
+The part of a program that holds one project's own facts: file names, addresses, unit lists.
+_Avoid_: script, wrapper, harness (a harness is a different thing)
+
+**Compare tool**:
+A program that compares our bytes against the original's bytes.
+_Avoid_: comparator, differ, verifier
+
+**Allowed-difference rule**:
+The rule that says which differences a compare tool accepts. It is passed in, never built in, because the rule inverts by artefact.
+_Avoid_: excuse rule, mask, tolerance, heuristic
+
+**Scratch folder**:
+A temporary folder that a build erases and then uses. One per project, named in config, because three build scripts once shared one and could not run at the same time.
+_Avoid_: build dir, temp, workspace
 
 ### The fidelity ladder
 
