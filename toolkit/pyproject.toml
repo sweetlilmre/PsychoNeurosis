@@ -1,0 +1,29 @@
+# The toolkit is the installable unit, not the repo. A pyproject.toml at the
+# repo root would declare that all of Psycho Neurosis is a Python package,
+# which it is not -- the repo is mostly 1994 binaries, Pascal sources and notes.
+#
+# Decided in issue #9 (the tooling boundary) and issue #6 (where things live).
+
+[project]
+name = "pascal-re-toolkit"
+version = "0.1.0"
+description = "Reverse-engineering tools for 16-bit DOS binaries built with Borland Pascal"
+requires-python = ">=3.11"
+
+# pyyaml reads the wiki's OKF frontmatter. Issue #8 argued for a real parser
+# rather than a regex over text, and the reason is on the record: a line-based
+# regex in tools/encaudit.py "reported 32 sites of which 16 were artifacts
+# while missing 4 real ones", and only an AST parse was right. There is no
+# reason to expect a hand-rolled frontmatter reader to do better.
+#
+# Config files are TOML and need NOTHING here: tomllib is in the standard
+# library from 3.11, and the toolkit only ever reads config, never writes it.
+# That is why requires-python is 3.11 rather than something older.
+dependencies = [
+    "pyyaml>=6.0",
+]
+
+[tool.uv]
+# Install into a virtual environment, never globally:
+#     uv venv .venv
+#     uv pip install --python .venv/Scripts/python.exe -e toolkit

@@ -43,6 +43,11 @@ REQUIRED_FRONTMATTER = {
     "Artefact Answer": ("type", "title", "description", "identify", "holding",
                         "order", "artefact", "tier", "ladder_node", "tags",
                         "timestamp"),
+    # Documents that are not techniques but still live in the bundle. Registered
+    # rather than skipped by filename: OKF reserves only index.md and log.md, so
+    # everything else is a concept document and should declare what it is.
+    "Orientation": ("type", "title", "description", "tags", "timestamp"),
+    "Glossary": ("type", "title", "description", "tags", "timestamp"),
 }
 
 # Body headings an artefact answer must carry. `Decides` is retired and
@@ -52,6 +57,8 @@ REQUIRED_SECTIONS = {
                         "Example", "Withdrawn", "Citations"),
     "Observation": (),
     "Procedure": (),
+    "Orientation": (),
+    "Glossary": (),
 }
 
 TIERS = ("substrate", "pascal")
@@ -221,7 +228,7 @@ def main(argv):
     problems = []
     docs = 0
     for path in sorted(root.rglob("*.md")):
-        if path.name in ("index.md", "log.md", "README.md"):
+        if path.name in ("index.md", "log.md"):
             continue
         docs += 1
         problems.extend(check_doc(path, path.relative_to(root).as_posix()))
