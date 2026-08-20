@@ -3,6 +3,12 @@ type: Orientation
 title: The wiki
 description: What this bundle is, how to check it, and what is deliberately missing from it.
 tags: [prototype, orientation]
+glossary_allow:
+  # "Where the knowledge base lives" is the verbatim title of issue #6.
+  # A quoted title cannot be reworded without misquoting it, so the avoid
+  # rule is overridden here rather than bent. This is the documented
+  # override from issue #15, not an exemption.
+  - knowledge base
 timestamp: 2026-08-19T00:00:00Z
 ---
 
@@ -38,7 +44,7 @@ Three artefacts whose rules **invert**. Two tiers inside one hub. A caveat and a
 
 ## Known gaps, recorded rather than hidden
 
-- **It needs a virtual environment.** Both tools import `pyyaml` from PyPI, installed with `uv` into `.venv` at the repo root, because #8 argued for a real YAML parser rather than a regex -- this project has been burned by regex-over-text before. Run them with `.venv/Scripts/python.exe`, not the system Python. **This is the knowledge base's first third-party dependency**, and whether the tooling package may carry one at all is [Draw the tooling package boundary](https://github.com/sweetlilmre/PsychoNeurosis/issues/9)'s decision, not this prototype's.
+- **It needs a virtual environment.** Both tools import `pyyaml` from PyPI, installed with `uv` into `.venv` at the repo root, because #8 argued for a real YAML parser rather than a regex -- this project has been burned by regex-over-text before. Run them with `.venv/Scripts/python.exe`, not the system Python. **This was the toolkit's first third-party dependency**, and [Draw the tooling package boundary](https://github.com/sweetlilmre/PsychoNeurosis/issues/9) has since allowed it, with `toolkit/pyproject.toml` as the manifest.
 - **`tools/encaudit.py` does not scan this directory.** Its `DEFAULT_DIRS` is `('tools', 'tools/dosbox')` and the map forbids adjusting the originals, so run it explicitly: `python tools/encaudit.py toolkit/wikitools`.
 - **A README is a concept document.** OKF reserves only `index.md` and `log.md`, so `okfcheck.py` correctly refused this very file until it grew frontmatter and a `type`. The spec has no notion of a README, so anything else in a bundle must declare a type or be reserved.
 - **The hub was still answering, via the generator.** The first version generated a `summary` column holding each artefact's *rule*, which put rules back into the hub -- the exact thing the design forbids. Worse, `check_hub_states_no_rule` deliberately strips the generated block before looking, so **the one place rules ended up was the one place exempt from the check.** Fixed twice over: the column is now `identify` ("how to tell you are holding this"), which serves discrimination and gives nothing away, and the check now also reads the `identify` and `description` keys that feed the table. Verified by injecting a rule and watching it fail.
