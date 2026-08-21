@@ -79,6 +79,17 @@ This is Borland's own library code, not Asphyxia's — the reconstruction writes
 - **Setup's exit code is a protocol**: `1` = skip the demo but show the end screen, `2` = quit silently, anything else = run the demo. The reconstruction of `NEUROSIS.000` (`STARTUP.PAS`) must reproduce these `Halt` codes — this is a cross-artefact constraint the `STARTUP.PAS` ticket needs.
 - **How much is ours**: Asphyxia's own code in this file is main's 122 bytes plus five string literals. Everything else is the compiler's.
 
+## The reconstruction: byte-identical
+
+`src/PSYCHO.PAS` rebuilds to a **SHA256-identical 1,936-byte executable** (`f1264dc5…10dce`), so the launcher stands at **R7, artefact-identical** — the first artefact in the project to reach the ladder's top, and it needs no behavioural observation: identical bytes behave identically.
+
+The closing byte-diff recovered two facts about the 1994 source that no amount of charting gives:
+
+- **It used `goto`.** The original's `75 02 EB xx` jump-over-jump at `1000:0064`/`006d` is TP7's encoding for `if X then goto L` with a forward label; a nested `if`/`begin` shape emits short jumps, reorders the tests, and shifts every relocation after it by four bytes. 76 differing bytes fell to 1 when the `goto`s went in.
+- **It was compiled `{$G+}`.** The last byte, `LEAVE` (`C9`) against our `POP BP` (`5D`) at main's end, is a 286 encoding. `{$G+}` closed it to zero.
+
+The diff-reading method is now the wiki observation [The rebuild nearly matches, and the last bytes name their causes](../wiki/observations/near-match-diff/observation.md).
+
 ### Addressing note, recorded once
 
 Two addresses in this chart wear two names each: the `Dos` unit's base (`100b:0000` = `1000:00B0`) and both RTL calls (`1000:0190` = `1019:0000`, `1000:02A6` = `1019:0116`). The wiki observation [The same bytes answer to two different addresses](../wiki/observations/two-names-one-address/observation.md) is the rule for this; it was written from this chart.

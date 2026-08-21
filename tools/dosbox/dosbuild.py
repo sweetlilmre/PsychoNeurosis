@@ -35,6 +35,7 @@ DOSBOX = Path(r"D:\DOSBox-X\dosbox-x.exe")
 # Pascal identifier and is independent of the filename, but TP7 finds units BY
 # FILENAME, so `uses Part3Sprites` must become `uses P3Sprite`.
 NAMES = {
+    "PSYCHO.PAS":     ("PSYCHO.PAS",   "Psycho",        "Psycho"),
     "VGA.PAS":        ("VGA.PAS",      "VGA",           "VGA"),
     "DEMOVT.PAS":     ("DEMOVT.PAS",   "DemoVT",        "DemoVT"),
     "MODEX.PAS":      ("MODEX.PAS",    "ModeX",         "ModeX"),

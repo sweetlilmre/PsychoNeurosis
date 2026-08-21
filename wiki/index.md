@@ -10,3 +10,4 @@ A field manual for reverse engineering 16-bit DOS binaries built with Borland Pa
 
 * [A zero byte where the original has something else](observations/zero-byte-difference/observation.md) - the rule inverts by artefact, and using the wrong one is destructive in both directions
 * [The same bytes answer to two different addresses](observations/two-names-one-address/observation.md) - segment:offset is a many-to-one name; convert to linear before believing duplication or a gap
+* [The rebuild nearly matches, and the last bytes name their causes](observations/near-match-diff/observation.md) - each residual diff pattern fingerprints one source construct or compiler switch; read it, do not tune
