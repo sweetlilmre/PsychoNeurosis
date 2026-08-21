@@ -7,7 +7,7 @@ Asphyxia's first megademo, 1994. Borland Pascal 7 plus hand-written assembler, r
 | job | entry point | state |
 |---|---|---|
 | **Reconstruct the demo** — recover Pascal source for parts 001–007 that behaves like the 1994 binaries | `docs/continuation.md` (untracked local marker), then `docs/23-deviations.md` | in progress; **behavioural** fidelity, not byte-exact |
-| **Build the RE knowledge base** — a Pascal/DOS field manual and a reusable toolkit, extracted from what both efforts learnt | [The Pascal RE knowledge base](https://github.com/sweetlilmre/PsychoNeurosis/issues/1) | **the next act is the user's, at a DOSBox screen**: [Run the six part harnesses and record what you see](https://github.com/sweetlilmre/PsychoNeurosis/issues/18), which blocks the last decision, [Shape of the psycho application plan](https://github.com/sweetlilmre/PsychoNeurosis/issues/11). Work the map with `/wayfinder https://github.com/sweetlilmre/PsychoNeurosis/issues/1` |
+| **Build the RE knowledge base** — a Pascal/DOS field manual and a reusable toolkit, extracted from what both efforts learnt | [The Pascal RE knowledge base](https://github.com/sweetlilmre/PsychoNeurosis/issues/1) | **complete, closed 21 Aug 2026** — all three artifacts exist: `wiki/`, `toolkit/`, and the plan in `status.toml`. **What follows is the acceptance test**: a NEW `/wayfinder` map, charted fresh, running the wiki and toolkit cold against `PSYCHO.EXE`, `NEUROSIS_000` and `NEUROSIS_009` — the map's closing comment carries the watch-list. Cleanup work needs no map: work `plan.py --report`'s table, top investigation first |
 | **Read the wiki, or add to it** — the Pascal/DOS field manual the knowledge-base effort is producing | `wiki/index.md`, and `toolkit/README.md` for the tools | one observation written as the pattern; grows every time a binary is read |
 | **DemoVT byte-exact rebuild** | `docs/CONTINUATION.md` in the sibling `VangeliSTracker` checkout (`v1.31b/`) | **a different repo.** Complete: byte-identical load image, blocked only on LZEXE |
 
@@ -20,7 +20,7 @@ Asphyxia's first megademo, 1994. Borland Pascal 7 plus hand-written assembler, r
     uv venv .venv
     uv pip install --python .venv/Scripts/python.exe -e toolkit
 
-Then all nine checks, which **all pass** as of `44daecf`:
+Then all ten checks, which **all pass** as of `b801d3e`:
 
     .venv/Scripts/python.exe toolkit/wikitools/okfcheck.py wiki
     .venv/Scripts/python.exe toolkit/wikitools/kbprofile.py wiki          # --write regenerates
@@ -28,13 +28,14 @@ Then all nine checks, which **all pass** as of `44daecf`:
     .venv/Scripts/python.exe toolkit/pascal/markers.py src
     .venv/Scripts/python.exe toolkit/pascal/ratchet.py status.toml --coverage 71
     .venv/Scripts/python.exe toolkit/pascal/observe.py status.toml --report
+    .venv/Scripts/python.exe toolkit/pascal/plan.py status.toml --report
     .venv/Scripts/python.exe toolkit/census.py --root tools --root <sibling repo>
     python tools/paslint.py
     python tools/encaudit.py            # add a dir argument for toolkit/*, it does not scan it
 
-**`status.toml` at the root is the status register**, and it is the ratchet: coverage may only rise, a byte match may not shorten, and an achieved rung may not fall unless the *target* is lowered with a reason. `achieved` and `matched` are **measured** and must never be hand-edited.
+**`status.toml` at the root is the status register**, and it is the ratchet: coverage may only rise, a byte match may not shorten, and an achieved rung may not fall unless the *target* is lowered with a reason. `achieved`, `matched` and every `[observation.*]` are **measured** and must never be hand-edited; `[plan]` is **decided** — an ordered list of investigations whose order is the priority, written only through `plan.py`. All three writers serialise through `toolkit/pascal/register.py`, which refuses on a section it does not know rather than dropping it.
 
-**Nothing has been observed running.** All 29 harnesses are built in `run/` and the register says every one is at R0. Recording an observation nobody made is the one thing `observe.py` exists to prevent.
+**The first observations were recorded on 21 Aug 2026** ([#18](https://github.com/sweetlilmre/PsychoNeurosis/issues/18)): seven runs by pe, six `differs` at R2 and one R3 — `TPART7` matches its original. The 22 scene harnesses remain at R0. Recording an observation nobody made is the one thing `observe.py` exists to prevent.
 
 **The census needs the sibling repo's path on the command line**, because a machine path may never appear in a committed file.
 
