@@ -79,6 +79,7 @@ SPLIT = ROOT / "work" / "split"
 # The FPU variants are the ones the rest of the tooling reads, where both
 # exist. Header size comes out of the MZ header, so nothing is hard-coded.
 ORIGINALS = {
+    "000": "NEUROSIS_000.exe",
     "001": "NEUROSIS_001_fpu.exe",
     "002": "NEUROSIS_002_fpu.exe",
     "003": "NEUROSIS_003_fpu.exe",
@@ -223,9 +224,13 @@ def built_images():
 
     run/ also holds ORIG0..ORIG9.EXE -- copies of the 1994 binaries kept there
     so the demo can be run side by side. Comparing an original against itself
-    passes trivially and proves nothing, so only TP*.EXE is searched.
+    passes trivially and proves nothing, so only OUR builds are searched:
+    the TP* harnesses plus the three whole-program reconstructions.
     """
-    return [(p.name, p.read_bytes()) for p in sorted(RUN.glob("TP*.EXE"))]
+    ours = sorted(RUN.glob("TP*.EXE"))
+    ours += [RUN / n for n in ("PSYCHO.EXE", "STARTUP.EXE", "BYEBYE.EXE")
+             if (RUN / n).exists()]
+    return [(p.name, p.read_bytes()) for p in ours]
 
 
 def locate(orig, images, fragment=False):

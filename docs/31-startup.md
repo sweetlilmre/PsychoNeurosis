@@ -54,8 +54,16 @@ So **the chain of parts 001–007 is authored here**: setup writes it into `NEUR
 - **`IsVGA` returns garbage that is accidentally always True.** The asm computes the answer into `AX` but the function epilogue returns the *never-written* result variable `[BP-1]` — which at that point holds the high byte of the `__StackCheck` call's pushed return segment: nonzero on any real machine, so the Boolean reads True and the VGA gate never fires. A verbatim reconstruction preserves this exactly; an "obvious fix" would change behaviour on no machine that exists, but the bytes would differ.
 - **Failed detections `Halt(0)`,** which PSYCHO's protocol reads as "run the demo" — a machine without a 386 is told `'ByeBye'` and then the demo is launched at it anyway (with the previous cfg, since setup never wrote one). `YesNo`'s `'N'` branch does the same. Only low memory (`Halt(2)`) actually stops the show.
 
-## For the reconstruction (#25)
+## The reconstruction: byte-identical
 
-- `ChooseCard`'s 250 source lines still need the instruction-level read — the strings and locals above fix its shape, not its statements.
-- The three `Detect` probes and `IsVGA`'s body are verbatim-rule material, including the unassigned-result defect.
-- `{$G+,S+}`, and the string pools' exact content and order matter for a byte-level target.
+`src/STARTUP.PAS` + `src/DETECT.PAS` (a TASM object, `src/asm/DETECT.ASM`, linked `{$L}`) rebuild to a **load image byte-identical to the original's 12,880 bytes** — the third and last of the unread binaries at R7. The near-match iteration ran 569 → 98 → 22 → 9 → 1 → 0 diff runs, and each step recovered a fact about the 1994 source:
+
+- **`YesNo` waits with `until ch in ['N','Y']`** — the single-load compare chain, not two equality tests.
+- **Every selection is a `case`** — the arrow handlers (`case ch of 'P','H'`), the Previous-Setup/Exit pair, and all five `forfile` assignments. An `if`/`else if` chain compiles a memory compare per arm; the original loads once.
+- **Each menu's initial highlight is `WriteStr(opt[loop2], 22, loop2 + 8, 30)`** — indexed and computed, even though `loop2` is always 1 there.
+- **`WriteStr` addresses the screen as `x*2 + loop1*2 + y*160 - 2`** — recovered from TP7 computing the rightmost additive term first.
+- **`Detections`' protected-mode branch writes a second blank line** before `YesNo`.
+- **`Detect` is a TASM object linked whole** — proven twice: the pure-Pascal unit lost the never-called `HasMouse` to the smart linker, and the original's `XOR AX,AX` is `33 C0`, TASM's operand order where BASM emits `31 C0`. TASM needs `.286P` for `SMSW`.
+- **The `uses` clause is `Crt, Detect`** — TP7 emits unit code segments in *reverse* uses order, measured when the two segments came out swapped.
+
+All fingerprints are recorded as new rows in the wiki's [near-match-diff](../wiki/observations/near-match-diff/observation.md) table. The three `Detect` routines carry `@asm` markers (coverage 71 → 74); `asmverify.py` finds them in `STARTUP.EXE` and matches all three end to end.

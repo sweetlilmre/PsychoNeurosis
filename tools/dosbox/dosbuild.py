@@ -37,6 +37,8 @@ DOSBOX = Path(r"D:\DOSBox-X\dosbox-x.exe")
 NAMES = {
     "PSYCHO.PAS":     ("PSYCHO.PAS",   "Psycho",        "Psycho"),
     "BYEBYE.PAS":     ("BYEBYE.PAS",   "ByeBye",        "ByeBye"),
+    "STARTUP.PAS":    ("STARTUP.PAS",  "Startup",       "Startup"),
+    "DETECT.PAS":     ("DETECT.PAS",   "Detect",        "Detect"),
     "VGA.PAS":        ("VGA.PAS",      "VGA",           "VGA"),
     "DEMOVT.PAS":     ("DEMOVT.PAS",   "DemoVT",        "DemoVT"),
     "MODEX.PAS":      ("MODEX.PAS",    "ModeX",         "ModeX"),

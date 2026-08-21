@@ -18,6 +18,10 @@ Patterns measured so far, each closed by exactly one change:
 | `C9` (`LEAVE`) where yours has `5D` (`POP BP`) at a routine's end | the original was compiled `{$G+}` -- `LEAVE` is a 286 encoding, and with `$G-` TP7 closes the frame with `POP BP` | set `{$G+}` |
 | every relocation entry after some point shifted by a constant | your code upstream of that point is longer or shorter than the original's by that constant -- the relocations are right, the code before them is not | fix the code-shape diff earlier in the image; the relocations follow by themselves |
 | comparisons in a different order than yours | source statement order, not optimisation -- TP7 does not reorder tests | match the original's statement order |
+| one register load followed by a chain of `CMP AX/AL, imm`, where yours reloads memory per test | the original was a `case` statement (or a constant-set `in` test) -- an `if`/`else if` chain compiles a memory compare per arm | write the `case` (or the `in`) |
+| a routine present in the original that nothing calls, missing from yours | the original linked a TASM object whole with `{$L}` -- Pascal smart-links per routine and drops the uncalled; `XOR r,r` as `33 Cx` (TASM operand order) instead of BASM's `31 Cx` corroborates | move the routines to a `.ASM` linked with `{$L}` |
+| two whole unit code segments swapped | TP7 emits unit segments in REVERSE `uses` order | swap the `uses` clause |
+| an additive chain computed back to front | TP7 computes the RIGHTMOST term of `a + b + c` first -- the first-computed term in the bytes is the source's last | reorder the expression's terms |
 
 ## Why it works
 

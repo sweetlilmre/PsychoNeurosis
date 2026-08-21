@@ -26,7 +26,7 @@ Then all ten checks, which **all pass** as of `b801d3e`:
     .venv/Scripts/python.exe toolkit/wikitools/kbprofile.py wiki          # --write regenerates
     .venv/Scripts/python.exe toolkit/wikitools/glossary.py wiki CONTEXT.md
     .venv/Scripts/python.exe toolkit/pascal/markers.py src
-    .venv/Scripts/python.exe toolkit/pascal/ratchet.py status.toml --coverage 71
+    .venv/Scripts/python.exe toolkit/pascal/ratchet.py status.toml --coverage 74
     .venv/Scripts/python.exe toolkit/pascal/observe.py status.toml --report
     .venv/Scripts/python.exe toolkit/pascal/plan.py status.toml --report
     .venv/Scripts/python.exe toolkit/census.py --root tools --root <sibling repo>
