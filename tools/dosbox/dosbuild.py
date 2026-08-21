@@ -36,6 +36,7 @@ DOSBOX = Path(r"D:\DOSBox-X\dosbox-x.exe")
 # FILENAME, so `uses Part3Sprites` must become `uses P3Sprite`.
 NAMES = {
     "PSYCHO.PAS":     ("PSYCHO.PAS",   "Psycho",        "Psycho"),
+    "BYEBYE.PAS":     ("BYEBYE.PAS",   "ByeBye",        "ByeBye"),
     "VGA.PAS":        ("VGA.PAS",      "VGA",           "VGA"),
     "DEMOVT.PAS":     ("DEMOVT.PAS",   "DemoVT",        "DemoVT"),
     "MODEX.PAS":      ("MODEX.PAS",    "ModeX",         "ModeX"),
