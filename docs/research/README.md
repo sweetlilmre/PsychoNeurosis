@@ -9,6 +9,7 @@ Each file is also posted as a resolution comment on its ticket. These copies exi
 | [02-script-classification.md](02-script-classification.md) | [#2](https://github.com/sweetlilmre/PsychoNeurosis/issues/2) | All 55 scripts tiered as substrate / Pascal / project, with what each measures, whether it needs a disassembler, and library-vs-driver. Seven genuine overlaps between the two repos |
 | [03-technique-inventory.md](03-technique-inventory.md) | [#3](https://github.com/sweetlilmre/PsychoNeurosis/issues/3) | 209 techniques (76 substrate, 133 Pascal), 88 with a worked example, 91 needing no disassembler, and 79 withdrawn conclusions in 9 repeating classes |
 | [04-ledger-audit.md](04-ledger-audit.md) | [#4](https://github.com/sweetlilmre/PsychoNeurosis/issues/4) | What `tools/ledger.py` actually records (18 of 317 routines, 3 rows being regex artifacts), why it cannot carry a graded status, and that `asmverify.py` is the only real per-routine instrument |
+| [borland-debug-info.md](borland-debug-info.md) | [#27](https://github.com/sweetlilmre/PsychoNeurosis/issues/27) | The TP7 appended debug format (magic `0x52FB`, version 2.08) decoded end to end against `NEUROSIS.000`/`.009` with zero residue: every table, every symbol name and address, the source names STARTUP.PAS and BYEBYE.PAS with their 1994 save timestamps, and where both published open-source readers get the layout wrong. Decoder: `toolkit/substrate/tddump.py` |
 
 ## Reading them with the right expectations
 
