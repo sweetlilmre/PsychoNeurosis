@@ -74,3 +74,17 @@ _Avoid_: inline block, snippet, chunk
 A measure that cannot go backwards without failing the build. `asmverify.py` locks routine lengths, so a change that shortens a match is a regression.
 _Avoid_: gate (a gate is a different thing), guard, lock
 
+### The plan
+
+**Plan**:
+The `[plan]` section of the status register: an ordered list of investigations plus the rows under them. The order is the priority; there is no priority number. Decided by a person, never measured.
+_Avoid_: backlog, roadmap, todo
+
+**Investigation**:
+One finding a person saw, named and written as prose in the plan, citing the observation it came from. Resolved only with prose saying what was found.
+_Avoid_: issue, bug, task, ticket (a ticket is a different thing)
+
+**Plan row**:
+One routine enrolled under an investigation, keyed by its address in the 1994 binary — the one identity in this project that can never drift. Created lazily when a session localises a finding, never in bulk.
+_Avoid_: entry, item, line
+
