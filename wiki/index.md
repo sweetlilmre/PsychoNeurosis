@@ -11,3 +11,5 @@ A field manual for reverse engineering 16-bit DOS binaries built with Borland Pa
 * [A zero byte where the original has something else](observations/zero-byte-difference/observation.md) - the rule inverts by artefact, and using the wrong one is destructive in both directions
 * [The same bytes answer to two different addresses](observations/two-names-one-address/observation.md) - segment:offset is a many-to-one name; convert to linear before believing duplication or a gap
 * [The rebuild nearly matches, and the last bytes name their causes](observations/near-match-diff/observation.md) - each residual diff pattern fingerprints one source construct or compiler switch; read it, do not tune
+* [The file is bigger than its load image](observations/file-bigger-than-image/observation.md) - the tail past the MZ image is data for another reader; the measured cause is Borland debug info, decoded whole by tddump.py
+* [The line table advances one line per instruction](observations/line-table-reveals-asm/observation.md) - a dense stretch in the debug info's line table marks an inline asm block, no disassembly needed
