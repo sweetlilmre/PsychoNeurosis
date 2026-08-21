@@ -14,7 +14,7 @@ timestamp: 2026-08-19T00:00:00Z
 
 # The wiki
 
-An [OKF v0.1](https://okf.md/spec/) bundle. It holds one observation today and grows every time somebody reads a binary.
+An [OKF v0.1](https://okf.md/spec/) bundle. It grows every time somebody reads a binary; `index.md` lists what it holds.
 
 It began as the prototype for [Write one technique page as the pattern](https://github.com/sweetlilmre/PsychoNeurosis/issues/10) and was moved here by [Where the knowledge base lives](https://github.com/sweetlilmre/PsychoNeurosis/issues/6), which also put the tools in `toolkit/wikitools/` rather than inside the bundle. The rename kept the file history, which matters: two of the corrections below are lessons these files themselves demonstrate.
 
