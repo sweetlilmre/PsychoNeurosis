@@ -6,7 +6,7 @@
 # [plan] is DECIDED: investigation order is the priority order.
 
 [coverage]
-targets = 75
+targets = 76
 
 [observation."TPART1"]
 harness = "TPART1"
@@ -123,7 +123,8 @@ resolution = "The left half was dark because Waves_LoadCurves' own palette was m
 name = "part1-s4s5-palette"
 finding = "part 001: palette glitch at the scene 4 to scene 5 transition"
 seen_in = "TPART1"
-state = "open"
+state = "resolved"
+resolution = "The binary's Demo_Scene5 (12c5:0a89) flushes keys, clears the screen to colour 0, allocates and clears the work buffer (12c5:0a60), and only then lets Vector_Load rewrite the DAC -- over black, so the swap is invisible. The reconstruction went straight into Load, recolouring scene 4's still-displayed final frame for the whole file read and backdrop build. Scene5 rebuilt to the binary's structure, opcode-identical modulo fixups; pe confirmed the transition looks right against ORIG1 on 22 Aug 2026. Residual part-001 speed differences continue under the pacing investigation."
 
 [[plan.investigation]]
 name = "part5-386-trio"
@@ -142,6 +143,11 @@ name = "part6-confirm-r3"
 finding = "part 006 looked identical bar possibly slight timing; a careful scene-by-scene pass could raise it to R3"
 seen_in = "TPART6"
 state = "open"
+
+[plan.row."001 10e3:0148"]
+label = "Mosaic block sampling BASM"
+investigation = "pacing"
+note = "Scene 3's crawl: the mosaic block sampling (10e3:0148..01cb) is one hand BASM block loading ES/DS once per level and walking blocks register-only, five instructions a pixel; it had been re-expressed as Pascal Mem[] loops that reload a segment register on every one of 128,000 accesses per level. Back in verbatim, fragment @asm 001 10e3:0148 +132 locked at 132. Also recorded as a deviation: the _fpu originals' raw x87 came from a post-build patch a byte-scanner cannot reproduce safely (validated against all six variant pairs and refused), so our $N+ scenes keep TP7's emulator-interrupt encoding -- a bounded per-op cost."
 
 [plan.row."001 12c5:0a89"]
 label = "Demo_Scene5 preamble"

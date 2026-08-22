@@ -163,6 +163,7 @@ EXPECTED = {
     "PART3_MORPH.SetPalette768": 40,
     "PART3_MORPH.StepAngles": 390,
     "PART3_MORPH.TransformPoint": 293,
+    "P1S3.MosaicBlocks": 132,
     "PART3_SPRITES.DrawRotated": 103,
     "PART3_WAVES.StepEraseDraw": 59,
     "PART4_LEMMINGS.Blit": 63,
