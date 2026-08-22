@@ -148,6 +148,11 @@ label = "Demo_Scene5 preamble"
 investigation = "part1-s4s5-palette"
 note = "Scene5 in the binary flushes keys, does ClearScreen($A000,0), then AllocWork (12c5:0a60: GetMem+clear of the work buffer), THEN Load rewrites the DAC -- so the palette swap happens over black. Ours went straight into Load, recolouring scene 4's still-displayed frame for the whole file read and backdrop build. Scene5 rebuilt to the binary's structure (also: palette is a Load local passed to VGA.SetPalette768, FreeMem(Work) on exit, and P1S5 needs $G+). Opcode-identical modulo fixups after the fix."
 
+[plan.row."002 108b:0e03"]
+label = "$G-/$N- codegen vs the binary's"
+investigation = "pacing"
+note = "Every framed routine in every original segment opens ENTER -- a 286 instruction TP7 only emits under $G+ -- yet eight of our scene units compiled under the $G- default (P1S1/S2/S3, P2S2, PART3_TUNNEL, PART3_STARS, P5S3, P6S1), so the compiler multiplied with MUL and doubled shifts in exactly the per-frame 3-D and fixed-point Pascal (Obj_Transform 108b:0e03 is the archetype). Likewise x87 originals compiled under $N-: P1S5's PER-FRAME translate trig (12c5:07b9) ran on the software six-byte-Real RTL. $G+ added to the eight (evidence cited per unit), $N+ to P1S1/P1S3/P1S4/P1S5/PART3_BLOCKS. DETECT stays $G- -- its byte-identical R7 artefact proves the original was. Awaiting a run to measure the remaining gap."
+
 [plan.row."003 120f:00fe"]
 label = "Waves_Step erase/draw BASM"
 investigation = "part3-s6-left-dark"

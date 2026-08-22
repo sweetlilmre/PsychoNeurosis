@@ -12,6 +12,10 @@ unit P1S5;
 
 {$G+}   { 286: the binary's Scene5 pushes immediates (68 00 A0 at 12c5:0a9c)
           and closes with LEAVE -- $G+ codegen throughout the segment. }
+{$N+}   { the PER-FRAME translate trig is x87 in the binary -- 12c5:07b9,
+          12c5:07df FILD and the $N+ RTL's Sin/Cos. Under the $N- default the
+          same three calls a frame went through the software six-byte-Real
+          RTL, slowing every frame of the vector scene (plan: pacing). }
 
 interface
 

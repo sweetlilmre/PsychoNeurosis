@@ -39,6 +39,9 @@
 
 unit P6S1;
 
+{$G+}   { 286: Whoosh_Run 100f:0590 opens ENTER $50a; every framed routine
+          in the segment does. }
+
 interface
 
 procedure Scene1;

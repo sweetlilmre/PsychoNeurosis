@@ -34,6 +34,9 @@
 
 unit Part3Stars;
 
+{$G+}   { 286: Stars_ProjectAndPlot 10b8:0000 opens ENTER 4; every framed
+          routine in 10b8 does. }
+
 interface
 
 procedure Scene2;

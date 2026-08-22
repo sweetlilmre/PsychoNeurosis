@@ -21,6 +21,7 @@
   one point per character. Eight rows of eighteen is exactly the 144.
   =========================================================================== }
 
+{$N+}   { Demo_Scene4's scale arithmetic is x87 -- 1107:097b FILD/FDIV/FMUL. }
 {$G+}   { 286 instructions: REP OUTSB in SetPalette768 (1107:0011). The
           original targets 386 and above. }
 

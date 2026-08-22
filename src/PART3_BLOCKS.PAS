@@ -15,6 +15,9 @@
   =========================================================================== }
 
 {$G+}   { 286 instructions -- the block loops below use them }
+{$N+}   { the palette ramp is x87 in the binary -- 11f3:0072 FILD and the
+          ten-byte extended 0.2 at CS:$000D. Same values either way (I*0.2
+          never lands on an exact half), but the original's arithmetic. }
 
 unit Part3Blocks;
 

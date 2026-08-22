@@ -42,6 +42,9 @@
 
 unit P5S3;
 
+{$G+}   { 286: RenderPatch 1102:0000 opens ENTER $26; the whole segment is
+          ENTER-framed. }
+
 interface
 
 procedure Scene3;

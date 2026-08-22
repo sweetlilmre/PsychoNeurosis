@@ -25,6 +25,12 @@
 
 unit P2S2;
 
+{$G+}   { 286: the whole segment is ENTER-framed -- Obj_Transform 108b:0e03
+          opens ENTER $1136, Tri_Fill 108b:0461 ENTER $28. Under the $G-
+          default the compiler multiplies with MUL and doubles the shifts,
+          which is measurably slower in exactly these per-frame routines
+          (plan: pacing). }
+
 interface
 
 procedure Scene2;

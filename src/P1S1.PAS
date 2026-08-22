@@ -8,6 +8,10 @@
 
 unit P1S1;
 
+{$G+}   { 286: every framed routine in 1012 opens ENTER, e.g. Bounce_Run
+          1012:03e3 ENTER $54. }
+{$N+}   { the unit init's arithmetic is x87 -- 1012:0142 FILD. }
+
 interface
 
 procedure Scene1;

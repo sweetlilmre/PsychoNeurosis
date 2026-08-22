@@ -8,6 +8,9 @@
 
 unit P1S2;
 
+{$G+}   { 286: Title_Load 1082:0000 opens ENTER $182; every framed routine
+          in the segment does. }
+
 interface
 
 procedure Scene2;

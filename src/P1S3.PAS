@@ -8,6 +8,9 @@
 
 unit P1S3;
 
+{$G+}   { 286: Mosaic_Run 10e3:00bb opens ENTER $18. }
+{$N+}   { Mosaic_Load's arithmetic is x87 -- 10e3:0075 FILD. }
+
 interface
 
 procedure Scene3;

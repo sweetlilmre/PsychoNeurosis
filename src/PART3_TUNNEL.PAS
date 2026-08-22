@@ -32,6 +32,9 @@
 
 unit Part3Tunnel;
 
+{$G+}   { 286: Demo_Scene1 1015:098d opens ENTER 2; every framed routine
+          in 1015 does. }
+
 interface
 
 procedure Scene1;
