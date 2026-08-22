@@ -243,6 +243,15 @@ def write_batch(targets):
     for t in targets:
         lines.append("echo. >> D:\\BUILD.LOG")
         lines.append(f"echo ---- {t} >> D:\\BUILD.LOG")
+        # No /$E-: the _fpu originals carry raw 9B+ESC where TP7 emits CD 3x
+        # emulator interrupts, but that is a POST-BUILD PATCH, not a compile
+        # option -- NEUROSIS_003.exe and NEUROSIS_003_fpu.exe are the same
+        # size and differ exactly by CD 3x pairs rewritten to 9B+ESC in
+        # place. TP7 emits the interrupt form regardless of $E; $E only
+        # controls linking the emulator, and dropping it risks an unhandled
+        # INT 34h on any path the RTL does not patch. So the build keeps the
+        # $E+ default, which is what the authors' real build used, and the
+        # fpu patching stays out of scope the same way LZEXE does.
         lines.append(f"C:\\TP\\BIN\\TPC.EXE {t} /ED: /UD:;C:\\TP\\UNITS /ID:;D:\\GEN "
                      f"/$S- >> D:\\BUILD.LOG")
         lines.append("if errorlevel 1 echo ** FAILED >> D:\\BUILD.LOG")

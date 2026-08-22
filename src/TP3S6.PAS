@@ -9,6 +9,11 @@
 
 program TP3S6;
 
+{ No $E- here, deliberately: the _fpu originals' raw 9B+ESC x87 encodings
+  are a post-build PATCH of the CD 3x emulator interrupts TP7 always emits
+  -- the two variants are byte-identical apart from exactly those pairs --
+  so the faithful build keeps the $E+ default. See dosbuild.py. }
+
 uses Crt, VGA, DemoVT, Part3Waves;
 
 var
@@ -27,7 +32,6 @@ end;
 
 var
   F : file;
-  I : Integer;
 begin
   Assign(F, 'neurosis.dat');
   {$I-} Reset(F, 1); {$I+}
@@ -49,9 +53,6 @@ begin
   SetMode13h;
   VirtScrAlloc;
   MusicDetect;          { harmless with no player resident }
-  for I := 1 to 255 do SetRGB(I, 0, 0, 0);
-  { the blue ramp scene 5 leaves - PART3_BLOCKS.Ramp, 11f3:0072..00a7 }
-  for I := 1 to 221 do SetRGB(I, 0, 0, Round(I * 0.2) + 19);
   Scene6;
 
   VirtScrFree;

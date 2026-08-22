@@ -41,17 +41,11 @@ VGA_CLOSE = """  VirtScrFree;
   SetTextMode;
 """
 
-# Scene 6 of part 003 draws with colours 0..178 (Phase shr 1) and never
-# loads a palette: in the part it runs on whatever scene 5 leaves in the DAC.
-# The blocks scene blanks entries 1..255 and lays its blue ramp over 1..221
-# (11f3:0048..00a7), and its reveal/hide arithmetic returns every PIXEL to
-# zero without touching the DAC again -- so that ramp IS scene 6's palette.
-# The harness recreates it, or the waves run in mode 13h's default colours.
-P3S6_OPEN = VGA_OPEN + """  for I := 1 to 255 do SetRGB(I, 0, 0, 0);
-  { the blue ramp scene 5 leaves - PART3_BLOCKS.Ramp, 11f3:0072..00a7 }
-  for I := 1 to 221 do SetRGB(I, 0, 0, Round(I * 0.2) + 19);
-"""
-P3S6_VARS = "  I : Integer;" + NL
+# Scene 6 of part 003 needs no palette help: an earlier version of this file
+# recreated scene 5's ramp here, on the belief that the waves inherit it. They
+# do not -- Waves_LoadCurves (120f:0017) builds the scene's OWN blue triangle
+# over colours 1..178 after reading the curve table, so the unit is
+# self-sufficient in isolation.
 
 # Part 002 links the same VGA and DemoVT units as everything else -- it just
 # adds ModeX, P2View and FixMath on top, and each of its two scenes sets up
@@ -125,7 +119,7 @@ SCENES = [
      "part 003 scene 4 -- the globe"),
     ("TP3S5", "Part3Blocks",  "Scene5", VGA_USES, VGA_OPEN, VGA_CLOSE,
      "part 003 scene 5 -- the blocks"),
-    ("TP3S6", "Part3Waves",   "Scene6", VGA_USES, P3S6_OPEN, VGA_CLOSE,
+    ("TP3S6", "Part3Waves",   "Scene6", VGA_USES, VGA_OPEN, VGA_CLOSE,
      "part 003 scene 6 -- the waves"),
     ("TP3S7", "Part3Sprites", "Scene7", VGA_USES, VGA_OPEN, VGA_CLOSE,
      "part 003 scene 7 -- the spinning portraits"),
@@ -220,6 +214,11 @@ HEAD = """{ ====================================================================
 
 program %(prog)s;
 
+{ No $E- here, deliberately: the _fpu originals' raw 9B+ESC x87 encodings
+  are a post-build PATCH of the CD 3x emulator interrupts TP7 always emits
+  -- the two variants are byte-identical apart from exactly those pairs --
+  so the faithful build keeps the $E+ default. See dosbuild.py. }
+
 uses %(uses)s, %(unit)s;
 
 %(exit)svar
@@ -255,9 +254,9 @@ HOOK = """
 
 # Harnesses whose opening needs a variable of its own beyond the file check's
 # F. Keyed by program name; the declaration lands in the main var block.
-EXTRA_VARS = {
-    "TP3S6": P3S6_VARS,
-}
+# Empty at present -- TP3S6 briefly used it for a palette loop that turned out
+# to belong in Waves_LoadCurves itself.
+EXTRA_VARS = {}
 
 
 def write(prog, unit, entry, uses, opening, closing, what):

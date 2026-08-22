@@ -25,6 +25,11 @@ unit Part3Waves;
           phase*2 temp OUT of DX into CX -- and CX still holding 356 from
           the phase-update IDIV is half of what the erase/draw bug in Step
           writes through. Measured: 120f:012f..014b vs a $G- build. }
+{$N+}   { LoadCurves' palette ramp is x87 -- 120f:008b FILD and the ten-byte
+          extended 0.4 at CS:$000D. }
+{$I-}   { LoadCurves' compiled I/O (120f:0025..0070) has NO IOCheck call after
+          any of Assign/Reset/Seek/BlockRead/Close -- the original was built
+          with I/O checking off. }
 
 interface
 
@@ -65,7 +70,10 @@ var
     `with P[I] do` the field would win. }
   CurveTab : ^TCurves;                              { 36,414 bytes }
   P      : array[1..Particles] of TParticle;
-  SweepX : Integer;
+  SweepX : Integer;                                 { DS:$d20a }
+  { A GLOBAL in the original -- 120f:001b passes DS:$d20c to Assign, right
+    after SweepX -- not a local of LoadCurves. }
+  F      : file;                                    { DS:$d20c }
 
 { --------------------------------------------------------------------------
   Waves_LoadCurves (120f:0017)
@@ -75,10 +83,26 @@ var
           51 curves x 357 signed 16-bit X offsets. 51 * 714 = 36,414 exactly,
           which is what fixes the stride.
           See docs/12-part3-scene6-waves.md.
+
+  AND THE SCENE'S OWN PALETTE. This routine does not stop at the BlockRead:
+  after the Close it lays a TRIANGLE ramp on blue over exactly the colours
+  Step draws with (Phase shr 1 = 0..178), on the x87 (120f:008b onwards,
+  the ten-byte extended 0.4 at CS:$000D):
+
+      1..89     Round(I * 0.4) + 27          rising, 27 -> 63 at 89
+      89..178   Round((178 - I) * 0.4) + 27  falling back to 27
+
+  so a particle is BRIGHTEST MID-PHASE and dim at both ends of its curve.
+  An earlier version of this unit ended at the Close, leaving whatever
+  palette the previous scene had -- under scene 5's monotone ramp the low
+  phases (the left half of the shape) rendered dark, which is the defect
+  the first observation run reported (plan: part3-s6-left-dark). Measured
+  from the screenshots: ours stepped from median blue 84 on the left to
+  108 on the right; the original sits near 107 across the whole shape.
   -------------------------------------------------------------------------- }
 procedure LoadCurves;
 var
-  F : file;
+  I : Integer;
 begin
   Assign(F, 'neurosis.dat');
   Reset(F, 1);
@@ -86,6 +110,12 @@ begin
   GetMem(CurveTab, DataSize);
   BlockRead(F, CurveTab^, DataSize);
   Close(F);
+
+  { 120f:0075 -- colour 89 is written by both loops, same value both times. }
+  for I := 1 to 89 do
+    SetRGB(I, 0, 0, Round(I * 0.4) + 27);
+  for I := 89 to 178 do
+    SetRGB(I, 0, 0, Round((178 - I) * 0.4) + 27);
 end;
 
 { --------------------------------------------------------------------------
@@ -117,10 +147,13 @@ end;
   corrupted HIGH byte pushes the point past 320 and it just stops drawing.
   The corruption accumulates across all four passes (the table is loaded
   once), and a point corrupted between its draw and its erase leaves the
-  old pixel lit for good. That drift and litter is why the original's dot
-  object is BRIGHTER on the left half: an earlier Pascal-isation of this
-  block re-derived ES and the row offset for the draw, rendered every
-  pixel correctly, and so came out darker (plan: part3-s6-left-dark).
+  old pixel lit for good.
+
+  (An earlier note here blamed this corruption for the left half of the
+  shape rendering darker in the reconstruction. It was not the cause --
+  the shape was dark on the left because LoadCurves' own TRIANGLE palette
+  was missing, see above it -- but the stray store is real, the bytes at
+  120f:01b1 prove it, and it stays transcribed verbatim.)
   -------------------------------------------------------------------------- }
 procedure Step;
 var
@@ -284,13 +317,18 @@ end.
 
     All 51 overlaid: assets/part003/waves_curves_all.png
 
-  RESOLVED -- WHY THE LEFT HALF IS BRIGHTER IN THE ORIGINAL
-  * Step's erase/draw is hand BASM with ES and the row offset set up only in
-    the erase branch. A particle re-entering the screen draws through the
-    stale registers instead -- a colour byte into the curve table at offset
-    356 + NewX, corrupting the back half of curve 0. The drift and the
-    unerased litter it causes are part of the original's look, so the block
-    is transcribed verbatim, bug included. Details above Waves_Step.
+  RESOLVED -- WHY THE LEFT HALF RENDERED DARKER THAN THE ORIGINAL
+  * LoadCurves builds the scene's own palette after the BlockRead: a blue
+    TRIANGLE over colours 1..178, peaking at 89 -- brightest MID-PHASE. The
+    reconstruction had ended the routine at the Close, inheriting scene 5's
+    monotone ramp, under which low phases (the shape's left half) are dark.
+    Confirmed by measuring both screenshots; details above LoadCurves.
+  * Separately, Step's erase/draw is hand BASM with ES and the row offset
+    set up only in the erase branch. A particle re-entering the screen
+    draws through the stale registers instead -- a colour byte into the
+    curve table at offset 356 + NewX, corrupting the back half of curve 0.
+    That is the original's own bug, transcribed verbatim; it was once
+    blamed for the left-half difference and is not the cause.
 
   OPEN
   * Nothing outstanding.

@@ -117,7 +117,8 @@ measured_at = "5c764e5a4c2f"
 name = "part3-s6-left-dark"
 finding = "part 003 scene 6: left half of the dot object renders darker than the original"
 seen_in = "TPART3"
-state = "open"
+state = "resolved"
+resolution = "The left half was dark because Waves_LoadCurves' own palette was missing: the routine does not stop at the curve BlockRead -- it lays a blue TRIANGLE ramp over colours 1..178, brightest mid-phase, so both ends of every curve are dim and no half of the shape is darker than the other. The reconstruction had inherited the previous scene's monotone ramp instead. Two secondary recoveries from the same investigation: the erase/draw BASM block is back verbatim with the original's stray-store bug (row 003 120f:00fe -- real, but not this defect's cause), and the fpu variants proved to be post-build patches of the CD 3x emulator interrupts, so the build keeps $E+. Fix confirmed by pe against ORIG3 side by side on 22 Aug 2026; the part-tier rung moves when TPART3 is re-observed through observe.py."
 
 [[plan.investigation]]
 name = "part1-s4s5-palette"
@@ -152,6 +153,11 @@ note = "Scene5 in the binary flushes keys, does ClearScreen($A000,0), then Alloc
 label = "$G-/$N- codegen vs the binary's"
 investigation = "pacing"
 note = "Every framed routine in every original segment opens ENTER -- a 286 instruction TP7 only emits under $G+ -- yet eight of our scene units compiled under the $G- default (P1S1/S2/S3, P2S2, PART3_TUNNEL, PART3_STARS, P5S3, P6S1), so the compiler multiplied with MUL and doubled shifts in exactly the per-frame 3-D and fixed-point Pascal (Obj_Transform 108b:0e03 is the archetype). Likewise x87 originals compiled under $N-: P1S5's PER-FRAME translate trig (12c5:07b9) ran on the software six-byte-Real RTL. $G+ added to the eight (evidence cited per unit), $N+ to P1S1/P1S3/P1S4/P1S5/PART3_BLOCKS. DETECT stays $G- -- its byte-identical R7 artefact proves the original was. Awaiting a run to measure the remaining gap."
+
+[plan.row."003 120f:0017"]
+label = "Waves_LoadCurves palette"
+investigation = "part3-s6-left-dark"
+note = "The TRUE cause: LoadCurves builds the scene's own palette after the BlockRead -- a blue triangle over colours 1..178 peaking at 89 (Round(I*0.4)+27 rising, Round((178-I)*0.4)+27 falling, x87, extended 0.4 at CS:000D). The reconstruction ended at the Close, inheriting scene 5's monotone ramp, under which low phases (the left half) rendered dark: measured median blue 84 left / 108 right vs the original's uniform ~107. Palette loops added; also {$I-} (no IOCheck in the original) and F as the DGROUP global at DS:D20C. Fixed and confirmed against ORIG3 by pe. The earlier row's stray-store finding stands but was NOT the cause of this defect."
 
 [plan.row."003 120f:00fe"]
 label = "Waves_Step erase/draw BASM"

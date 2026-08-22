@@ -9,6 +9,11 @@
 
 program TPART6;
 
+{ No $E- here, deliberately: the _fpu originals' raw 9B+ESC x87 encodings
+  are a post-build PATCH of the CD 3x emulator interrupts TP7 always emits
+  -- the two variants are byte-identical apart from exactly those pairs --
+  so the faithful build keeps the $E+ default. See dosbuild.py. }
+
 uses Crt, VGA, DemoVT, P6Main;
 
 var
