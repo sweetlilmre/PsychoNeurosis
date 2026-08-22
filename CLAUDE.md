@@ -20,13 +20,13 @@ Asphyxia's first megademo, 1994. Borland Pascal 7 plus hand-written assembler, r
     uv venv .venv
     uv pip install --python .venv/Scripts/python.exe -e toolkit
 
-Then all the checks, which **all pass** as of `5c764e5`:
+Then all the checks, which **all pass** as of `f83944d`:
 
     .venv/Scripts/python.exe toolkit/wikitools/okfcheck.py wiki
     .venv/Scripts/python.exe toolkit/wikitools/kbprofile.py wiki          # --write regenerates
     .venv/Scripts/python.exe toolkit/wikitools/glossary.py wiki CONTEXT.md
     .venv/Scripts/python.exe toolkit/pascal/markers.py src
-    .venv/Scripts/python.exe toolkit/pascal/ratchet.py status.toml --coverage 74
+    .venv/Scripts/python.exe toolkit/pascal/ratchet.py status.toml --coverage 76
     .venv/Scripts/python.exe toolkit/pascal/observe.py status.toml --report
     .venv/Scripts/python.exe toolkit/pascal/artefact.py status.toml --check
     .venv/Scripts/python.exe toolkit/pascal/plan.py status.toml --report
@@ -42,7 +42,7 @@ Then all the checks, which **all pass** as of `5c764e5`:
 
 ## The state of this working tree, as of 22 Aug 2026
 
-**Everything is committed and pushed on `vangelistracker-build`, the issue tracker is empty, and the one queue of work is the plan**: `.venv/Scripts/python.exe toolkit/pascal/plan.py status.toml --report` — five investigations, defect-first, worked directly without a map. This is where the toolkit meets the hard parts, per the acceptance-test verdict's reservation.
+**Everything is committed and pushed on `vangelistracker-build`, the issue tracker is empty, and the one queue of work is the plan**: `.venv/Scripts/python.exe toolkit/pascal/plan.py status.toml --report` — five investigations seeded defect-first, of which two are RESOLVED against pe's live runs (22 Aug) and three remain: part5-386-trio (fixed in code, needs a TPART5 run), **pacing (the main line — `tools/shapediff.py` lists the divergent spans to work top-down)**, and part6-confirm-r3 (a careful run, no code). `docs/continuation.md`'s dated block has the full state.
 
 The remote is private `sweetlilmre/PsychoNeurosis`, default branch `main`. **`main` is behind `vangelistracker-build`** and everything lives on the branch. History contains third-party bytes — `bin/NEUROSIS.008` and `work/split/NEUROSIS_008.exe` are DemoVT — acceptable only while the repo stays private, and a blocker on ever making it public. A lesson kept from an earlier version of this section: treat a "not mine" claim about tree contents as needing a check against the diff, not as fact.
 
