@@ -86,6 +86,33 @@ confirmed_at = "be253cb07d6c"
 fingerprint = "5741a180fb198746"
 against = "ORIG7.EXE"
 
+[artefact."TPART0"]
+ours = "run/TPART0.EXE"
+original = "bin/NEUROSIS.000"
+compare = "load-image"
+sha256 = "b38a99529d9e87be98c7c06bcc4906de9730a022126750fa4377c6d63700c0b6"
+achieved = "R7"
+target = "R7"
+measured_at = "5c764e5a4c2f"
+
+[artefact."TPART9"]
+ours = "run/TPART9.EXE"
+original = "bin/NEUROSIS.009"
+compare = "load-image"
+sha256 = "2636da8621ac5a49aff23ba7f49f2bc04e34afeeab8367ab0ef305c9a7d4b25f"
+achieved = "R7"
+target = "R7"
+measured_at = "5c764e5a4c2f"
+
+[artefact."TPSYCHO"]
+ours = "run/TPSYCHO.EXE"
+original = "bin/PSYCHO.EXE"
+compare = "file"
+sha256 = "f1264dc5fbaf5c75f2e9be241e0276e242a9f343532d256a30bc51a06bf10dce"
+achieved = "R7"
+target = "R7"
+measured_at = "5c764e5a4c2f"
+
 [[plan.investigation]]
 name = "part3-s6-left-dark"
 finding = "part 003 scene 6: left half of the dot object renders darker than the original"

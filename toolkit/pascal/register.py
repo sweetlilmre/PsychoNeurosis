@@ -38,8 +38,10 @@ OBSERVATION_FIELDS = ("harness", "tier", "outcome", "achieved", "observer",
                       "date", "confirmed_at", "fingerprint", "against", "note")
 INVESTIGATION_FIELDS = ("name", "finding", "seen_in", "state", "resolution")
 ROW_FIELDS = ("label", "investigation", "target", "cost", "note")
+ARTEFACT_FIELDS = ("ours", "original", "compare", "sha256", "achieved",
+                   "target", "measured_at", "reason", "note")
 
-KNOWN_SECTIONS = ("coverage", "routine", "observation", "plan")
+KNOWN_SECTIONS = ("coverage", "routine", "observation", "plan", "artefact")
 
 
 def load(path):
@@ -84,6 +86,13 @@ def dump(status):
         row = status["observation"][key]
         out.append("[observation.%s]" % toml_str(key))
         for f in OBSERVATION_FIELDS:
+            if row.get(f) not in (None, ""):
+                _emit(out, f, row[f])
+        out.append("")
+    for key in sorted(status.get("artefact", {})):
+        row = status["artefact"][key]
+        out.append("[artefact.%s]" % toml_str(key))
+        for f in ARTEFACT_FIELDS:
             if row.get(f) not in (None, ""):
                 _emit(out, f, row[f])
         out.append("")

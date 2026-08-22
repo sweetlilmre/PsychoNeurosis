@@ -20,7 +20,7 @@ Asphyxia's first megademo, 1994. Borland Pascal 7 plus hand-written assembler, r
     uv venv .venv
     uv pip install --python .venv/Scripts/python.exe -e toolkit
 
-Then all ten checks, which **all pass** as of `b801d3e`:
+Then all the checks, which **all pass** as of `5c764e5`:
 
     .venv/Scripts/python.exe toolkit/wikitools/okfcheck.py wiki
     .venv/Scripts/python.exe toolkit/wikitools/kbprofile.py wiki          # --write regenerates
@@ -28,6 +28,7 @@ Then all ten checks, which **all pass** as of `b801d3e`:
     .venv/Scripts/python.exe toolkit/pascal/markers.py src
     .venv/Scripts/python.exe toolkit/pascal/ratchet.py status.toml --coverage 74
     .venv/Scripts/python.exe toolkit/pascal/observe.py status.toml --report
+    .venv/Scripts/python.exe toolkit/pascal/artefact.py status.toml --check
     .venv/Scripts/python.exe toolkit/pascal/plan.py status.toml --report
     .venv/Scripts/python.exe toolkit/census.py --root tools --root <sibling repo>
     python tools/paslint.py
