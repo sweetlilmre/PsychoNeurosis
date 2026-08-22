@@ -152,3 +152,8 @@ note = "Scene5 in the binary flushes keys, does ClearScreen($A000,0), then Alloc
 label = "Waves_Step erase/draw BASM"
 investigation = "part3-s6-left-dark"
 note = "Erase/draw is hand BASM with ES/CX set only in the erase branch; a skipped erase makes the draw store the colour byte into the curve table at 356+NewX (back half of curve 0). Original's left-half brightness is that corruption plus unerased litter; our Pascal-isation had fixed the bug. Block now transcribed verbatim, fragment target @asm 003 120f:01b1 +59 StepEraseDraw."
+
+[plan.row."005 1096:051a"]
+label = "Scene2 motion-table build"
+investigation = "part5-386-trio"
+note = "The investigation's premise is stale: the 386 trio (SinCos/RotatePoint/Project) HAS been transcribed since the 19 Aug part-005 re-read (P5S3, verified fragments). The real cost was the motion-table build at 1096:051a: x87 code in the original (FILD / FDIV single 180.0 / FLD extended Pi / RTL Sin-Cos-Round), but P5S2 compiled under the $N- default, sending 3,424 trig calls through the software six-byte-Real RTL -- the multi-second black-screen pause. Fix: {$N+} on P5S2; the build now emits x87 (FLD extended + FMULP present). Awaiting a run to confirm the pause is gone."

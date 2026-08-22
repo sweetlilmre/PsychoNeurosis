@@ -34,6 +34,14 @@
 
 unit P5S2;
 
+{$N+}   { The motion-table build at 1096:051a is x87 code: FILD the index,
+          FDIV by a SINGLE 180.0 at CS:$03c9, FLD the ten-byte EXTENDED Pi at
+          CS:$03cd, and the $N+ RTL's Sin/Cos/Round on the stack top. Under
+          the $N- default the same 3,424 trig calls go through the software
+          six-byte-Real RTL instead, which took long enough to read as a
+          multi-second black-screen pause in the part run -- the plan's
+          part5-386-trio symptom; the 386 trio itself was already transcribed. }
+
 interface
 
 procedure Scene2;
