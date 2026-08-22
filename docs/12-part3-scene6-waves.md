@@ -50,6 +50,8 @@ travels and the motion reads as a gradient.
 This scene writes straight to `$A000` with no virtual screen — consistent with
 never needing a full-screen operation.
 
+**The erase/draw is hand BASM (`120f:01b1`), and the Pascal above is what it MEANS, not what it DOES.** `ES` and the row offset in `CX` are set up inside the erase branch only, so a particle whose old pixel is offscreen and whose new pixel is not gets its draw stored through the registers the compiled code happens to leave: `ES` = the curve table's segment (from the `LES` that read the curve) and `CX` = 356 (the phase-update `IDIV`'s divisor). The stray store lands in the curve table at offset `356 + NewX` — bytes 357..675, the back half of curve 0, the straight centre line. Colour bytes are 0..178, so a corrupted low byte moves a curve-0 point from x = 160 into the left half; the corruption accumulates over all four passes, and a point corrupted between its draw and its erase leaves a pixel lit for good. That drift and litter is the original's extra left-half brightness — the defect behind the plan investigation `part3-s6-left-dark`, where a Pascal-ised version of the block drew every pixel correctly and rendered darker. The block is transcribed verbatim in `PART3_WAVES.PAS` (fragment target `@asm 003 120f:01b1 +59`), and the unit needs `{$G+}`: with 8086 codegen the compiler multiplies with `MUL DX` and parks the phase×2 temp in `CX`, destroying the 356 the bug writes through. All 249 bytes of `Waves_Step` match the binary modulo DGROUP displacements.
+
 ## Four passes
 
 Each pass reseeds the array, spreads the phases so particles are staggered

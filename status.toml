@@ -6,7 +6,7 @@
 # [plan] is DECIDED: investigation order is the priority order.
 
 [coverage]
-targets = 74
+targets = 75
 
 [observation."TPART1"]
 harness = "TPART1"
@@ -142,3 +142,8 @@ name = "part6-confirm-r3"
 finding = "part 006 looked identical bar possibly slight timing; a careful scene-by-scene pass could raise it to R3"
 seen_in = "TPART6"
 state = "open"
+
+[plan.row."003 120f:00fe"]
+label = "Waves_Step erase/draw BASM"
+investigation = "part3-s6-left-dark"
+note = "Erase/draw is hand BASM with ES/CX set only in the erase branch; a skipped erase makes the draw store the colour byte into the curve table at 356+NewX (back half of curve 0). Original's left-half brightness is that corruption plus unerased litter; our Pascal-isation had fixed the bug. Block now transcribed verbatim, fragment target @asm 003 120f:01b1 +59 StepEraseDraw."

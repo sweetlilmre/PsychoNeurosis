@@ -19,6 +19,13 @@
 
 unit Part3Waves;
 
+{$G+}   { 286: the binary's Step is 286 codegen -- SHL DI,2 as C1 E7 02 and
+          curve*714 as IMUL AX,AX,2CAh. This is not cosmetic here: with $G-
+          the compiler multiplies with MUL DX instead, which forces the
+          phase*2 temp OUT of DX into CX -- and CX still holding 356 from
+          the phase-update IDIV is half of what the erase/draw bug in Step
+          writes through. Measured: 120f:012f..014b vs a $G- build. }
+
 interface
 
 procedure Scene6;
@@ -89,25 +96,96 @@ end;
 
   Colour is Phase div 2, so a particle's colour changes as it travels -- the
   trail reads as a gradient rather than a flat line.
+
+  The erase and the draw are a hand BASM block in the original (the STOSB
+  and the XOR/MOV/SHL row-table setup are the tells; compiled TP7 never
+  emits STOSB for a single store), and the block carries a REAL BUG this
+  unit must reproduce: ES and CX are set up INSIDE the erase branch only,
+  so a particle whose old pixel is offscreen but whose new pixel is not
+  gets its draw stored through whatever ES:CX already hold. The compiled
+  code above the block leaves both deterministic every iteration:
+
+      CX = 356               parked there by `Phase mod PhaseWrap`
+                             (MOV CX,164h / IDIV CX at 120f:0161)
+      ES = Seg(CurveTab^)    left by the LES that read the new curve X
+                             (120f:0190)
+
+  so the stray store writes Col into the CURVE TABLE at offset 356 + NewX,
+  i.e. bytes 357..675 -- the back half of curve 0, the straight centre
+  line. Colour bytes are 0..178, so a corrupted LOW byte moves a curve-0
+  point from x = 160 to x = 0..178, the left half of the screen; a
+  corrupted HIGH byte pushes the point past 320 and it just stops drawing.
+  The corruption accumulates across all four passes (the table is loaded
+  once), and a point corrupted between its draw and its erase leaves the
+  old pixel lit for good. That drift and litter is why the original's dot
+  object is BRIGHTER on the left half: an earlier Pascal-isation of this
+  block re-derived ES and the row offset for the draw, rendered every
+  pixel correctly, and so came out darker (plan: part3-s6-left-dark).
   -------------------------------------------------------------------------- }
 procedure Step;
 var
-  I, OldX, NewX : Integer;
-  Row           : Byte;
+  { Declared in this order so the frame matches the binary's:
+    I at [BP-2], Row [BP-3], Col [BP-4], OldX [BP-6], NewX [BP-8]. }
+  I    : Integer;
+  Row  : Byte;
+  Col  : Byte;
+  OldX : Integer;
+  NewX : Integer;
 begin
   if KeyPressed then Exit;
+  { No `with P[I] do` here, for two measured reasons: the binary recomputes
+    DI := I*4 before EVERY field access, which is what explicit P[I].x
+    compiles to (a with-statement caches the base once); and inside the asm
+    block below a with-scope makes BASM resolve `Row` to the FIELD -- which
+    assembles as MOV BL,3, the field's offset, not a load of the local. }
   for I := 1 to Particles do
-    with P[I] do
     begin
       Row  := P[I].Row;
-      OldX := CurveTab^[Curve, Phase] + SweepX - 1;
-      Phase := Phase mod PhaseWrap + 1;
-      NewX := CurveTab^[Curve, Phase] + SweepX;
+      OldX := CurveTab^[P[I].Curve, P[I].Phase] + SweepX - 1;
+      P[I].Phase := P[I].Phase mod PhaseWrap + 1;
+      NewX := CurveTab^[P[I].Curve, P[I].Phase] + SweepX;
+      Col  := P[I].Phase shr 1;
 
-      if (OldX > 0) and (OldX < 320) then
-        Mem[VGASeg : YOfs[Row] + OldX] := 0;             { erase }
-      if (NewX > 0) and (NewX < 320) then
-        Mem[VGASeg : YOfs[Row] + NewX] := Phase shr 1;   { draw }
+      { EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+            if (OldX > 0) and (OldX < 320) then
+              Mem[VGASeg : YOfs[Row] + OldX] := 0;
+            if (NewX > 0) and (NewX < 320) then
+              Mem[VGASeg : YOfs[Row] + NewX] := Col;
+
+        Where that Pascal is not the same thing: it re-derives the segment
+        and the row offset for the draw, which is exactly the bug it fails
+        to reproduce -- see the block comment above this routine. }
+
+      { @asm 003 120f:01b1 +59 StepEraseDraw }
+      asm
+        CMP  OldX, 0             { old pixel off the left edge (x <= 0)?     }
+        JLE  @@NoErase           {   then nothing to erase                   }
+        CMP  OldX, 320           { off the right edge (x >= 320)?            }
+        JGE  @@NoErase           {   same                                    }
+        MOV  AX, VGASeg          { $A000                                     }
+        MOV  ES, AX              { ES := the screen -- set ONLY here         }
+        XOR  BX, BX              { clear BH ahead of the byte load           }
+        MOV  BL, Row             { BL := the particle's row                  }
+        SHL  BX, 1               { byte index -> word index                  }
+        MOV  CX, [BX + OFFSET YOfs]  { CX := Row * 320 -- set ONLY here      }
+        MOV  DI, CX              { DI := start of the row                    }
+        ADD  DI, OldX            { DI := the old pixel                       }
+        MOV  AL, 0               { black                                     }
+        STOSB                    { erase it                                  }
+      @@NoErase:
+        CMP  NewX, 0             { new pixel off the left edge?              }
+        JLE  @@NoDraw            {   then nothing to draw                    }
+        CMP  NewX, 320           { off the right edge?                       }
+        JGE  @@NoDraw            {   same                                    }
+        MOV  DI, CX              { DI := row start -- STALE (356) if the     }
+                                 {   erase above was skipped                 }
+        ADD  DI, NewX            { DI := the new pixel                       }
+        MOV  AL, Col             { the colour, Phase shr 1                   }
+        STOSB                    { draw -- through ES, which is still the    }
+                                 {   CURVE TABLE if the erase was skipped    }
+      @@NoDraw:
+      end;
     end;
 end;
 
@@ -205,6 +283,14 @@ end.
     the indices to fan the particles out into a family of nested waves.
 
     All 51 overlaid: assets/part003/waves_curves_all.png
+
+  RESOLVED -- WHY THE LEFT HALF IS BRIGHTER IN THE ORIGINAL
+  * Step's erase/draw is hand BASM with ES and the row offset set up only in
+    the erase branch. A particle re-entering the screen draws through the
+    stale registers instead -- a colour byte into the curve table at offset
+    356 + NewX, corrupting the back half of curve 0. The drift and the
+    unerased litter it causes are part of the original's look, so the block
+    is transcribed verbatim, bug included. Details above Waves_Step.
 
   OPEN
   * Nothing outstanding.
