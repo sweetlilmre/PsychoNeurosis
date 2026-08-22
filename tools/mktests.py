@@ -118,8 +118,8 @@ SCENES = [
     ("TP3S7", "Part3Sprites", "Scene7", VGA_USES, VGA_OPEN, VGA_CLOSE,
      "part 003 scene 7 -- the spinning portraits"),
 
-    ("TP4S1", "Part4Lemmings", "RunPart4", P4_USES, P4_OPEN, P4_CLOSE,
-     "part 004 -- the lemmings"),
+    ("TPART4", "Part4Lemmings", "RunPart4", P4_USES, P4_OPEN, P4_CLOSE,
+     "part 004 -- the lemmings; single-scene, the harness stands in for the driver"),
 
     ("TP5S1", "P5S1", "Scene1", P5_USES, P5_OPEN, P5_CLOSE,
      "part 005 scene 1 -- the heightfield mesh"),

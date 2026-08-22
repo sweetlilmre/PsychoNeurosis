@@ -8,17 +8,6 @@
 [coverage]
 targets = 74
 
-[observation."TP4S1"]
-harness = "TP4S1"
-tier = "scene"
-outcome = "differs"
-achieved = "R2"
-observer = "pe"
-date = "2026-08-21"
-confirmed_at = "fbe0608dba1c"
-fingerprint = "09e5d3d1a74c0dff"
-against = "ORIG4.EXE"
-
 [observation."TPART1"]
 harness = "TPART1"
 tier = "part"
@@ -51,6 +40,18 @@ date = "2026-08-21"
 confirmed_at = "fbe0608dba1c"
 fingerprint = "6191289fa10add94"
 against = "ORIG3.EXE"
+
+[observation."TPART4"]
+harness = "TPART4"
+tier = "scene"
+outcome = "differs"
+achieved = "R2"
+observer = "pe"
+date = "2026-08-21"
+confirmed_at = "fbe0608dba1c"
+fingerprint = "09e5d3d1a74c0dff"
+against = "ORIG4.EXE"
+note = "renamed from TP4S1 on 2026-08-22; the observation is the one pe recorded on 2026-08-21"
 
 [observation."TPART5"]
 harness = "TPART5"
