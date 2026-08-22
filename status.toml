@@ -14,10 +14,9 @@ tier = "part"
 outcome = "differs"
 achieved = "R2"
 observer = "pe"
-date = "2026-08-21"
-confirmed_at = "fbe0608dba1c"
-fingerprint = "f542a2452ddbaa58"
-against = "ORIG1.EXE"
+date = "2026-08-22"
+confirmed_at = "fa3fb7dce541"
+fingerprint = "fe684476bd604f52"
 
 [observation."TPART2"]
 harness = "TPART2"
