@@ -164,6 +164,7 @@ EXPECTED = {
     "PART3_MORPH.StepAngles": 390,
     "PART3_MORPH.TransformPoint": 293,
     "PART3_SPRITES.DrawRotated": 103,
+    "PART3_WAVES.StepEraseDraw": 59,
     "PART4_LEMMINGS.Blit": 63,
     "PART4_LEMMINGS.ColumnSlideIn": 112,
     "PART4_LEMMINGS.CopyScreen": 30,
@@ -228,6 +229,51 @@ def built_images():
     the TP* harnesses plus the three whole-program reconstructions.
     """
     return [(p.name, p.read_bytes()) for p in sorted(RUN.glob("TP*.EXE"))]
+
+
+def candidates(blob, hdr, seg, images):
+    """Probe for a marker whose OFFSET is wrong, behind --probe.
+
+    The declared address was NOT FOUND in any built image, and the usual
+    reason is a right segment with a wrong offset. So: walk the first 4KB of
+    that segment in the original, anchor every offset against every built
+    image, and report the few alignments the comparison gets furthest into.
+    Offsets that are merely the tail of a better alignment one byte earlier
+    are dropped, so what comes back is routine STARTS, not a smear of every
+    suffix. Slow, which is why it hides behind the flag.
+
+    The scan stops at 4KB because it cannot know the unit's real extent, and
+    past the unit's end sit the shared units and the RTL -- code that is
+    IDENTICAL in both builds and outscores any real find. The full-window
+    filter below exists for the same reason. A probe into a unit bigger than
+    4KB just reports less than it could.
+
+    This function was called from the day --probe was added but never
+    written, so the flag died with a NameError on exactly the runs it was
+    for. Found by a type checker, not a run -- the probe path had never been
+    taken.
+    """
+    base = hdr + (seg - 0x1000) * 16
+    scored = {}
+    for ofs in range(0, 0x1000):
+        chunk = blob[base + ofs:base + ofs + WINDOW]
+        if len(chunk) <= ANCHOR:
+            break
+        anchor = bytes(chunk[:ANCHOR])
+        for _, image in images:
+            at = image.find(anchor)
+            if at < 0:
+                continue
+            got, _, _ = walk(chunk, image[at:at + len(chunk)], False)
+            # A match that never stops inside the window is shared-unit or
+            # RTL code that is identical in both builds -- real, but not the
+            # lost routine the probe is hunting, and long enough to drown it.
+            if got < len(chunk) and got > scored.get(ofs, 0):
+                scored[ofs] = got
+    starts = [(ofs, got) for ofs, got in scored.items()
+              if got >= MINIMUM and got > scored.get(ofs - 1, 0)]
+    starts.sort(key=lambda t: (-t[1], t[0]))
+    return starts[:3]
 
 
 def locate(orig, images, fragment=False):

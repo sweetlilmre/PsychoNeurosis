@@ -296,6 +296,12 @@ def main(argv):
         # "Error 15: File not found (P2VGA.TPU)" the moment a part arrived
         # that uses anything else.
         targets = deps_first(sel)
+    elif not selftest:
+        # The full build needs the same ordering: TPC runs without /M, so a
+        # program staged ahead of a unit it uses fails with Error 15. NAMES
+        # order stopped being a build order the day TPART0 (uses Detect) was
+        # added above DETECT.PAS.
+        targets = deps_first(targets)
     write_batch(targets)
 
     print(f"staged {len(targets)} file(s) into build/: {', '.join(targets)}")
