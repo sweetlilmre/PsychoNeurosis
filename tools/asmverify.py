@@ -228,8 +228,8 @@ def built_images():
     the TP* harnesses plus the three whole-program reconstructions.
     """
     ours = sorted(RUN.glob("TP*.EXE"))
-    ours += [RUN / n for n in ("PSYCHO.EXE", "STARTUP.EXE", "BYEBYE.EXE")
-             if (RUN / n).exists()]
+    if (RUN / "PSYCHO.EXE").exists():
+        ours.append(RUN / "PSYCHO.EXE")
     return [(p.name, p.read_bytes()) for p in ours]
 
 

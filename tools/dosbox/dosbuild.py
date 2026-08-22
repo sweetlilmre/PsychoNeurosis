@@ -35,9 +35,13 @@ DOSBOX = Path(r"D:\DOSBox-X\dosbox-x.exe")
 # Pascal identifier and is independent of the filename, but TP7 finds units BY
 # FILENAME, so `uses Part3Sprites` must become `uses P3Sprite`.
 NAMES = {
+    # The whole-program reconstructions build under part-tier harness names:
+    # TPART0 is the setup (STARTUP.PAS) and TPART9 the end screen
+    # (BYEBYE.PAS), consistent with TPART1..7. The sources keep the names
+    # the originals' debug info recovered.
     "PSYCHO.PAS":     ("PSYCHO.PAS",   "Psycho",        "Psycho"),
-    "BYEBYE.PAS":     ("BYEBYE.PAS",   "ByeBye",        "ByeBye"),
-    "STARTUP.PAS":    ("STARTUP.PAS",  "Startup",       "Startup"),
+    "BYEBYE.PAS":     ("TPART9.PAS",   "ByeBye",        "ByeBye"),
+    "STARTUP.PAS":    ("TPART0.PAS",   "Startup",       "Startup"),
     "DETECT.PAS":     ("DETECT.PAS",   "Detect",        "Detect"),
     "VGA.PAS":        ("VGA.PAS",      "VGA",           "VGA"),
     "DEMOVT.PAS":     ("DEMOVT.PAS",   "DemoVT",        "DemoVT"),
