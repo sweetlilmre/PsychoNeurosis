@@ -10,6 +10,9 @@
 
 unit P1S5;
 
+{$G+}   { 286: the binary's Scene5 pushes immediates (68 00 A0 at 12c5:0a9c)
+          and closes with LEAVE -- $G+ codegen throughout the segment. }
+
 interface
 
 procedure Scene5;
@@ -575,19 +578,20 @@ end;
   -------------------------------------------------------------------------- }
 procedure Load;
 var
-  F : file;
-  I : Integer;
+  F   : file;
+  I   : Integer;
+  { The palette is a LOCAL in the original -- Load's frame is ENTER $482 and
+    the second BlockRead lands at [BP-$481], which then goes straight to
+    VGA.SetPalette768 (12c5:0473 -> 1491:01c2). Nothing keeps a copy. }
+  Pal : array[0..767] of Byte;
 begin
-  if Work = nil then GetMem(Work, 64000);
-  WorkSeg := Seg(Work^);
-
   Assign(F, 'neurosis.dat');
   Reset(F, 1);
   Seek(F, $03BB02);
   BlockRead(F, ObjMeta, SizeOf(ObjMeta));
-  BlockRead(F, Palette, 768);
+  BlockRead(F, Pal, 768);
+  SetPalette768(@Pal);                 { before the Close, as the binary has it }
   Close(F);
-  SetPalette;
 
   FillChar(Mem[VirtScrSeg : 0], 64000, 0);
   for I := 100 to 255 do
@@ -598,10 +602,46 @@ begin
     DrawLine(0, I, $13F, I, $FF - (I - $85), VirtScrSeg);
 end;
 
+{ --------------------------------------------------------------------------
+  12c5:0a60 -- the work-buffer setup, a routine of its own in the binary.
+
+  GetMem straight off (no nil test -- Scene5 frees it on the way out, so a
+  second run allocates again), and the buffer is CLEARED before anything
+  draws into it. Load used to allocate lazily here and never cleared, so the
+  first frame blitted whatever the heap held.
+  -------------------------------------------------------------------------- }
+procedure AllocWork;
+begin
+  GetMem(Work, 64000);                 { 12c5:0a64 }
+  WorkSeg := Seg(Work^);               { 12c5:0a73 }
+  ClearScreen(WorkSeg, 0);             { 12c5:0a7c }
+end;
+
+{ --------------------------------------------------------------------------
+  12c5:0a89 -- Demo_Scene5.
+
+      while KeyPressed do ReadKey      12c5:0a8c -- its own flush, inline
+      ClearScreen($A000, 0)            12c5:0a9c
+      AllocWork                        12c5:0aa6 -> 0a60
+      Load                             12c5:0aa9 -> 0413
+      VectorRun                        12c5:0aac -> 0870
+      FreeMem(Work, 64000)             12c5:0aaf
+
+  THE ORDER IS THE POINT (plan: part1-s4s5-palette). The screen is blanked
+  to colour 0 BEFORE Load rewrites the whole DAC, so the palette swap
+  happens over black and is invisible. This unit used to go straight into
+  Load, which recoloured scene 4's still-displayed final frame and left it
+  on show for the whole file read and backdrop build -- the glitch seen at
+  the scene 4 to 5 transition.
+  -------------------------------------------------------------------------- }
 procedure Scene5;
 begin
+  while KeyPressed do ReadKey;
+  ClearScreen(VGASeg, 0);
+  AllocWork;
   Load;
   VectorRun;
+  FreeMem(Work, 64000);
 end;
 
 end.

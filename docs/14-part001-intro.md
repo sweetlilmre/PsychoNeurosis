@@ -133,6 +133,8 @@ The welcome scroller text lives in this segment at `1107:070A`:
 
 `Demo_Scene5` `12c5:0a89`, effect at `Vector_Run` `12c5:0870`.
 
+The scene body's order matters at the 4→5 transition (plan `part1-s4s5-palette`): it flushes the keyboard inline, blanks the screen with `ClearScreen($A000, 0)`, allocates and clears the 64,000-byte work buffer (`12c5:0a60`), and only THEN does `Vector_Load` (`12c5:0413`) rewrite the whole DAC — so the palette swap happens over black. A reconstruction that loads first recolours scene 4's still-displayed final frame for the whole file read and backdrop build, which is exactly the glitch the first observation run reported. `Vector_Load` reads the palette into a stack local and hands it to `VGA.SetPalette768` (`1491:01c2`); the scene ends with `FreeMem(Work, 64000)`.
+
 Two 3-D objects compiled into DGROUP as integer coordinate triples, converted
 to Real at load time by `Math_IntToReal` (`1483:0000`) into 12-byte records:
 

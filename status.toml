@@ -143,6 +143,11 @@ finding = "part 006 looked identical bar possibly slight timing; a careful scene
 seen_in = "TPART6"
 state = "open"
 
+[plan.row."001 12c5:0a89"]
+label = "Demo_Scene5 preamble"
+investigation = "part1-s4s5-palette"
+note = "Scene5 in the binary flushes keys, does ClearScreen($A000,0), then AllocWork (12c5:0a60: GetMem+clear of the work buffer), THEN Load rewrites the DAC -- so the palette swap happens over black. Ours went straight into Load, recolouring scene 4's still-displayed frame for the whole file read and backdrop build. Scene5 rebuilt to the binary's structure (also: palette is a Load local passed to VGA.SetPalette768, FreeMem(Work) on exit, and P1S5 needs $G+). Opcode-identical modulo fixups after the fix."
+
 [plan.row."003 120f:00fe"]
 label = "Waves_Step erase/draw BASM"
 investigation = "part3-s6-left-dark"
