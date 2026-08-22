@@ -93,36 +93,24 @@ stays `$G-`: its byte-identical artefact proves that is what the original was.
 
 ---
 
-## The x87 code runs through TP7's emulator interrupts; the originals were patched to raw opcodes
+## NOT a deviation: the x87 emulator traps, and the `_fpu` files' provenance
 
-**What the original does:** the `_fpu` binaries carry raw `9B`+ESC x87
-encodings. Measured on 22 Aug 2026, they are a **post-build patch** of the
-base variants: `NEUROSIS_003.exe` and `NEUROSIS_003_fpu.exe` are the same
-size and differ exactly by TP7's `CD 34..3D` emulator-interrupt pairs
-rewritten in place (`CD 34+n` → `9B D8+n`, `CD 3C 98+n` → `9B 2E D8+n`,
-`CD 3D` → `90 9B`).
+Recorded because a session on 22 Aug 2026 built an elaborate wrong theory
+here — that the `work/split/*_fpu.exe` binaries were 1994 release variants
+someone had patched to raw x87, making our `$E+` builds a deviation. **They
+are not.** The author had no x87 in 1994; the real release is the base
+binaries only, carrying TP7's `CD 34..3D` emulator traps exactly as our
+builds do, and the `_fpu` files were derived IN THIS PROJECT as disassembly
+aids — `docs/02-fpu-emulator.md` documents the trap encoding and how to undo
+it, and is the file to read before theorising. At run time Borland's RTL
+patches the traps back to real FP opcodes at startup when an FPU is present,
+so ours and the originals run identical x87 paths under DOSBox. No
+deviation, no speed difference from this mechanism.
 
-**What we do instead:** ship the unpatched form TP7 always emits — `$E` only
-controls linking the emulator, not the encoding, so every FPU instruction in
-a `{$N+}` unit costs an INT/IRET dispatch at run time even with an FPU
-present.
-
-**Why:** replicating the patch safely needs the patcher's site knowledge. A
-byte-scanning reimplementation was written and validated against all six
-original variant pairs, and it FAILED the byte-identity test both ways: the
-real tool left alone coincidental `CD 3x` pairs inside ordinary integer code
-(`FE CD 3A` at file offset `0x3747` of `NEUROSIS_003.exe` is `DEC CH` + a
-`CMP` — patching it corrupts the code) and the emulator RTL's own interior,
-and neither class is distinguishable by scanning bytes. The MZ relocation
-table does not mark the sites either (checked: 22 of 61 patched runs have a
-reloc within two bytes, 39 do not).
-
-**Effect on output:** none on pixels; a bounded per-FPU-op time cost in the
-`{$N+}` scenes, largest where trig runs per frame.
-
-**What would close it:** the period patch tool itself, or an exact site list
-per executable (e.g. derived by disassembly from each segment's entry), fed
-to a patcher that refuses everything else.
+One measured detail worth keeping: byte comparisons against the `_fpu`
+files show 2-byte `CD 3x` vs `9B Dx` holes at every FPU instruction — that
+is the readability patch, not a transcription error. `tools/shapediff.py`
+compares against the BASE binaries for exactly this reason.
 
 ---
 
