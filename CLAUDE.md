@@ -40,15 +40,15 @@ Then all the checks, which **all pass** as of `5c764e5`:
 
 **The census needs the sibling repo's path on the command line**, because a machine path may never appear in a committed file.
 
-## The state of this working tree, as of 19 Aug 2026
+## The state of this working tree, as of 22 Aug 2026
 
-**The reconstruction work in flight is now committed**, on `vangelistracker-build`: parts 005–007 split by scene, the regenerated harnesses, the `@asm` marker sweep, and the parts 003/004 work. Before this the tree carried roughly 60 modified and two dozen untracked files, and an earlier version of this section warned that four of them were someone else's and not to be staged. **That warning was wrong** — the changes were the knowledge-base sessions' own, and they cite the wayfinder map to prove it. Treat a "not mine" claim here as needing a check against the diff, not as fact.
+**Everything is committed and pushed on `vangelistracker-build`, the issue tracker is empty, and the one queue of work is the plan**: `.venv/Scripts/python.exe toolkit/pascal/plan.py status.toml --report` — five investigations, defect-first, worked directly without a map. This is where the toolkit meets the hard parts, per the acceptance-test verdict's reservation.
 
-The repo now has a remote: private `sweetlilmre/PsychoNeurosis`, default branch `main`. **`main` is behind `vangelistracker-build`** and the reconstruction lives on the branch. Note that history already contains third-party bytes — `bin/NEUROSIS.008` and `work/split/NEUROSIS_008.exe` are DemoVT — which is acceptable only while the repo stays private, and is a blocker on ever making it public.
+The remote is private `sweetlilmre/PsychoNeurosis`, default branch `main`. **`main` is behind `vangelistracker-build`** and everything lives on the branch. History contains third-party bytes — `bin/NEUROSIS.008` and `work/split/NEUROSIS_008.exe` are DemoVT — acceptable only while the repo stays private, and a blocker on ever making it public. A lesson kept from an earlier version of this section: treat a "not mine" claim about tree contents as needing a check against the diff, not as fact.
 
-**`docs/continuation.md` is the marker file for where to go next, and it is deliberately NOT tracked** — `.gitignore` excludes it. It is a local working register, it carries real local paths, and its content is nobody's deliverable. Read it first for the reconstruction job. Its tracked history up to 19 Aug 2026 is in the log under its old name, `docs/24-continuation.md`.
+**`docs/continuation.md` is the marker file for where to go next, and it is deliberately NOT tracked** — `.gitignore` excludes it. It is a local working register, it carries real local paths, and its content is nobody's deliverable. Read it first for the reconstruction job; its dated block at the top is current. Its tracked history to 19 Aug 2026 is in the log under its old name, `docs/24-continuation.md`.
 
-**A note left deliberately: the three tracked docs still want a read.** `docs/23-deviations.md` and `docs/25-part4-notes.md` were committed on 19 Aug 2026 without their prose being audited, and `docs/23-deviations.md` is known to quote two different `asmverify.py` counts in one file. `docs/README.md` still indexes 28 numbered documents and now numbers one that no longer exists. None of that is load-bearing for a build, so it was not fixed under a commit-everything instruction — but it is unfinished, and the ledger audit ([#4](https://github.com/sweetlilmre/PsychoNeurosis/issues/4)) is the place that says what to distrust.
+**The old note about unaudited docs is retired**: `docs/README.md`'s index and status table were brought current and `docs/23-deviations.md`'s conflicting `asmverify` counts fixed on 22 Aug 2026. `docs/research/` remains inputs-not-conclusions per its own README, and the ledger audit ([#4](https://github.com/sweetlilmre/PsychoNeurosis/issues/4)) still says what to distrust in the older material.
 
 ## Working the knowledge base
 

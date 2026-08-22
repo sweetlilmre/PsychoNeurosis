@@ -145,7 +145,7 @@ DGROUP offsets. Three or more differing bytes in a row is an opcode change and
 fails. Lengths are locked in the tool, so a change that shortens a match is a
 regression.
 
-    56 routine(s): 55 locked, 0 not locked, 1 unconfirmed, 0 failing.
+    74 routine(s): 71 locked, 3 not locked, 0 unconfirmed, 0 failing.
 
 A marker may also declare a **fragment** -- `{ @asm 003 11f3:0105 +32 BlockUp }`
 -- meaning "compare exactly 32 bytes from here and do not expect a return".
@@ -153,8 +153,10 @@ Some of the demo's assembler is inline inside a compiled Pascal routine, so
 there is no routine to walk to the end of.
 
 **Nothing is unconfirmed.** The `?` suffix exists for an address that has not
-been verified, and no marker currently carries one: 71 routines, 71 locked,
-0 failing.
+been verified, and no marker currently carries one. The three "not locked"
+are `DETECT.PAS`'s probes, matched end to end but not yet in the tool's
+frozen `EXPECTED` table -- the committed lock for them is `status.toml`,
+where the ratchet holds coverage at 74.
 
 Routines whose Pascal body merely *contains* an `asm` block carry no marker
 unless the assembler is declared as a fragment -- there is no whole-routine

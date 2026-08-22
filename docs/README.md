@@ -27,8 +27,19 @@ Goal: understand every effect, then reconstruct the original source.
 | 17 | [Part 005 — rotozoomer](17-part005.md) | Segment:offset texture addressing |
 | 18 | [Part 006 — credits](18-part006-credits.md) | Line wipes and the 4000-dot whooshtext |
 | 19 | [Part 007 — FLIC player](19-part007-flic.md) | Full Autodesk FLIC chunk decoder |
-| 20 | [Parts 000 and 009](20-parts000-009-setup-and-end.md) | Setup program that writes NEUROSIS.CFG; end screen |
+| 20 | [Parts 000 and 009](20-parts000-009-setup-and-end.md) | Setup program that writes NEUROSIS.CFG; end screen — superseded by 30 and 31 where they disagree |
 | 09 | [Spotting hand assembler](09-hand-assembler.md) | Telling compiled Pascal from hand-written asm |
+| 22 | [Part 002, Scene 2](22-part002-scene2.md) | The solid 3-D object scene, read from the binary |
+| 23 | [Deliberate deviations](23-deviations.md) | Everything the reconstruction knowingly does differently, and why |
+| 25 | [Part 004 working notes](25-part4-notes.md) | The Lemmings disassembly, block by block |
+| 26 | [Part 005 working notes](26-part5-notes.md) | The rotozoomer part, read from the binary |
+| 27 | [Part 006 working notes](27-part6-notes.md) | The credits part, read from the binary |
+| 28 | [Part 007 working notes](28-part7-notes.md) | The FLIC player, read instruction by instruction |
+| 29 | [PSYCHO.EXE charted](29-psycho-launcher.md) | The launcher: three EXECs, an exit-code protocol, byte-identical rebuild |
+| 30 | [BYEBYE.PAS charted](30-byebye.md) | The end screen, read mostly from its debug info; byte-identical rebuild |
+| 31 | [STARTUP.PAS charted](31-startup.md) | Setup: the demo chain is authored here; byte-identical rebuild |
+
+(24 is deliberately absent: it became the untracked local marker `continuation.md`.)
 
 ## Layout
 
@@ -51,17 +62,19 @@ are listed at the foot of the individual documents and are all minor.
 
 | Part | File | Status |
 |---|---|---|
-| `PSYCHO.EXE` | launcher | understood |
-| `NEUROSIS.000` | setup (`STARTUP.PAS`) | **understood** — writes NEUROSIS.CFG |
-| `NEUROSIS.001` | intro | **complete** |
-| `NEUROSIS.002` | house + Enterprise | **complete** |
-| `NEUROSIS.003` | "Techno Tick" | **complete** |
-| `NEUROSIS.004` | **Lemmings game** | **complete** |
-| `NEUROSIS.005` | terrain / rotozoom / heightmap | **complete** |
-| `NEUROSIS.006` | credits / whooshtext | **complete** |
-| `NEUROSIS.007` | FLIC player | **complete** |
-| `NEUROSIS.008` | DemoVT (third-party) | LZEXE-packed, out of scope |
-| `NEUROSIS.009` | end screen (`BYEBYE.PAS`) | **understood** |
+| `PSYCHO.EXE` | launcher (`PSYCHO.PAS`) | **byte-identical rebuild** (`TPSYCHO`), guarded in `status.toml` |
+| `NEUROSIS.000` | setup (`STARTUP.PAS` + `DETECT`) | **byte-identical rebuild** (`TPART0`), guarded in `status.toml` |
+| `NEUROSIS.001` | intro | reconstructed; observed `differs` at R2 — see the plan |
+| `NEUROSIS.002` | house + Enterprise | reconstructed; observed `differs` at R2 — see the plan |
+| `NEUROSIS.003` | "Techno Tick" | reconstructed; observed `differs` at R2 — see the plan |
+| `NEUROSIS.004` | **Lemmings game** | reconstructed; observed `differs` at R2 (scene tier) |
+| `NEUROSIS.005` | terrain / rotozoom / heightmap | reconstructed; observed `differs` at R2 — see the plan |
+| `NEUROSIS.006` | credits / whooshtext | reconstructed; observed `differs` at R2, closest match |
+| `NEUROSIS.007` | FLIC player | reconstructed; observed **`matches` at R3** |
+| `NEUROSIS.008` | DemoVT (third-party) | LZEXE-packed, out of scope — see the `VangeliSTracker` repo |
+| `NEUROSIS.009` | end screen (`BYEBYE.PAS`) | **byte-identical rebuild** (`TPART9`), guarded in `status.toml` |
+
+"See the plan" means the `[plan]` section of `status.toml` — five investigations, defect-first, reported by `toolkit/pascal/plan.py`. Observations and rungs live in `status.toml` too; the register is the authority, this table is a snapshot from 22 Aug 2026.
 
 ## Building
 

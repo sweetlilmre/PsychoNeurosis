@@ -173,7 +173,7 @@ Between reads 3 and 4 it runs `Effect_ColumnSlideIn`, `Delay($514)` = 1300,
 then 64 x `FadeStep`. After read 20 it sets the palette and blacks entries
 `$E0`..`$E9`.
 
-Blocks 1, 13, 17 and 18 are not yet identified.
+Blocks 1, 13, 17 and 18 were the last to be identified -- see the final section.
 
 ---
 
