@@ -27,6 +27,7 @@ end;
 
 var
   F : file;
+  I : Integer;
 begin
   Assign(F, 'neurosis.dat');
   {$I-} Reset(F, 1); {$I+}
@@ -48,6 +49,9 @@ begin
   SetMode13h;
   VirtScrAlloc;
   MusicDetect;          { harmless with no player resident }
+  for I := 1 to 255 do SetRGB(I, 0, 0, 0);
+  { the blue ramp scene 5 leaves - PART3_BLOCKS.Ramp, 11f3:0072..00a7 }
+  for I := 1 to 221 do SetRGB(I, 0, 0, Round(I * 0.2) + 19);
   Scene6;
 
   VirtScrFree;

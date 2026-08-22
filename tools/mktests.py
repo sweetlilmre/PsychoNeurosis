@@ -41,6 +41,18 @@ VGA_CLOSE = """  VirtScrFree;
   SetTextMode;
 """
 
+# Scene 6 of part 003 draws with colours 0..178 (Phase shr 1) and never
+# loads a palette: in the part it runs on whatever scene 5 leaves in the DAC.
+# The blocks scene blanks entries 1..255 and lays its blue ramp over 1..221
+# (11f3:0048..00a7), and its reveal/hide arithmetic returns every PIXEL to
+# zero without touching the DAC again -- so that ramp IS scene 6's palette.
+# The harness recreates it, or the waves run in mode 13h's default colours.
+P3S6_OPEN = VGA_OPEN + """  for I := 1 to 255 do SetRGB(I, 0, 0, 0);
+  { the blue ramp scene 5 leaves - PART3_BLOCKS.Ramp, 11f3:0072..00a7 }
+  for I := 1 to 221 do SetRGB(I, 0, 0, Round(I * 0.2) + 19);
+"""
+P3S6_VARS = "  I : Integer;" + NL
+
 # Part 002 links the same VGA and DemoVT units as everything else -- it just
 # adds ModeX, P2View and FixMath on top, and each of its two scenes sets up
 # its own video mode.
@@ -113,7 +125,7 @@ SCENES = [
      "part 003 scene 4 -- the globe"),
     ("TP3S5", "Part3Blocks",  "Scene5", VGA_USES, VGA_OPEN, VGA_CLOSE,
      "part 003 scene 5 -- the blocks"),
-    ("TP3S6", "Part3Waves",   "Scene6", VGA_USES, VGA_OPEN, VGA_CLOSE,
+    ("TP3S6", "Part3Waves",   "Scene6", VGA_USES, P3S6_OPEN, VGA_CLOSE,
      "part 003 scene 6 -- the waves"),
     ("TP3S7", "Part3Sprites", "Scene7", VGA_USES, VGA_OPEN, VGA_CLOSE,
      "part 003 scene 7 -- the spinning portraits"),
@@ -212,7 +224,7 @@ uses %(uses)s, %(unit)s;
 
 %(exit)svar
   F : file;
-begin
+%(vars)sbegin
   Assign(F, 'neurosis.dat');
   {$I-} Reset(F, 1); {$I+}
   if IOResult <> 0 then
@@ -241,9 +253,17 @@ HOOK = """
 """
 
 
+# Harnesses whose opening needs a variable of its own beyond the file check's
+# F. Keyed by program name; the declaration lands in the main var block.
+EXTRA_VARS = {
+    "TP3S6": P3S6_VARS,
+}
+
+
 def write(prog, unit, entry, uses, opening, closing, what):
     text = (HEAD % dict(prog=prog, unit=unit, uses=uses, what=what,
-                        pad=" " * len(prog), exit=EXIT_PROC, hook=HOOK)
+                        pad=" " * len(prog), exit=EXIT_PROC, hook=HOOK,
+                        vars=EXTRA_VARS.get(prog, ""))
             + opening
             + "  %s;\n\n" % entry
             + closing
