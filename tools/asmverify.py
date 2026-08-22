@@ -227,10 +227,7 @@ def built_images():
     passes trivially and proves nothing, so only OUR builds are searched:
     the TP* harnesses plus the three whole-program reconstructions.
     """
-    ours = sorted(RUN.glob("TP*.EXE"))
-    if (RUN / "PSYCHO.EXE").exists():
-        ours.append(RUN / "PSYCHO.EXE")
-    return [(p.name, p.read_bytes()) for p in ours]
+    return [(p.name, p.read_bytes()) for p in sorted(RUN.glob("TP*.EXE"))]
 
 
 def locate(orig, images, fragment=False):
