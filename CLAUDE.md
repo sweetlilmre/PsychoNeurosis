@@ -13,51 +13,24 @@ Asphyxia's first megademo, 1994. Borland Pascal 7 plus hand-written assembler, r
 
 **The vocabulary is split by what travels.** [`kit/wiki/CONTEXT.md`](kit/wiki/CONTEXT.md) holds the METHOD's words -- artefact, instrument, blind spot, toolkit, core, driver, compare tool, allowed-difference rule, scratch folder, harness, marker, fragment, ratchet, plus gate, rung, strand, stance, provenance and the rest of the wiki's own terms -- and it goes wherever `kit/` goes. [`CONTEXT.md`](CONTEXT.md) at the root keeps only THIS target's words: part, scene, plan, investigation, plan row. Read both before arguing about any of them; the split was made under [#42](https://github.com/sweetlilmre/PsychoNeurosis/issues/42) and the test for which side a word belongs on is whether a different binary would need it rewritten.
 
-## Running the toolkit — read this before touching anything, as of 20 Aug 2026
+## The kit
 
-**It needs a virtual environment.** `pyyaml` is the only third-party dependency; TOML is read with stdlib `tomllib`, so Python 3.11+ is required.
+`kit/` is a submodule on [re-kit](https://github.com/sweetlilmre/re-kit) -- the reusable programs and the field manual. **Run `git submodule update --init kit` before anything else**: without it `kit/` is empty and every command below fails on a missing file without naming the cause.
 
-    git submodule update --init kit          # FIRST -- see below
+**Read [`kit/WORKING.md`](kit/WORKING.md) first.** It holds how to pick up the next piece of work, which instrument answers which question, the checks and when to run them, and the standing rules. This file holds only what is true of THIS target.
+
+`kit.toml` answers what the kit needs to know about this project; `kit.local.toml`, which git ignores, holds the machine paths. Neither is hand-written -- the kit's setup wizard writes them.
+
+    git submodule update --init kit
     uv venv .venv
     uv pip install --python .venv/Scripts/python.exe -e kit/tools
 
-**`kit/` IS A SUBMODULE**, pointing at [sweetlilmre/re-kit](https://github.com/sweetlilmre/re-kit) -- the portable half, extracted with its history on 23 Aug 2026 ([#44](https://github.com/sweetlilmre/PsychoNeurosis/issues/44)). A clone made without `--recurse-submodules` has an EMPTY `kit/`, and every command below then fails on a missing file without naming the cause, so that line comes first.
+**This target's own checks**, on top of the kit's list in `kit/WORKING.md`. Both are frozen originals awaiting [#36](https://github.com/sweetlilmre/PsychoNeurosis/issues/36):
 
-**The gitlink records WHICH kit this project is on**, which is the point of the submodule rather than a copy: `git -C kit log --oneline -1` says, and `git diff --submodule` shows a move. To take a newer kit: `git -C kit pull`, run the checks, then commit the new gitlink here -- a kit change and its acceptance are two separate acts, deliberately.
+    python tools/paslint.py             # non-ASCII bytes in a DOS source, and four other defects
+    python tools/encaudit.py            # text I/O that leaves the encoding to the locale
 
-**To change the kit while working here**: edit inside `kit/`, commit and push from there (`git -C kit push`), then commit the gitlink. Push with `git push --recurse-submodules=check`, which refuses if the commit this project pins is not on a remote the other consumer can fetch.
-
-**The install works and the kit still runs without it.** Both are deliberate: `python kit/tools/pascal/plan.py --report` works on a fresh clone with nothing installed, which is how a first session starts, so there are no console entry points to require an install before the first command. The install exists so a consumer can `import`: `from substrate import align`, `import project`. It failed silently for as long as it was documented -- `pyproject.toml` declared no `[build-system]` and no packages, so setuptools refused the flat layout of `substrate`/`pascal`/`wikitools` -- and nobody noticed because every command below runs a script by path. Fixed under [#39](https://github.com/sweetlilmre/PsychoNeurosis/issues/39) by declaring the three packages rather than moving any file.
-
-Then all the checks. **They all pass, and the list is run in full at the end of any session that touches the kit** -- a commit hash here would go stale, and this file has been wrong three times in one day already.
-
-    V=.venv/Scripts/python.exe
-
-    $V kit/tools/wikitools/okfcheck.py
-    $V kit/tools/wikitools/kbprofile.py          # --write regenerates
-    $V kit/tools/wikitools/glossary.py
-    $V kit/tools/pascal/markers.py --emit build/measured.toml
-    $V kit/tools/pascal/ratchet.py --measured build/measured.toml
-    $V kit/tools/pascal/observe.py --report
-    $V kit/tools/pascal/artefact.py --check
-    $V kit/tools/pascal/plan.py --report
-    $V kit/tools/census.py
-    $V kit/tools/pascal/shared_asm.py --gate    # asm duplicated between units instead of shared as an .INC
-    $V kit/tools/pascal/routines.py     # the per-routine byte check; --emit feeds the ratchet
-    python tools/paslint.py
-    python tools/encaudit.py                    # add a dir argument for kit/tools/*, it does not scan it
-
-**No paths and no numbers in that list, and both absences are the point.** Every program in the kit asks [`kit.toml`](kit.toml) where this repository keeps things -- the sources, the wiki, the register, the exempt list, the script roots -- and prints which answer it used and where it came from, so a disagreement with the tree is visible. An explicit path on the command line still wins; it is now the exception. Machine-specific paths, which may never be committed, live in the untracked `kit.local.toml` and override `kit.toml` key by key: that is how the sibling repository's root reaches the census. Neither file is hand-written -- the kit's setup wizard writes them ([#40](https://github.com/sweetlilmre/PsychoNeurosis/issues/40)).
-
-**The routine lock lives in the register too, not in a tool.** `kit/tools/pascal/routines.py` is the successor to `tools/asmverify.py` and reads its locked lengths from `status.toml`'s `[routine.*]`, where a rise happens by itself and a lowering is a visible data change. The two agree on all 77 routines -- name, source, part, address, matched bytes, holes and which built image -- and the frozen one keeps working until [#36](https://github.com/sweetlilmre/PsychoNeurosis/issues/36) deletes it.
-
-**The coverage number comes from the scan that measures it.** `markers.py --emit` writes what it counted and `ratchet.py --measured` reads it. It used to be typed into the command above as `--coverage 76` while the scan measured 78, so the ratchet sat two below the truth and could not have noticed a real fall -- which is the ratchet's own hole number one, *the lock sits stale-low*, surviving in the one number a person still typed.
-
-**`status.toml` at the root is the status register**, and it is the ratchet: coverage may only rise, a byte match may not shorten, and an achieved rung may not fall unless the *target* is lowered with a reason. `achieved`, `matched` and every `[observation.*]` are **measured** and must never be hand-edited; `[plan]` is **decided** — an ordered list of investigations whose order is the priority, written only through `plan.py`. All three writers serialise through `kit/tools/pascal/register.py`, which refuses on a section it does not know rather than dropping it.
-
-**The first observations were recorded on 21 Aug 2026** ([#18](https://github.com/sweetlilmre/PsychoNeurosis/issues/18)): seven runs by pe, six `differs` at R2 and one R3 — `TPART7` matches its original. The 22 scene harnesses remain at R0. Recording an observation nobody made is the one thing `observe.py` exists to prevent.
-
-**The census needs the sibling repo's path on the command line**, because a machine path may never appear in a committed file.
+**The Pascal sources are LF on disk** despite the CRLF rule, because `.gitattributes` marks them `-text` and they were authored that way; Turbo Pascal reads them regardless. Do not "fix" this in bulk -- it would rewrite every source file for no measured gain.
 
 ## The state of this working tree, as of 22 Aug 2026
 
@@ -73,35 +46,22 @@ The remote is private `sweetlilmre/PsychoNeurosis`, default branch `main`. **`ma
 
 It is a wayfinder map on GitHub Issues: tickets are sub-issues, blocking is native, and the frontier is the open, unblocked, unassigned ones. **Its governing rule is copy and adjust, never refactor the originals** — `tools/*`, `docs/*` and the VangeliSTracker scripts stay exactly as they are; anything generic gets *copied* into the knowledge base and adapted there. Refactoring the originals to consume it is a later, separate effort, and executing the demo cleanup is out of scope for that map.
 
-## Standing rules
+## Standing rules for this target
 
-- **Never re-express hand-written assembler as Pascal.** Transcribe it verbatim, comment every line, and put equivalent Pascal above it as a comment.
-- **A measurement beats an argument.** Every confident claim about the compiler in this project's history has a roughly one-in-six survival rate; put the claimed difference in a probe and let a build settle it.
-- **Distrust the verifier before the transcription.** The verify tooling has been wrong more often than the code it judged. Check a surprising measurement a second way.
-- Prose in markdown is never hard-wrapped. Commits carry `Co-authored-by: Claude <noreply@anthropic.com>`.
-- **Encoding and line endings split by who reads the file, and every script must say which it means.** Never rely on the locale: Windows' is cp1252, so a bare `open`/`read_text`/`write_text`, or a `subprocess` with `text=True`, silently decodes UTF-8 as cp1252. That has already mojibaked two documents and produced two false comparisons.
+**The method's rules are in [`kit/WORKING.md`](kit/WORKING.md)** -- the verbatim stance, *a measurement beats an argument*, *distrust the verifier before the transcription*, the encoding and line-ending table, prose never hard-wrapped, and the commit trailer. They moved there under [#30](https://github.com/sweetlilmre/PsychoNeurosis/issues/30) because a new target would carry every one of them unchanged. Read that file, not this section, for how to work.
 
-| the file is read by | encoding | line ending |
-|---|---|---|
-| humans and modern tools — `.md` | `utf-8` | LF, so pass `newline='\n'`; Python defaults to CRLF on Windows |
-| a 1990s DOS tool — `.PAS` `.ASM` `.INC` `.MAP` `.BAT` `.CFG` | **`ascii`**, and strictly on write | CRLF |
-| our own scripts' stdout via `subprocess` | `utf-8` | — |
+What is left here is this demo's own:
 
-  `ascii` on a DOS file is a **guard**, not a codec preference: it raises rather than quietly encoding an em dash as two bytes into a file Turbo Pascal will read. `paslint.py` checks for non-ASCII bytes and `build.py` refuses to compile when lint fails, so **write `--` not `—`, and `"` not `“`, in any `.PAS` comment.** `.gitattributes` in both repos enforces the line-ending half.
-- Do not fetch period third-party binaries (LZEXE and friends). That is the user's call.
+- **Do not fetch period third-party binaries** (LZEXE and friends). That is the user's call.
+- **`NEUROSIS.008` is not Asphyxia code.** It is DemoVT, third-party, and its reconstruction lives in the sibling repository. History here contains its bytes, which is acceptable only while this repo stays private and is a blocker on ever making it public.
+- **A "not mine" claim about tree contents needs a check against the diff**, not agreement. That has been wrong before.
 
-## Environment traps that have each cost real time
+## This machine's toolchain
 
-- Git Bash rewrites an argument starting with a slash into a Windows path, so `--sw=/GS` silently compiles **nothing** and reports `0 unit(s) compiled`. Prefix with `MSYS_NO_PATHCONV=1`, or use PowerShell. The same happens to `gh api /repos/...` — call `gh` from Python's `subprocess`, or use the `gh issue` / `gh label` subcommands.
-- **A DOUBLED backslash in a Bash command is halved before bash sees it.** The `command` parameter carries one level of backslash escaping whose only known escape is the backslash itself: `\\` becomes `\`, every other `\x` passes through. Measured — N backslashes arrive as ceil(N/2) (2→1, 3→2, 4→2), while `\'`, `\"`, `\t`, `\n` are untouched. **A lone backslash is safe, so raw Windows paths are fine**; only doubling breaks, and doubling is what a Python literal needs for one backslash. Two failures follow, and they look unrelated: generated scripts get broken string literals (`'\\n'` arrives as `'\n'` — hence the endless `SyntaxWarning: invalid escape sequence '\s'`), and a `\\` next to a quote becomes `\` + quote, which bash reads as an *escaped* quote, unbalancing the command and reporting `unexpected EOF while looking for matching ''` at the wrong line. **So: write scripts with the Write tool and run them**, build backslashes as `chr(92)`, and pass prose via `--body-file` rather than inline.
-- **Something in this environment has twice multiplied every line break in a markdown file** — `VangeliSTracker`'s `00-map.md` (91% blank lines) and this repo's `docs/README.md` (58%). The cause was never found. `tools/repairdoc.py` diagnoses and repairs it, and proves content preservation before writing.
+The traps that come with the tools a session is driven with -- the backslash halving, the slash-to-path rewriting, the multiplied line breaks -- are in [`kit/WORKING.md`](kit/WORKING.md) section 9, because a new project inherits every one of them. What is here is only where this machine keeps things:
 
-**Two of those traps now have mechanisms rather than warnings**, which is the only thing that has ever stopped a blind spot recurring here:
+    DOSBox-X    D:\DOSBox-X\dosbox-x.exe
+    Turbo Pascal 7.01, TASM   C:\TP\BIN, C:\TASM\BIN
+    the DOSBox configs        tools/dosbox/*.conf, mounting build/ and run/
 
-    python tools/encaudit.py     any text I/O that leaves the encoding to the locale
-    python tools/paslint.py      non-ASCII bytes in a DOS source, and four other defects
-    python tools/repairdoc.py    diagnose or repair multiplied line breaks in a document
-
-`encaudit.py` parses rather than pattern-matches, and the reason is worth reading in its docstring: a line-based regex reported 32 sites of which 16 were artifacts while missing 4 real ones, and parenthesis-matching then flagged the tool's own docstring. Both trees are currently clean.
-
-**The backslash trap has already cost this project a file.** `tools/emit_p6text.py` sat with a literal newline inside a string literal — written by an earlier session's heredoc, where the intended `\n` was collapsed — so it never compiled and never produced its output. Found by `encaudit.py` refusing to parse it, and repaired on 19 Aug 2026.
+None of those may appear in a committed file: they live in the untracked `kit.local.toml`, which is the rule that keeps a machine path out of the repository. `tools/dosbox/dosbuild.py` still holds them as constants -- it is a frozen original awaiting [#35](https://github.com/sweetlilmre/PsychoNeurosis/issues/35).
