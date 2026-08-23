@@ -66,3 +66,6 @@ binaries  = "bin"
 # Directories holding scripts, for the retirement census. The sibling
 # repository's root is machine-specific and lives in kit.local.toml.
 roots = ["tools", "kit/tools"]
+# The table itself is this project's data -- a list of THIS pair of repos'
+# scripts -- so it lives here and not beside the tool that reads it.
+table = "docs/census.toml"
