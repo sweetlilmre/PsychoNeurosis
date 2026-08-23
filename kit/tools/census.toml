@@ -336,6 +336,10 @@ state = "decline"
 reason = "dead: its input src/PART1_INTRO.PAS no longer exists, and parts 5-7 were split later without it"
 
 
+[script."staged.py"]
+state = "carry"
+reason = "is a build output still the source it was built from; text not timestamps, and it says unknown where no copy was staged"
+
 [script."strings.py"]
 state = "carry"
 reason = "printable strings, load image only"
