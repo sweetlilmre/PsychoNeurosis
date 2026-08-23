@@ -39,6 +39,8 @@ Goal: understand every effect, then reconstruct the original source.
 | 30 | [BYEBYE.PAS charted](30-byebye.md) | The end screen, read mostly from its debug info; byte-identical rebuild |
 | 31 | [STARTUP.PAS charted](31-startup.md) | Setup: the demo chain is authored here; byte-identical rebuild |
 
+| 32 | [The tool disposition](32-tool-disposition.md) | Where every script goes as the kit absorbs the tooling; generated, and proven to cover the tree |
+
 (24 is deliberately absent: it became the untracked local marker `continuation.md`.)
 
 ## Layout
