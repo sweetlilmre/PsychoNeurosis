@@ -113,13 +113,15 @@ reason = "all 35 executables byte-identical (#35); its data is build.toml, gener
 
 
 [script."emit_byebye.py"]
-state = "carry"
-reason = "generates the end screen's image include"
+state = "archived"
+successor = "none -- spent, output committed"
+reason = "src/gen/P9IMG.INC states its provenance: read out of bin/NEUROSIS.009 at DGROUP+2, 00C3:0002 in the debug info, named IMAGEDATA, 4,000 bytes -- and it names this emitter"
 
 
 [script."emit_costab.py"]
-state = "decline"
-reason = "spent driver; COSTAB.INC is committed. Its content is the assertion that three copies agree"
+state = "archived"
+successor = "none -- spent, output committed"
+reason = "src/asm/COSTAB.INC states its provenance and names this emitter"
 
 
 [script."emit_gain.py"]
@@ -128,13 +130,15 @@ reason = "spent one-shot, output committed. Its VALUE is a property, not code: i
 
 
 [script."emit_p6shape.py"]
-state = "decline"
-reason = "spent one-shot; prints a count only, and did not produce P6SHAPE.INC"
+state = "archived"
+successor = "none -- spent, output committed"
+reason = "src/gen/P6SHAPE.INC states its provenance: NEUROSIS_006_fpu.exe at DS:$000A, 2,048 bytes -- and it names this emitter"
 
 
 [script."emit_p6text.py"]
-state = "decline"
-reason = "spent one-shot, repaired 19 Aug 2026 and run; P6TEXT.INC is committed"
+state = "archived"
+successor = "none -- spent, output committed"
+reason = "src/gen/P6TEXT.INC states its provenance: NEUROSIS_006_fpu.exe at DS:$0C8A, 113 lines -- and it names this emitter"
 
 
 [script."emit_pascal_data.py"]
@@ -209,18 +213,20 @@ reason = "reads the @asm markers out of the source tree"
 
 
 [script."mktests.py"]
-state = "carry"
-reason = "harness generator, two tiers"
+state = "decline"
+reason = "THE RECORD'S. It generates THIS demo's harnesses and would need a scene inventory in the answers file before it could move -- a known future move, named rather than half-done (#17). Its row said `carry`, which read as work outstanding when the decision was to keep it"
 
 
 [script."modex.py"]
-state = "carry"
-reason = "de-interleave four Mode-X planes"
+state = "archived"
+successor = "kit/tools/substrate/modex.py"
+reason = "de-interleaves four Mode-X planes; unchained VGA, nothing about Pascal. VERIFIED: deinterleave() returns an identical 256,000-byte image from both copies. build_assets.py -- which stays with the record -- was repointed at substrate.modex, because it was the one caller that survives"
 
 
 [script."mzinfo.py"]
-state = "carry"
-reason = "MZ header parsing, and LZ91/LZ90 detection"
+state = "archived"
+successor = "kit/tools/substrate/mzinfo.py"
+reason = "MZ headers, and whether the file is bigger than its image. VERIFIED: identical output on bin/NEUROSIS.000. Its opening line named this demo and now states the question instead"
 
 
 [script.'objcheck.py']
@@ -244,8 +250,9 @@ reason = "reads an Intel OMF .OBJ's code and FIXUPP records; copied into the kit
 
 
 [script."p2obj.py"]
-state = "decline"
-reason = "project one-shot: part 002 scene 2's objects"
+state = "archived"
+successor = "none -- spent, output committed"
+reason = "src/gen/P2OBJ.INC states its provenance and names this emitter"
 
 
 [script."pairmap.py"]
@@ -285,8 +292,8 @@ reason = "the ratchet: coverage may only rise"
 
 
 [script."refpath.py"]
-state = "carry"
-reason = "what unpacking DECIDED rather than recovered"
+state = "decline"
+reason = "THE RECORD'S: where DemoVT's reference image is, a fact about that checkout. Its row said `carry`"
 
 
 [script."register.py"]
@@ -295,8 +302,8 @@ reason = "the one writer for status.toml; refuses a section it does not know"
 
 
 [script."relmatch.py"]
-state = "carry"
-reason = "relocation matching"
+state = "decline"
+reason = "THE RECORD'S: how far 1.39b's code matches 1.31's, a fact about that pair of releases rather than about Borland Pascal. Its row said `carry`, and it is the stated exception to the rule that a generic instrument written against one target still moves"
 
 
 [script."repair_map.py"]
@@ -330,8 +337,9 @@ reason = "BP6 prologue and epilogue entry-point scan"
 
 
 [script."segmap.py"]
-state = "carry"
-reason = "segment layout from relocation fixups"
+state = "archived"
+successor = "kit/tools/substrate/segmap.py"
+reason = "real-mode segment layout derived from the relocation table. VERIFIED: identical 9-line output"
 
 
 [script."wizard.py"]
@@ -350,8 +358,9 @@ reason = "assembler duplicated between units instead of shared as one include; w
 
 
 [script."split.py"]
-state = "carry"
-reason = "MZ image from its appended payload"
+state = "archived"
+successor = "kit/tools/substrate/split.py"
+reason = "an MZ image plus its appended payload. VERIFIED: identical output splitting bin/NEUROSIS.008"
 
 
 [script."split_part1.py"]
@@ -365,13 +374,15 @@ state = "carry"
 reason = "is a build output still the source it was built from; text not timestamps, and it says unknown where no copy was staged"
 
 [script."strings.py"]
-state = "carry"
-reason = "printable strings, load image only"
+state = "archived"
+successor = "kit/tools/substrate/strings.py"
+reason = "printable strings, restricted to the load image. VERIFIED: identical 160-line output"
 
 
 [script."symbols.py"]
-state = "carry"
-reason = "Borland debug name pools, magic 0x52FB"
+state = "archived"
+successor = "kit/tools/substrate/symbols.py"
+reason = "the 0x52FB name pools. VERIFIED: identical output"
 
 
 [script."tddump.py"]
@@ -390,13 +401,15 @@ reason = "each compiled unit's code against the segment it rebuilds, by prefix; 
 
 
 [script."unlzexe.py"]
-state = "carry"
-reason = "LZEXE 0.91 container; one idea, currently in both repos"
+state = "archived"
+successor = "kit/tools/substrate/unlzexe.py"
+reason = "LZEXE 0.91. VERIFIED: the unpacked image is BYTE-IDENTICAL, sha256 0177fce7ba1080b1..., from both copies of the unpacker -- the only difference in the run was the output path each was told to write. Both repositories had a copy and now neither does. Its docstring named one file in one demo; it now carries the SHAPE that finding has -- a single packed file in an otherwise unpacked release is often somebody else's code"
 
 
 [script."vecobj.py"]
-state = "decline"
-reason = "project one-shot: 3-D vector objects from DGROUP"
+state = "archived"
+successor = "tools/build_assets.py"
+reason = "THE DISPOSITION'S REASON WAS WRONG and the decision was right. It said 'output committed as src/gen/P1VECT.INC'; that file names emit_pascal_data2.py, and vecobj.py never wrote it -- it writes into assets/. Checked instead: build_assets.py carries its own EMBEDDED table producing the same vector_globe and vector_logo_a, assets/ is committed (163 files), and assets/README.md names build_assets.py as the producer with the DGROUP offsets in its table. So it is spent, superseded by a tool that STAYS with the record"
 
 
 [script."verify.py"]

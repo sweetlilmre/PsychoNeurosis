@@ -231,7 +231,11 @@ def carve_embedded_palettes(manifest):
 
 def build_composites(manifest):
     """De-interleave Mode-X plane sets into the image they actually represent."""
-    from modex import deinterleave
+    # The de-interleaver is the kit's now -- it says nothing about Pascal and
+    # nothing about this demo, so it moved to substrate under #50. This script
+    # stays with the record because its region map is this target's.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "kit" / "tools"))
+    from substrate.modex import deinterleave
     for part, planes, name, w, h, palname in PLANE_SETS:
         d = OUT / f"part{part}"
         data = [(d / f"{p}.raw").read_bytes() for p in planes]
