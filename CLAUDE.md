@@ -18,7 +18,7 @@ Asphyxia's first megademo, 1994. Borland Pascal 7 plus hand-written assembler, r
 
 `kit/` is a submodule on [re-kit](https://github.com/sweetlilmre/re-kit) -- the reusable programs and the field manual. **Run `git submodule update --init kit` before anything else**: without it `kit/` is empty and every command below fails on a missing file without naming the cause.
 
-**Read [`kit/WORKING.md`](kit/WORKING.md) first.** It holds how to pick up the next piece of work, which instrument answers which question, the checks and when to run them, and the standing rules. This file holds only what is true of THIS target.
+**Read [`kit/WORKING.md`](kit/WORKING.md) first, and its section 2a is the loop** -- pick up work, walk the coverage, read the segment, edit, rebuild one target, check BOTH instruments, run it, record it. Sections 1, 2, 2a and 4 are the session and are about a page; 3 and 8 are reference, consulted when you have a question. It also holds when a finding becomes a wiki observation, and how to change the kit from inside this project -- which is two acts, never one. This file holds only what is true of THIS target.
 
 `kit.toml` answers what the kit needs to know about this project; `kit.local.toml`, which git ignores, holds the machine paths. Neither is hand-written -- the kit's setup wizard writes them.
 

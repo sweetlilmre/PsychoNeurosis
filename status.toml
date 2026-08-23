@@ -349,7 +349,7 @@ resolution = "The binary's Demo_Scene5 (12c5:0a89) flushes keys, clears the scre
 
 [[plan.investigation]]
 name = "part5-386-trio"
-finding = "part 005: SinCos/RotatePoint/Project never transcribed; run-time Sin()/Cos() shows as a long pause between scenes 2 and 3"
+finding = "part 005: a multi-second black-screen pause between scenes 2 and 3. FIXED IN CODE, AWAITING A RUN -- do not re-do it. The name is kept because the record cites it, but its premise was wrong twice over: the 386 trio was already transcribed, and the cost was not run-time trig at all. P5S2 compiled under the $N- default, so 3,424 trig calls went through the software six-byte-Real RTL; the original does the same table build in x87 at 1096:051a. {$N+} on P5S2 fixes it and the built TPART5 now carries real x87. The remaining Sin/Cos in P5S2 is FAITHFUL -- 14 emulator traps sit at 1096:051a in the shipped binary -- so it must not be removed. What is owed is one run of TPART5 beside ORIG5, watching that transition."
 seen_in = "TPART5"
 state = "open"
 
