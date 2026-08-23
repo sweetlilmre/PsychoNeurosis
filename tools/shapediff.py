@@ -12,7 +12,15 @@ always one of two things:
     block sampling crawled for a week; or
   * a structural transcription divergence in compiled code (different
     statement shape, different locals), which may be behaviourally fine but
-    is where any pacing gap hides.
+    is where any pacing gap hides; or
+
+  * a routine WE ALREADY HAVE, transcribed under another part's name. The
+    demo reuses whole routines across parts, so a span missing from this
+    part can be sitting verbatim in another unit -- part 001's blitter at
+    1107:0199 is part 006's 100f:0000, instruction for instruction, and had
+    been locked in P6S2.PAS for weeks while this part ran a Pascal rewrite of
+    it. Every span is therefore also looked for in EVERY other built harness,
+    and one that turns up there is a copy job, not a disassembly job.
 
 The alignment reuses asmverify's tolerant differ: 1-2 byte holes are
 displacements, three or more is a real divergence. Spans shorter than
@@ -20,6 +28,10 @@ displacements, three or more is a real divergence. Spans shorter than
 
     python tools/shapediff.py 001            one part
     python tools/shapediff.py all            every part with a harness
+    python tools/shapediff.py 001 --same     also say which other harness
+                                             already has each span
+
+--same costs a search of every built image per span, so it is off by default.
 
 Output lines are  seg:from..to  size  -- read them with the part's unit
 headers: the ADDRESS MAP in each unit says which routine owns the range.
@@ -74,7 +86,28 @@ def load_base(part):
     return blob, hdr
 
 
-def part_report(part, min_span):
+# A span found in another harness has to be long enough that the match is the
+# routine rather than a shared prologue. Twenty-four bytes is three or four
+# instructions past any ENTER/PUSH DS/LDS opening.
+ELSEWHERE = 24
+
+
+def elsewhere(chunk, own_exe):
+    """Which OTHER built harness already contains this original code.
+
+    Returns (image name, bytes that line up) or (None, 0). Our own part is
+    skipped: by construction the span did not align there, and a partial hit
+    inside it is the divergence we are already reporting.
+    """
+    images = [(n, b) for n, b in asmverify.built_images() if n != own_exe]
+    name, image, at = asmverify.locate(chunk, images, fragment=True)
+    if at < 0:
+        return None, 0
+    got, _, _ = asmverify.walk(chunk, image[at:at + len(chunk)], False)
+    return (name, got) if got >= ELSEWHERE else (None, 0)
+
+
+def part_report(part, min_span, same=False):
     info = SEGMENTS[part]
     blob, hdr = load_base(part)
     ours = (RUN / info["exe"]).read_bytes()
@@ -117,7 +150,15 @@ def part_report(part, min_span):
     for seg, a, b in sorted(spans, key=lambda s: s[1] - s[2]):
         if b - a < min_span:
             continue
-        print("  %04x:%04x..%04x  %5d byte(s) unaligned" % (seg, a, b, b - a))
+        note = ""
+        if same:
+            base = hdr + (seg - 0x1000) * 16
+            chunk = blob[base + a:base + min(b, a + asmverify.WINDOW)]
+            where, got = elsewhere(chunk, info["exe"])
+            if where:
+                note = "  -- %d byte(s) of it are already in %s" % (got, where)
+        print("  %04x:%04x..%04x  %5d byte(s) unaligned%s"
+              % (seg, a, b, b - a, note))
         shown += 1
     if not shown:
         print("  no unaligned span >= %d bytes" % min_span)
@@ -125,15 +166,15 @@ def part_report(part, min_span):
 
 def main(argv):
     min_span = MIN_SPAN
+    same = "--same" in argv
     parts = [a for a in argv if not a.startswith("-")]
     for a in argv:
         if a.startswith("--min="):
             min_span = int(a.split("=")[1])
-            parts.remove(a) if a in parts else None
     if parts == ["all"] or not parts:
         parts = sorted(SEGMENTS)
     for p in parts:
-        part_report(p, min_span)
+        part_report(p, min_span, same)
     return 0
 
 

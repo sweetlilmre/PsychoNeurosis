@@ -354,7 +354,7 @@ begin
 end;
 
 { --------------------------------------------------------------------------
-  1107:0199 -- BlitBlob(Src, X, Y, Segment). HAND ASSEMBLER, verbatim.
+  1107:0199 -- BlitBlob(S, X, Y, Segment). HAND ASSEMBLER, verbatim.
 
   THE SAME ROUTINE AS PART 006's 100f:0000, byte for byte and instruction for
   instruction, at the same relative offsets -- our addresses are that unit's
@@ -383,7 +383,7 @@ end;
   clip bounds are four DGROUP words the routine reads directly.
   -------------------------------------------------------------------------- }
 { @asm 001 1107:0199 +170 BlitBlob }
-procedure BlitBlob(Src : Pointer; X, Y : Integer; Segment : Word); assembler;
+procedure BlitBlob(S : Pointer; X, Y : Integer; Segment : Word); assembler;
 var
   SkipLeft, SkipRight : Integer;  { [BP-2], [BP-4] }
   Spare               : Integer;  { [BP-6] -- ENTER $0006 reserves a third
@@ -392,7 +392,7 @@ asm
   PUSH DS                { 1107:019d                                         }
   MOV  AX, Segment       { 1107:019e                                         }
   MOV  ES, AX            { 1107:01a1  ES:DI is the destination               }
-  LDS  SI, Src           { 1107:01a3  DS:SI is the sprite                    }
+  LDS  SI, S             { 1107:01a3  DS:SI is the sprite                    }
   XOR  DH, DH            { 1107:01a6                                         }
   MOV  DL, [SI+1]        { 1107:01a8  DL := the height                       }
   XOR  CH, CH            { 1107:01ab                                         }
@@ -447,7 +447,7 @@ asm
   MOV  BX, CX            { 1107:0211  BX keeps the clipped width             }
   PUSH DS                { 1107:0213                                         }
   PUSH SI                { 1107:0214                                         }
-  LDS  SI, Src           { 1107:0215  DS := the sprite's segment...          }
+  LDS  SI, S             { 1107:0215  DS := the sprite's segment...          }
   POP  SI                { 1107:0218    ...but keep the stepped SI           }
   ADD  SI, 2             { 1107:0219  past the width/height bytes            }
   CLD                    { 1107:021c                                         }

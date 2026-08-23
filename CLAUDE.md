@@ -32,6 +32,7 @@ Then all the checks, which **all pass** as of `f83944d`:
     .venv/Scripts/python.exe toolkit/pascal/plan.py status.toml --report
     .venv/Scripts/python.exe toolkit/census.py --root tools --root <sibling repo>
     python tools/paslint.py
+    python tools/asmshare.py            # routines the demo compiles into more than one part
     python tools/encaudit.py            # add a dir argument for toolkit/*, it does not scan it
 
 **`status.toml` at the root is the status register**, and it is the ratchet: coverage may only rise, a byte match may not shorten, and an achieved rung may not fall unless the *target* is lowered with a reason. `achieved`, `matched` and every `[observation.*]` are **measured** and must never be hand-edited; `[plan]` is **decided** — an ordered list of investigations whose order is the priority, written only through `plan.py`. All three writers serialise through `toolkit/pascal/register.py`, which refuses on a section it does not know rather than dropping it.
