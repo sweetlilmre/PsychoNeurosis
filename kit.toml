@@ -41,10 +41,6 @@ built_pattern = "TP*.EXE"
 # in the @asm markers and in the wiki's examples is relative to it.
 first_para = 0x1000
 
-# The nine files the 1994 demo shipped as, and where the unpacked images live.
-originals = "work/split"
-binaries  = "bin"
-
 # WHICH file each part is measured against, and it is not always the plain one.
 # `_fpu` variants are THIS PROJECT'S disassembly aid -- the CD 3x x87-emulator
 # traps rewritten to raw 9B+ESC so a disassembler can decode them -- not 1994
