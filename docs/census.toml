@@ -94,8 +94,9 @@ reason = "RENAMED from the second consumer's census.py, which collided with the 
 
 
 [script."coverage.py"]
-state = "carry"
-reason = "coverage measurement"
+state = "archived"
+successor = "kit/tools/pascal/coverage.py"
+reason = "how much of the target is accounted for -- the complement of the per-unit table, because that table says nothing about a segment nobody has started. IT HAD BEEN READING ZERO FOR THE PROGRAM: it shelled out to progcmp.py, archived under #36, and its regex found no match, so `n` fell back to 0 and 1,616 verified bytes dropped out of the total with nothing said. A regex returning None on a MISSING TOOL is indistinguishable from a tool that measured nothing, so it refuses now. Repointed at blockcmp: 99.8% restored, and 12 bytes higher than the figure on record because #45 fixed progcmp's clipping"
 
 
 [script."datcarve.py"]
@@ -109,8 +110,9 @@ reason = "project driver: NEUROSIS.DAT region map"
 
 
 [script."dgroup.py"]
-state = "carry"
-reason = "the initialised DGROUP image, byte for byte"
+state = "archived"
+successor = "kit/tools/pascal/dgroup.py"
+reason = "compares the initialised DGROUP image. The reference image, the map, the executable and the DGROUP segment number all moved out -- and the segment number turned out to be the same 0x1caa that two other tools carried as a boundary marker. VERIFIED: identical output, the layout agrees for the first 3184 bytes"
 
 
 [script."dosbuild.py"]
@@ -202,13 +204,15 @@ reason = "identical line for line, all 31 lines (#33); no flags of its own"
 
 
 [script."linkorder.py"]
-state = "carry"
-reason = "TP6 segment order: reverse DFS post-order over uses"
+state = "archived"
+successor = "kit/tools/pascal/linkorder.py"
+reason = "predicts the link order from the uses graph and diffs it against the original's. Its unit-name map, its no-segment set and the original's order all moved into link.toml. VERIFIED: identical output, 30 of 30 positions agree"
 
 
 [script."mapcmp.py"]
-state = "carry"
-reason = "segment lengths, and the three-lengths footing rule"
+state = "archived"
+successor = "kit/tools/pascal/mapcmp.py"
+reason = "compares linked segment lengths on the same footing. ITS OUTPUT CHANGED, and both changes are repairs: its copy of the segment list was missing VTSHELL at 0x1931, so that unit was never compared -- and because each length is the NEXT segment's address minus its own, the gap also inflated OBJECTS by exactly VTSHELL's 144 padded bytes and the tool reported it as 'short -- 144 byte(s) of routines nothing references'. That was an artefact of the missing row, not an observation. Now 30 of 30 exact"
 
 
 [script.'marker.py']
@@ -411,8 +415,9 @@ reason = "Borland debug info, decoded whole"
 
 
 [script."undeclared.py"]
-state = "carry"
-reason = "the TP7 builtin identifier set is the reusable half"
+state = "archived"
+successor = "kit/tools/pascal/undeclared.py"
+reason = "identifiers a unit uses but never declares. THREE project facts came out of it -- the source directory, which units export the names anything may use without declaring, and which files are worth scanning, the last of which was the glob PART*.PAS and is a naming convention no other target has. VERIFIED: identical output, all 51 lines"
 
 
 [script.'units.py']

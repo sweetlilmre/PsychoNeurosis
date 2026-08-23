@@ -72,3 +72,12 @@ table = "docs/census.toml"
 # have since been emptied by the migration, and the kit's own scripts were never
 # scanned by it at all.
 dirs = ["tools", "kit/tools", "kit/tools/substrate", "kit/tools/pascal", "kit/tools/wikitools"]
+
+[undeclared]
+# Units whose exported names any other unit may use without declaring them --
+# this demo's two shared units. It was a constant naming VGA.PAS and DEMOVT.PAS
+# inside the tool.
+shared = ["VGA.PAS", "DEMOVT.PAS"]
+# Which sources are worth scanning. PART*.PAS is this demo's naming and nobody
+# else's; a project with no convention scans everything.
+scan = "PART*.PAS"
