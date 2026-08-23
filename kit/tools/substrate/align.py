@@ -60,15 +60,20 @@ DENSITY_LIMIT = 8
 
 
 # A walk's rule is called with the run's LENGTH, both byte strings and the
-# offset the run starts at -- so a rule can look at the bytes when it needs to
-# and ignore them when it does not. `zeros` needs them; `holes` does not.
+# offset the run starts at -- so it can look at the bytes when it needs to and
+# ignore them when it does not -- and it returns HOW MANY bytes it forgives.
+# Zero stops the walk. A count short of the run forgives that much and then
+# stops, which is the only honest reading of a mixed run.
 def holes(run, orig=None, mine=None, at=0):
     """The default allowed-difference rule: an isolated run of one or two
     differing bytes is an address the rebuild put somewhere else -- two bytes
     for an absolute address, one for a frame-relative local. Three or more is
     an opcode change and ends the comparison.
+
+    Returns how many bytes it forgives, which for this rule is all of them or
+    none: an address is a whole operand.
     """
-    return run < OPCODE_CHANGE
+    return run if run < OPCODE_CHANGE else 0
 
 
 # The longest thing a linker fixup can zero out is a far pointer: four bytes.
@@ -88,17 +93,28 @@ def pending(run, orig=None, mine=None, at=0):
     caps it, and why `zeros` (the per-byte form, for `compare`) is not the same
     rule and must not be substituted for it.
     """
-    if run > MAX_FIXUP or mine is None:
-        return False
-    return all(b == 0 for b in mine[at:at + run])
+    if mine is None:
+        return 0
+    # Count the LEADING zeros only. A run is not necessarily homogeneous:
+    # `00 00 3C` is two pending fixups and then a real difference, and
+    # forgiving the pair while stopping at the 3C is the only honest reading.
+    # Answering yes-or-no about the whole run costs two bytes of prefix on one
+    # unit in this corpus and would cost more on another.
+    n = 0
+    while n < run and mine[at + n] == 0:
+        n += 1
+    return n if n <= MAX_FIXUP else 0
 
 
-def walk(orig, mine, allow=holes, stop=None):
+def walk(orig, mine, allow=holes, stop=None, density=True):
     """How far two byte strings agree, forgiving what `allow` forgives.
 
-    Differences are gathered into runs and each run is offered to `allow`; the
-    first run it refuses ends the walk, and so does too dense a scatter of
-    forgiven ones.
+    Differences are gathered into runs and each run is offered to `allow`,
+    which returns HOW MANY of its bytes it forgives. Zero ends the walk; fewer
+    than the whole run forgives that many and then ends it, which is what a
+    mixed run like `00 00 3C` needs -- two pending fixups and then a real
+    difference. Too dense a scatter of forgiven bytes ends it too, unless the
+    caller turns that gate off.
 
     `stop(orig, mine, i)` optionally recognises a TERMINATOR at an agreed
     position, returning `(size, definite)` or None. A definite terminator ends
@@ -106,6 +122,16 @@ def walk(orig, mine, allow=holes, stop=None):
     without a definite one the last provisional is used instead. That is the
     shape a routine-end rule needs, with none of the rule itself: what counts
     as a return is the caller's fact, not this module's.
+
+    `density` is the gate that stops a walk staying alive on forgiven bytes
+    alone -- and it belongs to the ARTEFACT, so it can be turned off. For a
+    routine inside an executable it is essential: a scatter of holes that dense
+    means the alignment wandered into unrelated code. For a unit's code inside a
+    .TPU it is simply wrong, because dense pending fixups are normal there --
+    one unit in this corpus has 569 -- and the gate silently shortens every
+    measurement. Measured: with it on, fourteen of twenty-six units reported a
+    prefix shorter than the truth, one of them 38 bytes instead of 1,617, while
+    the offset was right every time.
 
     Returns (length, holes, ended_on_terminator). `holes` is the offset of each
     forgiven run, which is what a caller reports as "5 holes" -- the bytes the
@@ -131,15 +157,19 @@ def walk(orig, mine, allow=holes, stop=None):
             run = 0
             while i + run < n and orig[i + run] != mine[i + run]:
                 run += 1
-            if not allow(run, orig, mine, i):
+            forgiven = allow(run, orig, mine, i)
+            if not forgiven:
                 break
             holes_at.append(i)
-            recent.extend([1] * run)
-            i += run
-        if len(recent) > DENSITY_WINDOW:
-            recent = recent[-DENSITY_WINDOW:]
-        if sum(recent) > DENSITY_LIMIT:
-            break
+            recent.extend([1] * forgiven)
+            i += forgiven
+            if forgiven < run:
+                break            # the rule forgave a prefix of the run only
+        if density:
+            if len(recent) > DENSITY_WINDOW:
+                recent = recent[-DENSITY_WINDOW:]
+            if sum(recent) > DENSITY_LIMIT:
+                break
     if fallback is not None:
         end, hs = fallback
         return end, [h for h in hs if h < end], True
@@ -274,6 +304,57 @@ def best_shift(want, image, nominal, span, forgive=None):
         if best is None or cand < best:
             best = cand
     return best
+
+
+# How much of a segment has to be present at a candidate position for it to be
+# worth considering. Enough that a run of coincidence cannot win, small enough
+# that a partially transcribed unit is still measurable.
+MIN_OVERLAP = 64
+
+
+def anchor_first(orig, image, allow=holes, stop=None, min_overlap=None,
+                 density=False):
+    """Where `orig` starts in `image`, anchored on its FIRST BYTE.
+
+    The other strategy in this module -- `locate` -- anchors on a unique run and
+    scores by how far the walk gets, which is right for finding a routine inside
+    a whole executable. This one is for finding the head of something whose
+    START is known to be the start: a unit's code at the top of a .TPU.
+
+    Candidates are positions whose first byte matches exactly. That single
+    constraint is what keeps the search out of a .TPU's symbol table and off its
+    runs of zeros, both of which have scored well enough to be chosen before --
+    one of them reporting a match sitting in the middle of a string.
+
+    The winner is the candidate whose forgiving prefix reaches FURTHEST, which
+    is alignment-independent and makes the reported divergence the real one.
+
+    A PARTIAL UNIT COMPILES MUCH SHORTER THAN ITS SEGMENT, so requiring the
+    whole segment to fit from the candidate onwards rejects every candidate and
+    reports "not located" for a unit whose opening is perfect. Requiring
+    `min(MIN_OVERLAP, len(orig))` instead is load-bearing in BOTH halves:
+    without the cap a partial unit has no valid candidate at all; without the
+    `len(orig)` floor a segment SHORTER than the overlap gets a harder test than
+    before, which once took a 29-byte unit from 93% to not-located.
+
+    Returns (offset, prefix length), or (-1, 0).
+    """
+    need = min(MIN_OVERLAP if min_overlap is None else min_overlap, len(orig))
+    best, at = 0, -1
+    i = image.find(orig[:1])
+    while i >= 0:
+        if len(image) - i >= need:
+            # Compare only what is actually there: the whole segment for a
+            # complete unit, however much has been written for a partial one.
+            head = orig[:min(len(orig), len(image) - i)]
+            got, _, _ = walk(head, image[i:i + len(head)], allow, stop,
+                             density)
+            if got > best:
+                best, at = got, i
+        i = image.find(orig[:1], i + 1)
+    # Too short to be the thing: its first instruction differs, so there is
+    # nothing to align against and no offset worth reporting.
+    return (at, best) if best >= MINIMUM else (-1, 0)
 
 
 def load_image(blob):

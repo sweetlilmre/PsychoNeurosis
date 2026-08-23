@@ -176,7 +176,7 @@ reason = "its reader crossed comment boundaries; the convention was sound"
 
 [script."linkcmp.py"]
 state = "carry"
-reason = "all linked segments with fixups resolved"
+reason = "every linked code segment against the original's, reading the DGROUP VARIABLE layout out of the differences; copied into the kit's pascal tier with its segment table as config"
 
 
 [script."linkorder.py"]
@@ -213,6 +213,11 @@ state = "carry"
 reason = "MZ header parsing, and LZ91/LZ90 detection"
 
 
+[script.'objcheck.py']
+state = "carry"
+reason = "a {$L} object module against the object's OWN relocations, which is stricter than the zero rule rather than looser; supersedes asmcheck.py"
+
+
 [script."observe.py"]
 state = "carry"
 reason = "records a run somebody actually made, and nothing else"
@@ -225,7 +230,7 @@ reason = "OKF v0.1 conformance only; no project facts, deliberately"
 
 [script."omf.py"]
 state = "carry"
-reason = "OMF record reader, feeds the .OBJ rule"
+reason = "reads an Intel OMF .OBJ's code and FIXUPP records; copied into the kit's substrate tier, where it returns fields with lengths instead of making a caller parse its output"
 
 
 [script."p2obj.py"]
@@ -358,6 +363,11 @@ reason = "Borland debug info, decoded whole"
 [script."undeclared.py"]
 state = "carry"
 reason = "the TP7 builtin identifier set is the reusable half"
+
+
+[script.'units.py']
+state = "carry"
+reason = "each compiled unit's code against the segment it rebuilds, by prefix; supersedes verify.py"
 
 
 [script."unlzexe.py"]
