@@ -1,0 +1,95 @@
+# Compiled-in data to emit back out as Borland Pascal typed constants. Read by
+# kit/tools/pascal/emit.py; every offset, length, type name and line of prose
+# here is this demo's own.
+#
+# TRANSCRIBED from tools/emit_pascal_data.py under psycho #50. Anything in
+# DGROUP's initialised region was a typed constant in the original source, so
+# these declarations are not decoration: without them the source compiles to a
+# different binary.
+
+out = "src/gen"
+
+[[file]]
+name    = "P3PAL.INC"
+part    = "003"
+segment = 0x1761
+header  = """
+{ Tunnel palette -- three separate 225-byte channel tables.
+  Typed constants, so they live in the executable's initialised data
+  and are writable: the band rotations shuffle them in place."""
+
+  [[file.array]]
+  name = "Red"
+  type = "TColourTable"
+  element = "byte"
+  offset = 0x0002
+  count = 225
+
+  [[file.array]]
+  name = "Green"
+  type = "TColourTable"
+  element = "byte"
+  offset = 0x00E3
+  count = 225
+
+  [[file.array]]
+  name = "Blue"
+  type = "TColourTable"
+  element = "byte"
+  offset = 0x01C4
+  count = 225
+
+[[file]]
+name    = "P3SINE.INC"
+part    = "003"
+segment = 0x1761
+header  = """
+{ Sine table, 16.14 fixed point (x16384), 450 entries.
+  450 rather than 360 because cos(a) is read as sin(a+90) from the
+  same table -- see Morph_SetAngles."""
+
+  [[file.array]]
+  name = "SinTab"
+  type = "array[0..449] of Integer"
+  element = "int"
+  offset = 0x02A8
+  count = 450
+  per_line = 10
+  comment_offset = false
+
+[[file]]
+name    = "P3SHAPE.INC"
+part    = "003"
+segment = 0x1761
+header  = """
+{ Scene 3 morph shapes: 765 points of (X, Y, Z) signed words."""
+
+  # group = 3 is the NESTED-PARENTHESIS rule: a multidimensional typed constant
+  # needs ((x, y, z), ...) and Turbo Pascal rejects a flat list of the same
+  # numbers. `count` is points, not values.
+  [[file.array]]
+  name = "ShapeSphere"
+  type = "TShape"
+  element = "int"
+  offset = 0x0636
+  count = 765
+  group = 3
+  per_line = 9
+
+  [[file.array]]
+  name = "ShapeCube"
+  type = "TShape"
+  element = "int"
+  offset = 0x5136
+  count = 765
+  group = 3
+  per_line = 9
+
+  [[file.array]]
+  name = "ShapeGrid"
+  type = "TShape"
+  element = "int"
+  offset = 0x63F6
+  count = 765
+  group = 3
+  per_line = 9

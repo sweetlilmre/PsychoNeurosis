@@ -1,0 +1,33 @@
+# The user-code segments of each part, for the coverage walk. Read by
+# kit/tools/pascal/spans.py; every number here was read out of this demo's own
+# unit headers.
+#
+# GENERATED from tools/shapediff.py on 23 Aug 2026 by parsing it (psycho #50).
+#
+# `segs` is in ASCENDING order and each segment's extent is the NEXT entry's
+# base -- so the list has to be complete, and `rtl` is the first runtime segment,
+# which caps the last user one. That is the same arithmetic the link instruments
+# use, and for the same reason: a length table beside an address table is a
+# second copy of one measurement.
+
+min_span = 16
+
+[part."001"]
+exe  = "TPART1.EXE"
+rtl  = 0x1546
+segs = [0x1012, 0x1082, 0x10e3, 0x1107, 0x12b2, 0x12c5, 0x1483, 0x1491, 0x1532]
+
+[part."002"]
+exe  = "TPART2.EXE"
+rtl  = 0x1444
+segs = [0x1008, 0x107c, 0x108b, 0x13f9, 0x140c, 0x142a, 0x1436]
+
+[part."003"]
+exe  = "TPART3.EXE"
+rtl  = 0x137b
+segs = [0x1015, 0x10b8, 0x1139, 0x1192, 0x119d, 0x11f3, 0x120f, 0x125e, 0x12f8, 0x136b]
+
+[part."005"]
+exe  = "TPART5.EXE"
+rtl  = 0x12d8
+segs = [0x100e, 0x1096, 0x1102, 0x124a, 0x1252, 0x12c8]

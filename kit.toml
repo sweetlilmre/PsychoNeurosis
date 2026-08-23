@@ -64,6 +64,23 @@ first_para = 0x1000
 # the sibling repository.
 "009" = "work/split/NEUROSIS_009.exe"
 
+# WHICH ORIGINAL A COVERAGE WALK USES, and it is NOT the table above. That one
+# names the trap-rewritten copies where they exist, so a per-routine check reads
+# an x87 site as a tolerated hole. A walk over every byte must use the SHIPPED
+# bytes: our build carries the traps exactly as the release does, so measuring
+# against the rewritten copy would show a two-byte hole at every FPU op and
+# drown an x87-heavy region in noise. Two questions, two answers.
+[target.release]
+"000" = "work/split/NEUROSIS_000.exe"
+"001" = "work/split/NEUROSIS_001.exe"
+"002" = "work/split/NEUROSIS_002.exe"
+"003" = "work/split/NEUROSIS_003.exe"
+"004" = "work/split/NEUROSIS_004.exe"
+"005" = "work/split/NEUROSIS_005.exe"
+"006" = "work/split/NEUROSIS_006.exe"
+"007" = "work/split/NEUROSIS_007.exe"
+"009" = "work/split/NEUROSIS_009.exe"
+
 [census]
 # Directories holding scripts, for the retirement census. The sibling
 # repository's root is machine-specific and lives in kit.local.toml.

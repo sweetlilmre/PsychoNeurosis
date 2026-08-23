@@ -151,14 +151,19 @@ reason = "src/gen/P6TEXT.INC states its provenance: NEUROSIS_006_fpu.exe at DS:$
 
 
 [script."emit_pascal_data.py"]
-state = "carry"
-reason = "the typed-constant formatter is the reusable half of three copies"
+state = "archived"
+successor = "kit/tools/pascal/emit.py"
+reason = "the typed-constant emitter. WHAT MOVED is the formatter and the reading; what stayed is every offset, length, type name and line of prose, all of it in emit.toml. VERIFIED: all three generated files' CONST BODIES are byte-identical, 8,010 values -- and a full rebuild leaves all 35 executables byte-identical, which is the test that matters since these are {$I} includes. The HEADERS deliberately changed: each now names the binary AND the offset it came from, which is what #17's provenance gate asks of a generated file before its emitter can be retired. It also confirmed something worth knowing: the bodies are identical although the source is now the trap-rewritten variant rather than the plain file, so that patching leaves this DGROUP data alone"
 
 
 [script."emit_pascal_data2.py"]
 state = "decline"
 reason = "second copy of emit_pascal_data's formatter; carry that one instead"
 
+
+[script."emit.py"]
+state = "carry"
+reason = "THE KIT'S, born there: the typed-constant formatter with the nested-parenthesis rule, and the reading that feeds it. A multidimensional typed constant needs ((x, y, z), ...) and Turbo Pascal rejects a flat list of the same numbers, which fails a long way from its cause"
 
 [script."encaudit.py"]
 state = "archived"
@@ -385,15 +390,19 @@ state = "carry"
 reason = "THE KIT'S, born there: the runtime in three steps -- find the block and measure it, name routines inside it by pattern, and enumerate likely procedure starts anywhere by prologue shape. Two of the three already shared code, so they were one tool in two files"
 
 [script."shapediff.py"]
-state = "carry"
-reason = "coverage alignment over a whole part; superseded in the toolkit by align.py, kept as the demo's own caller"
-kept = "KEPT under #36 and NOT superseded, against the disposition's 'already copied': align.py holds spans() as a library function but the kit has no runnable command for it, and --same (find each span in every other built harness) has no equivalent at all. It is also the instrument the top open investigation runs on"
+state = "archived"
+successor = "kit/tools/pascal/spans.py"
+reason = "the coverage walk, and the instrument the top open investigation runs on. IT WAS BROKEN BY THIS MIGRATION: it imported asmverify, archived under #36, so it had stopped running entirely -- the fourth time a deletion here caught a surviving script. What was missing from the kit was not the measurement, which align.spans() has held since #33, but a way to RUN it and an equivalent of --same. VERIFIED against the original restored from the archive tag: parts 001, 002 and 003 identical in every figure including the recorded 66.6% and 49.9%, --same identical, and part 005 aligns 24 bytes MORE -- 80.4% against 80.2%, the SAME 20 spans, two of them starting 14 bytes later and ending 10 earlier. That is the two density gates being formulated differently, measured back to back on a byte-identical TPART5.EXE: not a source change and not a stale figure. The kit's gate is the one #33 measured against all 77 routines. No span is lost, so no work is hidden. It also reads target.release rather than target.original, which is a distinction the answers file did not carry until now"
 
 
 [script."shared_asm.py"]
 state = "carry"
 reason = "assembler duplicated between units instead of shared as one include; written here, project exemptions passed in"
 
+
+[script."spans.py"]
+state = "carry"
+reason = "THE KIT'S: the coverage walk made runnable, plus --same, which asks whether an unaligned span is code already transcribed in ANOTHER harness -- turning the job from write this into share what exists"
 
 [script."split.py"]
 state = "archived"
