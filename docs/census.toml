@@ -19,8 +19,9 @@ reason = "guards the byte-identical rebuilds"
 
 
 [script."asmaudit.py"]
-state = "carry"
-reason = "checks two of the three transcription rules mechanically"
+state = "archived"
+successor = "kit/tools/pascal/asmaudit.py"
+reason = "checks two of the three transcription rules mechanically -- a comment on every assembler line, and the equivalent Pascal above it. VERIFIED: output identical bar the provenance line every kit program prints, 12 units meeting the rule and 43 not. Its source directory was a constant and is now layout.src"
 
 
 [script."asmcheck.py"]
@@ -152,8 +153,9 @@ reason = "second copy of emit_pascal_data's formatter; carry that one instead"
 
 
 [script."encaudit.py"]
-state = "carry"
-reason = "locale-dependent text I/O, by AST; in both repos"
+state = "archived"
+successor = "kit/tools/encaudit.py"
+reason = "text I/O that leaves the encoding to the locale. Its DEFAULT_DIRS was a constant naming one repository's two folders -- so the KIT'S OWN SCRIPTS were never audited by it unless somebody passed them by hand, and the folders it named have since been emptied by this migration. Reading encaudit.dirs it now covers 53 files against 19. Both repositories had a copy and now neither does"
 
 
 [script."fpconst.py"]
@@ -262,8 +264,9 @@ kept = "KEPT under #36. The disposition says 'NameError on refpath; it cannot ru
 
 
 [script."paslint.py"]
-state = "carry"
-reason = "the four TP7 traps; nearly clean already, in both repos"
+state = "archived"
+successor = "kit/tools/pascal/paslint.py"
+reason = "VERIFIED identical on this repository, 0 problems in 67 files -- AND THE MOVE FIXED A CHECK THAT COULD NOT FAIL. Its source directory was the constant ROOT/'src'; the second consumer keeps its sources under v1.31b/src, so running it there reported '0 problem(s) in 0 file(s)' and passed. Reading layout.src instead, it lints 29 files there. Both repositories had a copy and now neither does"
 
 
 [script."plan.py"]
@@ -313,8 +316,9 @@ reason = "verified spent under #36: run today it answers '00-map.md looks alread
 
 
 [script."repairdoc.py"]
-state = "carry"
-reason = "multiplied line breaks in a document"
+state = "archived"
+successor = "kit/tools/repairdoc.py"
+reason = "repairs a markdown file whose line breaks have been multiplied -- a fact about the tools a session is driven with, which every project inherits on day one. VERIFIED: identical report on docs/README.md"
 
 
 [script.'routines.py']

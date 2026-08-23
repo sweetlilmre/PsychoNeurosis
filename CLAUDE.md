@@ -26,10 +26,7 @@ Asphyxia's first megademo, 1994. Borland Pascal 7 plus hand-written assembler, r
     uv venv .venv
     uv pip install --python .venv/Scripts/python.exe pyyaml
 
-**This target's own checks**, on top of the kit's list in `kit/WORKING.md`. Both are frozen originals awaiting [#36](https://github.com/sweetlilmre/PsychoNeurosis/issues/36):
-
-    python tools/paslint.py             # non-ASCII bytes in a DOS source, and four other defects
-    python tools/encaudit.py            # text I/O that leaves the encoding to the locale
+**This target has no checks of its own any more.** `paslint` and `encaudit` were the last two and they are the kit's, on its list in [`kit/WORKING.md`](kit/WORKING.md) -- neither says anything about this demo, and both had a constant where a project's answer belonged. Moving `paslint` fixed a check that could not fail: its source directory was hardcoded, so in the sibling repository it reported *0 problems in 0 files* and passed. Run the kit's list and nothing else.
 
 **The Pascal sources are LF on disk** despite the CRLF rule, because `.gitattributes` marks them `-text` and they were authored that way; Turbo Pascal reads them regardless. Do not "fix" this in bulk -- it would rewrite every source file for no measured gain.
 

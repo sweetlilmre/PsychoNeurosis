@@ -65,3 +65,10 @@ roots = ["tools", "kit/tools"]
 # The table itself is this project's data -- a list of THIS pair of repos'
 # scripts -- so it lives here and not beside the tool that reads it.
 table = "docs/census.toml"
+
+[encaudit]
+# Where to look for text I/O that leaves the encoding to the locale. This was a
+# constant inside the tool naming one repository's folders; the folders it named
+# have since been emptied by the migration, and the kit's own scripts were never
+# scanned by it at all.
+dirs = ["tools", "kit/tools", "kit/tools/substrate", "kit/tools/pascal", "kit/tools/wikitools"]

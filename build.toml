@@ -14,7 +14,7 @@ title   = "psycho build"
 drive   = "D"
 log     = "D:\\BUILD.LOG"
 timeout = 180
-lint    = "tools/paslint.py"
+lint    = "kit/tools/pascal/paslint.py"
 
 [compiler]
 default = "tp7"
