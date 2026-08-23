@@ -81,14 +81,6 @@ first_para = 0x1000
 "007" = "work/split/NEUROSIS_007.exe"
 "009" = "work/split/NEUROSIS_009.exe"
 
-[census]
-# Directories holding scripts, for the retirement census. The sibling
-# repository's root is machine-specific and lives in kit.local.toml.
-roots = ["tools", "kit/tools"]
-# The table itself is this project's data -- a list of THIS pair of repos'
-# scripts -- so it lives here and not beside the tool that reads it.
-table = "docs/census.toml"
-
 [encaudit]
 # Where to look for text I/O that leaves the encoding to the locale. This was a
 # constant inside the tool naming one repository's folders; the folders it named
