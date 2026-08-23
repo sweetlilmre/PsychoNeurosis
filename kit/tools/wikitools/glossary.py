@@ -38,6 +38,9 @@ import sys
 
 import yaml
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+import project                                    # noqa: E402
+
 RESERVED = ("log.md",)
 
 
@@ -106,10 +109,21 @@ def scan(root, avoid):
 
 
 def main(argv):
-    if len(argv) < 3:
-        sys.stdout.write("usage: glossary.py <wiki-root> <glossary.md> [more.md]\n")
-        return 2
-    root, glossaries = argv[1], argv[2:]
+    if len(argv) >= 3:
+        root, glossaries = argv[1], argv[2:]
+    else:
+        # The wiki carries its own glossary; a host repository's own is found
+        # beside its answers file, because the split between them IS the point.
+        try:
+            root = str(project.path("layout.wiki"))
+            host = project.find() / "CONTEXT.md"
+        except project.Missing as exc:
+            return project.complain(exc)
+        glossaries = [str(host)] if host.is_file() else []
+        if not glossaries and len(argv) < 2:
+            sys.stdout.write("usage: glossary.py <wiki-root> <glossary.md> "
+                             "[more.md]\n")
+            return 2
     # the wiki's own glossary counts too, if it has one
     local = pathlib.Path(root) / "CONTEXT.md"
     if local.exists() and str(local) not in glossaries:

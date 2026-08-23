@@ -46,6 +46,9 @@ import pathlib
 import re
 import sys
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+import project                                    # noqa: E402
+
 MARKER = re.compile(r"@asm\s+(\d{3})\s+([0-9a-fA-F]{4}):([0-9a-fA-F]{4})"
                     r"(?:\s*\+(\d+))?(?:\s+(\w+))?")
 HEADER = re.compile(r"\s*(?:procedure|function)\s+(\w+)")
@@ -162,13 +165,15 @@ def read_exempt(path):
 
 def main(argv):
     args = [a for a in argv if not a.startswith("--")]
-    if not args:
-        print(__doc__.strip().split("\n\n")[0])
-        return 2
-    exempt = []
-    for a in argv:
-        if a.startswith("--exempt="):
-            exempt = read_exempt(a.split("=", 1)[1])
+    named = [a.split("=", 1)[1] for a in argv if a.startswith("--exempt=")]
+    try:
+        if not args:
+            args = [str(project.path("layout.src"))]
+        if not named:
+            named = [str(project.path("layout.exempt"))]
+    except project.Missing as exc:
+        return project.complain(exc)
+    exempt = read_exempt(named[0]) if named else []
     found = bodies(args[0])
     dups = duplicates(found, exempt)
     print("%d routine(s) with assembler written out in a unit" % len(found))

@@ -33,6 +33,9 @@ import sys
 
 import yaml
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+import project                                    # noqa: E402
+
 BEGIN = "<!-- generated:discriminator -->"
 END = "<!-- /generated:discriminator -->"
 
@@ -232,7 +235,12 @@ def generate(root, write):
 def main(argv):
     args = [a for a in argv[1:] if not a.startswith("--")]
     write = "--write" in argv
-    root = pathlib.Path(args[0] if args else ".")
+    if not args:
+        try:
+            args = [str(project.path("layout.wiki"))]
+        except project.Missing as exc:
+            return project.complain(exc)
+    root = pathlib.Path(args[0])
 
     problems = []
     docs = 0

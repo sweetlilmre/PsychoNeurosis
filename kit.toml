@@ -1,0 +1,45 @@
+# This project's answers to the kit's questions. Read by kit/tools/project.py,
+# and by nothing else.
+#
+# WHAT BELONGS HERE: what somebody READ. Where this repository keeps things,
+# and the facts a person took out of the target's binaries once -- a segment
+# list from a unit header, the paragraph a disassembler calls the start of an
+# image.
+#
+# WHAT DOES NOT: anything MEASURED. Coverage, byte-match lengths, observations
+# and rungs live in the status register, where the ratchet guards them. A
+# measured number in a config file is a number that goes stale quietly, and
+# this project has the scar: a coverage number pasted into a documented command
+# line sat two below the truth.
+#
+# Machine-specific paths do not belong here either -- they may never appear in
+# a committed file. They go in kit.local.toml, which git ignores and which
+# overrides this file key by key.
+#
+# A person does not hand-write this file. The kit's setup wizard writes it.
+
+[layout]
+# Where this repository keeps things, relative to the directory holding this
+# file. Every program in the kit takes these as an argument too, and an
+# explicit argument always wins.
+src      = "src"                       # the Pascal sources under reconstruction
+wiki     = "kit/wiki"                  # the field manual
+register  = "status.toml"              # the status register: the ratchet, the observations, the plan
+exempt   = "src/asm/shared-exempt.txt" # assembler duplicated between units that cannot become one text
+
+[target]
+# Facts about the thing being reverse engineered, read out of it by a person.
+
+# The paragraph the disassembly calls the start of the load image. Ghidra was
+# given this base for every part of this demo, so every address in the notes,
+# in the @asm markers and in the wiki's examples is relative to it.
+first_para = 0x1000
+
+# The nine files the 1994 demo shipped as, and where the unpacked images live.
+originals = "work/split"
+binaries  = "bin"
+
+[census]
+# Directories holding scripts, for the retirement census. The sibling
+# repository's root is machine-specific and lives in kit.local.toml.
+roots = ["tools", "kit/tools"]

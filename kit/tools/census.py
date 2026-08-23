@@ -40,6 +40,9 @@ import os
 import pathlib
 import sys
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[0]))
+import project                                    # noqa: E402
+
 try:
     import tomllib
 except ModuleNotFoundError:  # pragma: no cover -- 3.11+ per pyproject.toml
@@ -67,10 +70,13 @@ def parses(path):
 def main(argv):
     roots = [argv[i + 1] for i, a in enumerate(argv) if a == "--root"]
     if not roots:
-        sys.stdout.write("usage: census.py --root <dir> [--root <dir> ...]\n"
-                         "  the sibling repo's path is machine-specific and is "
-                         "never committed -- pass it here.\n")
-        return 2
+        # The project's answers hold this repository's script folders in
+        # kit.toml and any machine-specific root in kit.local.toml, which is
+        # the mechanism this docstring used to promise and did not have.
+        try:
+            roots = [str(p) for p in project.paths("census.roots")]
+        except project.Missing as exc:
+            return project.complain(exc)
 
     found = {}
     for root in roots:

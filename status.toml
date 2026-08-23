@@ -6,7 +6,7 @@
 # [plan] is DECIDED: investigation order is the priority order.
 
 [coverage]
-targets = 76
+targets = 78
 
 [observation."TPART1"]
 harness = "TPART1"

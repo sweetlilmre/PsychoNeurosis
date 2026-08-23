@@ -28,6 +28,9 @@ import sys
 
 import yaml
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+import project                                    # noqa: E402
+
 RESERVED = ("index.md", "log.md")
 
 
@@ -74,7 +77,13 @@ def check(root):
 
 
 def main(argv):
-    root = argv[1] if len(argv) > 1 else "."
+    if len(argv) > 1:
+        root = argv[1]
+    else:
+        try:
+            root = str(project.path("layout.wiki"))
+        except project.Missing as exc:
+            return project.complain(exc)
     docs, problems = check(root)
     for rel, err in problems:
         sys.stdout.write("  " + rel + ": " + err + "\n")

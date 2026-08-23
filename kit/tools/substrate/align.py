@@ -23,6 +23,11 @@ Nothing here needs a disassembler, and nothing here knows anything about
 Pascal: a segment list and two images is the whole input.
 """
 import struct
+import pathlib
+import sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+import project                                    # noqa: E402
 
 # How much of the original to pull in when looking for a routine. Long enough
 # to hold any hand-written routine in this corpus.
@@ -127,18 +132,25 @@ def load_image(blob):
     return blob[hdr:], hdr
 
 
-def spans(orig_blob, our_blob, segments, first_para=0x1000, min_span=16,
+def spans(orig_blob, our_blob, segments, first_para=None, min_span=16,
           allow=holes):
     """The stretches of the original's code that will not align at all.
 
     `segments` is the ascending list of code segment paragraphs, with ONE extra
     entry at the end bounding the last one -- usually the first library segment.
     Each is taken relative to `first_para`, the paragraph the disassembly calls
-    the start of the image.
+    the start of the image -- which comes from the project's answers when the
+    caller does not say, because it is a fact about the target and not about
+    this code.
 
     Yields (segment, start, end) offsets within each segment, and returns the
     (aligned, total) byte counts through StopIteration's value.
     """
+    if first_para is None:
+        # Which paragraph the disassembly calls the start of the image is a
+        # fact about the TARGET, read out of it once, so it comes from the
+        # project rather than from a default baked in here.
+        first_para = project.get("target.first_para", quiet=True)
     orig, _ = load_image(orig_blob)
     ours, _ = load_image(our_blob)
     total = aligned = 0

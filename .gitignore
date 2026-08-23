@@ -40,3 +40,8 @@ docs/continuation.md
 
 # uv virtual environment for the knowledge-base tooling.
 .venv/
+
+# The kit's machine-specific answers: real local paths, so never committed --
+# the same rule that keeps docs/continuation.md out. kit.toml holds the
+# relative ones and IS committed.
+kit.local.toml

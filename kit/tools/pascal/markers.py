@@ -50,6 +50,9 @@ import pathlib
 import re
 import sys
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+import project                                    # noqa: E402
+
 try:
     import tomllib
 except ModuleNotFoundError:  # pragma: no cover -- 3.11+ per pyproject.toml
@@ -168,7 +171,22 @@ def scan(root):
 
 
 def main(argv):
-    args = [a for a in argv[1:] if not a.startswith("--")]
+    # A flag's VALUE is not a positional -- see project.positionals.
+    args = project.positionals(argv[1:], ('--status', '--emit'))
+    if not args:
+        # No source directory given: ask the project. The kit holds no path of
+        # its own, so this is the only place one can come from.
+        try:
+            args = [str(project.path("layout.src"))]
+        except project.Missing as exc:
+            return project.complain(exc)
+    if not args:
+        # No source directory given: ask the project. The kit holds no path of
+        # its own, so this is the only place one can come from.
+        try:
+            args = [str(project.path("layout.src"))]
+        except project.Missing as exc:
+            return project.complain(exc)
     root = args[0] if args else "src"
     status = {}
     if "--status" in argv:
@@ -207,6 +225,21 @@ def main(argv):
         sys.stdout.write("  %d routine(s) with a measured rung\n" % len(rows))
         missing = [t[3] for t in targets if t[3] not in rows]
         sys.stdout.write("  %d target(s) with no measurement yet\n" % len(missing))
+
+    if "--emit" in argv:
+        # The MEASURER writes the number, so nothing has to type it.
+        # Coverage is the count of declared targets, and it was pasted
+        # into a documented ratchet command as 76 while this scan
+        # measured 78 -- the ratchet's own hole number one, "the lock
+        # sits stale-low", surviving in the one number a person still
+        # typed. ratchet.py --measured reads what this writes.
+        out = pathlib.Path(argv[argv.index("--emit") + 1])
+        out.parent.mkdir(parents=True, exist_ok=True)
+        io.open(out, "w", encoding="utf-8", newline="\n").write(
+            "# Measured by markers.py. Not hand-written, not committed.\n"
+            "[coverage]\ntargets = %d\n" % len(targets))
+        sys.stdout.write("  measured %d target(s) -> %s\n"
+                         % (len(targets), out))
 
     sys.stdout.write("\nCOVERAGE, reported and not gated (issue #15)\n")
     sys.stdout.write("  %d bare seg:off address(es) in the tree; %d carry a target.\n"

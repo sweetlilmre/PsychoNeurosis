@@ -36,6 +36,10 @@ Sound checks, per issue #15 -- each refuses rather than reports:
 import sys
 
 import register
+import pathlib
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+import project                                    # noqa: E402
 
 STATES = ("open", "resolved")
 
@@ -136,7 +140,14 @@ def report(status):
 
 
 def main(argv):
-    args = [a for a in argv[1:] if not a.startswith("--")]
+    # A flag's VALUE is not a positional -- see project.positionals.
+    args = project.positionals(argv[1:], ('--investigation', '--finding', '--seen-in', '--row', '--for', '--label', '--target', '--cost', '--note', '--resolution'))
+    if not args and any(a.startswith("--") for a in argv[1:]):
+        # A flag but no register: ask the project where its register is.
+        try:
+            args = [str(project.path("layout.register"))]
+        except project.Missing as exc:
+            return project.complain(exc)
     if not args:
         sys.stdout.write(
             "usage: plan.py <status.toml> --report\n"

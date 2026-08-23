@@ -250,6 +250,10 @@ state = "carry"
 reason = "one segment, per routine, shift searched"
 
 
+[script."project.py"]
+state = "carry"
+reason = "the only reader of a project's answers file; every other program in the kit asks it where things are"
+
 [script."ratchet.py"]
 state = "carry"
 reason = "the ratchet: coverage may only rise"
