@@ -88,7 +88,7 @@ the whole data-segment layout.
 
 **Why.** The nesting is only reachable through the parameter, and the parameter is only ever the one global: the wrapper's single call site passes it. Matching the shape would mean declaring the array type 1-based -- the original addresses `A[I]` as `base + I*7 - 3`, so the array it receives starts at index 1 -- while entry 0 of our `Outp` is the translation the transform writes, which would need a typecast to hand over the tail of the array. A cast to force the compiler to emit a slower access path is not a transcription.
 
-**Effect on output: none, but the reconstruction's sort is FASTER than the original's.** It is a per-frame cost, so it belongs on the record of the pacing investigation: this is one of the few places where our code does less work than the binary's, and any pacing comparison for scene 4 should expect it. Found by `tools/shapediff.py 001`, which lists the span as `1107:0287..039a`.
+**Effect on output: none, but the reconstruction's sort is FASTER than the original's.** It is a per-frame cost, so it belongs on the record of the pacing investigation: this is one of the few places where our code does less work than the binary's, and any pacing comparison for scene 4 should expect it. Found by the coverage walk -- `kit/tools/pascal/spans.py spans.toml 001`, then `tools/shapediff.py`, which is archived under the `archive/pre-kit-scripts` tag -- which lists the span as `1107:0287..039a`.
 
 ---
 

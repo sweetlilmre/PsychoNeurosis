@@ -30,9 +30,9 @@ Asphyxia's first megademo, 1994. Borland Pascal 7 plus hand-written assembler, r
 
 **The Pascal sources are LF on disk** despite the CRLF rule, because `.gitattributes` marks them `-text` and they were authored that way; Turbo Pascal reads them regardless. Do not "fix" this in bulk -- it would rewrite every source file for no measured gain.
 
-## The state of this working tree, as of 22 Aug 2026
+## The state of this working tree, as of 23 Aug 2026
 
-**Everything is committed and pushed on `vangelistracker-build`, the issue tracker is empty, and the one queue of work is the plan**: `.venv/Scripts/python.exe kit/tools/pascal/plan.py status.toml --report` — five investigations seeded defect-first, of which two are RESOLVED against pe's live runs (22 Aug) and three remain: part5-386-trio (fixed in code, needs a TPART5 run), **pacing (the main line — `tools/shapediff.py` lists the divergent spans to work top-down)**, and part6-confirm-r3 (a careful run, no code). `docs/continuation.md`'s dated block has the full state.
+**Everything is committed and pushed on `vangelistracker-build`, the only open ticket is the finished kit map itself, and the one queue of work is the plan**: `.venv/Scripts/python.exe kit/tools/pascal/plan.py status.toml --report` — five investigations seeded defect-first, of which two are RESOLVED against pe's live runs (22 Aug) and three remain: part5-386-trio (fixed in code, needs a TPART5 run), **pacing (the main line — `kit/tools/pascal/spans.py spans.toml 001` lists the divergent spans to work top-down)**, and part6-confirm-r3 (a careful run, no code). `docs/continuation.md`'s dated block has the full state.
 
 The remote is private `sweetlilmre/PsychoNeurosis`, default branch `main`. **`main` is behind `vangelistracker-build`** and everything lives on the branch. History contains third-party bytes — `bin/NEUROSIS.008` and `work/split/NEUROSIS_008.exe` are DemoVT — acceptable only while the repo stays private, and a blocker on ever making it public. A lesson kept from an earlier version of this section: treat a "not mine" claim about tree contents as needing a check against the diff, not as fact.
 
@@ -42,7 +42,11 @@ The remote is private `sweetlilmre/PsychoNeurosis`, default branch `main`. **`ma
 
 ## Working the knowledge base
 
-It is a wayfinder map on GitHub Issues: tickets are sub-issues, blocking is native, and the frontier is the open, unblocked, unassigned ones. **Its governing rule is copy and adjust, never refactor the originals** — `tools/*`, `docs/*` and the VangeliSTracker scripts stay exactly as they are; anything generic gets *copied* into the knowledge base and adapted there. Refactoring the originals to consume it is a later, separate effort, and executing the demo cleanup is out of scope for that map.
+It was a wayfinder map on GitHub Issues, and it is **finished**: 22 tickets, all closed, 23 Aug 2026.
+
+**Its governing rule has expired, and that is worth knowing rather than deleting.** For most of the effort it was *copy and adjust, never refactor the originals* -- `tools/*` and the sibling repository's scripts kept working, untouched, while anything generic was copied into the kit and adapted there. That rule existed to make the migration safe, and it ended when the migration did: the originals it protected are archived under `archive/pre-kit-scripts`, and `docs/32-tool-disposition.md` says where each one went and what measurement justified deleting it. What is left in `tools/` is ten scripts kept deliberately -- this demo's data carvers, its harness generator -- and they are the record's, not candidates.
+
+**What replaces it, for anything new:** a generic tool is BORN in `kit/tools`. Writing one beside the record and copying it later duplicates it from birth, which happened once and is why the rule is stated this way round.
 
 ## Standing rules for this target
 

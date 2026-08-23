@@ -32,8 +32,8 @@ Reconstructed Pascal: **[`src/`](src/)**.
 ## Rebuilding everything from `bin/`
 
 ```sh
-python tools/split.py -o work/split bin/PSYCHO.EXE bin/NEUROSIS.00*   # strip MODs
-python tools/build_assets.py                                          # assets/
+.venv/Scripts/python.exe kit/tools/substrate/split.py -o work/split bin/PSYCHO.EXE bin/NEUROSIS.00*
+python tools/build_assets.py
 ```
 
 Ghidra import and the FP fixup are described in
@@ -42,36 +42,34 @@ Ghidra import and the FP fixup are described in
 
 ## Tools
 
-| Script | Purpose |
+**Almost all of them are the kit's now**, and `kit/WORKING.md` section 3 groups
+all 47 by the question you have -- which is the useful way in, and the reason
+this file no longer lists them. `docs/32-tool-disposition.md` says where each of
+the 49 archived scripts went and what measurement justified deleting it.
+
+What stayed here is this demo's own, and it stayed because it would have to be
+rewritten for a different binary:
+
+| script | purpose |
 |---|---|
-| `tools/mzinfo.py` | MZ header parse; image vs. file size |
-| `tools/probe.py` | Identify appended payload + toolchain fingerprints |
-| `tools/symbols.py` | Extract Borland `0x52FB` debug symbol pools |
-| `tools/strings.py` | Strings, image-only and Pascal length-prefixed modes |
-| `tools/split.py` | Split each part into `.exe` + `.mod`/`.tdb` |
-| `tools/segmap.py` | Segment map from the relocation table |
-| `tools/fpsurvey.py` | Survey x87-emulator trap sites |
-| `tools/fpfix.py` | Rewrite emulator traps to real x87 |
-| `tools/fpconst.py` | Decode FP constants from a code segment — single, double, x87 ext80 and Borland Real48 |
-| `kit/tools/pascal/build.py` + `build.toml` | Stage sources to 8.3 and compile them with a real Turbo Pascal under DOSBox-X. Replaced `tools/dosbox/dosbuild.py`, which is archived under the `archive/pre-kit-scripts` tag; the DOSBox config is generated per build rather than committed |
-| `tools/paslint.py` | Catch TP7 comment-nesting and shadowed-built-in defects before the compiler does |
-| `tools/undeclared.py` | List identifiers a unit uses but never declares |
-| `tools/fpround.sh` | One convergence round of the FP fixup |
-| `tools/rtlmatch.py` | Locate + compare RTL segments across parts |
-| `tools/rtlfind.py` | Find RTL routines by byte pattern, emit per-part tables |
-| `tools/datmap.py` | NEUROSIS.DAT region map + tiling proof |
-| `tools/datcarve.py` | Low-level carve + PNG writer |
-| `tools/modex.py` | De-interleave Mode-X planes |
-| `tools/build_assets.py` | Build the `assets/` tree |
-| `tools/vecobj.py` | Extract + render the compiled-in 3-D models, five projections each |
-| `tools/emit_pascal_data.py` | Emit part 003's compiled-in data as typed constants |
-| `tools/emit_pascal_data2.py` | Same for parts 001, 002, 005, 006 and part 003's captions |
-| `tools/ghidra/ApplyRtlNames.java` | Name the RTL from a per-part table |
-| `tools/ghidra/DumpDatAccess.java` | Recover Seek/BlockRead constants |
-| `tools/ghidra/FixCsOverride.java` | Restore `CS:` on recovered x87 operands |
-| `tools/ghidra/DumpTraps.java` | List surviving emulator traps |
-| `tools/ghidra/FpReport.java` | Per-program FP/trap/function tally |
-| `tools/ghidra/ReportLayout.java` | Blocks, function count, INT/port tally |
+| `tools/datmap.py` | `NEUROSIS.DAT`'s region map, and the tiling proof |
+| `tools/datcarve.py` | the low-level carve and PNG writer that map feeds |
+| `tools/build_assets.py` | build the `assets/` tree from the map and from DGROUP |
+| `tools/mktests.py` | generate this demo's per-scene and per-part harnesses |
+| `tools/emit_pascal_data2.py` | the remaining compiled-in data for parts 001, 002, 005, 006 and part 003's captions |
+| `tools/fpround.sh` | one convergence round of the FP fixup |
+| `tools/dosbox/vtbuild.py` | compile the 1.39b release tree; declined, because the tree is held out of source control and it cannot be exercised |
+| `tools/ghidra/*.java` | seven Ghidra scripts: name the RTL from a table, recover the `Seek`/`BlockRead` constants, restore `CS:` on recovered x87 operands, list surviving traps, and the layout and FP reports |
+
+The ones a session reaches for most, in the kit:
+
+| question | tool |
+|---|---|
+| build it | `kit/tools/pascal/build.py build.toml` |
+| which bytes do NOT line up? | `kit/tools/pascal/spans.py spans.toml 001` |
+| does each declared routine match? | `kit/tools/pascal/routines.py` |
+| is our whole build the original's bytes? | `kit/tools/pascal/artefact.py --check` |
+| what is the next piece of work? | `kit/tools/pascal/plan.py --report` |
 
 ## Compiled-in data
 
