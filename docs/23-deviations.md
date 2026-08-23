@@ -80,6 +80,18 @@ the whole data-segment layout.
 
 ---
 
+## Part 001 scene 4's depth sort works on a global, not a passed-in array
+
+**Original.** `1107:03e7 BuildBlobs(var A)` takes the output array as a `var` parameter -- a far pointer, hence the `LES DI,[BP+4]` at `1107:03eb` -- and hands it to a one-line wrapper at `1107:03d7` whose only statement is `DepthSort(1, 144)`. `DepthSort` (`1107:0287`) is NESTED inside that wrapper, so every one of its element reads goes through the static link: `MOV DI,[BP+4]` then `LES DI,SS:[DI+4]` then `ADD DI,AX` then `MOV AX,ES:[DI-3]`, fourteen bytes to fetch one depth key. It is a Hoare quicksort over 144 seven-byte records, so that happens on the order of a thousand times a frame.
+
+**Reconstruction.** `DepthSort` is a top-level procedure and reads the unit's `Outp` global directly; `BuildBlobs` takes no parameter and the wrapper does not exist.
+
+**Why.** The nesting is only reachable through the parameter, and the parameter is only ever the one global: the wrapper's single call site passes it. Matching the shape would mean declaring the array type 1-based -- the original addresses `A[I]` as `base + I*7 - 3`, so the array it receives starts at index 1 -- while entry 0 of our `Outp` is the translation the transform writes, which would need a typecast to hand over the tail of the array. A cast to force the compiler to emit a slower access path is not a transcription.
+
+**Effect on output: none, but the reconstruction's sort is FASTER than the original's.** It is a per-frame cost, so it belongs on the record of the pacing investigation: this is one of the few places where our code does less work than the binary's, and any pacing comparison for scene 4 should expect it. Found by `tools/shapediff.py 001`, which lists the span as `1107:0287..039a`.
+
+---
+
 ## `{$G+}` is enabled where the assembler needs 286 instructions
 
 The original targets 286 and above — `1139:01d9` is `SHR DI,2`, and a shift by
