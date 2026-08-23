@@ -1,0 +1,53 @@
+# Where the Borland runtime sits in each part, and the routines confirmed inside
+# it. Read by kit/tools/pascal/rtl.py; everything here is this target's data.
+#
+# GENERATED from tools/rtlfind.py on 23 Aug 2026 by parsing it (psycho #50).
+
+# The reference part -- the one whose routine bodies become the search patterns.
+reference = "003"
+
+# Where rtl.py writes the names it locates.
+out = "work/sites/rtlnames.json"
+
+# How many bytes of an anchor's prefix to check. Halt's full body diverges on
+# near call displacements, so it is confirmed on a prefix.
+anchor_prefix = 10
+
+# The RTL segment base in each part. These are MEASURED, one per binary, and
+# they are the reason naming by offset alone does not work: only a stable core
+# keeps its offsets across parts.
+[base]
+"000" = 0x1213
+"001" = 0x1543
+"002" = 0x14b1
+"003" = 0x137b
+"004" = 0x1288
+"005" = 0x12d9
+"006" = 0x128a
+"007" = 0x110c
+"009" = 0x1069
+
+# Offsets in the reference part, EACH CONFIRMED BY DECOMPILING THE ROUTINE. A
+# pattern that matches more than once is not reported, so this table is the
+# evidence and not a guess.
+[known]
+"0000" = "RTL_SystemInit"
+"0116" = "RTL_Halt"
+"028a" = "RTL_GetMem"
+"029f" = "RTL_FreeMem"
+"0cd3" = "RTL_Random"
+"0e7c" = "RTL_FillChar"
+"320d" = "RTL_RoundToInt"
+"3420" = "RTL_FileAssign"
+"345b" = "RTL_FileReset"
+"34dc" = "RTL_FileClose"
+"3501" = "RTL_FileCheckOpen"
+"3546" = "RTL_FileBlockRead"
+"35ae" = "RTL_FileSeek"
+
+# The two the pattern search cannot confirm itself. Offset 0 is the system init
+# by construction, because the block starts there; the other is checked on a
+# prefix. Both are assumptions, named as such.
+[anchor]
+"0000" = "RTL_SystemInit"
+"0116" = "RTL_Halt"

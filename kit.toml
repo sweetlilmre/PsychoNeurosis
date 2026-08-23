@@ -57,6 +57,12 @@ first_para = 0x1000
 "005" = "work/split/NEUROSIS_005_fpu.exe"
 "006" = "work/split/NEUROSIS_006_fpu.exe"
 "007" = "work/split/NEUROSIS_007_fpu.exe"
+# 009 is the end screen. It was missing from this table until #50, and the gap
+# showed up the moment a tool that had its own hardcoded path started reading
+# this one instead -- that tool covered nine parts and this covered eight.
+# There is deliberately no 008: it is DemoVT, third-party, and reconstructed in
+# the sibling repository.
+"009" = "work/split/NEUROSIS_009.exe"
 
 [census]
 # Directories holding scripts, for the retirement census. The sibling

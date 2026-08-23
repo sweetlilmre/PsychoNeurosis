@@ -167,18 +167,21 @@ reason = "text I/O that leaves the encoding to the locale. Its DEFAULT_DIRS was 
 
 
 [script."fpconst.py"]
-state = "carry"
-reason = "floating-point constants out of a code segment"
+state = "archived"
+successor = "kit/tools/pascal/x87.py"
+reason = "decodes the constants the rewritten code turns out to load. VERIFIED identical on all four formats -- AND IT COULD NOT DECODE ONE OF THEM: its own docstring described the 4-byte operand as 'FADD/FCOMP float ptr', which is what a disassembler prints, while its table keyed it as `single`, so asking for `float` raised KeyError. Both names work now. Its part-to-file lookup was a hardcoded work/split path with a fallback and is target.original"
 
 
 [script."fpfix.py"]
-state = "carry"
-reason = "emulator traps back to real x87"
+state = "archived"
+successor = "kit/tools/pascal/x87.py"
+reason = "rewrites confirmed traps back to real x87. VERIFIED both paths: the PATCHED IMAGE IS BYTE-IDENTICAL on four real trap sites, 4 of 4 applied, and identical again on three offsets that are not traps, 0 of 3 applied with all three named"
 
 
 [script."fpsurvey.py"]
-state = "carry"
-reason = "x87-emulator trap sites, INT 34h..3Eh"
+state = "archived"
+successor = "kit/tools/pascal/x87.py"
+reason = "surveys the trap sites and is what keeps the encoding table honest -- the table is empirical, from one 1994 binary, so a new target runs this before trusting the rewriter. VERIFIED: identical output on two parts"
 
 
 [script."glossary.py"]
@@ -346,18 +349,21 @@ state = "carry"
 reason = 'per-routine byte check, the successor to asmverify.py; its lock lives in the register rather than in a source dict'
 
 [script."rtlfind.py"]
-state = "carry"
-reason = "RTL routines by byte pattern"
+state = "archived"
+successor = "kit/tools/pascal/rtl.py"
+reason = "names RTL routines by pattern rather than by offset -- the corrected assumption at the heart of this tool, since smart-linking preserves offsets only for a stable core. VERIFIED identical on all nine parts, and the JSON it writes is content-identical. Its per-part RTL bases, its reference part and its thirteen confirmed offsets are rtl.toml. THE MOVE FOUND A GAP IN THE ANSWERS FILE: this tool covered nine parts from its own hardcoded path while target.original listed eight -- 009 was missing, and is there now"
 
 
 [script."rtlmatch.py"]
-state = "carry"
-reason = "RTL segment, and how far it matches"
+state = "archived"
+successor = "kit/tools/pascal/rtl.py"
+reason = "finds the runtime block in a binary and measures how far it agrees with a reference. VERIFIED: identical output. Its masking and offset arithmetic were already imported by rtlfind, so the two were one tool in two files"
 
 
 [script."scan_funcs.py"]
-state = "carry"
-reason = "BP6 prologue and epilogue entry-point scan"
+state = "archived"
+successor = "kit/tools/pascal/rtl.py"
+reason = "enumerates likely procedure entry points by prologue shape. ITS OUTPUT CHANGED AND THE CHANGE IS A REPAIR: it carried its own segment-length table, and for three segments the declared length EXCEEDED the space before the next segment begins -- 1000 by 5 bytes, 1931 by 14, 19a0 by 1 -- so those scans ran into the neighbour and attributed 4 entry points to the wrong segment. Deriving each extent from the next segment's base cannot do that: 350 becomes 346. It also no longer scans the DGROUP segment, which is data and had 0 anyway"
 
 
 [script."segmap.py"]
@@ -366,9 +372,17 @@ successor = "kit/tools/substrate/segmap.py"
 reason = "real-mode segment layout derived from the relocation table. VERIFIED: identical 9-line output"
 
 
+[script."x87.py"]
+state = "carry"
+reason = "THE KIT'S, born there: the three-step x87 job -- survey the emulator traps, rewrite the confirmed ones, read the constants the rewritten code loads. Three scripts merged into one tool because they are three steps of ONE job, and doing the third without the first is how a wrong theory becomes a table of plausible constants"
+
 [script."wizard.py"]
 state = "carry"
 reason = "installs the kit into a project: proposes with its evidence, asks what no listing implies, and --check diffs against a kit.toml already there"
+
+[script."rtl.py"]
+state = "carry"
+reason = "THE KIT'S, born there: the runtime in three steps -- find the block and measure it, name routines inside it by pattern, and enumerate likely procedure starts anywhere by prologue shape. Two of the three already shared code, so they were one tool in two files"
 
 [script."shapediff.py"]
 state = "carry"
