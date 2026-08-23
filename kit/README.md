@@ -32,8 +32,7 @@ if that happens.
 
 `tools/README.md` says what each program is for and which tier it belongs to.
 `wiki/index.md` lists what has been learnt about reading these binaries, and
-`wiki/CONTEXT.md` holds the vocabulary -- read it before arguing about any of
-those words.
+`wiki/CONTEXT.md` holds the METHOD's vocabulary and travels with this folder; a host repository's own `CONTEXT.md` keeps only the words for its target. Read both before arguing about any of them.
 
 Decided in [The kit travels as one folder](https://github.com/sweetlilmre/PsychoNeurosis/issues/43),
 on the map [The toolkit and wiki become the RE drivers](https://github.com/sweetlilmre/PsychoNeurosis/issues/29).

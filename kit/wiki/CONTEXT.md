@@ -1,16 +1,16 @@
 ---
 type: Glossary
 title: The wiki -- vocabulary
-description: Terms for how a wiki page is shaped, how the catalogue is organised, and the fidelity ladder.
+description: The method's vocabulary -- what we measure, what measures it, how a wiki page is shaped, how the catalogue is organised, and the fidelity ladder.
 tags: [glossary, vocabulary]
 timestamp: 2026-08-20T00:00:00Z
 ---
 
-# The wiki
+# The method -- vocabulary
 
-Vocabulary for the wiki itself -- how a page is shaped, how the catalogue is organised, and the fidelity ladder it all hangs off.
+**Vocabulary for the METHOD.** How a page is shaped, how the catalogue is organised, the fidelity ladder it all hangs off -- and, since 23 Aug 2026, the words for what we measure, the programs that measure it, and how a measurement is held: thirteen terms that used to live in a host repository's root glossary and had to be carried to every new target unchanged.
 
-**This file travels with the wiki.** When the bundle lifts out into its own repository, these terms go with it. The repo-root `CONTEXT.md` keeps the terms that belong to the demo reconstruction and the toolkit, and points here for these.
+**This file travels with the kit.** It is the kit's half of the vocabulary, so it goes wherever `kit/` goes. A host repository's own `CONTEXT.md` keeps only the words for ITS target -- the things that would have to be rewritten for a different binary -- and points here for the rest.
 
 ## Language
 
@@ -43,6 +43,66 @@ _Avoid_: compiler layer, upper tier
 **Withdrawn conclusion**:
 A claim this project made, believed, and then disproved by measurement. These belong in the catalogue next to the technique that produced them. They are not an appendix.
 _Avoid_: mistake, error, false start, retraction
+
+### What we measure, and what measures it
+
+**Artefact**:
+A thing you can measure. It is a whole file, or one named part of a file. Examples: `PSYCHO.EXE`, one segment, one routine, one `.PAS` file.
+_Avoid_: target, object, item, subject
+
+**Instrument**:
+A tool or a method that measures how well an artefact agrees with the original. A person who watches the screen is an instrument.
+_Avoid_: tool, check, test, measure (as a noun)
+
+**Blind spot**:
+The thing an instrument cannot see. Every instrument has one. Each instrument is blind to something the next one catches.
+_Avoid_: limitation, gap, weakness
+
+
+### The toolkit
+
+**Toolkit**:
+The reusable programs, with no project facts in them. It lives at `kit/tools`, in three folders: `substrate`, `pascal`, `wikitools`. **`tools` was on this avoid-list until 23 Aug 2026**, because the word once named both the frozen scripts at a host repo's root and the reusable set. The folder is now called `tools` and the ambiguity ends with the frozen copies, so the avoid-list drops it -- a glossary that contradicts the directory layout is worse than none.
+_Avoid_: library, framework, package
+
+**Core**:
+The part of a program with no project facts in it. The reusable part.
+_Avoid_: engine, kernel, generic layer
+
+**Driver**:
+The part of a program that holds one project's own facts: file names, addresses, unit lists.
+_Avoid_: script, wrapper, harness (a harness is a different thing)
+
+**Compare tool**:
+A program that compares our bytes against the original's bytes.
+_Avoid_: comparator, differ, verifier
+
+**Allowed-difference rule**:
+The rule that says which differences a compare tool accepts. It is passed in, never built in, because the rule inverts by artefact.
+_Avoid_: excuse rule, mask, tolerance, heuristic
+
+**Scratch folder**:
+A temporary folder that a build erases and then uses. One per project, named in config, because three build scripts once shared one and could not run at the same time.
+_Avoid_: build dir, temp, workspace
+
+
+### Verification
+
+**Harness**:
+A small program that runs one piece of the subject on its own -- one effect, one screen, one whole part -- so a person can watch it. A harness is itself a deviation: it is ours, not the original's.
+_Avoid_: test, driver, runner
+
+**Marker**:
+A comment in a `.PAS` file that a tool reads. `{ @asm 003 11f3:0105 }` names the address in the original that a routine's bytes must match.
+_Avoid_: annotation, tag, directive
+
+**Fragment**:
+Hand-written assembler inside a compiled Pascal routine. It has no routine boundary, so its marker states a byte count instead.
+_Avoid_: inline block, snippet, chunk
+
+**Ratchet**:
+A measure that cannot go backwards without failing the build. `asmverify.py` locks routine lengths, so a change that shortens a match is a regression.
+_Avoid_: gate (a gate is a different thing), guard, lock
 
 ### How the catalogue is organised
 
