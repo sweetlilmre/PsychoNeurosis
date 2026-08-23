@@ -72,9 +72,10 @@ reason = "every row reproduced against real build output (#34); the segment, len
 
 
 [script."build.py"]
-state = "superseded"
+state = "archived"
 successor = "kit/tools/pascal/build.py"
-reason = "donated the compiler-as-a-variable shape, the TP6 dialect rewrite and the bootstrap prepass; its data is DemoVT's build.toml. Verified: all 26 unit rows identical (psycho #35). NOTE: this name now also belongs to the kit tool"
+reason = "the second consumer's build harness. It donated the compiler-as-a-variable shape, the TP6 dialect rewrite and the SongUnit bootstrap prepass; its data is build.toml. VERIFIED at #35: all 26 unit rows identical. It outlived that by two tickets because probe.py and verify.py imported tp6_dialect from it -- probe.py is now the kit's codegen.py and verify.py imports the kit's copy, so the last hold on it is gone. THE KIT'S OWN build.py CARRIES THIS NAME, which is why archived means 'no ORIGINAL on disk' rather than 'no file of that name'"
+
 
 
 [script."build_assets.py"]
@@ -279,9 +280,17 @@ state = "carry"
 reason = "the ordered queue of investigations"
 
 
-[script."probe.py"]
-state = "carry"
-reason = "NAME COLLISION: substrate fingerprinter vs compiler differ, one must be renamed"
+[script."fingerprint.py"]
+state = "archived"
+successor = "kit/tools/substrate/fingerprint.py"
+reason = "RENAMED from this repository's probe.py, per #17: there were TWO unrelated tools called probe.py, one in each consumer, and both are renamed rather than one -- renaming only one would leave an older document's mention of 'probe' ambiguous for ever. This one answers what is appended past the load image and what wrote it. VERIFIED: identical output on the packed file and on a part with an overlay"
+
+[script."codegen.py"]
+state = "archived"
+successor = "kit/tools/pascal/codegen.py"
+reason = "RENAMED from the second consumer's probe.py -- the other tool of that name, sharing nothing with the fingerprinter. It compiles a probe unit with every installed compiler and diffs the code, which turns a claimed compiler difference from an assertion into a measurement; five of six such claims in that target were wrong. VERIFIED: identical output, all 40 lines. IT COULD NOT RUN AS IT STOOD -- #36 deleted the committed vt131.conf it took from build.py, and the differential needed that file restored from the archive tag to get an honest comparison. Its successor writes the config AFTER wiping the staging directory, which is what the original could not do"
+
+
 
 
 [script."progcmp.py"]

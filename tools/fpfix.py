@@ -26,7 +26,13 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from mzinfo import parse
+# mzinfo is the kit's now (#50). These scripts are the record's, or are
+# waiting their turn to move, and they keep working meanwhile -- which is
+# the standing rule: the originals go on working until their successor has
+# landed AND every caller has been repointed.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] /
+                      "kit" / "tools"))
+from substrate.mzinfo import parse
 
 LOAD_SEG = 0x1000  # Ghidra's MZ loader places the image here
 
