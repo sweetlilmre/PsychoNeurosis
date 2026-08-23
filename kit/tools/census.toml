@@ -189,6 +189,10 @@ state = "carry"
 reason = "segment lengths, and the three-lengths footing rule"
 
 
+[script.'marker.py']
+state = "carry"
+reason = 'the one reader for @asm markers; three programs had their own and one had already diverged'
+
 [script."markers.py"]
 state = "carry"
 reason = "reads the @asm markers out of the source tree"
@@ -287,6 +291,10 @@ reason = "spent one-shot, and honestly so: it detects the repaired file and refu
 state = "carry"
 reason = "multiplied line breaks in a document"
 
+
+[script.'routines.py']
+state = "carry"
+reason = 'per-routine byte check, the successor to asmverify.py; its lock lives in the register rather than in a source dict'
 
 [script."rtlfind.py"]
 state = "carry"

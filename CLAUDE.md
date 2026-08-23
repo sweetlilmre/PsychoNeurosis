@@ -36,10 +36,13 @@ Then all the checks. **They all pass, and the list is run in full at the end of 
     $V kit/tools/pascal/plan.py --report
     $V kit/tools/census.py
     $V kit/tools/pascal/shared_asm.py --gate    # asm duplicated between units instead of shared as an .INC
+    $V kit/tools/pascal/routines.py     # the per-routine byte check; --emit feeds the ratchet
     python tools/paslint.py
     python tools/encaudit.py                    # add a dir argument for kit/tools/*, it does not scan it
 
 **No paths and no numbers in that list, and both absences are the point.** Every program in the kit asks [`kit.toml`](kit.toml) where this repository keeps things -- the sources, the wiki, the register, the exempt list, the script roots -- and prints which answer it used and where it came from, so a disagreement with the tree is visible. An explicit path on the command line still wins; it is now the exception. Machine-specific paths, which may never be committed, live in the untracked `kit.local.toml` and override `kit.toml` key by key: that is how the sibling repository's root reaches the census. Neither file is hand-written -- the kit's setup wizard writes them ([#40](https://github.com/sweetlilmre/PsychoNeurosis/issues/40)).
+
+**The routine lock lives in the register too, not in a tool.** `kit/tools/pascal/routines.py` is the successor to `tools/asmverify.py` and reads its locked lengths from `status.toml`'s `[routine.*]`, where a rise happens by itself and a lowering is a visible data change. The two agree on all 77 routines -- name, source, part, address, matched bytes, holes and which built image -- and the frozen one keeps working until [#36](https://github.com/sweetlilmre/PsychoNeurosis/issues/36) deletes it.
 
 **The coverage number comes from the scan that measures it.** `markers.py --emit` writes what it counted and `ratchet.py --measured` reads it. It used to be typed into the command above as `--coverage 76` while the scan measured 78, so the ratchet sat two below the truth and could not have noticed a real fall -- which is the ratchet's own hole number one, *the lock sits stale-low*, surviving in the one number a person still typed.
 

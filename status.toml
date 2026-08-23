@@ -8,6 +8,228 @@
 [coverage]
 targets = 78
 
+[routine."DEMOVT.GetVolume"]
+matched = 21
+
+[routine."DEMOVT.MusicDetect"]
+matched = 64
+
+[routine."DEMOVT.MusicFunc3"]
+matched = 14
+
+[routine."DEMOVT.MusicPoll"]
+matched = 14
+
+[routine."DEMOVT.MusicPos"]
+matched = 27
+
+[routine."DEMOVT.MusicStart"]
+matched = 14
+
+[routine."DEMOVT.MusicStop"]
+matched = 14
+
+[routine."DEMOVT.SetVolume"]
+matched = 28
+
+[routine."MODEX.SelectPlane"]
+matched = 20
+
+[routine."MODEX.SetModeX"]
+matched = 93
+
+[routine."MODEX.ShowFrame"]
+matched = 67
+
+[routine."P1S1.BlitSprite"]
+matched = 20
+
+[routine."P1S1.SaveUnder"]
+matched = 20
+
+[routine."P1S1.whose"]
+matched = 38
+
+[routine."P1S3.MosaicBlocks"]
+matched = 132
+
+[routine."P1S4.Blit"]
+matched = 170
+
+[routine."P1S4.SetPalette768"]
+matched = 24
+
+[routine."P2S1.BlitBitmapX"]
+matched = 56
+
+[routine."P2S1.DoorRaiseOneRow"]
+matched = 38
+
+[routine."P2VIEW.FillRect"]
+matched = 145
+
+[routine."P2VIEW.FlipPage"]
+matched = 42
+
+[routine."P2VIEW.Plot"]
+matched = 67
+
+[routine."P2VIEW.SetMode"]
+matched = 26
+
+[routine."P5S1.DrawMesh"]
+matched = 132
+
+[routine."P5S1.FillTriangle"]
+matched = 1254
+
+[routine."P5S1.Project"]
+matched = 87
+
+[routine."P5S2.RotozoomFrame"]
+matched = 64
+
+[routine."P5S3.FixDiv"]
+matched = 32
+
+[routine."P5S3.FixMul"]
+matched = 19
+
+[routine."P5S3.Project5"]
+matched = 166
+
+[routine."P5S3.RotatePoint5"]
+matched = 334
+
+[routine."P5S3.SinCos5"]
+matched = 178
+
+[routine."P6S2.Blit"]
+matched = 170
+
+[routine."P6S3.Overlay"]
+matched = 33
+
+[routine."P6S3.ScrollOut"]
+matched = 37
+
+[routine."P7S1.FliBrun"]
+matched = 75
+
+[routine."P7S1.FliCopy"]
+matched = 25
+
+[routine."P7S1.FliLC"]
+matched = 99
+
+[routine."P7S1.FliSS2"]
+matched = 98
+
+[routine."PART3_BLOCKS.BlockDown"]
+matched = 32
+
+[routine."PART3_BLOCKS.BlockUp"]
+matched = 32
+
+[routine."PART3_GLOBE.RenderFrame"]
+matched = 121
+
+[routine."PART3_MORPH.ClearPage"]
+matched = 62
+
+[routine."PART3_MORPH.DrawMorph"]
+matched = 56
+
+[routine."PART3_MORPH.DrawShape"]
+matched = 92
+
+[routine."PART3_MORPH.FlipPage"]
+matched = 29
+
+[routine."PART3_MORPH.GetPalette768"]
+matched = 24
+
+[routine."PART3_MORPH.PlotPixel"]
+matched = 62
+
+[routine."PART3_MORPH.Set400Lines"]
+matched = 12
+
+[routine."PART3_MORPH.SetAngles"]
+matched = 18
+
+[routine."PART3_MORPH.SetPalette768"]
+matched = 40
+
+[routine."PART3_MORPH.StepAngles"]
+matched = 390
+
+[routine."PART3_MORPH.TransformPoint"]
+matched = 293
+
+[routine."PART3_SPRITES.DrawRotated"]
+matched = 103
+
+[routine."PART3_WAVES.StepEraseDraw"]
+matched = 59
+
+[routine."PART4_LEMMINGS.Blit"]
+matched = 63
+
+[routine."PART4_LEMMINGS.ColumnSlideIn"]
+matched = 112
+
+[routine."PART4_LEMMINGS.CopyScreen"]
+matched = 30
+
+[routine."PART4_LEMMINGS.HLine"]
+matched = 38
+
+[routine."PART4_LEMMINGS.ScrollRender"]
+matched = 60
+
+[routine."PART4_LEMMINGS.VLine"]
+matched = 44
+
+[routine."VGA.ClearScreen"]
+matched = 22
+
+[routine."VGA.CopyScreen"]
+matched = 28
+
+[routine."VGA.FillRect"]
+matched = 37
+
+[routine."VGA.GetPalette768"]
+matched = 24
+
+[routine."VGA.GetPixel"]
+matched = 27
+
+[routine."VGA.GetRGB"]
+matched = 32
+
+[routine."VGA.GetRGBTo"]
+matched = 26
+
+[routine."VGA.PaletteDim"]
+matched = 19
+
+[routine."VGA.PutPixel"]
+matched = 28
+
+[routine."VGA.SetPalette768"]
+matched = 24
+
+[routine."VGA.SetRGB"]
+matched = 27
+
+[routine."VGA.SetRGBFrom"]
+matched = 32
+
+[routine."VGA.WaitRetrace"]
+matched = 14
+
 [observation."TPART1"]
 harness = "TPART1"
 tier = "part"

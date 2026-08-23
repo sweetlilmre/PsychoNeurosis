@@ -71,19 +71,38 @@ def holes(run):
     return run < OPCODE_CHANGE
 
 
-def walk(orig, mine, allow=holes):
+def walk(orig, mine, allow=holes, stop=None):
     """How far two byte strings agree, forgiving what `allow` forgives.
 
-    Returns the number of bytes that lined up. Differences are gathered into
-    runs and each run is offered to `allow`; the first run it refuses ends the
-    walk, and so does too dense a scatter of forgiven ones.
+    Differences are gathered into runs and each run is offered to `allow`; the
+    first run it refuses ends the walk, and so does too dense a scatter of
+    forgiven ones.
+
+    `stop(orig, mine, i)` optionally recognises a TERMINATOR at an agreed
+    position, returning `(size, definite)` or None. A definite terminator ends
+    the walk there; a provisional one is remembered, and if the walk runs out
+    without a definite one the last provisional is used instead. That is the
+    shape a routine-end rule needs, with none of the rule itself: what counts
+    as a return is the caller's fact, not this module's.
+
+    Returns (length, holes, ended_on_terminator). `holes` is the offset of each
+    forgiven run, which is what a caller reports as "5 holes" -- the bytes the
+    rule excused, so a reader can see how much was excused and where.
     """
     n = min(len(orig), len(mine))
-    i = matched = 0
+    i = 0
+    holes_at = []
     recent = []
+    fallback = None
     while i < n:
         if orig[i] == mine[i]:
-            matched += 1
+            if stop is not None:
+                found = stop(orig, mine, i)
+                if found:
+                    size, definite = found
+                    if definite:
+                        return i + size, holes_at, True
+                    fallback = (i + size, list(holes_at))
             recent.append(0)
             i += 1
         else:
@@ -92,17 +111,20 @@ def walk(orig, mine, allow=holes):
                 run += 1
             if not allow(run):
                 break
+            holes_at.append(i)
             recent.extend([1] * run)
             i += run
-            matched += run
         if len(recent) > DENSITY_WINDOW:
             recent = recent[-DENSITY_WINDOW:]
         if sum(recent) > DENSITY_LIMIT:
             break
-    return matched
+    if fallback is not None:
+        end, hs = fallback
+        return end, [h for h in hs if h < end], True
+    return i, holes_at, stop is None and i >= n
 
 
-def locate(orig, image, allow=holes):
+def locate(orig, image, allow=holes, stop=None):
     """Where `orig` sits in `image` -- BEST fit, not first.
 
     Anchoring on the first unique run is not good enough: a run from the middle
@@ -110,6 +132,10 @@ def locate(orig, image, allow=holes):
     suggests then scores zero and looks like a transcription defect. So every
     alignment suggested by any anchor-length run near the start is scored by how
     far the comparison actually gets, and the winner is kept.
+
+    `stop` is the walk's terminator and is passed through, because the search
+    and the comparison have to agree: scoring by a rule the caller will not
+    then use picks an alignment whose reported length means something else.
 
     Returns (offset, bytes that lined up), or (-1, 0).
     """
@@ -124,7 +150,14 @@ def locate(orig, image, allow=holes):
             start = at - d
             if start >= 0 and start not in tried:
                 tried.add(start)
-                got = walk(orig, image[start:start + len(orig)], allow)
+                got, _, ended = walk(orig, image[start:start + len(orig)],
+                                     allow, stop)
+                # Score by how far the comparison gets, and -- when there is a
+                # terminator -- only believe an alignment that reached one. An
+                # alignment that dribbles out mid-routine scores zero, because
+                # a run from the middle of one routine can occur inside an
+                # unrelated one and the length it reports there means nothing.
+                got = got if (ended or stop is None) else 0
                 if got > best[1]:
                     best = (start, got)
             at = image.find(probe, at + 1)

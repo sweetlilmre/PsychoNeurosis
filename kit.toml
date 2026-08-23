@@ -27,6 +27,11 @@ wiki     = "kit/wiki"                  # the field manual
 register  = "status.toml"              # the status register: the ratchet, the observations, the plan
 exempt   = "src/asm/shared-exempt.txt" # assembler duplicated between units that cannot become one text
 build    = "build"                     # where a build stages and leaves its output
+built    = "run"                       # where a finished harness is installed
+# Only OUR harnesses. `run/` also holds copies of the 1994 binaries so the
+# demo can be run side by side, and comparing an original against itself
+# passes trivially and proves nothing.
+built_pattern = "TP*.EXE"
 
 [target]
 # Facts about the thing being reverse engineered, read out of it by a person.
@@ -39,6 +44,23 @@ first_para = 0x1000
 # The nine files the 1994 demo shipped as, and where the unpacked images live.
 originals = "work/split"
 binaries  = "bin"
+
+# WHICH file each part is measured against, and it is not always the plain one.
+# `_fpu` variants are THIS PROJECT'S disassembly aid -- the CD 3x x87-emulator
+# traps rewritten to raw 9B+ESC so a disassembler can decode them -- not 1994
+# release variants. Measuring a routine that touches the x87 against the plain
+# file shows every FPU site as a difference; measuring against the patched one
+# shows them as tolerated holes. Which to use is a decision about the
+# measurement, so it is stated here rather than buried in a tool.
+[target.original]
+"000" = "work/split/NEUROSIS_000.exe"
+"001" = "work/split/NEUROSIS_001_fpu.exe"
+"002" = "work/split/NEUROSIS_002_fpu.exe"
+"003" = "work/split/NEUROSIS_003_fpu.exe"
+"004" = "work/split/NEUROSIS_004.exe"
+"005" = "work/split/NEUROSIS_005_fpu.exe"
+"006" = "work/split/NEUROSIS_006_fpu.exe"
+"007" = "work/split/NEUROSIS_007_fpu.exe"
 
 [census]
 # Directories holding scripts, for the retirement census. The sibling
