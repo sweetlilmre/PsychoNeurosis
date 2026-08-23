@@ -1,0 +1,6 @@
+Metadata-Version: 2.4
+Name: pascal-re-toolkit
+Version: 0.1.0
+Summary: Reverse-engineering tools for 16-bit DOS binaries built with Borland Pascal
+Requires-Python: >=3.11
+Requires-Dist: pyyaml>=6.0

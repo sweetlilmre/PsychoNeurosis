@@ -51,10 +51,16 @@ import io
 import os
 import sys
 
-import register
 import pathlib
 
+# Both invocation styles are first-class, so both need a path. parents[1]
+# is kit/tools, which is where `project` lives; parents[0] is this tier's
+# own folder, which Python only adds by itself when the file is run as a
+# script -- so without it `from pascal import ratchet` cannot find the
+# sibling `register`.
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[0]))
+import register                                   # noqa: E402
 import project                                    # noqa: E402
 
 try:

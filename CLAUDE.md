@@ -18,9 +18,9 @@ Asphyxia's first megademo, 1994. Borland Pascal 7 plus hand-written assembler, r
 **It needs a virtual environment.** `pyyaml` is the only third-party dependency; TOML is read with stdlib `tomllib`, so Python 3.11+ is required.
 
     uv venv .venv
-    uv pip install --python .venv/Scripts/python.exe pyyaml
+    uv pip install --python .venv/Scripts/python.exe -e kit/tools
 
-**The editable install of the toolkit that used to be documented here DOES NOT WORK, and never did** -- `kit/tools/pyproject.toml` declares no `[build-system]` and no package discovery, so setuptools refuses the flat layout of `substrate`/`pascal`/`wikitools`. Nothing has broken because nothing depends on it: every command below runs a script by path. Being made real is [Make the toolkit an installable package](https://github.com/sweetlilmre/PsychoNeurosis/issues/39); until then install `pyyaml` alone.
+**The install works and the kit still runs without it.** Both are deliberate: `python kit/tools/pascal/plan.py --report` works on a fresh clone with nothing installed, which is how a first session starts, so there are no console entry points to require an install before the first command. The install exists so a consumer can `import`: `from substrate import align`, `import project`. It failed silently for as long as it was documented -- `pyproject.toml` declared no `[build-system]` and no packages, so setuptools refused the flat layout of `substrate`/`pascal`/`wikitools` -- and nobody noticed because every command below runs a script by path. Fixed under [#39](https://github.com/sweetlilmre/PsychoNeurosis/issues/39) by declaring the three packages rather than moving any file.
 
 Then all the checks. **They all pass, and the list is run in full at the end of any session that touches the kit** -- a commit hash here would go stale, and this file has been wrong three times in one day already.
 
