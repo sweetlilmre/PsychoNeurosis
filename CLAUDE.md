@@ -17,8 +17,15 @@ Asphyxia's first megademo, 1994. Borland Pascal 7 plus hand-written assembler, r
 
 **It needs a virtual environment.** `pyyaml` is the only third-party dependency; TOML is read with stdlib `tomllib`, so Python 3.11+ is required.
 
+    git submodule update --init kit          # FIRST -- see below
     uv venv .venv
     uv pip install --python .venv/Scripts/python.exe -e kit/tools
+
+**`kit/` IS A SUBMODULE**, pointing at [sweetlilmre/re-kit](https://github.com/sweetlilmre/re-kit) -- the portable half, extracted with its history on 23 Aug 2026 ([#44](https://github.com/sweetlilmre/PsychoNeurosis/issues/44)). A clone made without `--recurse-submodules` has an EMPTY `kit/`, and every command below then fails on a missing file without naming the cause, so that line comes first.
+
+**The gitlink records WHICH kit this project is on**, which is the point of the submodule rather than a copy: `git -C kit log --oneline -1` says, and `git diff --submodule` shows a move. To take a newer kit: `git -C kit pull`, run the checks, then commit the new gitlink here -- a kit change and its acceptance are two separate acts, deliberately.
+
+**To change the kit while working here**: edit inside `kit/`, commit and push from there (`git -C kit push`), then commit the gitlink. Push with `git push --recurse-submodules=check`, which refuses if the commit this project pins is not on a remote the other consumer can fetch.
 
 **The install works and the kit still runs without it.** Both are deliberate: `python kit/tools/pascal/plan.py --report` works on a fresh clone with nothing installed, which is how a first session starts, so there are no console entry points to require an install before the first command. The install exists so a consumer can `import`: `from substrate import align`, `import project`. It failed silently for as long as it was documented -- `pyproject.toml` declared no `[build-system]` and no packages, so setuptools refused the flat layout of `substrate`/`pascal`/`wikitools` -- and nobody noticed because every command below runs a script by path. Fixed under [#39](https://github.com/sweetlilmre/PsychoNeurosis/issues/39) by declaring the three packages rather than moving any file.
 
