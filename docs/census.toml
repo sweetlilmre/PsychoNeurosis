@@ -84,7 +84,12 @@ reason = "project driver: builds assets/ from NEUROSIS.DAT"
 
 [script."census.py"]
 state = "carry"
-reason = "RETF census, far-call histogram, VMT reader; no disassembler"
+reason = "the kit's script-retirement census, and the row now means only that. THE SECOND CONSUMER HAD A COMPLETELY DIFFERENT TOOL UNDER THIS NAME -- four cheap measurements on one segment: far returns as a routine signature, string absence as evidence, far calls out, and CALLF [DI+nn] sites giving the VMT layout. A table keyed by basename cannot hold both, and this row very nearly archived a live tool on the strength of a successor that is an unrelated program. It is kit/tools/pascal/survey.py now"
+
+[script."survey.py"]
+state = "archived"
+successor = "kit/tools/pascal/survey.py"
+reason = "RENAMED from the second consumer's census.py, which collided with the kit's. VERIFIED on four segments -- 17cf, 116e, 1a17 and 12ba -- output identical line for line, 108, 41, 45 and 43 lines. It could not be run as it stood: its image path still pointed at work/unpack/ from when it lived in the other repository, so it crashed on every invocation, and its census row said carry. Its 27-entry segment table, whose own comment asked somebody to keep it in step with verify.py's UNITS, is gone -- the unit config already held it"
 
 
 [script."coverage.py"]
