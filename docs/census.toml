@@ -253,8 +253,10 @@ reason = "OKF v0.1 conformance only; no project facts, deliberately"
 
 
 [script."omf.py"]
-state = "carry"
-reason = "reads an Intel OMF .OBJ's code and FIXUPP records; copied into the kit's substrate tier, where it returns fields with lengths instead of making a caller parse its output"
+state = "archived"
+successor = "kit/tools/substrate/omf.py"
+reason = "the OMF fixup reader. Its only importer was verify.py, so it went with it. VERIFIED: identical code length and identical fixup sets on both object modules in that target -- PLAYMOD 695 bytes with 36 fixups, SOUNDDEV 2,430 with 384"
+
 
 
 [script."p2obj.py"]
@@ -431,9 +433,10 @@ reason = "THE DISPOSITION'S REASON WAS WRONG and the decision was right. It said
 
 
 [script."verify.py"]
-state = "carry"
-reason = "the compare-tool core: slide-to-locate plus a maskable rule"
-kept = "KEPT under #36 and NOT fully superseded: units.py reproduces every row, but verify.py's --detail and --all print the divergent-region diagnostics for a unit that does NOT match, and the kit has no equivalent. Eight scripts also import it"
+state = "archived"
+successor = "kit/tools/pascal/units.py"
+reason = "kept twice under #33 and #36 because units.py reproduced every ROW while dropping its two diagnostic views. Those are ported: align.regions() lists every divergent region and align.hexpair() renders one with a mark line, behind units.py --all and --detail. VERIFIED on a build made to FAIL on purpose (/$R+ turned 0 mismatched into 19): all 566 printed regions identical across all 19 units, per-unit counts identical on every one, and the hex dump identical byte for byte. Two callers repointed first -- coverage.py, whose answer is unchanged at 96.1%, and relmatch.py, which cannot be exercised here because its input tree is held out of source control"
+
 
 
 [script."vtbuild.py"]
