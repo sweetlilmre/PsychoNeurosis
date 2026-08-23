@@ -24,7 +24,7 @@ Asphyxia's first megademo, 1994. Borland Pascal 7 plus hand-written assembler, r
 
     git submodule update --init kit
     uv venv .venv
-    uv pip install --python .venv/Scripts/python.exe -e kit/tools
+    uv pip install --python .venv/Scripts/python.exe pyyaml
 
 **This target's own checks**, on top of the kit's list in `kit/WORKING.md`. Both are frozen originals awaiting [#36](https://github.com/sweetlilmre/PsychoNeurosis/issues/36):
 

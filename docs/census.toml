@@ -322,7 +322,7 @@ state = "carry"
 reason = "segment layout from relocation fixups"
 
 
-[script."setup.py"]
+[script."wizard.py"]
 state = "carry"
 reason = "installs the kit into a project: proposes with its evidence, asks what no listing implies, and --check diffs against a kit.toml already there"
 
