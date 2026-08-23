@@ -34,13 +34,22 @@
 
 unit P5S2;
 
-{$N+}   { The motion-table build at 1096:051a is x87 code: FILD the index,
+{$N+}   { The motion-table build at 1096:051a is 80x87 CODE: FILD the index,
           FDIV by a SINGLE 180.0 at CS:$03c9, FLD the ten-byte EXTENDED Pi at
           CS:$03cd, and the $N+ RTL's Sin/Cos/Round on the stack top. Under
           the $N- default the same 3,424 trig calls go through the software
           six-byte-Real RTL instead, which took long enough to read as a
           multi-second black-screen pause in the part run -- the plan's
-          part5-386-trio symptom; the 386 trio itself was already transcribed. }
+          part5-386-trio symptom; the 386 trio itself was already transcribed.
+
+          $N SAYS WHICH CODE IS EMITTED. IT SAYS NOTHING ABOUT THE EMULATOR,
+          and conflating the two is a mistake this project has now made twice.
+          Those 80x87 instructions SHIP as INT 34h..3Dh traps of identical
+          length under $E+ -- 14 of them sit at 1096:051a in the shipped
+          binary -- and THE AUTHOR HAD NO COPROCESSOR, so in 1994 the emulator
+          executed every one. The RTL patches them back to real opcodes at
+          startup only where a coprocessor is present. See
+          docs/23-deviations.md, `NOT a deviation: the x87 emulator traps`. }
 
 interface
 
