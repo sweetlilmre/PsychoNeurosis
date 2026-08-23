@@ -99,120 +99,13 @@ var
   F     : file;                   { DS:$72fe }
 
 { --------------------------------------------------------------------------
-  100f:0000 -- a clipped sprite blit. HAND ASSEMBLER, verbatim.
-
-  The sprite carries its own size in its first two bytes, and colour 0 is
-  transparent. Clipping is done by moving the pointers rather than by testing
-  each pixel: the top rows are skipped with one MUL, the left and right
-  margins become two per-row skips held in the frame, and anything wholly
-  outside leaves through the same exit.
-
-  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
-
-      W := S^.W;  H := S^.H;  P := 0;
-      clip H and the source start against the top edge,
-      clip H against the bottom edge,
-      clip W and record SkipLeft/SkipRight against the two side edges;
-      for each remaining row, for each remaining column, copy the byte unless
-      it is zero, then step DI on by 320 - W.
-
-  It cannot be written that way: the row table is indexed straight off BX, the
-  transparent case bumps DI rather than branching around a store, and the
-  clip bounds are four DGROUP words the routine reads directly.
+  100f:0000 -- the clipped transparent sprite blit. HAND ASSEMBLER, verbatim,
+  and SHARED SOURCE: the routine is src/asm/BLITCLIP.INC, because part 001
+  scene 4 compiles the same text at 1107:0199. The marker names the routine,
+  which is how it stays byte-checked with its header inside the include.
   -------------------------------------------------------------------------- }
 { @asm 006 100f:0000 +170 Blit }
-procedure Blit(S : Pointer; X, Y : Integer; Segment : Word); assembler;
-var
-  SkipLeft, SkipRight : Integer;  { [BP-2], [BP-4] }
-  Spare               : Integer;  { [BP-6] -- ENTER $0006 reserves a third
-                                    word that the routine never touches }
-asm
-  PUSH DS                { 100f:0004                                         }
-  MOV  AX, Segment       { 100f:0005                                         }
-  MOV  ES, AX            { 100f:0008  ES:DI is the destination               }
-  LDS  SI, S             { 100f:000a  DS:SI is the sprite                    }
-  XOR  DH, DH            { 100f:000d                                         }
-  MOV  DL, [SI+1]        { 100f:000f  DL := the height                       }
-  XOR  CH, CH            { 100f:0012                                         }
-  MOV  CL, [SI]          { 100f:0014  CL := the width                        }
-  POP  DS                { 100f:0016  DGROUP again, for the clip bounds      }
-  MOV  SkipLeft, 0       { 100f:0017                                         }
-  MOV  SkipRight, 0      { 100f:001c                                         }
-  MOV  BX, Y             { 100f:0021                                         }
-  MOV  AX, ClipTop       { 100f:0024  the top edge -- [6] in the binary       }
-  SUB  AX, BX            { 100f:0027  how far above it we start              }
-  JLE  @@TopOK           { 100f:0029                                         }
-  CMP  AX, DX            { 100f:002b                                         }
-  JGE  @@Out             { 100f:002d  the whole sprite is above the window   }
-  SUB  DX, AX            { 100f:002f  drop that many rows                    }
-  ADD  BX, AX            { 100f:0031                                         }
-  MOV  DI, DX            { 100f:0033  MUL clobbers DX, so park the height    }
-  MUL  CX                { 100f:0035  rows-skipped * width                   }
-  MOV  DX, DI            { 100f:0037                                         }
-  ADD  SI, AX            { 100f:0039  and step the source past them          }
-@@TopOK:
-  MOV  AX, ClipBottom    { 100f:003b  the bottom edge -- [8]                  }
-  SUB  AX, BX            { 100f:003e                                         }
-  JLE  @@Out             { 100f:0040                                         }
-  CMP  AX, DX            { 100f:0042                                         }
-  JGE  @@RowsOK          { 100f:0044                                         }
-  INC  AX                { 100f:0046                                         }
-  MOV  DX, AX            { 100f:0047  clip the height                        }
-@@RowsOK:
-  ADD  BX, BX            { 100f:0049                                         }
-  MOV  DI, [BX + OFFSET YOfs]  { 100f:004b  the binary has $96DA, which is   }
-                         {   the VGA unit's row table in ITS data segment    }
-  MOV  BX, X             { 100f:004f                                         }
-  ADD  DI, BX            { 100f:0052                                         }
-  MOV  AX, ClipLeft      { 100f:0054  the left edge -- [2]                    }
-  SUB  AX, BX            { 100f:0057                                         }
-  JLE  @@LeftOK          { 100f:0059                                         }
-  CMP  AX, CX            { 100f:005b                                         }
-  JGE  @@Out             { 100f:005d  wholly off the left                    }
-  MOV  SkipLeft, AX      { 100f:005f  skip this many bytes of each row       }
-  ADD  DI, AX            { 100f:0062                                         }
-  SUB  CX, AX            { 100f:0064                                         }
-@@LeftOK:
-  MOV  AX, ClipRight     { 100f:0066  the right edge -- [4]                   }
-  SUB  AX, BX            { 100f:0069                                         }
-  JLE  @@Out             { 100f:006b                                         }
-  CMP  AX, CX            { 100f:006d                                         }
-  JGE  @@WidthOK         { 100f:006f                                         }
-  SUB  CX, AX            { 100f:0071                                         }
-  MOV  SkipRight, CX     { 100f:0073                                         }
-  MOV  CX, AX            { 100f:0076                                         }
-@@WidthOK:
-  MOV  BX, CX            { 100f:0078  BX keeps the clipped width             }
-  PUSH DS                { 100f:007a                                         }
-  PUSH SI                { 100f:007b                                         }
-  LDS  SI, S             { 100f:007c  DS := the sprite's segment...          }
-  POP  SI                { 100f:007f    ...but keep the stepped SI           }
-  ADD  SI, 2             { 100f:0080  past the width/height bytes            }
-  CLD                    { 100f:0083                                         }
-@@Row:
-  ADD  SI, SkipLeft      { 100f:0084                                         }
-@@Pixel:
-  LODSB                  { 100f:0087                                         }
-  OR   AL, AL            { 100f:0088                                         }
-  JZ   @@Clear           { 100f:008a  colour 0 is transparent                }
-  STOSB                  { 100f:008c                                         }
-  DEC  CL                { 100f:008d                                         }
-  JNZ  @@Pixel           { 100f:008f                                         }
-  JMP  @@EndRow          { 100f:0091                                         }
-@@Clear:
-  INC  DI                { 100f:0093  step over it instead of storing        }
-  DEC  CL                { 100f:0094                                         }
-  JNZ  @@Pixel           { 100f:0096                                         }
-@@EndRow:
-  ADD  SI, SkipRight     { 100f:0098                                         }
-  MOV  CX, BX            { 100f:009b                                         }
-  ADD  DI, 140h          { 100f:009d  next screen row...                     }
-  SUB  DI, BX            { 100f:00a1    ...less what we just wrote           }
-  DEC  DL                { 100f:00a3                                         }
-  JNZ  @@Row             { 100f:00a5                                         }
-  POP  DS                { 100f:00a7                                         }
-@@Out:
-end;
+{$I BLITCLIP.INC}
 
 { --------------------------------------------------------------------------
   100f:00ac -- read one 256-byte colour map.

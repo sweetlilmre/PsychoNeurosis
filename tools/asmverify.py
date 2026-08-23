@@ -130,7 +130,7 @@ EXPECTED = {
     "P1S1.BlitSprite": 20,
     "P1S1.SaveUnder": 20,
     "P1S1.whose": 38,
-    "P1S4.BlitBlob": 170,
+    "P1S4.Blit": 170,
     "P1S4.SetPalette768": 24,
     "P2S1.BlitBitmapX": 56,
     "P2S1.DoorRaiseOneRow": 38,

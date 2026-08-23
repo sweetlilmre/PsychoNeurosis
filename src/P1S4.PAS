@@ -85,7 +85,7 @@ const
 
   { The clip box the blitter reads from DS:$000C..$0013. }
   { DS:$000C..$0013 -- INITIALISED DATA, read straight out of the image:
-    00 00  C7 00  00 00  3F 01, the full 320 x 200 screen. BlitBlob reads all
+    00 00  C7 00  00 00  3F 01, the full 320 x 200 screen. The blit reads all
     four from DGROUP, so they are typed constants rather than plain consts: a
     plain const folds into the instruction and stops matching. The order is
     the binary's -- top, bottom, left, right. }
@@ -354,127 +354,15 @@ begin
 end;
 
 { --------------------------------------------------------------------------
-  1107:0199 -- BlitBlob(S, X, Y, Segment). HAND ASSEMBLER, verbatim.
-
-  THE SAME ROUTINE AS PART 006's 100f:0000, byte for byte and instruction for
-  instruction, at the same relative offsets -- our addresses are that unit's
-  plus $199. P6S2.PAS carries it verbatim and asmverify locks it at +170; this
-  part's copy had been re-expressed as a Pascal double loop over Mem[], which
-  is exactly the class shapediff.py exists to find: no ENTER of its own to
-  give it away, no REP, and 144 calls a frame over 49 pixels each.
-
-  The sprite carries its own size in its first two bytes and colour 0 is
-  transparent. Clipping moves the pointers rather than testing each pixel:
-  the top rows go in one MUL, the left and right margins become two per-row
-  skips held in the frame, and anything wholly outside leaves through the
-  same exit.
-
-  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
-
-      W := Src^.W;  H := Src^.H;
-      clip H and the source start against the top edge,
-      clip H against the bottom edge,
-      clip W and record SkipLeft/SkipRight against the two side edges;
-      for each remaining row, for each remaining column, copy the byte unless
-      it is zero, then step DI on by 320 - W.
-
-  It cannot be written that way: the row table is indexed straight off BX,
-  the transparent case bumps DI rather than branching around a store, and the
-  clip bounds are four DGROUP words the routine reads directly.
+  1107:0199 -- the clipped transparent sprite blit. HAND ASSEMBLER, verbatim,
+  and SHARED SOURCE: the routine is src/asm/BLITCLIP.INC, because part 006
+  scene 2 compiles the same text at 100f:0000 -- byte for byte, our addresses
+  being that unit's plus $199. It sits here, between Banner_Load and
+  DrawBlobs, rather than at the head of a segment of its own, which is how we
+  know the original shared the SOURCE and let each unit compile its own copy.
   -------------------------------------------------------------------------- }
-{ @asm 001 1107:0199 +170 BlitBlob }
-procedure BlitBlob(S : Pointer; X, Y : Integer; Segment : Word); assembler;
-var
-  SkipLeft, SkipRight : Integer;  { [BP-2], [BP-4] }
-  Spare               : Integer;  { [BP-6] -- ENTER $0006 reserves a third
-                                    word that the routine never touches }
-asm
-  PUSH DS                { 1107:019d                                         }
-  MOV  AX, Segment       { 1107:019e                                         }
-  MOV  ES, AX            { 1107:01a1  ES:DI is the destination               }
-  LDS  SI, S             { 1107:01a3  DS:SI is the sprite                    }
-  XOR  DH, DH            { 1107:01a6                                         }
-  MOV  DL, [SI+1]        { 1107:01a8  DL := the height                       }
-  XOR  CH, CH            { 1107:01ab                                         }
-  MOV  CL, [SI]          { 1107:01ad  CL := the width                        }
-  POP  DS                { 1107:01af  DGROUP again, for the clip bounds      }
-  MOV  SkipLeft, 0       { 1107:01b0                                         }
-  MOV  SkipRight, 0      { 1107:01b5                                         }
-  MOV  BX, Y             { 1107:01ba                                         }
-  MOV  AX, ClipTop       { 1107:01bd  the top edge -- [$0C] in the binary    }
-  SUB  AX, BX            { 1107:01c0  how far above it we start              }
-  JLE  @@TopOK           { 1107:01c2                                         }
-  CMP  AX, DX            { 1107:01c4                                         }
-  JGE  @@Out             { 1107:01c6  the whole sprite is above the window   }
-  SUB  DX, AX            { 1107:01c8  drop that many rows                    }
-  ADD  BX, AX            { 1107:01ca                                         }
-  MOV  DI, DX            { 1107:01cc  MUL clobbers DX, so park the height    }
-  MUL  CX                { 1107:01ce  rows-skipped * width                   }
-  MOV  DX, DI            { 1107:01d0                                         }
-  ADD  SI, AX            { 1107:01d2  and step the source past them          }
-@@TopOK:
-  MOV  AX, ClipBottom    { 1107:01d4  the bottom edge -- [$0E]               }
-  SUB  AX, BX            { 1107:01d7                                         }
-  JLE  @@Out             { 1107:01d9                                         }
-  CMP  AX, DX            { 1107:01db                                         }
-  JGE  @@RowsOK          { 1107:01dd                                         }
-  INC  AX                { 1107:01df                                         }
-  MOV  DX, AX            { 1107:01e0  clip the height                        }
-@@RowsOK:
-  ADD  BX, BX            { 1107:01e2                                         }
-  MOV  DI, [BX + OFFSET YOfs]  { 1107:01e4  the binary has $AB5A, which is   }
-                         {   the VGA unit's row table in ITS data segment    }
-  MOV  BX, X             { 1107:01e8                                         }
-  ADD  DI, BX            { 1107:01eb                                         }
-  MOV  AX, ClipLeft      { 1107:01ed  the left edge -- [$10]                 }
-  SUB  AX, BX            { 1107:01f0                                         }
-  JLE  @@LeftOK          { 1107:01f2                                         }
-  CMP  AX, CX            { 1107:01f4                                         }
-  JGE  @@Out             { 1107:01f6  wholly off the left                    }
-  MOV  SkipLeft, AX      { 1107:01f8  skip this many bytes of each row       }
-  ADD  DI, AX            { 1107:01fb                                         }
-  SUB  CX, AX            { 1107:01fd                                         }
-@@LeftOK:
-  MOV  AX, ClipRight     { 1107:01ff  the right edge -- [$12]                }
-  SUB  AX, BX            { 1107:0202                                         }
-  JLE  @@Out             { 1107:0204                                         }
-  CMP  AX, CX            { 1107:0206                                         }
-  JGE  @@WidthOK         { 1107:0208                                         }
-  SUB  CX, AX            { 1107:020a                                         }
-  MOV  SkipRight, CX     { 1107:020c                                         }
-  MOV  CX, AX            { 1107:020f                                         }
-@@WidthOK:
-  MOV  BX, CX            { 1107:0211  BX keeps the clipped width             }
-  PUSH DS                { 1107:0213                                         }
-  PUSH SI                { 1107:0214                                         }
-  LDS  SI, S             { 1107:0215  DS := the sprite's segment...          }
-  POP  SI                { 1107:0218    ...but keep the stepped SI           }
-  ADD  SI, 2             { 1107:0219  past the width/height bytes            }
-  CLD                    { 1107:021c                                         }
-@@Row:
-  ADD  SI, SkipLeft      { 1107:021d                                         }
-@@Pixel:
-  LODSB                  { 1107:0220                                         }
-  OR   AL, AL            { 1107:0221                                         }
-  JZ   @@Clear           { 1107:0223  colour 0 is transparent                }
-  STOSB                  { 1107:0225                                         }
-  DEC  CL                { 1107:0226                                         }
-  JNZ  @@Pixel           { 1107:0228                                         }
-  JMP  @@EndRow          { 1107:022a                                         }
-@@Clear:
-  INC  DI                { 1107:022c  step over it instead of storing        }
-  DEC  CL                { 1107:022d                                         }
-  JNZ  @@Pixel           { 1107:022f                                         }
-@@EndRow:
-  ADD  SI, SkipRight     { 1107:0231                                         }
-  MOV  CX, BX            { 1107:0234                                         }
-  ADD  DI, 140h          { 1107:0236  next screen row...                     }
-  SUB  DI, BX            { 1107:023a    ...less what we just wrote           }
-  DEC  DL                { 1107:023c                                         }
-  JNZ  @@Row             { 1107:023e                                         }
-  POP  DS                { 1107:0240                                         }
-@@Out:
-end;
+{ @asm 001 1107:0199 +170 Blit }
+{$I BLITCLIP.INC}
 
 { [transcribed] 1107:0245 -- blit blobs 1..144. Note 145 is transformed and
   given a sprite but never drawn; the loop counter is a BYTE ([BP-1], CMP
@@ -484,7 +372,7 @@ var
   I : Byte;
 begin
   for I := 1 to TrailCount do
-    BlitBlob(@Blob[I], Outp[I].X, Outp[I].Y, VirtScrSeg);
+    Blit(@Blob[I], Outp[I].X, Outp[I].Y, VirtScrSeg);
 end;
 
 { [transcribed] 1107:0562 -- FrameStep(A1, A2, A3). Straight pass-through to
