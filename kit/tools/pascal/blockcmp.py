@@ -12,11 +12,16 @@ So each block is compared AT ITS OWN POSITION, searching for the shift that
 minimises real differences. Never a single global shift: the record says that
 mistake once reported 73 mismatches where there were none.
 
-A byte counts as a difference only where OUR side is non-zero -- Turbo Pascal
-leaves an unresolved reference as zeros plus a fixup record, so a zero on our
-side is the linker's job. That is `align.zeros`, and note what it covers: an
-INTRA-UNIT NEAR CALL is a pending fixup too, so a call inside the unit agreeing
-is not evidence that its target sits in the right place.
+WHAT COUNTS AS A DIFFERENCE IS THE CONFIG'S CHOICE, because it depends on what
+is being compared:
+
+  * `pending` -- our side is zero. Turbo Pascal leaves an unresolved reference
+    as zeros plus a fixup record, so a zero is the linker's job. Note what that
+    covers: an INTRA-UNIT NEAR CALL is a pending fixup too, so a call inside the
+    unit agreeing is not evidence that its target sits in the right place.
+  * `linked` -- for a LINKED image, where nothing is left as zeros because the
+    linker already ran. A segment word off by a fixed number of paragraphs, or a
+    DGROUP variable offset, and nothing else. See `align.linked`.
 
     python kit/tools/pascal/blockcmp.py CONFIG.toml
     python kit/tools/pascal/blockcmp.py CONFIG.toml --only PlayStart
@@ -75,7 +80,28 @@ def read_config(path):
             raise SystemExit("  %s does not say `%s`" % (path, key))
     cfg.setdefault("window", WINDOW)
     cfg.setdefault("block", [])
+    cfg.setdefault("rule", "pending")
     return cfg
+
+
+def rule_from(cfg):
+    """The allowed-difference rule this segment is measured by, by NAME.
+
+    A `.TPU`'s unresolved references are zeros, so `pending` is the default and
+    is what four of the five segments here use. A LINKED image's are not zeros
+    at all -- see `align.linked` -- so it says so, and says what its two
+    parameters are, because both are facts about the target rather than about
+    the comparison.
+    """
+    name = cfg["rule"]
+    if name == "pending":
+        return align.zeros
+    if name == "linked":
+        if "varbase" not in cfg:
+            raise SystemExit("  the `linked` rule needs `varbase`: the "
+                             "initialised/uninitialised DGROUP boundary")
+        return align.linked(cfg["varbase"], cfg.get("segment_delta"))
+    raise SystemExit("  no rule called %r -- `pending` or `linked`" % name)
 
 
 def segment_bytes(original, seg, length, first_para):
@@ -87,7 +113,8 @@ def segment_bytes(original, seg, length, first_para):
 
 
 def main(argv):
-    args = project.positionals(argv[1:], ("--only", "--build", "--original"))
+    args = project.positionals(argv[1:], ("--only", "--build",
+                                          "--original", "--limit"))
     if not args:
         sys.stdout.write("usage: blockcmp.py CONFIG.toml [--only NAME] "
                          "[--build DIR] [--original FILE]\n")
@@ -110,29 +137,54 @@ def main(argv):
         sys.stdout.write("  no %s -- build it first\n" % unit)
         return 1
     image = unit.read_bytes()
+    if cfg.get("strip_header"):
+        # A linked .EXE carries an MZ header and the segment sits at the start
+        # of the LOAD IMAGE past it. A .TPU has no header at all.
+        image, _ = align.load_image(image)
     orig = segment_bytes(original, cfg["segment"], cfg["length"], first_para)
 
-    at, _ = align.locate(orig, image)
-    if at < 0:
-        sys.stdout.write("  NOT LOCATED -- the unit's first instruction "
-                         "differs, so nothing below can be positioned\n")
-        return 1
-    sys.stdout.write("segment %04x, unit code located at %s offset 0x%04x\n\n"
-                     % (cfg["segment"], cfg["unit"], at))
+    if "at" in cfg:
+        # The position is KNOWN, so it is not searched for. Searching for
+        # something known to be at offset 0 is not merely wasted work: it is a
+        # chance to find a better-scoring coincidence somewhere else.
+        at = cfg["at"]
+        sys.stdout.write("segment %04x, at %s offset 0x%04x as declared\n\n"
+                         % (cfg["segment"], cfg["unit"], at))
+    else:
+        at, _ = align.locate(orig, image)
+        if at < 0:
+            sys.stdout.write("  NOT LOCATED -- the unit's first instruction "
+                             "differs, so nothing below can be positioned\n")
+            return 1
+        sys.stdout.write("segment %04x, unit code located at %s offset "
+                         "0x%04x\n\n" % (cfg["segment"], cfg["unit"], at))
     sys.stdout.write("block                 addr         len  shift  real  "
                      "pending\n")
     sys.stdout.write("-" * 62 + "\n")
 
     only = opt("only")
-    done = clean = covered = bad = 0
+    rule = rule_from(cfg)
+    # How much of the image is OURS. Measured -- our segment's length, out of
+    # the build's own map -- so it is passed in and never stored in a config.
+    limit = int(opt("limit"), 0) if opt("limit") else None
+    done = clean = covered = bad = short = 0
     for b in cfg["block"]:
         name, lo, hi = b["name"], b["from"], b["to"]
         transcribed = b.get("transcribed", True)
         if only and only.lower() not in name.lower():
             continue
         want = orig[lo:hi]
-        found = align.best_shift(want, image, at + lo, cfg["window"],
-                                 align.zeros)
+        if limit is not None and at + hi > at + limit:
+            # The block runs past the end of OUR segment, so part of it has
+            # nothing to be compared against. Reported, not clipped and not
+            # searched: clipping and searching produces a plausible shift for
+            # a block that simply is not all there.
+            sys.stdout.write("%-20s %04x..%04x %5d      -     -      -  "
+                             "%d byte(s) past the end of our %d\n"
+                             % (name, lo, hi, hi - lo, hi - limit, limit))
+            short += 1
+            continue
+        found = align.best_shift(want, image, at + lo, cfg["window"], rule)
         if found is None:
             # The window found nothing to compare: the block's nominal offset
             # is past the end of the image. That is a property of measuring an
@@ -160,6 +212,9 @@ def main(argv):
 
     sys.stdout.write("-" * 62 + "\n")
     sys.stdout.write("%d of %d transcribed block(s) agree\n" % (clean, done))
+    if short:
+        sys.stdout.write("%d block(s) run past the end of our segment and were "
+                         "NOT compared\n" % short)
     sys.stdout.write("%d of %d byte(s) of segment %04x transcribed (%d%%)\n"
                      % (covered, cfg["length"], cfg["segment"],
                         100 * covered // max(1, cfg["length"])))

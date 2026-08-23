@@ -230,7 +230,7 @@ def locate(orig, image, allow=holes, stop=None):
 # the cap is what stops a field of zeros reading as agreement.
 
 
-def zeros(offset, want, got):
+def zeros(offset, want, got, a=None, b=None):
     """A .TPU's pending fixup: OUR side is zero where the original has a value.
 
     Turbo Pascal leaves an unresolved reference as zeros plus a fixup record,
@@ -252,7 +252,7 @@ def relocations(fixups):
     .OBJ says exactly which offsets are relocated, so that is the rule.
     """
     fixups = set(fixups)
-    return lambda offset, want, got: offset in fixups
+    return lambda offset, want, got, a=None, b=None: offset in fixups
 
 
 def window(lo, hi):
@@ -262,20 +262,51 @@ def window(lo, hi):
     The loosest of the four, and the reason it is named: the caller states the
     range, so a reader of the call site can see how much was excused.
     """
-    return lambda offset, want, got: lo <= got <= hi
+    return lambda offset, want, got, a=None, b=None: lo <= got <= hi
+
+
+def linked(varbase, delta=None, top=0x10000):
+    """A LINKED image's two known fixup classes, and nothing else.
+
+    Both need context a single byte does not carry, which is why a positional
+    rule is handed the buffers:
+
+      * **a segment word a fixed number of paragraphs off.** Our image loads its
+        segments at slightly different paragraphs than the original's, so a
+        segment-valued byte differs by exactly that delta everywhere. A fixed
+        delta is safe to forgive; a variable one would forgive real differences.
+      * **a DGROUP VARIABLE offset**, judged on the WORD at `offset - 1` being at
+        or above `varbase` on BOTH sides. Below `varbase` is the initialised
+        half, which is measured exactly elsewhere, so a difference there is a
+        regression and is NOT forgiven here.
+
+    `delta` of None forgives no segment words.
+    """
+    def rule(offset, want, got, a=None, b=None):
+        if delta is not None and want - got == delta:
+            return True
+        if a is None or b is None or offset < 1 or offset + 1 >= min(len(a),
+                                                                    len(b)):
+            return False
+        wa = a[offset - 1] | (a[offset] << 8)
+        wb = b[offset - 1] | (b[offset] << 8)
+        return varbase <= wa < top and varbase <= wb < top
+    return rule
 
 
 def compare(want, got, forgive=None):
     """Positional difference count between two equal-length blocks.
 
-    Returns (real, forgiven). `forgive(offset, want_byte, got_byte)` decides;
-    with no rule, every difference is real.
+    Returns (real, forgiven). `forgive(offset, want_byte, got_byte, want, got)`
+    decides -- the buffers come last because most rules ignore them, and the
+    linked-image rule cannot: it forgives a byte because of the word it belongs
+    to. With no rule, every difference is real.
     """
     real = excused = 0
     for i, (a, b) in enumerate(zip(want, got)):
         if a == b:
             continue
-        if forgive is not None and forgive(i, a, b):
+        if forgive is not None and forgive(i, a, b, want, got):
             excused += 1
         else:
             real += 1

@@ -259,8 +259,9 @@ reason = "NAME COLLISION: substrate fingerprinter vs compiler differ, one must b
 
 
 [script."progcmp.py"]
-state = "carry"
-reason = "one segment, per routine, shift searched"
+state = "superseded"
+successor = "kit/tools/pascal/blockcmp.py"
+reason = "not a compare tool of its own: blockcmp's shape applied to the program segment with the linked rule, now blocks/1000.toml"
 
 
 [script."project.py"]
