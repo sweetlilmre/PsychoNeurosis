@@ -59,16 +59,38 @@ DENSITY_WINDOW = 16
 DENSITY_LIMIT = 8
 
 
-def holes(run):
+# A walk's rule is called with the run's LENGTH, both byte strings and the
+# offset the run starts at -- so a rule can look at the bytes when it needs to
+# and ignore them when it does not. `zeros` needs them; `holes` does not.
+def holes(run, orig=None, mine=None, at=0):
     """The default allowed-difference rule: an isolated run of one or two
     differing bytes is an address the rebuild put somewhere else -- two bytes
     for an absolute address, one for a frame-relative local. Three or more is
     an opcode change and ends the comparison.
-
-    A rule is a function of the differing run's length, so a caller can forgive
-    more (a fixup, a relocation, a known window) by passing its own.
     """
     return run < OPCODE_CHANGE
+
+
+# The longest thing a linker fixup can zero out is a far pointer: four bytes.
+MAX_FIXUP = 4
+
+
+def pending(run, orig=None, mine=None, at=0):
+    """A .TPU's unresolved references, as a WALK rule rather than a per-byte
+    one -- and capped.
+
+    Turbo Pascal leaves an unresolved reference as zeros plus a fixup record,
+    so a short run of zeros on our side is the linker's job. A LONG run is not:
+    anything past four bytes is a region the compiler did not fill because the
+    code is simply different, or padding past the end of the unit. Without the
+    cap a long run of zeros swallows the real divergence and the unit reports
+    far better agreement than it has -- which is why the tool this came from
+    caps it, and why `zeros` (the per-byte form, for `compare`) is not the same
+    rule and must not be substituted for it.
+    """
+    if run > MAX_FIXUP or mine is None:
+        return False
+    return all(b == 0 for b in mine[at:at + run])
 
 
 def walk(orig, mine, allow=holes, stop=None):
@@ -109,7 +131,7 @@ def walk(orig, mine, allow=holes, stop=None):
             run = 0
             while i + run < n and orig[i + run] != mine[i + run]:
                 run += 1
-            if not allow(run):
+            if not allow(run, orig, mine, i):
                 break
             holes_at.append(i)
             recent.extend([1] * run)
@@ -170,6 +192,12 @@ def locate(orig, image, allow=holes, stop=None):
 # THE ALLOWED-DIFFERENCE RULES, one per artefact, all passed in rather than
 # built in. Issue #9's finding was that four compare tools differed ONLY in
 # this, so here they are, side by side, where the difference is readable.
+#
+# They come in the two shapes the two comparisons need: a WALK rule sees a
+# run -- `holes`, `pending` -- and a COMPARE rule sees one byte -- `zeros`,
+# `relocations`, `window`. `pending` and `zeros` both forgive a zero on our
+# side and are NOT interchangeable: only the walk form can cap the run, and
+# the cap is what stops a field of zeros reading as agreement.
 
 
 def zeros(offset, want, got):
