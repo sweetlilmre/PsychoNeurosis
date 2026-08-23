@@ -19,6 +19,13 @@ to forgive passes its own.
     for seg, start, end in align.spans(original, ours, segments):
         ...
 
+Two comparison shapes live here, and conflating them is why four compare
+tools existed. `walk()` answers "how far do these agree before a difference
+that cannot be forgiven?" and its rule is about a RUN. `compare()` answers
+"how many bytes of these two equal-length blocks disagree?" and its rule is
+about ONE BYTE, sometimes about where that byte is. The four rules the old
+tools each hard-coded are `holes`, `zeros`, `relocations` and `window`.
+
 Nothing here needs a disassembler, and nothing here knows anything about
 Pascal: a segment list and two images is the whole input.
 """
@@ -124,6 +131,88 @@ def locate(orig, image, allow=holes):
         if len(tried) > 64:
             break
     return best if best[1] >= MINIMUM else (-1, 0)
+
+
+# ---------------------------------------------------------------------------
+# THE ALLOWED-DIFFERENCE RULES, one per artefact, all passed in rather than
+# built in. Issue #9's finding was that four compare tools differed ONLY in
+# this, so here they are, side by side, where the difference is readable.
+
+
+def zeros(offset, want, got):
+    """A .TPU's pending fixup: OUR side is zero where the original has a value.
+
+    Turbo Pascal leaves an unresolved reference as zeros plus a fixup record,
+    so a zero on our side is the linker's job, not a defect. Note what that
+    covers: an INTRA-UNIT NEAR CALL is one of them, so a call inside the unit
+    agreeing is not evidence that its target sits in the right place.
+    """
+    return got == 0
+
+
+def relocations(fixups):
+    """An assembled .OBJ: exactly the bytes the module's own FIXUPP records
+    name, and no others.
+
+    TASM does not leave an unresolved reference as zeros the way Turbo Pascal
+    does -- it writes the offset RELATIVE TO THE MODULE and lets the linker add
+    the base -- so every self-reference differs by the segment base in bytes
+    that are NOT zero. Forgiving them by value would forgive real defects; the
+    .OBJ says exactly which offsets are relocated, so that is the rule.
+    """
+    fixups = set(fixups)
+    return lambda offset, want, got: offset in fixups
+
+
+def window(lo, hi):
+    """A linked image: a difference is forgiven when OUR byte could be the low
+    or high half of an address inside a known DGROUP range.
+
+    The loosest of the four, and the reason it is named: the caller states the
+    range, so a reader of the call site can see how much was excused.
+    """
+    return lambda offset, want, got: lo <= got <= hi
+
+
+def compare(want, got, forgive=None):
+    """Positional difference count between two equal-length blocks.
+
+    Returns (real, forgiven). `forgive(offset, want_byte, got_byte)` decides;
+    with no rule, every difference is real.
+    """
+    real = excused = 0
+    for i, (a, b) in enumerate(zip(want, got)):
+        if a == b:
+            continue
+        if forgive is not None and forgive(i, a, b):
+            excused += 1
+        else:
+            real += 1
+    return real, excused
+
+
+def best_shift(want, image, nominal, span, forgive=None):
+    """Where a block really sits, and how well it agrees there.
+
+    A block inside a half-written unit is displaced by the ACCUMULATED
+    shortfall of every placeholder above it, so the shift is searched for and
+    never assumed -- a single global shift once reported 73 mismatches where
+    there were none. The window is clamped at BOTH ends, because a block's
+    nominal offset can fall past the end of an unfinished image entirely, and
+    an unclamped range then searches nothing.
+
+    Returns (real, forgiven, drift, position), lowest real first -- so the
+    result is the alignment that the rule says is best, not the nearest one.
+    """
+    hi = min(len(image) - len(want), nominal + span)
+    lo = max(0, min(nominal - span, hi))
+    best = None
+    for pos in range(lo, hi + 1):
+        real, excused = compare(want, image[pos:pos + len(want)], forgive)
+        cand = (real, excused, abs(pos - nominal), pos)
+        if best is None or cand < best:
+            best = cand
+    return best
 
 
 def load_image(blob):

@@ -26,6 +26,7 @@ src      = "src"                       # the Pascal sources under reconstruction
 wiki     = "kit/wiki"                  # the field manual
 register  = "status.toml"              # the status register: the ratchet, the observations, the plan
 exempt   = "src/asm/shared-exempt.txt" # assembler duplicated between units that cannot become one text
+build    = "build"                     # where a build stages and leaves its output
 
 [target]
 # Facts about the thing being reverse engineered, read out of it by a person.

@@ -54,6 +54,10 @@ state = "decline"
 reason = "one of four copies of blocks.py, differing only in constants"
 
 
+[script."blockcmp.py"]
+state = "carry"
+reason = "one segment, block by block; the five blocks*.py scripts merged into it, their segment lists now config"
+
 [script."blocks.py"]
 state = "carry"
 reason = "per-block shift search; the four block*.py collapse into it"
