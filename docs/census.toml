@@ -24,34 +24,40 @@ reason = "checks two of the three transcription rules mechanically"
 
 
 [script."asmcheck.py"]
-state = "carry"
-reason = "allowed-difference rule for an assembled .OBJ"
+state = "archived"
+successor = "kit/tools/pascal/objcheck.py"
+reason = "byte-identical output including the implied DGROUP symbol and both padding lines (#33); no flags of its own to lose"
 
 
 
 [script."asmverify.py"]
-state = "carry"
-reason = "anchor alignment and the 1-2 byte hole rule"
+state = "archived"
+successor = "kit/tools/pascal/routines.py"
+reason = "all 77 rows identical (#33), the lock moved into the register, and --probe ported under #36 and verified to return the identical candidate list [(409,238),(447,200),(470,177)] on segment 1107"
 
 
 [script."block14b9.py"]
-state = "decline"
-reason = "one of four copies of blocks.py, differing only in constants"
+state = "archived"
+successor = "kit/tools/pascal/blockcmp.py"
+reason = "one of four copies differing only in constants; now blocks/14b9.toml"
 
 
 [script."block154d.py"]
-state = "decline"
-reason = "one of four copies of blocks.py, differing only in constants"
+state = "archived"
+successor = "kit/tools/pascal/blockcmp.py"
+reason = "one of four copies differing only in constants; now blocks/154d.toml"
 
 
 [script."block193a.py"]
-state = "decline"
-reason = "one of four copies of blocks.py, differing only in constants"
+state = "archived"
+successor = "kit/tools/pascal/blockcmp.py"
+reason = "one of four copies differing only in constants; now blocks/193a.toml"
 
 
 [script."block19a0.py"]
-state = "decline"
-reason = "one of four copies of blocks.py, differing only in constants"
+state = "archived"
+successor = "kit/tools/pascal/blockcmp.py"
+reason = "one of four copies differing only in constants; now blocks/19a0.toml"
 
 
 [script."blockcmp.py"]
@@ -59,8 +65,9 @@ state = "carry"
 reason = "one segment, block by block; the five blocks*.py scripts merged into it, their segment lists now config"
 
 [script."blocks.py"]
-state = "carry"
-reason = "per-block shift search; the four block*.py collapse into it"
+state = "archived"
+successor = "kit/tools/pascal/blockcmp.py"
+reason = "every row reproduced against real build output (#34); the segment, length, window and block list became a config"
 
 
 [script."build.py"]
@@ -100,9 +107,9 @@ reason = "the initialised DGROUP image, byte for byte"
 
 
 [script."dosbuild.py"]
-state = "superseded"
+state = "archived"
 successor = "kit/tools/pascal/build.py"
-reason = "the 8.3 staging, the uses order and the TASM step are the kit tool's; its data is build.toml, GENERATED from this script. Verified: all 35 executables byte-identical (psycho #35)"
+reason = "all 35 executables byte-identical (#35); its data is build.toml, generated from it by parsing"
 
 
 [script."emit_byebye.py"]
@@ -171,14 +178,15 @@ reason = "our stricter wiki profile, and the generators for what is generated"
 
 
 [script."ledger.py"]
-state = "superseded"
+state = "archived"
 successor = "kit/tools/pascal/markers.py"
-reason = "its reader crossed comment boundaries; the convention was sound"
+reason = "the repaired successor: ledger's DOTALL regex crossed comment boundaries, giving 18 of 317 routines with three rows that were not routines at all"
 
 
 [script."linkcmp.py"]
-state = "carry"
-reason = "every linked code segment against the original's, reading the DGROUP VARIABLE layout out of the differences; copied into the kit's pascal tier with its segment table as config"
+state = "archived"
+successor = "kit/tools/pascal/linkcmp.py"
+reason = "identical line for line, all 31 lines (#33); no flags of its own"
 
 
 [script."linkorder.py"]
@@ -243,6 +251,7 @@ reason = "project one-shot: part 002 scene 2's objects"
 [script."pairmap.py"]
 state = "decline"
 reason = "the PUSH CS literal-scoring idea is sound and one-way, but it is a project-specific driver; carry the idea if it proves needed"
+kept = "KEPT under #36. The disposition says 'NameError on refpath; it cannot run' and THAT IS FALSE -- it runs and prints its table. census.py's own header had already corrected the claim, and the later generated document carried it anyway"
 
 
 [script."paslint.py"]
@@ -261,9 +270,9 @@ reason = "NAME COLLISION: substrate fingerprinter vs compiler differ, one must b
 
 
 [script."progcmp.py"]
-state = "superseded"
+state = "archived"
 successor = "kit/tools/pascal/blockcmp.py"
-reason = "not a compare tool of its own: blockcmp's shape applied to the program segment with the linked rule, now blocks/1000.toml"
+reason = "a blockcmp case rather than a fourth instrument (#45); its headline figure was wrong -- it clipped a block running past the end of our segment and reported 149 real differences for 368 identical bytes"
 
 
 [script."project.py"]
@@ -291,8 +300,9 @@ reason = "relocation matching"
 
 
 [script."repair_map.py"]
-state = "decline"
-reason = "spent one-shot, and honestly so: it detects the repaired file and refuses, keeping itself as the record of the method"
+state = "archived"
+successor = "none -- spent"
+reason = "verified spent under #36: run today it answers '00-map.md looks already repaired (317 blank lines of 1289) -- nothing to do'"
 
 
 [script."repairdoc.py"]
@@ -331,6 +341,7 @@ reason = "installs the kit into a project: proposes with its evidence, asks what
 [script."shapediff.py"]
 state = "carry"
 reason = "coverage alignment over a whole part; superseded in the toolkit by align.py, kept as the demo's own caller"
+kept = "KEPT under #36 and NOT superseded, against the disposition's 'already copied': align.py holds spans() as a library function but the kit has no runnable command for it, and --same (find each span in every other built harness) has no equivalent at all. It is also the instrument the top open investigation runs on"
 
 
 [script."shared_asm.py"]
@@ -344,8 +355,9 @@ reason = "MZ image from its appended payload"
 
 
 [script."split_part1.py"]
-state = "decline"
-reason = "dead: its input src/PART1_INTRO.PAS no longer exists, and parts 5-7 were split later without it"
+state = "archived"
+successor = "none -- spent"
+reason = "verified spent under #36: its input src/PART1_INTRO.PAS no longer exists, so it cannot run. The same split was later done three times without a tool"
 
 
 [script."staged.py"]
@@ -390,6 +402,7 @@ reason = "project one-shot: 3-D vector objects from DGROUP"
 [script."verify.py"]
 state = "carry"
 reason = "the compare-tool core: slide-to-locate plus a maskable rule"
+kept = "KEPT under #36 and NOT fully superseded: units.py reproduces every row, but verify.py's --detail and --all print the divergent-region diagnostics for a unit that does NOT match, and the kit has no equivalent. Eight scripts also import it"
 
 
 [script."vtbuild.py"]

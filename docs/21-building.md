@@ -16,13 +16,16 @@ resolve. The config leaves the install untouched.
 ## Running it
 
 ```
-python tools/dosbox/dosbuild.py --selftest    prove the toolchain works
-python tools/dosbox/dosbuild.py               stage and build everything
-python tools/dosbox/dosbuild.py P3MORPH       build one unit (+ its dependencies)
+.venv/Scripts/python.exe kit/tools/pascal/build.py build.toml --selftest
+.venv/Scripts/python.exe kit/tools/pascal/build.py build.toml
+.venv/Scripts/python.exe kit/tools/pascal/build.py build.toml P3MORPH
 ```
 
-[`tools/dosbox/psycho.conf`](../tools/dosbox/psycho.conf) is a **separate**
-config from the user's own `dosbox-x.conf`, mounting:
+**`tools/dosbox/dosbuild.py` and `tools/dosbox/psycho.conf` are gone**, archived under the `archive/pre-kit-scripts` tag by [#36](https://github.com/sweetlilmre/PsychoNeurosis/issues/36), once the kit's tool had been measured to produce all 35 executables byte-identically. `build.toml` at the repository root holds what the script held -- the 8.3 name map, the switch line, what is staged alongside -- and it was generated from it rather than transcribed.
+
+**The DOSBox config is generated per build** into the staging directory, so there is no committed `.conf` to keep in step with anything. That is not tidying: the old one carried this machine's build path and HDD path as literals in a committed file, which the standing rules forbid. Both answers live in the untracked `kit.local.toml` now, and the mount cannot disagree with the staging directory because one value writes both.
+
+The drives it mounts:
 
 | Drive | Host path | Contents |
 |---|---|---|

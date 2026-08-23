@@ -53,8 +53,7 @@ Ghidra import and the FP fixup are described in
 | `tools/fpsurvey.py` | Survey x87-emulator trap sites |
 | `tools/fpfix.py` | Rewrite emulator traps to real x87 |
 | `tools/fpconst.py` | Decode FP constants from a code segment — single, double, x87 ext80 and Borland Real48 |
-| `tools/dosbox/dosbuild.py` | Stage sources to 8.3 and compile them with real TP 7.01 under DOSBox-X |
-| `tools/dosbox/psycho.conf` | DOSBox-X config for the build (separate from the user's own) |
+| `kit/tools/pascal/build.py` + `build.toml` | Stage sources to 8.3 and compile them with a real Turbo Pascal under DOSBox-X. Replaced `tools/dosbox/dosbuild.py`, which is archived under the `archive/pre-kit-scripts` tag; the DOSBox config is generated per build rather than committed |
 | `tools/paslint.py` | Catch TP7 comment-nesting and shadowed-built-in defects before the compiler does |
 | `tools/undeclared.py` | List identifiers a unit uses but never declares |
 | `tools/fpround.sh` | One convergence round of the FP fixup |
@@ -105,8 +104,8 @@ override — see [docs/16](docs/16-part004-lemmings.md).
 `docs/21-building.md`. There is a working Turbo Pascal 7.01 toolchain now:
 
 ```
-python tools/dosbox/dosbuild.py --selftest    prove the toolchain
-python tools/dosbox/dosbuild.py               build everything
+.venv/Scripts/python.exe kit/tools/pascal/build.py build.toml --selftest
+.venv/Scripts/python.exe kit/tools/pascal/build.py build.toml
 ```
 
 **All fifteen units compile.** That means valid Pascal the period compiler

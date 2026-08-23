@@ -310,8 +310,11 @@ read. It is assembled by TASM and linked into `P1S4`, `P1S5` and `P2S2` with
 three times, once per unit's code segment, and all three copies in the two
 binaries are byte-identical to each other.
 
-This is **not** a deviation. `python tools/asmverify.py` finds each routine in a
-freshly built executable and diffs it against the binary it was read from:
+This is **not** a deviation. `.venv/Scripts/python.exe kit/tools/pascal/routines.py` finds each
+routine in a freshly built executable and diffs it against the binary it was
+read from. (It replaced `tools/asmverify.py`, which is archived under the
+`archive/pre-kit-scripts` tag; the two agreed on all 77 rows, and the
+`--probe` flag was ported and checked against it.)
 
 ```
 SinCos       177 bytes, 8 masked displacement(s) -- IDENTICAL
