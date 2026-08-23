@@ -4,7 +4,7 @@ Read from `bin/NEUROSIS.009` for [Chart NEUROSIS.009](https://github.com/sweetli
 
 ## G0 — the container
 
-10,356 bytes on disk = 7,312-byte load image + 3,044 bytes of appended Borland debug info, exactly. The tail decodes with zero residue (`toolkit/substrate/tddump.py`, format in `docs/research/borland-debug-info.md`): source file **`BYEBYE.PAS`, saved 1994-02-04 18:31:14**, modules PROGRAM / `Crt` / `System`, 132 symbols, 25 line-number entries, 3 segments.
+10,356 bytes on disk = 7,312-byte load image + 3,044 bytes of appended Borland debug info, exactly. The tail decodes with zero residue (`kit/tools/substrate/tddump.py`, format in `docs/research/borland-debug-info.md`): source file **`BYEBYE.PAS`, saved 1994-02-04 18:31:14**, modules PROGRAM / `Crt` / `System`, 132 symbols, 25 line-number entries, 3 segments.
 
 ## G1 — identification
 
@@ -22,7 +22,7 @@ The program's own symbols: `IMAGEDATA` at `DS:0002` (a 4,000-byte typed constant
 
 Main is the whole program: 98 bytes, 37 instructions, every one read. The debug info's line table maps it to source lines 300–340 — so `BYEBYE.PAS` was ~340 lines, mostly the `IMAGEDATA` typed constant above main.
 
-**Lines 304–334 advance one line per instruction: the body's core is an inline BASM `asm` block** (see the wiki's [line-table-reveals-asm](../wiki/observations/line-table-reveals-asm/observation.md)); the gaps in the numbering are its blank lines. Around it, compiled Pascal.
+**Lines 304–334 advance one line per instruction: the body's core is an inline BASM `asm` block** (see the wiki's [line-table-reveals-asm](../kit/wiki/observations/line-table-reveals-asm/observation.md)); the gaps in the numbering are its blank lines. Around it, compiled Pascal.
 
 ```
 line  offset

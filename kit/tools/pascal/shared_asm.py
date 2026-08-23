@@ -13,8 +13,8 @@ routine re-expressed in Pascal in one of the two units is no row at all. This
 reads the source instead and reports assembler bodies that are duplicated
 between units rather than shared.
 
-    python toolkit/pascal/shared_asm.py SRCDIR
-    python toolkit/pascal/shared_asm.py SRCDIR --exempt exempt.txt
+    python kit/tools/pascal/shared_asm.py SRCDIR
+    python kit/tools/pascal/shared_asm.py SRCDIR --exempt exempt.txt
 
 It REPORTS and exits 0 unless --gate is passed, because whether a duplicate can
 become one text is a fact about the routine and not something a tool can see:

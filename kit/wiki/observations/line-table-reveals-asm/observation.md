@@ -24,7 +24,7 @@ The line table exists so a debugger can step by source line. For Pascal, a line 
 
 ## Cost
 
-`toolkit/substrate/tddump.py` over the binary; arithmetic on the printed table. No disassembler.
+`kit/tools/substrate/tddump.py` over the binary; arithmetic on the printed table. No disassembler.
 
 ## Example
 

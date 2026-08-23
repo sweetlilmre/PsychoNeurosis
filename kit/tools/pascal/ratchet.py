@@ -44,8 +44,8 @@ workflow -- the gap is reported instead.
 
 Encoding, per CLAUDE.md: utf-8 explicitly, and LF on write.
 
-    python toolkit/pascal/ratchet.py status.toml --coverage 71
-    python toolkit/pascal/ratchet.py status.toml --coverage 71 --write
+    python kit/tools/pascal/ratchet.py status.toml --coverage 71
+    python kit/tools/pascal/ratchet.py status.toml --coverage 71 --write
 """
 import io
 import os

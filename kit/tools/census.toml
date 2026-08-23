@@ -1,5 +1,5 @@
 # The census table: every script in both repos, and where it is in its
-# retirement. Read by toolkit/census.py.
+# retirement. Read by kit/tools/census.py.
 #
 # The originals in tools/ and in the sibling repo are FROZEN and keep
 # working. The toolkit is built beside them by copy and adjust. Once a
@@ -166,7 +166,7 @@ reason = "our stricter wiki profile, and the generators for what is generated"
 
 [script."ledger.py"]
 state = "superseded"
-successor = "toolkit/pascal/markers.py"
+successor = "kit/tools/pascal/markers.py"
 reason = "its reader crossed comment boundaries; the convention was sound"
 
 

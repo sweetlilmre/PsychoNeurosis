@@ -1,6 +1,6 @@
 # How to read Borland appended debug info
 
-Resolves [#27](https://github.com/sweetlilmre/PsychoNeurosis/issues/27). Everything below is tagged **MEASURED** (this session ran it against `bin/NEUROSIS.000` and `bin/NEUROSIS.009`), **DOCUMENTED** (a primary source says it, cited), or **INFERRED**. The decoder that produced every measured value is `toolkit/substrate/tddump.py`, stdlib-only Python, and both appended blocks now decode **end to end with zero unexplained bytes**.
+Resolves [#27](https://github.com/sweetlilmre/PsychoNeurosis/issues/27). Everything below is tagged **MEASURED** (this session ran it against `bin/NEUROSIS.000` and `bin/NEUROSIS.009`), **DOCUMENTED** (a primary source says it, cited), or **INFERRED**. The decoder that produced every measured value is `kit/tools/substrate/tddump.py`, stdlib-only Python, and both appended blocks now decode **end to end with zero unexplained bytes**.
 
 ## 1. What the format is and where it lives
 
@@ -74,8 +74,8 @@ The fixed-8-byte-slot type walk (tdinfo-parser's model) also misreads TP7 types 
 
 Run it yourself; the tool takes any MZ file on argv and has no project facts in it:
 
-    python toolkit/substrate/tddump.py bin/NEUROSIS.000 bin/NEUROSIS.009
-    python toolkit/substrate/tddump.py --names-only bin/NEUROSIS.009
+    python kit/tools/substrate/tddump.py bin/NEUROSIS.000 bin/NEUROSIS.009
+    python kit/tools/substrate/tddump.py --names-only bin/NEUROSIS.009
 
 ### NEUROSIS.009 (BYEBYE.PAS)
 
@@ -130,7 +130,7 @@ Auto-class offsets are signed BP-relative (`loop1` at `FFFE` = BP-2), and a `pas
 
 | reader | verdict | evidence |
 |---|---|---|
-| `toolkit/substrate/tddump.py` | full decode, zero residue | MEASURED here; stdlib only, no project facts, paths from argv |
+| `kit/tools/substrate/tddump.py` | full decode, zero residue | MEASURED here; stdlib only, no project facts, paths from argv |
 | Borland TDUMP.EXE | the reference dumper | DOCUMENTED — Borland's own utility, shipped with TP7/BC++; named as the "more complete parsing" route by tdinfo-parser's README. Period binary, so not fetched (standing rule) |
 | Turbo Debugger (TD.EXE) | consumes it directly | DOCUMENTED — [TD 4.0 User's Guide, bitsavers](https://bitsavers.org/pdf/borland/turbo_debugger/Turbo_Debugger_Version_4.0_Users_Guide_Oct93.pdf) |
 | [ramikg/tdinfo-parser](https://github.com/ramikg/tdinfo-parser) | works for symbols/names into IDA; segment record 2 bytes short, type table wrong for TP7 | MEASURED against its `tdinfo_structs.py` |

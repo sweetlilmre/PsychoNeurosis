@@ -35,8 +35,8 @@ THREE RULES THIS TOOL ENFORCES, each from a measured failure:
 omits a setup call can run a scene CORRECTLY AND INVISIBLY -- one ran entirely
 in 80x25 text, "indistinguishable from a hang".
 
-    python toolkit/pascal/observe.py status.toml --report
-    python toolkit/pascal/observe.py status.toml --harness TPART5 --tier part \\
+    python kit/tools/pascal/observe.py status.toml --report
+    python kit/tools/pascal/observe.py status.toml --harness TPART5 --tier part \\
         --outcome matches --observer pe --date 2026-08-20 --against NEUROSIS_005.exe
 """
 import hashlib

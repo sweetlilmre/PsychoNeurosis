@@ -26,4 +26,4 @@ dependencies = [
 [tool.uv]
 # Install into a virtual environment, never globally:
 #     uv venv .venv
-#     uv pip install --python .venv/Scripts/python.exe -e toolkit
+#     uv pip install --python .venv/Scripts/python.exe -e kit/tools

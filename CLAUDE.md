@@ -7,11 +7,11 @@ Asphyxia's first megademo, 1994. Borland Pascal 7 plus hand-written assembler, r
 | job | entry point | state |
 |---|---|---|
 | **Reconstruct the demo** — recover Pascal source for parts 001–007 that behaves like the 1994 binaries | `docs/continuation.md` (untracked local marker), then `docs/23-deviations.md` | in progress; **behavioural** fidelity, not byte-exact |
-| **Build the RE knowledge base** — a Pascal/DOS field manual and a reusable toolkit, extracted from what both efforts learnt | [The Pascal RE knowledge base](https://github.com/sweetlilmre/PsychoNeurosis/issues/1) | **complete, closed 21 Aug 2026** — `wiki/`, `toolkit/`, and the plan in `status.toml`. **Its acceptance test also complete, closed 22 Aug 2026** ([The acceptance test](https://github.com/sweetlilmre/PsychoNeurosis/issues/19)): the three never-decompiled binaries — the launcher, setup and end screen — **all rebuild byte-identical** (`src/PSYCHO.PAS`, `STARTUP.PAS`+`DETECT`, `BYEBYE.PAS`; guarded as `[artefact.*]` rows). Verdict: survived, with reservations — easy subjects; the toolkit meets the hard parts in the cleanup plan. **Next work anywhere: `plan.py --report`'s table, top investigation first** |
-| **Read the wiki, or add to it** — the Pascal/DOS field manual the knowledge-base effort is producing | `wiki/index.md`, and `toolkit/README.md` for the tools | one observation written as the pattern; grows every time a binary is read |
+| **Build the RE knowledge base** — a Pascal/DOS field manual and a reusable toolkit, extracted from what both efforts learnt | [The Pascal RE knowledge base](https://github.com/sweetlilmre/PsychoNeurosis/issues/1) | **complete, closed 21 Aug 2026** — `wiki/`, `kit/tools/`, and the plan in `status.toml`. **Its acceptance test also complete, closed 22 Aug 2026** ([The acceptance test](https://github.com/sweetlilmre/PsychoNeurosis/issues/19)): the three never-decompiled binaries — the launcher, setup and end screen — **all rebuild byte-identical** (`src/PSYCHO.PAS`, `STARTUP.PAS`+`DETECT`, `BYEBYE.PAS`; guarded as `[artefact.*]` rows). Verdict: survived, with reservations — easy subjects; the toolkit meets the hard parts in the cleanup plan. **Next work anywhere: `plan.py --report`'s table, top investigation first** |
+| **Read the wiki, or add to it** — the Pascal/DOS field manual the knowledge-base effort is producing | `kit/wiki/index.md`, and `kit/tools/README.md` for the tools | one observation written as the pattern; grows every time a binary is read |
 | **DemoVT byte-exact rebuild** | `docs/CONTINUATION.md` in the sibling `VangeliSTracker` checkout (`v1.31b/`) | **a different repo.** Complete: byte-identical load image, blocked only on LZEXE |
 
-**`CONTEXT.md` at the root is the shared glossary** -- artefact, instrument, tier, part, scene, deviation, harness, marker, ratchet, and the toolkit's own words. **Wiki-specific terms are in `wiki/CONTEXT.md`** -- gate, rung, strand, stance, provenance, symptom page, cross-index -- kept there so they lift out with the wiki. Read it before arguing about any of those words; it was written because a session generated vocabulary faster than it agreed on it. `docs/README.md` indexes the numbered documents by topic. `docs/research/` holds the resolved research tickets behind the knowledge base — the script classification, a 209-technique inventory, and the ledger audit; they are **inputs**, not conclusions, and its README says how much to trust them. `NEUROSIS.008` is **not** Asphyxia code — it is third-party, and its reconstruction moved out to the sibling `VangeliSTracker` checkout.
+**`CONTEXT.md` at the root is the shared glossary** -- artefact, instrument, tier, part, scene, deviation, harness, marker, ratchet, and the toolkit's own words. **Wiki-specific terms are in `kit/wiki/CONTEXT.md`** -- gate, rung, strand, stance, provenance, symptom page, cross-index -- kept there so they lift out with the wiki. Read it before arguing about any of those words; it was written because a session generated vocabulary faster than it agreed on it. `docs/README.md` indexes the numbered documents by topic. `docs/research/` holds the resolved research tickets behind the knowledge base — the script classification, a 209-technique inventory, and the ledger audit; they are **inputs**, not conclusions, and its README says how much to trust them. `NEUROSIS.008` is **not** Asphyxia code — it is third-party, and its reconstruction moved out to the sibling `VangeliSTracker` checkout.
 
 ## Running the toolkit — read this before touching anything, as of 20 Aug 2026
 
@@ -20,24 +20,24 @@ Asphyxia's first megademo, 1994. Borland Pascal 7 plus hand-written assembler, r
     uv venv .venv
     uv pip install --python .venv/Scripts/python.exe pyyaml
 
-**The editable install of the toolkit that used to be documented here DOES NOT WORK, and never did** -- `toolkit/pyproject.toml` declares no `[build-system]` and no package discovery, so setuptools refuses the flat layout of `substrate`/`pascal`/`wikitools`. Nothing has broken because nothing depends on it: every command below runs a script by path. Being made real is [Make the toolkit an installable package](https://github.com/sweetlilmre/PsychoNeurosis/issues/39); until then install `pyyaml` alone.
+**The editable install of the toolkit that used to be documented here DOES NOT WORK, and never did** -- `kit/tools/pyproject.toml` declares no `[build-system]` and no package discovery, so setuptools refuses the flat layout of `substrate`/`pascal`/`wikitools`. Nothing has broken because nothing depends on it: every command below runs a script by path. Being made real is [Make the toolkit an installable package](https://github.com/sweetlilmre/PsychoNeurosis/issues/39); until then install `pyyaml` alone.
 
 Then all the checks, which **all pass** as of `f83944d`:
 
-    .venv/Scripts/python.exe toolkit/wikitools/okfcheck.py wiki
-    .venv/Scripts/python.exe toolkit/wikitools/kbprofile.py wiki          # --write regenerates
-    .venv/Scripts/python.exe toolkit/wikitools/glossary.py wiki CONTEXT.md
-    .venv/Scripts/python.exe toolkit/pascal/markers.py src
-    .venv/Scripts/python.exe toolkit/pascal/ratchet.py status.toml --coverage 76
-    .venv/Scripts/python.exe toolkit/pascal/observe.py status.toml --report
-    .venv/Scripts/python.exe toolkit/pascal/artefact.py status.toml --check
-    .venv/Scripts/python.exe toolkit/pascal/plan.py status.toml --report
-    .venv/Scripts/python.exe toolkit/census.py --root tools --root <sibling repo>
+    .venv/Scripts/python.exe kit/tools/wikitools/okfcheck.py kit/wiki
+    .venv/Scripts/python.exe kit/tools/wikitools/kbprofile.py kit/wiki          # --write regenerates
+    .venv/Scripts/python.exe kit/tools/wikitools/glossary.py kit/wiki CONTEXT.md
+    .venv/Scripts/python.exe kit/tools/pascal/markers.py src
+    .venv/Scripts/python.exe kit/tools/pascal/ratchet.py status.toml --coverage 76
+    .venv/Scripts/python.exe kit/tools/pascal/observe.py status.toml --report
+    .venv/Scripts/python.exe kit/tools/pascal/artefact.py status.toml --check
+    .venv/Scripts/python.exe kit/tools/pascal/plan.py status.toml --report
+    .venv/Scripts/python.exe kit/tools/census.py --root tools --root kit/tools --root <sibling repo>
     python tools/paslint.py
-    .venv/Scripts/python.exe toolkit/pascal/shared_asm.py src --gate --exempt=src/asm/shared-exempt.txt   # verbatim asm duplicated between units instead of shared as an .INC
-    python tools/encaudit.py            # add a dir argument for toolkit/*, it does not scan it
+    .venv/Scripts/python.exe kit/tools/pascal/shared_asm.py src --gate --exempt=src/asm/shared-exempt.txt   # verbatim asm duplicated between units instead of shared as an .INC
+    python tools/encaudit.py            # add a dir argument for kit/tools/*, it does not scan it
 
-**`status.toml` at the root is the status register**, and it is the ratchet: coverage may only rise, a byte match may not shorten, and an achieved rung may not fall unless the *target* is lowered with a reason. `achieved`, `matched` and every `[observation.*]` are **measured** and must never be hand-edited; `[plan]` is **decided** — an ordered list of investigations whose order is the priority, written only through `plan.py`. All three writers serialise through `toolkit/pascal/register.py`, which refuses on a section it does not know rather than dropping it.
+**`status.toml` at the root is the status register**, and it is the ratchet: coverage may only rise, a byte match may not shorten, and an achieved rung may not fall unless the *target* is lowered with a reason. `achieved`, `matched` and every `[observation.*]` are **measured** and must never be hand-edited; `[plan]` is **decided** — an ordered list of investigations whose order is the priority, written only through `plan.py`. All three writers serialise through `kit/tools/pascal/register.py`, which refuses on a section it does not know rather than dropping it.
 
 **The first observations were recorded on 21 Aug 2026** ([#18](https://github.com/sweetlilmre/PsychoNeurosis/issues/18)): seven runs by pe, six `differs` at R2 and one R3 — `TPART7` matches its original. The 22 scene harnesses remain at R0. Recording an observation nobody made is the one thing `observe.py` exists to prevent.
 
@@ -45,7 +45,7 @@ Then all the checks, which **all pass** as of `f83944d`:
 
 ## The state of this working tree, as of 22 Aug 2026
 
-**Everything is committed and pushed on `vangelistracker-build`, the issue tracker is empty, and the one queue of work is the plan**: `.venv/Scripts/python.exe toolkit/pascal/plan.py status.toml --report` — five investigations seeded defect-first, of which two are RESOLVED against pe's live runs (22 Aug) and three remain: part5-386-trio (fixed in code, needs a TPART5 run), **pacing (the main line — `tools/shapediff.py` lists the divergent spans to work top-down)**, and part6-confirm-r3 (a careful run, no code). `docs/continuation.md`'s dated block has the full state.
+**Everything is committed and pushed on `vangelistracker-build`, the issue tracker is empty, and the one queue of work is the plan**: `.venv/Scripts/python.exe kit/tools/pascal/plan.py status.toml --report` — five investigations seeded defect-first, of which two are RESOLVED against pe's live runs (22 Aug) and three remain: part5-386-trio (fixed in code, needs a TPART5 run), **pacing (the main line — `tools/shapediff.py` lists the divergent spans to work top-down)**, and part6-confirm-r3 (a careful run, no code). `docs/continuation.md`'s dated block has the full state.
 
 The remote is private `sweetlilmre/PsychoNeurosis`, default branch `main`. **`main` is behind `vangelistracker-build`** and everything lives on the branch. History contains third-party bytes — `bin/NEUROSIS.008` and `work/split/NEUROSIS_008.exe` are DemoVT — acceptable only while the repo stays private, and a blocker on ever making it public. A lesson kept from an earlier version of this section: treat a "not mine" claim about tree contents as needing a check against the diff, not as fact.
 

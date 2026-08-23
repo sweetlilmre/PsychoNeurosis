@@ -4,7 +4,7 @@ Read from `bin/PSYCHO.EXE` (1,936 bytes, dated 7 Feb 1994) for [Chart PSYCHO.EXE
 
 ## G0 — the container
 
-The file is *all* load image: MZ header of 112 bytes (7 paragraphs), 20 relocations, no overlay, no appended debug info (`toolkit/substrate/tddump.py` reports none). Entry `0000:0036`, stack `SS:SP = 0098:0800` (a 2KB stack), and **minalloc = maxalloc = 166 paragraphs** — the program caps its own memory at ~2.6KB above the image, which is what a launcher that EXECs children must do to leave RAM for them. In Turbo Pascal that spells `{$M $800,0,0}`.
+The file is *all* load image: MZ header of 112 bytes (7 paragraphs), 20 relocations, no overlay, no appended debug info (`kit/tools/substrate/tddump.py` reports none). Entry `0000:0036`, stack `SS:SP = 0098:0800` (a 2KB stack), and **minalloc = maxalloc = 166 paragraphs** — the program caps its own memory at ~2.6KB above the image, which is what a launcher that EXECs children must do to leave RAM for them. In Turbo Pascal that spells `{$M $800,0,0}`.
 
 ## G1 — identification
 
@@ -88,8 +88,8 @@ The closing byte-diff recovered two facts about the 1994 source that no amount o
 - **It used `goto`.** The original's `75 02 EB xx` jump-over-jump at `1000:0064`/`006d` is TP7's encoding for `if X then goto L` with a forward label; a nested `if`/`begin` shape emits short jumps, reorders the tests, and shifts every relocation after it by four bytes. 76 differing bytes fell to 1 when the `goto`s went in.
 - **It was compiled `{$G+}`.** The last byte, `LEAVE` (`C9`) against our `POP BP` (`5D`) at main's end, is a 286 encoding. `{$G+}` closed it to zero.
 
-The diff-reading method is now the wiki observation [The rebuild nearly matches, and the last bytes name their causes](../wiki/observations/near-match-diff/observation.md).
+The diff-reading method is now the wiki observation [The rebuild nearly matches, and the last bytes name their causes](../kit/wiki/observations/near-match-diff/observation.md).
 
 ### Addressing note, recorded once
 
-Two addresses in this chart wear two names each: the `Dos` unit's base (`100b:0000` = `1000:00B0`) and both RTL calls (`1000:0190` = `1019:0000`, `1000:02A6` = `1019:0116`). The wiki observation [The same bytes answer to two different addresses](../wiki/observations/two-names-one-address/observation.md) is the rule for this; it was written from this chart.
+Two addresses in this chart wear two names each: the `Dos` unit's base (`100b:0000` = `1000:00B0`) and both RTL calls (`1000:0190` = `1019:0000`, `1000:02A6` = `1019:0116`). The wiki observation [The same bytes answer to two different addresses](../kit/wiki/observations/two-names-one-address/observation.md) is the rule for this; it was written from this chart.

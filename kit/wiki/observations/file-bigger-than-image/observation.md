@@ -12,7 +12,7 @@ An MZ executable's header states its own load-image size (`(e_cp - 1) * 512 + e_
 
 **Check the arithmetic first**: the difference is exact, and what sits at the boundary identifies the tail. The one cause measured in this project so far:
 
-**Borland debug info** -- magic word `0x52FB` at exactly the load-image boundary, followed by a version word (`0x0208` for TP7). `toolkit/substrate/tddump.py` decodes it completely: module names, source-file names with save timestamps, every public symbol with its address, scopes, per-line addresses, and the type table. It is the strongest identification evidence there is -- `NEUROSIS.009`'s 3,044-byte tail yielded the source filename, its save time to the second, and the address of every variable. See the research record for the format, the two published readers it corrects, and the field layouts. [1]
+**Borland debug info** -- magic word `0x52FB` at exactly the load-image boundary, followed by a version word (`0x0208` for TP7). `kit/tools/substrate/tddump.py` decodes it completely: module names, source-file names with save timestamps, every public symbol with its address, scopes, per-line addresses, and the type table. It is the strongest identification evidence there is -- `NEUROSIS.009`'s 3,044-byte tail yielded the source filename, its save time to the second, and the address of every variable. See the research record for the format, the two published readers it corrects, and the field layouts. [1]
 
 Other causes exist -- appended data payloads a program reads from its own file, packer signatures -- but none has been measured in this project yet, so this page does not describe them. Add the section when one is read, not before.
 

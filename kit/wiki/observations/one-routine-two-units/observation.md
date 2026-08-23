@@ -48,6 +48,6 @@ An earlier session kept the two copies duplicated instead, on the stated grounds
 
 # Citations
 
-[1] `src/asm/BLITCLIP.INC` in the psycho repository -- the shared text -- and `toolkit/pascal/shared_asm.py`, the check that no verbatim assembler is duplicated between units instead of shared, with that repository's unshareable cases in `src/asm/shared-exempt.txt`.
+[1] `src/asm/BLITCLIP.INC` in the psycho repository -- the shared text -- and `kit/tools/pascal/shared_asm.py`, the check that no verbatim assembler is duplicated between units instead of shared, with that repository's unshareable cases in `src/asm/shared-exempt.txt`.
 
 [2] Commits `d6e0882` and `ed0314c` in the psycho repository: the reasoning, and its correction.

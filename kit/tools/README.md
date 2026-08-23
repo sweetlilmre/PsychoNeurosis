@@ -30,13 +30,13 @@ Each copy carries the finding that produced it in its docstring, and the wiki ca
 ## Running it
 
     uv venv .venv
-    uv pip install --python .venv/Scripts/python.exe -e toolkit
+    uv pip install --python .venv/Scripts/python.exe -e kit/tools
 
 Then, from the repo root:
 
-    .venv/Scripts/python.exe toolkit/wikitools/okfcheck.py wiki
-    .venv/Scripts/python.exe toolkit/wikitools/kbprofile.py wiki
-    .venv/Scripts/python.exe toolkit/wikitools/kbprofile.py wiki --write
+    .venv/Scripts/python.exe kit/tools/wikitools/okfcheck.py kit/wiki
+    .venv/Scripts/python.exe kit/tools/wikitools/kbprofile.py kit/wiki
+    .venv/Scripts/python.exe kit/tools/wikitools/kbprofile.py kit/wiki --write
 
 `okfcheck.py` checks only what the OKF spec requires. `kbprofile.py` checks our house rules and regenerates the parts of the wiki that are generated. Keeping them apart is deliberate: if `okfcheck.py` ever rejects a document only our template dislikes, we have quietly redefined a portable format as ours.
 

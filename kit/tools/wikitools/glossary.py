@@ -29,7 +29,7 @@ never pass silently, so every override is printed.
 
 Encoding, per CLAUDE.md: utf-8 explicitly. The locale here is cp1252.
 
-    python toolkit/wikitools/glossary.py wiki CONTEXT.md
+    python kit/tools/wikitools/glossary.py kit/wiki CONTEXT.md
 """
 import io
 import pathlib

@@ -9,13 +9,13 @@ routine matches, and the rebuild still behaves differently`.
 
 Copied and adapted from `tools/asmverify.py` and `tools/shapediff.py` in the
 psycho repository, per the map's rule: the originals keep working, untouched.
-What changed in the copy is the toolkit's own rule from `toolkit/README.md` --
+What changed in the copy is the toolkit's own rule from `kit/tools/README.md` --
 **the allowed-difference rule is passed in, never built in**, because baking it
 in hides how strict a measurement was. `holes()` is the default rule those two
 scripts use; a caller with a `.TPU`'s pending fixups or an `.OBJ`'s relocations
 to forgive passes its own.
 
-    from toolkit.substrate import align
+    from substrate import align          # with kit/tools on sys.path
     for seg, start, end in align.spans(original, ours, segments):
         ...
 

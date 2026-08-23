@@ -2,7 +2,7 @@
 
 The shared vocabulary for reverse engineering 16-bit DOS binaries built with Borland Pascal. It covers all three jobs in this tree, because they measure the same things and argue about the same words.
 
-**Wiki-specific terms live in [`wiki/CONTEXT.md`](wiki/CONTEXT.md)** -- how a page is shaped, how the catalogue is organised, and the fidelity ladder. They are kept there deliberately, so that when the wiki lifts out into its own repository its vocabulary goes with it instead of being left behind here.
+**Wiki-specific terms live in [`kit/wiki/CONTEXT.md`](kit/wiki/CONTEXT.md)** -- how a page is shaped, how the catalogue is organised, and the fidelity ladder. They are kept there deliberately, so that when the wiki lifts out into its own repository its vocabulary goes with it instead of being left behind here.
 
 Note one deliberate absence across both files: there is no entry for *axis*. The catalogue is sorted by what a reader already knows, which is the **lookup key**, and "axis" was the word we used while that was still unclear.
 

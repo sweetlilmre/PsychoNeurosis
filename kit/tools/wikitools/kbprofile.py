@@ -23,8 +23,8 @@ Encoding, per CLAUDE.md: utf-8 explicitly on read and write, and newline
 '\n' on write, because Python defaults to CRLF on Windows and documents in
 this repo are LF (.gitattributes enforces it).
 
-    python kb-prototype/tools/kbprofile.py kb-prototype
-    python kb-prototype/tools/kbprofile.py kb-prototype --write
+    python kit/tools/wikitools/kbprofile.py kit/wiki
+    python kit/tools/wikitools/kbprofile.py kit/wiki --write
 """
 import io
 import pathlib

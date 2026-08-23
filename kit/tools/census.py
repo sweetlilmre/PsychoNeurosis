@@ -31,8 +31,8 @@ in this committed file -- it comes from the local config, per the rule that put
 `docs/continuation.md` out of the index. Pass roots on the command line, or set
 them in the untracked local config.
 
-    python toolkit/census.py --root tools
-    python toolkit/census.py --root tools --root D:/elsewhere/scripts
+    python kit/tools/census.py --root tools
+    python kit/tools/census.py --root tools --root D:/elsewhere/scripts
 """
 import ast
 import io

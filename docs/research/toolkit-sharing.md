@@ -8,7 +8,7 @@ Every claim is tagged **DOCUMENTED** (a primary source says it, cited), **MEASUR
 
 **The toolkit is not installable today, by any of these mechanisms.** MEASURED: the command `CLAUDE.md` documents,
 
-    uv pip install --python .venv/Scripts/python.exe -e toolkit
+    uv pip install --python .venv/Scripts/python.exe -e kit/tools
 
 fails, and has presumably always failed:
 
@@ -16,9 +16,9 @@ fails, and has presumably always failed:
     error: Multiple top-level packages discovered in a flat-layout:
     ['pascal', 'substrate', 'wikitools'].
 
-MEASURED: `toolkit/pyproject.toml` declares no `[build-system]` and no package list, and there is no `__init__.py` anywhere under `toolkit/`. MEASURED: `.venv/Lib/site-packages` in this working tree contains `pyyaml`, `capstone` and nothing else — no `pascal_re_toolkit-0.1.0.dist-info`, no `__editable__` path file. The toolkit has never been installed into it.
+MEASURED: `kit/tools/pyproject.toml` declares no `[build-system]` and no package list, and there is no `__init__.py` anywhere under `kit/tools/`. MEASURED: `.venv/Lib/site-packages` in this working tree contains `pyyaml`, `capstone` and nothing else — no `pascal_re_toolkit-0.1.0.dist-info`, no `__editable__` path file. The toolkit has never been installed into it.
 
-Nothing is broken by this, because every documented invocation runs a script *by path* (`toolkit/wikitools/okfcheck.py`), and Python puts the script's own directory on `sys.path`, so the scripts never import each other across subdirectories. MEASURED: `okfcheck.py` imports only `io`, `pathlib`, `sys` and `yaml`.
+Nothing is broken by this, because every documented invocation runs a script *by path* (`kit/tools/wikitools/okfcheck.py`), and Python puts the script's own directory on `sys.path`, so the scripts never import each other across subdirectories. MEASURED: `okfcheck.py` imports only `io`, `pathlib`, `sys` and `yaml`.
 
 The consequence for #31 is the important part: **"the toolkit already has a `pyproject.toml` and is installed editable into `.venv` with `uv`" is half true.** The `pyproject.toml` exists; the editable install does not, and cannot until the package grows a build backend and an explicit package layout. Every option below except vendoring and bare `PYTHONPATH` needs that work done first, so it is a shared prerequisite cost rather than a discriminator between the options. It is roughly: add `[build-system]`, choose flat-layout with an explicit `packages` list or move to `src/`, add `__init__.py` files, and decide whether the three subdirectories are one distribution or three. MEASURED: adding `[build-system]` plus `[tool.setuptools] packages = ["pascal", "substrate", "wikitools"]` and three empty `__init__.py` files was sufficient to make every measurement in this document possible.
 
@@ -46,7 +46,7 @@ MEASURED: moving the source directory away and importing gives no warning about 
 
 ### Cost
 
-**Setup:** the section 0 prerequisite, then one command per consumer venv. **Upkeep:** near zero while both checkouts exist — an edit in `toolkit/` is live in both venvs with no reinstall, which is the whole point. Against that, the command is undiscoverable: nothing in the consumer repo records that the install is needed or where the toolkit lives, so it has to be written into the entry stanza as a human instruction. A fresh clone has a venv that imports nothing until somebody remembers to run it, and the failure mode is a bare `ModuleNotFoundError`.
+**Setup:** the section 0 prerequisite, then one command per consumer venv. **Upkeep:** near zero while both checkouts exist — an edit in `kit/tools/` is live in both venvs with no reinstall, which is the whole point. Against that, the command is undiscoverable: nothing in the consumer repo records that the install is needed or where the toolkit lives, so it has to be written into the entry stanza as a human instruction. A fresh clone has a venv that imports nothing until somebody remembers to run it, and the failure mode is a bare `ModuleNotFoundError`.
 
 ## 2. Declared path dependency — `[tool.uv.sources]`
 
@@ -86,7 +86,7 @@ DOCUMENTED: uv's [workspaces page](https://docs.astral.sh/uv/concepts/projects/w
 
 DOCUMENTED: uv supports `git+https://` requirements with `@tag`, `@branch` or a commit hash for `uv pip install`, and `git =` with `tag =` / `branch =` / `rev =` keys under `[tool.uv.sources]` ([dependencies](https://docs.astral.sh/uv/concepts/projects/dependencies/), [uv pip packages](https://docs.astral.sh/uv/pip/packages/)).
 
-**Subdirectory support matters here**, because the toolkit is at `toolkit/` and not at the repo root. DOCUMENTED: uv supports it — `{ git = "...", subdirectory = "libs/langchain" }`, and "A `subdirectory` may be specified if the package isn't in the repository root" ([dependencies](https://docs.astral.sh/uv/concepts/projects/dependencies/)). pip has the same feature: "Pip looks at the `subdirectory` fragments of VCS URLs for specifying the path to the Python package, when it is not in the root of the VCS directory" ([pip VCS support](https://pip.pypa.io/en/stable/topics/vcs-support/)). DOCUMENTED: `subdirectory` is **not** part of [PEP 508](https://packaging.python.org/en/latest/specifications/dependency-specifiers/) — it is a pip/uv convention layered on PEP 508's URL grammar.
+**Subdirectory support matters here**, because the toolkit is at `kit/tools/` and not at the repo root. DOCUMENTED: uv supports it — `{ git = "...", subdirectory = "libs/langchain" }`, and "A `subdirectory` may be specified if the package isn't in the repository root" ([dependencies](https://docs.astral.sh/uv/concepts/projects/dependencies/)). pip has the same feature: "Pip looks at the `subdirectory` fragments of VCS URLs for specifying the path to the Python package, when it is not in the root of the VCS directory" ([pip VCS support](https://pip.pypa.io/en/stable/topics/vcs-support/)). DOCUMENTED: `subdirectory` is **not** part of [PEP 508](https://packaging.python.org/en/latest/specifications/dependency-specifiers/) — it is a pip/uv convention layered on PEP 508's URL grammar.
 
 ### Authentication for a private repo
 
@@ -150,7 +150,7 @@ INFERRED (the git docs do not say it): cloning a private submodule needs credent
 
 ### Cost
 
-**Setup:** one `git submodule add` in each consumer, plus section 0 on top — a submodule places files, it does not make them importable. **Upkeep:** the highest of any option, and structural rather than occasional. Every toolkit edit made from inside a consumer's submodule tree is a detached-HEAD commit that must be pushed to the toolkit's own remote *and* recorded as a gitlink bump in the superproject, or it is silently lost. `git pull` not updating submodule contents by default is the classic quiet staleness. Working on one repo alone is fine — the submodule is a real checkout inside it. Note that a submodule presupposes the toolkit is **its own repository**, which is #31's fifth candidate: `toolkit/` cannot be a submodule of the sibling while remaining an ordinary directory of this repo.
+**Setup:** one `git submodule add` in each consumer, plus section 0 on top — a submodule places files, it does not make them importable. **Upkeep:** the highest of any option, and structural rather than occasional. Every toolkit edit made from inside a consumer's submodule tree is a detached-HEAD commit that must be pushed to the toolkit's own remote *and* recorded as a gitlink bump in the superproject, or it is silently lost. `git pull` not updating submodule contents by default is the classic quiet staleness. Working on one repo alone is fine — the submodule is a real checkout inside it. Note that a submodule presupposes the toolkit is **its own repository**, which is #31's fifth candidate: `kit/tools/` cannot be a submodule of the sibling while remaining an ordinary directory of this repo.
 
 ## 5. git subtree
 

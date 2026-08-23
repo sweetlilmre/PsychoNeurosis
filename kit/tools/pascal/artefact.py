@@ -20,8 +20,8 @@ bytes on disk today. A mismatch on a recorded row FAILS, with the escape
 where it always is -- lower the target with a reason, never edit the
 measurement.
 
-    python toolkit/pascal/artefact.py status.toml --check
-    python toolkit/pascal/artefact.py status.toml --record TPSYCHO \\
+    python kit/tools/pascal/artefact.py status.toml --check
+    python kit/tools/pascal/artefact.py status.toml --record TPSYCHO \\
         --ours run/TPSYCHO.EXE --original bin/PSYCHO.EXE --compare file --write
 """
 import hashlib

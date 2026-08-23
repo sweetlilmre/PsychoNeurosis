@@ -74,7 +74,7 @@ are listed at the foot of the individual documents and are all minor.
 | `NEUROSIS.008` | DemoVT (third-party) | LZEXE-packed, out of scope — see the `VangeliSTracker` repo |
 | `NEUROSIS.009` | end screen (`BYEBYE.PAS`) | **byte-identical rebuild** (`TPART9`), guarded in `status.toml` |
 
-"See the plan" means the `[plan]` section of `status.toml` — five investigations, defect-first, reported by `toolkit/pascal/plan.py`. Observations and rungs live in `status.toml` too; the register is the authority, this table is a snapshot from 22 Aug 2026.
+"See the plan" means the `[plan]` section of `status.toml` — five investigations, defect-first, reported by `kit/tools/pascal/plan.py`. Observations and rungs live in `status.toml` too; the register is the authority, this table is a snapshot from 22 Aug 2026.
 
 ## Building
 

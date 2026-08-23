@@ -20,7 +20,7 @@ bash". That is true, and most of what follows is the error reporting.
 Encoding, per CLAUDE.md: documents are read as utf-8 explicitly. The
 locale here is cp1252 and a bare open() would decode utf-8 as cp1252.
 
-    python kb-prototype/tools/okfcheck.py kb-prototype
+    python kit/tools/wikitools/okfcheck.py kit/wiki
 """
 import io
 import pathlib

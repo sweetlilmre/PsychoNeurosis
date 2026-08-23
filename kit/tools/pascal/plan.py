@@ -25,12 +25,12 @@ Sound checks, per issue #15 -- each refuses rather than reports:
   * resolving an investigation requires prose, same as lowering a ratchet
     target: the way out is a declared decision.
 
-    python toolkit/pascal/plan.py status.toml --report
-    python toolkit/pascal/plan.py status.toml --investigation part3-s6-dark \\
+    python kit/tools/pascal/plan.py status.toml --report
+    python kit/tools/pascal/plan.py status.toml --investigation part3-s6-dark \\
         --finding "left half of the dot object too dark" --seen-in TPART3 --write
-    python toolkit/pascal/plan.py status.toml --row "003 1139:0365" \\
+    python kit/tools/pascal/plan.py status.toml --row "003 1139:0365" \\
         --label PART3_MORPH.FadeStep --for part3-s6-dark --target R6 --write
-    python toolkit/pascal/plan.py status.toml --resolve part3-s6-dark \\
+    python kit/tools/pascal/plan.py status.toml --resolve part3-s6-dark \\
         --resolution "was the missing REP STOSW; fixed at <sha>" --write
 """
 import sys

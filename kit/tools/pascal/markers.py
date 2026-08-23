@@ -42,8 +42,8 @@ Encoding, per CLAUDE.md: DOS sources are ASCII and are read as ASCII, which is
 a guard rather than a preference -- a non-ASCII byte in a .PAS file is a defect
 `paslint.py` exists to catch, and decoding it silently here would hide it.
 
-    python toolkit/pascal/markers.py src
-    python toolkit/pascal/markers.py src --status status.toml
+    python kit/tools/pascal/markers.py src
+    python kit/tools/pascal/markers.py src --status status.toml
 """
 import io
 import pathlib
