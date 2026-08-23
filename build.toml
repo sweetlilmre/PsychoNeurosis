@@ -1,0 +1,154 @@
+# How this target is built. Read by kit/tools/pascal/build.py, which holds the
+# method; everything here is this demo's own data.
+#
+# GENERATED from tools/dosbox/dosbuild.py on 23 Aug 2026 by parsing it, not by
+# transcribing it -- forty name rows copied by hand is how a config drifts from
+# the script it replaces on its first day.
+#
+# NO MACHINE PATHS. The DOSBox-X executable, the drive C: image and the
+# compiler's own location live in kit.local.toml, which git ignores.
+
+src     = "src"
+build   = "build"
+title   = "psycho build"
+drive   = "D"
+log     = "D:\\BUILD.LOG"
+timeout = 180
+lint    = "tools/paslint.py"
+
+[compiler]
+default = "tp7"
+
+[compiler.tp7]
+binpath = "C:\\TP\\BIN"
+# /E<dir>  where the .EXE goes         /U<dirs> where to LOOK for units
+# /I<dirs> where {$I} includes live    /$S-     STACK CHECKING OFF
+#
+# /$S- is load-bearing and its absence does not fail. TP7 defaults stack
+# checking ON, and with it on every framed procedure -- INCLUDING an
+# `assembler` one -- opens with a seven-byte XOR AX,AX / CALLF before the body.
+# The demo was built with it off. Leaving the default made every hand-
+# transcribed routine differ from the binary in its opening bytes.
+#
+# There is no /D output switch: /D is conditional DEFINES, and giving it a path
+# is what produced "Error 130: Error in initial conditional defines".
+#
+# No /$E-, deliberately. The _fpu originals carry raw 9B+ESC where TP7 emits
+# CD 3x emulator interrupts, but that is a POST-BUILD PATCH rather than a
+# compile option, and dropping $E risks an unhandled INT 34h on any path the
+# RTL does not patch.
+switches = "/ED: /UD:;C:\\TP\\UNITS /ID:;D:\\GEN /$S-"
+
+[assembler]
+# TP7's built-in assembler stops at the 286 ({$G+} is documented as "Generate
+# 80286 Code Switch"), so the demo's 386 fixed-point maths comes in through
+# {$L DEMOMATH.OBJ} and that object is assembled first. /ML keeps the PUBLIC
+# names case-sensitive, which is how TPC matches them to Pascal identifiers.
+flags = "/ML /Z"
+
+[order]
+# Derived from the staged sources' own `uses` clauses. A hardcoded dependency
+# list gave "Error 15: File not found" the moment a part arrived that used
+# something not on it, and NAMES order stopped being a build order the day
+# TPART0 (uses Detect) was added above DETECT.PAS.
+mode = "uses"
+list = [
+  "PSYCHO.PAS",
+  "BYEBYE.PAS",
+  "STARTUP.PAS",
+  "DETECT.PAS",
+  "VGA.PAS",
+  "DEMOVT.PAS",
+  "MODEX.PAS",
+  "FIXMATH.PAS",
+  "P1S1.PAS",
+  "P1S2.PAS",
+  "P1S3.PAS",
+  "P1S4.PAS",
+  "P1S5.PAS",
+  "P1INTRO.PAS",
+  "P2VIEW.PAS",
+  "P2S1.PAS",
+  "P2S2.PAS",
+  "P2MAIN.PAS",
+  "PART3_TUNNEL.PAS",
+  "PART3_STARS.PAS",
+  "PART3_MORPH.PAS",
+  "PART3_GLOBE.PAS",
+  "PART3_BLOCKS.PAS",
+  "PART3_WAVES.PAS",
+  "PART3_SPRITES.PAS",
+  "P3MAIN.PAS",
+  "PART4_LEMMINGS.PAS",
+  "P5S1.PAS",
+  "P5S2.PAS",
+  "P5S3.PAS",
+  "P5MAIN.PAS",
+  "P6S1.PAS",
+  "P6S2.PAS",
+  "P6S3.PAS",
+  "P6S4.PAS",
+  "P6MAIN.PAS",
+  "P7S1.PAS",
+  "P7MAIN.PAS",
+]
+
+[stage]
+# Pascal sources here are 7-bit; anything else is a mistake worth seeing.
+encoding = "ascii"
+# The generated test harnesses already carry conforming 8.3 names and matching
+# unit identifiers, so they map to themselves and adding one needs no edit here.
+identity = ["TP*.PAS"]
+# The 386 maths module and its include go in the build ROOT, not GEN: TASM
+# resolves INCLUDE relative to the current directory, and TPC looks for the
+# .OBJ next to the unit that links it.
+alongside = ["src/asm/*.ASM", "src/asm/*.INC"]
+
+[stage.subdirs]
+GEN = "src/gen"
+
+[install]
+alongside = []
+
+# Reconstruction source -> 8.3 DOS name, unit identifier before and after. The
+# unit name inside a file is independent of the filename, but TP7 finds a unit
+# BY FILENAME, so `uses Part3Sprites` must become `uses P3Sprite`.
+[names]
+"PSYCHO.PAS" = ["TPSYCHO.PAS", "Psycho", "Psycho"]
+"BYEBYE.PAS" = ["TPART9.PAS", "ByeBye", "ByeBye"]
+"STARTUP.PAS" = ["TPART0.PAS", "Startup", "Startup"]
+"DETECT.PAS" = ["DETECT.PAS", "Detect", "Detect"]
+"VGA.PAS" = ["VGA.PAS", "VGA", "VGA"]
+"DEMOVT.PAS" = ["DEMOVT.PAS", "DemoVT", "DemoVT"]
+"MODEX.PAS" = ["MODEX.PAS", "ModeX", "ModeX"]
+"FIXMATH.PAS" = ["FIXMATH.PAS", "FixMath", "FixMath"]
+"P1S1.PAS" = ["P1S1.PAS", "P1S1", "P1S1"]
+"P1S2.PAS" = ["P1S2.PAS", "P1S2", "P1S2"]
+"P1S3.PAS" = ["P1S3.PAS", "P1S3", "P1S3"]
+"P1S4.PAS" = ["P1S4.PAS", "P1S4", "P1S4"]
+"P1S5.PAS" = ["P1S5.PAS", "P1S5", "P1S5"]
+"P1INTRO.PAS" = ["P1INTRO.PAS", "P1Intro", "P1Intro"]
+"P2VIEW.PAS" = ["P2VIEW.PAS", "P2View", "P2View"]
+"P2S1.PAS" = ["P2S1.PAS", "P2S1", "P2S1"]
+"P2S2.PAS" = ["P2S2.PAS", "P2S2", "P2S2"]
+"P2MAIN.PAS" = ["P2MAIN.PAS", "P2Main", "P2Main"]
+"PART3_TUNNEL.PAS" = ["P3TUNNEL.PAS", "Part3Tunnel", "P3Tunnel"]
+"PART3_STARS.PAS" = ["P3STARS.PAS", "Part3Stars", "P3Stars"]
+"PART3_MORPH.PAS" = ["P3MORPH.PAS", "Part3Morph", "P3Morph"]
+"PART3_GLOBE.PAS" = ["P3GLOBE.PAS", "Part3Globe", "P3Globe"]
+"PART3_BLOCKS.PAS" = ["P3BLOCKS.PAS", "Part3Blocks", "P3Blocks"]
+"PART3_WAVES.PAS" = ["P3WAVES.PAS", "Part3Waves", "P3Waves"]
+"PART3_SPRITES.PAS" = ["P3SPRITE.PAS", "Part3Sprites", "P3Sprite"]
+"P3MAIN.PAS" = ["P3MAIN.PAS", "P3Main", "P3Main"]
+"PART4_LEMMINGS.PAS" = ["P4LEMS.PAS", "Part4Lemmings", "P4Lems"]
+"P5S1.PAS" = ["P5S1.PAS", "P5S1", "P5S1"]
+"P5S2.PAS" = ["P5S2.PAS", "P5S2", "P5S2"]
+"P5S3.PAS" = ["P5S3.PAS", "P5S3", "P5S3"]
+"P5MAIN.PAS" = ["P5MAIN.PAS", "P5Main", "P5Main"]
+"P6S1.PAS" = ["P6S1.PAS", "P6S1", "P6S1"]
+"P6S2.PAS" = ["P6S2.PAS", "P6S2", "P6S2"]
+"P6S3.PAS" = ["P6S3.PAS", "P6S3", "P6S3"]
+"P6S4.PAS" = ["P6S4.PAS", "P6S4", "P6S4"]
+"P6MAIN.PAS" = ["P6MAIN.PAS", "P6Main", "P6Main"]
+"P7S1.PAS" = ["P7S1.PAS", "P7S1", "P7S1"]
+"P7MAIN.PAS" = ["P7MAIN.PAS", "P7Main", "P7Main"]

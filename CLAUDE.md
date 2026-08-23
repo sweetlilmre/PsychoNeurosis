@@ -59,10 +59,12 @@ What is left here is this demo's own:
 
 ## This machine's toolchain
 
-The traps that come with the tools a session is driven with -- the backslash halving, the slash-to-path rewriting, the multiplied line breaks -- are in [`kit/WORKING.md`](kit/WORKING.md) section 9, because a new project inherits every one of them. What is here is only where this machine keeps things:
+The traps that come with the tools a session is driven with -- the backslash halving, the slash-to-path rewriting, the multiplied line breaks -- are in [`kit/WORKING.md`](kit/WORKING.md) section 9, because a new project inherits every one of them.
 
-    DOSBox-X    D:\DOSBox-X\dosbox-x.exe
-    Turbo Pascal 7.01, TASM   C:\TP\BIN, C:\TASM\BIN
-    the DOSBox configs        tools/dosbox/*.conf, mounting build/ and run/
+**Where this machine keeps DOSBox-X, the drive C: image and each Turbo Pascal is answered by `kit.local.toml`, and this file no longer says.** It used to list all three and then assert in the next sentence that none of them may appear in a committed file, which was a contradiction anybody could read. Under [#35](https://github.com/sweetlilmre/PsychoNeurosis/issues/35) the last holders were emptied out: `dosbuild.py` carried them as constants and `tools/dosbox/psycho.conf` carried two of them as literals in a **committed** file. The DOSBox config is generated now, so the mount and the staging directory cannot disagree either.
 
-None of those may appear in a committed file: they live in the untracked `kit.local.toml`, which is the rule that keeps a machine path out of the repository. `tools/dosbox/dosbuild.py` still holds them as constants -- it is a frozen original awaiting [#35](https://github.com/sweetlilmre/PsychoNeurosis/issues/35).
+    .venv/Scripts/python.exe kit/tools/pascal/build.py build.toml          everything
+    .venv/Scripts/python.exe kit/tools/pascal/build.py build.toml TPART3   one harness and its units
+    .venv/Scripts/python.exe kit/tools/pascal/build.py build.toml --selftest
+
+`build.toml` is this target's build data -- the 8.3 name map, the switch line, what is staged alongside -- and it was GENERATED from `dosbuild.py` rather than transcribed. The switch line is the part to be careful with: `/$S-` does not fail when it is missing, it produces a build that measures wrong.
