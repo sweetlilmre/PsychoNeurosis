@@ -18,7 +18,9 @@ Asphyxia's first megademo, 1994. Borland Pascal 7 plus hand-written assembler, r
 **It needs a virtual environment.** `pyyaml` is the only third-party dependency; TOML is read with stdlib `tomllib`, so Python 3.11+ is required.
 
     uv venv .venv
-    uv pip install --python .venv/Scripts/python.exe -e toolkit
+    uv pip install --python .venv/Scripts/python.exe pyyaml
+
+**The editable install of the toolkit that used to be documented here DOES NOT WORK, and never did** -- `toolkit/pyproject.toml` declares no `[build-system]` and no package discovery, so setuptools refuses the flat layout of `substrate`/`pascal`/`wikitools`. Nothing has broken because nothing depends on it: every command below runs a script by path. Being made real is [Make the toolkit an installable package](https://github.com/sweetlilmre/PsychoNeurosis/issues/39); until then install `pyyaml` alone.
 
 Then all the checks, which **all pass** as of `f83944d`:
 
