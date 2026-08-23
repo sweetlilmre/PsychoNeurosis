@@ -8,227 +8,356 @@
 #
 # No machine path appears here. The sibling repo's location is passed on
 # the command line or set in the untracked local config.
+[script."align.py"]
+state = "carry"
+reason = "the coverage question -- which bytes of an original do not line up against a rebuild, allowed-difference rule passed in"
+
+
+[script."artefact.py"]
+state = "carry"
+reason = "guards the byte-identical rebuilds"
+
 
 [script."asmaudit.py"]
 state = "carry"
 reason = "checks two of the three transcription rules mechanically"
 
+
 [script."asmcheck.py"]
 state = "carry"
 reason = "allowed-difference rule for an assembled .OBJ"
+
+
+[script."asmshare.py"]
+state = "carry"
+reason = "the demo's shared-assembler check, with its own exemptions and their reasons; generic half copied to the toolkit as shared_asm.py"
+
 
 [script."asmverify.py"]
 state = "carry"
 reason = "anchor alignment and the 1-2 byte hole rule"
 
+
 [script."block14b9.py"]
 state = "decline"
 reason = "one of four copies of blocks.py, differing only in constants"
+
 
 [script."block154d.py"]
 state = "decline"
 reason = "one of four copies of blocks.py, differing only in constants"
 
+
 [script."block193a.py"]
 state = "decline"
 reason = "one of four copies of blocks.py, differing only in constants"
+
 
 [script."block19a0.py"]
 state = "decline"
 reason = "one of four copies of blocks.py, differing only in constants"
 
+
 [script."blocks.py"]
 state = "carry"
 reason = "per-block shift search; the four block*.py collapse into it"
+
 
 [script."build.py"]
 state = "carry"
 reason = "harness base: the only one treating the compiler as a variable"
 
+
 [script."build_assets.py"]
 state = "decline"
 reason = "project driver: builds assets/ from NEUROSIS.DAT"
+
 
 [script."census.py"]
 state = "carry"
 reason = "RETF census, far-call histogram, VMT reader; no disassembler"
 
+
 [script."coverage.py"]
 state = "carry"
 reason = "coverage measurement"
+
 
 [script."datcarve.py"]
 state = "decline"
 reason = "project driver; but png_indexed() is a dependency-free indexed PNG writer worth carrying separately"
 
+
 [script."datmap.py"]
 state = "decline"
 reason = "project driver: NEUROSIS.DAT region map"
+
 
 [script."dgroup.py"]
 state = "carry"
 reason = "the initialised DGROUP image, byte for byte"
 
+
 [script."dosbuild.py"]
 state = "carry"
 reason = "donates 8.3 staging, uses order, and the TASM step"
+
+
+[script."emit_byebye.py"]
+state = "carry"
+reason = "generates the end screen's image include"
+
 
 [script."emit_costab.py"]
 state = "decline"
 reason = "spent driver; COSTAB.INC is committed. Its content is the assertion that three copies agree"
 
+
 [script."emit_gain.py"]
 state = "decline"
 reason = "spent one-shot, output committed. Its VALUE is a property, not code: it reassembles and byte-compares before printing, and fails rather than emitting something plausible"
+
 
 [script."emit_p6shape.py"]
 state = "decline"
 reason = "spent one-shot; prints a count only, and did not produce P6SHAPE.INC"
 
+
 [script."emit_p6text.py"]
 state = "decline"
 reason = "spent one-shot, repaired 19 Aug 2026 and run; P6TEXT.INC is committed"
+
 
 [script."emit_pascal_data.py"]
 state = "carry"
 reason = "the typed-constant formatter is the reusable half of three copies"
 
+
 [script."emit_pascal_data2.py"]
 state = "decline"
 reason = "second copy of emit_pascal_data's formatter; carry that one instead"
+
 
 [script."encaudit.py"]
 state = "carry"
 reason = "locale-dependent text I/O, by AST; in both repos"
 
+
 [script."fpconst.py"]
 state = "carry"
 reason = "floating-point constants out of a code segment"
+
 
 [script."fpfix.py"]
 state = "carry"
 reason = "emulator traps back to real x87"
 
+
 [script."fpsurvey.py"]
 state = "carry"
 reason = "x87-emulator trap sites, INT 34h..3Eh"
+
+
+[script."glossary.py"]
+state = "carry"
+reason = "turns the glossary's Avoid lists into a check"
+
+
+[script."kbprofile.py"]
+state = "carry"
+reason = "our stricter wiki profile, and the generators for what is generated"
+
 
 [script."ledger.py"]
 state = "superseded"
 successor = "toolkit/pascal/markers.py"
 reason = "its reader crossed comment boundaries; the convention was sound"
 
+
 [script."linkcmp.py"]
 state = "carry"
 reason = "all linked segments with fixups resolved"
+
 
 [script."linkorder.py"]
 state = "carry"
 reason = "TP6 segment order: reverse DFS post-order over uses"
 
+
 [script."mapcmp.py"]
 state = "carry"
 reason = "segment lengths, and the three-lengths footing rule"
+
+
+[script."markers.py"]
+state = "carry"
+reason = "reads the @asm markers out of the source tree"
+
 
 [script."mktests.py"]
 state = "carry"
 reason = "harness generator, two tiers"
 
+
 [script."modex.py"]
 state = "carry"
 reason = "de-interleave four Mode-X planes"
+
 
 [script."mzinfo.py"]
 state = "carry"
 reason = "MZ header parsing, and LZ91/LZ90 detection"
 
+
+[script."observe.py"]
+state = "carry"
+reason = "records a run somebody actually made, and nothing else"
+
+
+[script."okfcheck.py"]
+state = "carry"
+reason = "OKF v0.1 conformance only; no project facts, deliberately"
+
+
 [script."omf.py"]
 state = "carry"
 reason = "OMF record reader, feeds the .OBJ rule"
+
 
 [script."p2obj.py"]
 state = "decline"
 reason = "project one-shot: part 002 scene 2's objects"
 
+
 [script."pairmap.py"]
 state = "decline"
 reason = "the PUSH CS literal-scoring idea is sound and one-way, but it is a project-specific driver; carry the idea if it proves needed"
+
 
 [script."paslint.py"]
 state = "carry"
 reason = "the four TP7 traps; nearly clean already, in both repos"
 
+
+[script."plan.py"]
+state = "carry"
+reason = "the ordered queue of investigations"
+
+
 [script."probe.py"]
 state = "carry"
 reason = "NAME COLLISION: substrate fingerprinter vs compiler differ, one must be renamed"
+
 
 [script."progcmp.py"]
 state = "carry"
 reason = "one segment, per routine, shift searched"
 
+
+[script."ratchet.py"]
+state = "carry"
+reason = "the ratchet: coverage may only rise"
+
+
 [script."refpath.py"]
 state = "carry"
 reason = "what unpacking DECIDED rather than recovered"
+
+
+[script."register.py"]
+state = "carry"
+reason = "the one writer for status.toml; refuses a section it does not know"
+
 
 [script."relmatch.py"]
 state = "carry"
 reason = "relocation matching"
 
+
 [script."repair_map.py"]
 state = "decline"
 reason = "spent one-shot, and honestly so: it detects the repaired file and refuses, keeping itself as the record of the method"
+
 
 [script."repairdoc.py"]
 state = "carry"
 reason = "multiplied line breaks in a document"
 
+
 [script."rtlfind.py"]
 state = "carry"
 reason = "RTL routines by byte pattern"
+
 
 [script."rtlmatch.py"]
 state = "carry"
 reason = "RTL segment, and how far it matches"
 
+
 [script."scan_funcs.py"]
 state = "carry"
 reason = "BP6 prologue and epilogue entry-point scan"
+
 
 [script."segmap.py"]
 state = "carry"
 reason = "segment layout from relocation fixups"
 
+
+[script."shapediff.py"]
+state = "carry"
+reason = "coverage alignment over a whole part; superseded in the toolkit by align.py, kept as the demo's own caller"
+
+
+[script."shared_asm.py"]
+state = "carry"
+reason = "assembler duplicated between units instead of shared as one include"
+
+
 [script."split.py"]
 state = "carry"
 reason = "MZ image from its appended payload"
+
 
 [script."split_part1.py"]
 state = "decline"
 reason = "dead: its input src/PART1_INTRO.PAS no longer exists, and parts 5-7 were split later without it"
 
+
 [script."strings.py"]
 state = "carry"
 reason = "printable strings, load image only"
+
 
 [script."symbols.py"]
 state = "carry"
 reason = "Borland debug name pools, magic 0x52FB"
 
+
+[script."tddump.py"]
+state = "carry"
+reason = "Borland debug info, decoded whole"
+
+
 [script."undeclared.py"]
 state = "carry"
 reason = "the TP7 builtin identifier set is the reusable half"
+
 
 [script."unlzexe.py"]
 state = "carry"
 reason = "LZEXE 0.91 container; one idea, currently in both repos"
 
+
 [script."vecobj.py"]
 state = "decline"
 reason = "project one-shot: 3-D vector objects from DGROUP"
 
+
 [script."verify.py"]
 state = "carry"
 reason = "the compare-tool core: slide-to-locate plus a maskable rule"
+
 
 [script."vtbuild.py"]
 state = "decline"

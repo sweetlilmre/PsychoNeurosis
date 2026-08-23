@@ -194,7 +194,16 @@ def generate(root, write):
         table = render_discriminator(children)
         text = io.open(hub, encoding="utf-8", newline="").read()
         if BEGIN not in text or END not in text:
-            changed.append((hub, "hub has no generated:discriminator markers"))
+            # A hub with no artefact answers has no table to route to, so
+            # there is nothing to generate and it is not stale. Reporting it
+            # anyway made this check exit 1 for every single-page observation
+            # in the bundle, permanently, while --write printed "regenerated"
+            # and wrote nothing -- it `continue`s here. A red check nobody can
+            # ever turn green is worse than no check.
+            if children:
+                changed.append((hub,
+                                "hub has artefact answers but no "
+                                "generated:discriminator markers"))
             continue
         head, rest = text.split(BEGIN, 1)
         _, tail = rest.split(END, 1)

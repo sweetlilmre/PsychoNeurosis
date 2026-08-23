@@ -8,7 +8,16 @@ Reusable programs with no project facts in them. Three folders, decided in [Draw
 | `pascal/` | Facts true only of Borland Pascal: `.TPU` structure, DGROUP layout, RTL byte patterns. | pascal |
 | `wikitools/` | Looking after the wiki itself: OKF conformance, our stricter profile, and the generators. | neither |
 
-**`substrate/` and `pascal/` are empty.** Nothing has been moved into them yet. The 55 existing scripts live in `tools/` and in the VangeliSTracker repo, and consolidating them is [Consolidate and prune the tools](https://github.com/sweetlilmre/PsychoNeurosis/issues/17). The map's standing rule is **copy and adjust, never refactor the originals** -- so `tools/*` keeps working, untouched, and anything generic gets *copied* here and adapted.
+The map's standing rule is **copy and adjust, never refactor the originals** -- so `tools/*` keeps working, untouched, and anything generic gets *copied* here and adapted. Consolidating the rest is [Consolidate and prune the tools](https://github.com/sweetlilmre/PsychoNeurosis/issues/17); most of the 55 existing scripts still live in `tools/` and in the VangeliSTracker repo. What has been copied so far:
+
+| here | copied from | what it is for |
+|---|---|---|
+| `pascal/register.py`, `ratchet.py`, `observe.py`, `artefact.py`, `plan.py`, `markers.py` | written here | the status register and its writers |
+| `substrate/tddump.py` | `tools/` | Borland debug info, decoded whole |
+| `substrate/align.py` | `tools/asmverify.py` + `tools/shapediff.py` | which bytes of an original do NOT line up against a rebuild -- the coverage question, with the allowed-difference rule passed in |
+| `pascal/shared_asm.py` | `tools/asmshare.py` | assembler duplicated between units instead of shared as one include |
+
+Each copy carries the finding that produced it in its docstring, and the wiki carries the observation: `verifier-blind-to-absence` for `align.py`, `one-routine-two-units` for `shared_asm.py`.
 
 ## Two rules that shaped this
 

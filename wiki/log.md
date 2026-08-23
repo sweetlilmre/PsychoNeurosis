@@ -1,5 +1,12 @@
 # Log
 
+## 2026-08-23
+
+* **Create**: [Every declared routine matches, and the rebuild still behaves differently](/observations/verifier-blind-to-absence/observation.md). Read out of part 001 of the demo: the per-routine byte check reported 73 routines locked and 0 failing while a hand-written blitter sat re-expressed as Pascal, because a checker driven by declarations has nowhere to report a routine nobody declared. Coverage alignment found it as a 799-byte span.
+* **Create**: [The same routine sits mid-unit in one binary and at a segment head in another](/observations/one-routine-two-units/observation.md). The same routine in two parts, and where it sits in the segment says whether the original shared a unit or shared source text. Carries the two Turbo Pascal mechanics for sharing it: a `{$I}` inside an `asm` block is refused, and an include quoting a directive needs `(* *)` delimiters.
+* **Withdrawn**: that a shared include would drop the routine out of the byte check, which is why an earlier commit that day kept two copies. The marker had always allowed a name of its own. Recorded on the observation itself, at the point of use.
+* **Correct**: `kbprofile.py` reported every single-page observation as having stale generated content, for ever -- there is no discriminator table to generate for a hub with no artefact answers, and `--write` printed "regenerated" while writing nothing. The check exited 1 on the committed bundle before either page above existed. A hub with no children is no longer reported.
+
 ## 2026-08-19
 
 * **Create**: the bundle, as the prototype for [Write one technique page as the pattern](https://github.com/sweetlilmre/PsychoNeurosis/issues/10).
