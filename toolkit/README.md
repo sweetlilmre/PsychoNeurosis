@@ -15,9 +15,11 @@ The map's standing rule is **copy and adjust, never refactor the originals** -- 
 | `pascal/register.py`, `ratchet.py`, `observe.py`, `artefact.py`, `plan.py`, `markers.py` | written here | the status register and its writers |
 | `substrate/tddump.py` | `tools/` | Borland debug info, decoded whole |
 | `substrate/align.py` | `tools/asmverify.py` + `tools/shapediff.py` | which bytes of an original do NOT line up against a rebuild -- the coverage question, with the allowed-difference rule passed in |
-| `pascal/shared_asm.py` | `tools/asmshare.py` | assembler duplicated between units instead of shared as one include |
+| `pascal/shared_asm.py` | written here | assembler duplicated between units instead of shared as one include |
 
 Each copy carries the finding that produced it in its docstring, and the wiki carries the observation: `verifier-blind-to-absence` for `align.py`, `one-routine-two-units` for `shared_asm.py`.
+
+**A NEW generic tool is born here; only a tool that already existed is copied.** Copy-and-adjust exists to keep working originals working, and a tool written today has no original to protect. Writing one in `tools/` and copying it the same day duplicates it from birth -- which happened once, on 23 Aug 2026, and put two rows in the census for one tool before it was collapsed. The project-specific half of such a tool is DATA passed in, not a second script: `shared_asm.py` takes the psycho repository's exemptions from `src/asm/shared-exempt.txt`.
 
 ## Two rules that shaped this
 

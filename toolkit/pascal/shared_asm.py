@@ -24,9 +24,12 @@ pointer -- so there is no single text to share. Cases like that go in the
 exempt file, one `UNIT.Routine` per line with `#` comments, and a project that
 wants the rule enforced passes --gate.
 
-Copied and adapted from `tools/asmshare.py` in the psycho repository, per the
-map's rule: the original keeps working, untouched, with that project's own
-exemptions and reasons built into it. This copy holds no project facts.
+This one was WRITTEN HERE, not copied. The map's copy-and-adjust rule protects
+tools that already existed; a new generic tool has no original to freeze, so
+writing it in `tools/` first and copying it here would duplicate it from birth
+-- which is what happened on the first attempt, complete with two rows in the
+census for one tool. Project facts stay out of it: the psycho repository keeps
+its exemptions in `src/asm/shared-exempt.txt` and passes them in.
 
 Two mechanics of writing the include, both measured 23 Aug 2026 and recorded
 here because the tool exists to push people towards it:

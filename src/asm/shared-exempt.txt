@@ -1,0 +1,26 @@
+# Assembler that is duplicated between units and CANNOT become one text.
+#
+# Read by:  toolkit/pascal/shared_asm.py src --exempt=src/asm/shared-exempt.txt
+#
+# The rule that tool enforces is that a routine the demo compiles into more
+# than one part lives in ONE include -- as BLITCLIP.INC in this directory does,
+# for the clipped sprite blit at 001 1107:0199 and 006 100f:0000. An entry here
+# is a case where that is impossible, with the reason, because whether two
+# identical bodies can share a text is a fact about their DECLARATIONS and no
+# tool can see it.
+#
+# One UNIT.Routine per line. Not read by any DOS tool -- dosbuild.py stages
+# only .ASM and .INC out of this directory -- so it is plain utf-8 text.
+
+# SetPalette768. The nine instructions are identical in parts 001, 003 and 004,
+# but the three declarations are not, and cannot be:
+#
+#     VGA.SetPalette768           004 11e3:0230   FAR, in the shared unit
+#     PART3_MORPH.SetPalette768   003 1139:0335   takes an untyped `var P`
+#     P1S4.SetPalette768          001 1107:0000   takes a `P : Pointer`
+#
+# An include carries the header, so there is no one text to share -- only the
+# same body reached three ways.
+P1S4.SetPalette768
+PART3_MORPH.SetPalette768
+VGA.SetPalette768

@@ -28,10 +28,6 @@ state = "carry"
 reason = "allowed-difference rule for an assembled .OBJ"
 
 
-[script."asmshare.py"]
-state = "carry"
-reason = "the demo's shared-assembler check, with its own exemptions and their reasons; generic half copied to the toolkit as shared_asm.py"
-
 
 [script."asmverify.py"]
 state = "carry"
@@ -311,7 +307,7 @@ reason = "coverage alignment over a whole part; superseded in the toolkit by ali
 
 [script."shared_asm.py"]
 state = "carry"
-reason = "assembler duplicated between units instead of shared as one include"
+reason = "assembler duplicated between units instead of shared as one include; written here, project exemptions passed in"
 
 
 [script."split.py"]
