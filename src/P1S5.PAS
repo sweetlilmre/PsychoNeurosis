@@ -408,13 +408,37 @@ end;
   No delay and no retrace wait anywhere in the loop: on the original the two
   64,000-byte screen copies were the frame rate.
   -------------------------------------------------------------------------- }
+{ THE FRAME IS ENTER $08 (12c5:075e) AND IT TAKES FOUR DECLARATIONS TO FILL,
+  not two. What gives it away is that every local sits on an ODD offset --
+  [BP-3] and [BP-7] -- which only happens if a ONE-BYTE local was declared
+  first and pushed everything after it out of alignment. Turbo Pascal does not
+  align locals, so the offsets recover the declaration order directly:
+
+      [BP-1]  1 byte    written 0 at 12c5:076c and NEVER READ. One reference
+                        in the whole routine, which is that store. It reads
+                        like an exit flag the author stopped using -- Exit is
+                        reached directly from the KeyPressed test at
+                        12c5:0851 instead. Boolean, Byte and Char are
+                        indistinguishable from `MOV BYTE PTR [BP-1],0`.
+      [BP-3]  Integer   Frame, 1..240 -- seeded 12c5:0770, tested 12c5:085c
+      [BP-5]  Integer   NEVER REFERENCED AT ALL, at any width
+      [BP-7]  Integer   Local -- seeded 12c5:0769, read 12c5:07b9 and
+                        12c5:0806, advanced by 3 at 12c5:082b
+
+  Seven bytes declared, and ENTER $08 because the frame is rounded to even.
+  Two of the four are dead, and they are transcribed anyway: they are what the
+  1994 source declared, and leaving them out is what put every other local in
+  this routine at the wrong offset. }
 procedure Animate;
 var
-  Frame : Integer;
-  Local : Integer;
+  Done   : Boolean;                     { [BP-1] -- assigned, never read }
+  Frame  : Integer;                    { [BP-3] }
+  Unused : Integer;                     { [BP-5] -- never referenced }
+  Local  : Integer;                    { [BP-7] }
 begin
   Angle := 0;                           { 12c5:0764 }
   Local := 0;                           { 12c5:0769 }
+  Done  := False;                       { 12c5:076c }
   { OrbitAngle deliberately NOT reset -- Vector_Run seeds it. }
 
   for Frame := 1 to VectorFrames do
