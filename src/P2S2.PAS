@@ -1422,17 +1422,29 @@ end;
   -------------------------------------------------------------------------- }
 procedure DrawText(X, Y : Integer; S : String);
 var
-  I, R, C, G, Pen : Integer;
+  { FOUR Integers, not five. `ENTER $10a` is 266 bytes: 256 for the String
+    value parameter's own copy at [BP-$100], then five word slots -- and the
+    DEEPEST of them, [BP-$10a], is the code generator's. 108b:0021 reads the
+    copy's length byte into it and 108b:002e compares against it, so it is
+    the `for I := 1 to Length(S)` limit temporary. Declaring a fifth variable
+    put the frame 2 bytes over at $10c. }
+  I, R, C, Pen : Integer;    { [BP-$102], [BP-$104], [BP-$106], [BP-$108] }
 begin
   Pen := 0;
   for I := 1 to Length(S) do
   begin
-    G := Ord(S[I]) - FontFirst;
-    if (G >= 0) and (G < FontCount) then
-      for R := 1 to GlyphSide do
-        for C := 1 to GlyphSide do
-          if Font^[G * 25 + (R - 1) * GlyphSide + (C - 1)] <> 0 then
-            Plot(R + X + Pen, C + Y, TextCol);
+    { NO `G` AND NO RANGE TEST. 108b:006b loads S[I] and 108b:0075 is
+      `IMUL DI, AX, $19` on Ord(S[I]) itself -- the subtraction of FontFirst
+      is folded into the base displacement along with the row and column
+      bias, which is why the font is addressed at $5122 and not at its own
+      $5448: $5448 - 32*25 - 5 - 1 = $5122 exactly. The reconstruction's
+      `if (G >= 0) and (G < FontCount)` has no counterpart in the bytes; the
+      original trusts its two messages to be inside the glyph table. }
+    for R := 1 to GlyphSide do
+      for C := 1 to GlyphSide do
+        if Font^[(Ord(S[I]) - FontFirst) * 25
+                 + (R - 1) * GlyphSide + (C - 1)] <> 0 then
+          Plot(R + X + Pen, C + Y, TextCol);
     Inc(Pen, 6);
   end;
 end;
@@ -1446,10 +1458,15 @@ end;
   -------------------------------------------------------------------------- }
 procedure DrawBanner;
 var
-  X, Y, Col : Integer;
+  { ENTER $04 is TWO Integers, not three: 108b:1105 runs the palette loop on
+    [BP-$02] and so does the column loop after it, so the reconstruction's
+    separate `Col` was a third variable the original does not have. Note also
+    `MOV AL, BYTE PTR [BP-$02]` at 108b:110f -- the loop counter's low byte
+    is what reaches SetRGB, because its first parameter is a Byte. }
+  X, Y : Integer;                      { [BP-$02] 14 refs, [BP-$04] 7 refs }
 begin
-  for Col := 100 to 200 do
-    SetRGB(Col, Pal[Col * 3], Pal[Col * 3 + 1], Pal[Col * 3 + 2]);
+  for X := 100 to 200 do
+    SetRGB(X, Pal[X * 3], Pal[X * 3 + 1], Pal[X * 3 + 2]);
 
   for X := 0 to ScrWidth - 1 do
     for Y := BannerTop to Rows - 1 do
@@ -1474,24 +1491,49 @@ end;
   really does step six pixels a character. Each character is drawn into BOTH
   pages so it survives the flip.
   -------------------------------------------------------------------------- }
-procedure Emit(S : String; Idx, Y : Integer);
-var
-  X : Integer;
-begin
-  if (Idx < 1) or (Idx > Length(S)) then Exit;
-  X := Idx * 6 + 15;
-  WritePage := PageBase[0];
-  DrawText(X, Y, S[Idx]);
-  WritePage := PageBase[1];
-  DrawText(X, Y, S[Idx]);
-end;
-
+{ 108b:0f66 -- Present, and Emit is INLINED into it }
 procedure Present;
 begin
-  if (Frame > 100) and (Frame < 150) then
-    Emit(Msg1, Frame - 100, TextY1);
-  if (Frame > 250) and (Frame < 300) then
-    Emit(Msg2, Frame - 250, TextY2);
+  { NO DECLARED LOCALS AT ALL. `ENTER $100` is 256 bytes and every one of them
+    is the CODE GENERATOR'S: 108b:0fd4 takes `LEA DI,[BP-$100]` and hands it
+    to the runtime helper at 14b1:3882, which is the Char-to-String
+    conversion. Passing `Msg1[i]` -- a Char -- to DrawText's `S : String`
+    parameter is what buys that temporary, and a declared String here would
+    have produced a second one. Same lesson as the loop limits in the
+    renderers: a frame slot is not evidence of a declaration.
+
+    There is no `Emit` procedure in the original -- no prologue candidate
+    exists between 108b:0f66 and 108b:1101 -- and no guard on the index
+    either; the reconstruction's `if (Idx < 1) or (Idx > Length(S))` has no
+    counterpart in the bytes.
+
+    THE OUTER `Frame > 100` IS REDUNDANT AND IT IS REALLY THERE. Three tests
+    precede the first message: 108b:0f6a and 108b:0f80 both compare Frame
+    against 100 and 108b:0f96 against 150, and the first one's false branch
+    goes to the procedure's end while the other two go to the second message.
+    Two tests would be a plain `and`; the third is an outer guard the author
+    wrote, so it is transcribed.
+
+    The arithmetic is 32-bit throughout because Frame is a LongInt: 108b:0fc5
+    is the runtime's LongInt multiply and 108b:0fca adds 15 with an ADC, then
+    only the low word is pushed for DrawText's Integer parameter. }
+  if Frame > 100 then
+  begin
+    if (Frame > 100) and (Frame < 150) then
+    begin
+      WritePage := PageBase[0];
+      DrawText((Frame - 100) * 6 + 15, TextY1, Msg1[Frame - 100]);
+      WritePage := PageBase[1];
+      DrawText((Frame - 100) * 6 + 15, TextY1, Msg1[Frame - 100]);
+    end;
+    if (Frame > 250) and (Frame < 300) then
+    begin
+      WritePage := PageBase[0];
+      DrawText((Frame - 250) * 6 + 15, TextY2, Msg2[Frame - 250]);
+      WritePage := PageBase[1];
+      DrawText((Frame - 250) * 6 + 15, TextY2, Msg2[Frame - 250]);
+    end;
+  end;
 end;
 
 { --------------------------------------------------------------------------

@@ -247,9 +247,9 @@ outcome = "differs"
 achieved = "R2"
 observer = "maintainer"
 date = "2026-08-24"
-confirmed_at = "1d74244951db"
+confirmed_at = "32b38f1778f5"
 fingerprint = "def2481f9e409647"
-note = "Watched beside ORIG2 after Choreography was inlined and ObjSortFaces rebuilt to copy the object into its frame. MEASURABLY BETTER: still slower than the original but by much less. That is the first evidence for the addressing-mode hypothesis - the original copies the object into the stack frame once and then works SS-relative, where the reconstruction read through the far var pointer per access. Look for the same pattern in the other per-frame routines."
+note = "Watched after the three renderers were rebuilt to take the object by value. NO FURTHER CHANGE - about the same as the previous run, which was already much better than before ObjSortFaces. So the addressing-mode change accounts for the one improvement and repeating it in the renderers added nothing measurable. The remaining gap is something else and is not explained yet."
 
 [observation."TPART3"]
 harness = "TPART3"
@@ -359,6 +359,7 @@ name = "pacing"
 finding = "ours runs slower wherever 3-D or converted fixed-point code runs, across parts 001-005; one investigation, not six"
 seen_in = "TPART2"
 state = "open"
+note = "NOT resolved as a defect, but the compiler-version question inside it is settled and the addressing-mode strand is measured out. THE ORIGINAL IS TP7, NOT TP6. The authors recall TP6 and that recollection is understandable - the sibling DemoVT, NEUROSIS.008, genuinely is TP6 - but three measurements agree for the Asphyxia binaries: all fifteen carry Portions Copyright (c) 1983,92 Borland where a known-TP6 build on this same machine carries 1983,90; and NEUROSIS.000, NEUROSIS.009 and PSYCHO.EXE rebuild BYTE-IDENTICAL whole load images with TP7.01, which contain the linked runtime and cannot come from another compiler version. Keep the toolchain. Separately: rebuilding ObjSortFaces to copy the object into its frame and address SS-relative took part 002 from noticeably slower to slightly slower in a watched run, but repeating that in the three renderers added nothing measurable in a second watched run, so the remaining gap is NOT explained by addressing mode alone and this investigation stays open."
 
 [[plan.investigation]]
 name = "part6-confirm-r3"
@@ -420,6 +421,11 @@ note = "Four routines in this segment had the compilers for-limit temporaries tr
 label = "ObjSortFaces copies the whole object into its frame"
 investigation = "pacing"
 note = "THE CANDIDATE MECHANISM FOR PACING, and it is the opposite of what it looks like. 108b:0e0c LEAs a 2897-byte local, pushes B51h and calls the runtime Move, and every access afterwards is SS-relative off BP. Nothing reads through the var parameter after the copy. The reconstruction worked through the far pointer for every read, costing a segment load and an ES override per access; the original pays one bulk copy and then uses near addressing. Also fixed: the depth accumulator is the Depth FIELD and is sixteen bit, not a LongInt Sum; the divisor is a fresh read of Face[F].Count with NO zero guard; BestKey is Integer; and 1495 bytes are declared and never addressed. Part 002 72.4 to 75.0 percent. What remains is six bytes of compiler temporary ours has and the original does not, so our ENTER is 113c against 1136 - a probe question, and every variable offset already matches."
+
+[plan.row."002 108b:0f66"]
+label = "Present inlines Emit; its whole frame is a compiler temporary"
+investigation = "pacing"
+note = "ENTER 100h is 256 bytes and every one is the code generators: 108b:0fd4 LEAs it and hands it to the runtime Char-to-String helper at 14b1:3882, which is what passing Msg1[i] to DrawTexts String parameter costs. No declared locals at all, no Emit procedure (no prologue candidate between 0f66 and 1101), and no index guard. The outer Frame > 100 test is redundant and really there: three tests precede the first message, two comparing against 100. Also DrawBanner has TWO Integers not three - the palette loop reuses X - and DrawText has FOUR not five, its deepest slot being the Length(S) limit temp, with no G variable and no range test because -FontFirst is folded into the base displacement. Part 002 78.3 to 80.4 percent."
 
 [plan.row."002 108b:11c1"]
 label = "Choreography inlines the phase body; PA/PB/PC are Integer locals"
