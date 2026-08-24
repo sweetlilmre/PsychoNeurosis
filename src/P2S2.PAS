@@ -230,29 +230,65 @@ end;
   Step 2's sines and cosines are therefore used only for the pivot. That is
   what the code does.
   -------------------------------------------------------------------------- }
+{ THE FRAME IS ENTER $36 -- 54 bytes -- AND IT TOOK FIVE DECLARATIONS TO FILL,
+  two of which the routine never reads. 46 bytes are declared and 8 are the
+  code generator's two far-pointer spills at [BP-$30] and [BP-$34]. Every
+  BP-relative access in 108b:00bf..03bd was enumerated, in both the disp8 and
+  the disp16 addressing forms, and this is the whole list:
+
+      [BP-$02]..[BP-$08]   8 bytes   NEVER TOUCHED
+      [BP-$0a]             I, the vertex counter -- 108b:02a3 IMUL by 12
+      [BP-$0c]..[BP-$16]  12 bytes   NEVER TOUCHED
+      [BP-$22]..[BP-$17]   V, and it is an ARRAY
+      [BP-$2e]..[BP-$23]   P, likewise
+      [BP-$30], [BP-$34]   the LES spills -- compiler temps, not declarations
+
+  V AND P ARE ARRAYS, NOT SIX SCALARS, and one instruction proves it: the
+  original loads a vertex with `Move(O.Vert[I], V, 12)` -- 108b:02b2 LEAs
+  [BP-$22], pushes 12, and far-calls Move -- which only works if V[1], V[2]
+  and V[3] are twelve consecutive bytes in that order. The pivot is loaded the
+  same way at 108b:0198, `Move(O.Pivot, P, 12)`. Three separate assignments
+  cannot produce that, and the reconstruction had three.
+
+  THE TWO DEAD BLOCKS ARE TRANSCRIBED DELIBERATELY. Their sizes and positions
+  are measured; their types are not recoverable, because nothing reads them --
+  12 bytes in the same place as V and P is most likely a third vector the
+  author stopped using. Leaving them out is not a tidier reconstruction, it is
+  a wrong one: every local after them moves, and the frame stops being $36.
+
+  THE WRAP IS INLINE, SIX TIMES. The reconstruction had a nested procedure
+  called six times; the original has no call and no static link -- the
+  test-and-add is written out at 108b:00d6, 0100, 012c for the accumulators
+  and 01c3, 01e3, 0203 for the parameters.
+
+  AND THE DEPTH KEY IS TAKEN AFTER Project, NOT BEFORE. The original projects,
+  stores X and Y, and only then computes D from V[3] (108b:0393). That reads
+  like a behavioural difference and is NOT one: Project writes back only its
+  first two var parameters -- 108b:36c4 and 36ce store through [BP+$0c] and
+  [BP+$08] and nothing stores through [BP+$04] -- so Z is unchanged across the
+  call and either order gives the same key. Recorded because the next reader
+  will have the same doubt, and the answer cost a disassembly. }
 procedure ObjTransform(var O : TObj; A1, A2, A3 : LongInt);
 var
-  I          : Integer;
-  PX, PY, PZ : LongInt;
-  X, Y, Z    : LongInt;
-
-  procedure Wrap(var V : LongInt);
-  begin
-    if V < 0 then Inc(V, 3600);
-  end;
-
+  Unused1 : array[1..2] of LongInt;   { [BP-$08]..[BP-$01], never read }
+  I       : Integer;                  { [BP-$0a] }
+  Unused2 : array[1..3] of LongInt;   { [BP-$16]..[BP-$0b], never read }
+  V       : array[1..3] of LongInt;   { [BP-$22] -- the working vertex }
+  P       : array[1..3] of LongInt;   { [BP-$2e] -- the rotated pivot }
 begin
-  Wrap(O.Accum[1]);  Wrap(O.Accum[2]);  Wrap(O.Accum[3]);
+  if O.Accum[1] < 0 then Inc(O.Accum[1], 3600);   { 108b:00d6 }
+  if O.Accum[2] < 0 then Inc(O.Accum[2], 3600);   { 108b:0100 }
+  if O.Accum[3] < 0 then Inc(O.Accum[3], 3600);   { 108b:012c }
   SinCos(O.Accum[1], MCos1, MSin1);
   SinCos(O.Accum[2], MCos2, MSin2);
   SinCos(O.Accum[3], MCos3, MSin3);
 
-  PX := O.Pivot[1];
-  PY := O.Pivot[2];
-  PZ := O.Pivot[3];
-  RotatePoint(PX, PY, PZ);
+  Move(O.Pivot, P, 12);                           { 108b:0198 }
+  RotatePoint(P[1], P[2], P[3]);
 
-  Wrap(A1);  Wrap(A2);  Wrap(A3);
+  if A1 < 0 then Inc(A1, 3600);                   { 108b:01c3 }
+  if A2 < 0 then Inc(A2, 3600);                   { 108b:01e3 }
+  if A3 < 0 then Inc(A3, 3600);                   { 108b:0203 }
   O.Angle[1] := A1;  O.Angle[2] := A2;  O.Angle[3] := A3;
   SinCos(A1, MCos1, MSin1);
   SinCos(A2, MCos2, MSin2);
@@ -260,16 +296,16 @@ begin
 
   for I := 1 to O.VertCount do
   begin
-    X := O.Vert[I].X;  Y := O.Vert[I].Y;  Z := O.Vert[I].Z;
-    RotatePoint(X, Y, Z);
-    X := X + PX + O.Trans[1];
-    Y := Y + PY + O.Trans[2];
-    Z := Z + PZ + O.Trans[3];
-    O.Scr[I].D := FixedToInt(Z);               { 108b:0393 }
-    Project(X, Y, Z);
+    Move(O.Vert[I], V, 12);                       { 108b:02b2 }
+    RotatePoint(V[1], V[2], V[3]);
+    V[1] := V[1] + P[1] + O.Trans[1];
+    V[2] := V[2] + P[2] + O.Trans[2];
+    V[3] := V[3] + P[3] + O.Trans[3];             { 108b:033b }
+    Project(V[1], V[2], V[3]);                    { 108b:035a }
     { both come back zero-extended, so the low word carries the sign }
-    O.Scr[I].X := Integer(X);
-    O.Scr[I].Y := Integer(Y);
+    O.Scr[I].X := Integer(V[1]);                  { 108b:0370 }
+    O.Scr[I].Y := Integer(V[2]);                  { 108b:0388 }
+    O.Scr[I].D := FixedToInt(V[3]);               { 108b:0393 -- AFTER Project }
   end;
 end;
 
