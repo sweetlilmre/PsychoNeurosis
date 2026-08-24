@@ -4,6 +4,30 @@
 #
 # GENERATED from tools/shapediff.py on 23 Aug 2026 by parsing it (psycho #50).
 #
+# EVERY ROW RE-DERIVED AND VERIFIED ON 24 Aug 2026, and three of the four that
+# existed were wrong. The user segments are the relocation targets below the
+# runtime (kit/tools/substrate/segmap.py); `rtl` is the segment holding Turbo
+# Pascal's SystemInit, whose prologue -- MOV DX,<DGROUP> / MOV DS,DX / MOV
+# [..],ES / XOR BP,BP -- is identical in all seven parts. Confirmed against
+# Ghidra's own function list for each binary, which names it RTL_SystemInit.
+#
+#     part 001   rtl was 0x1546, is 0x1543   three paragraphs INTO the RTL, so
+#                48 bytes of runtime were counted as user code -- and they
+#                aligned, because our build has the same runtime, so the part's
+#                score was flattered
+#     part 002   rtl was 0x1444, is 0x14b1   the worst of the three: segment
+#                144f, seventeen functions and 1,744 bytes of user code, was
+#                excluded from the walk entirely and had never been measured
+#     part 005   rtl was 0x12d8, is 0x12d9   one paragraph low
+#     part 003   was already correct
+#
+# Segment 0x1266 (part 005) and 0x144f (part 002) were also missing from their
+# `segs` lists. A missing segment does not lose bytes -- extents are computed
+# from the NEXT entry, so the bytes stay in the neighbour's range -- but it
+# mis-attributes them, and the wiki's `drifted-second-copy` records what that
+# costs. The main program block at 0x1000 is deliberately excluded everywhere:
+# a harness supplies its own main, so it can never match by construction.
+#
 # `segs` is in ASCENDING order and each segment's extent is the NEXT entry's
 # base -- so the list has to be complete, and `rtl` is the first runtime segment,
 # which caps the last user one. That is the same arithmetic the link instruments
@@ -14,13 +38,13 @@ min_span = 16
 
 [part."001"]
 exe  = "TPART1.EXE"
-rtl  = 0x1546
+rtl  = 0x1543
 segs = [0x1012, 0x1082, 0x10e3, 0x1107, 0x12b2, 0x12c5, 0x1483, 0x1491, 0x1532]
 
 [part."002"]
 exe  = "TPART2.EXE"
-rtl  = 0x1444
-segs = [0x1008, 0x107c, 0x108b, 0x13f9, 0x140c, 0x142a, 0x1436]
+rtl  = 0x14b1
+segs = [0x1008, 0x107c, 0x108b, 0x13f9, 0x140c, 0x142a, 0x1436, 0x144f]
 
 [part."003"]
 exe  = "TPART3.EXE"
@@ -29,5 +53,20 @@ segs = [0x1015, 0x10b8, 0x1139, 0x1192, 0x119d, 0x11f3, 0x120f, 0x125e, 0x12f8, 
 
 [part."005"]
 exe  = "TPART5.EXE"
-rtl  = 0x12d8
-segs = [0x100e, 0x1096, 0x1102, 0x124a, 0x1252, 0x12c8]
+rtl  = 0x12d9
+segs = [0x100e, 0x1096, 0x1102, 0x124a, 0x1252, 0x1266, 0x12c8]
+
+[part."004"]
+exe  = "TPART4.EXE"
+rtl  = 0x1288
+segs = [0x1005, 0x11d9, 0x11e3, 0x1226]
+
+[part."006"]
+exe  = "TPART6.EXE"
+rtl  = 0x128a
+segs = [0x100f, 0x1095, 0x1118, 0x11bb, 0x11ee, 0x1217, 0x1279]
+
+[part."007"]
+exe  = "TPART7.EXE"
+rtl  = 0x110c
+segs = [0x100b, 0x100f, 0x1099, 0x10fb]
