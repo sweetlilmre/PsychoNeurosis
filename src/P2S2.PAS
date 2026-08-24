@@ -28,6 +28,16 @@ unit P2S2;
 { I/O checking off -- see the note in P2S1. }
 {$I-}
 
+(* 80x87 CODE ON. Scene2_Setup's projection scale is computed in floating
+   point and 108b:1cc0 is `INT $37` -- an 80x87 opcode as it ships under
+   E-plus. With no N directive this unit took the N-minus default and the same
+   expression became far calls into the software six-byte Real library, with
+   the 0.9 arriving as MOV CX,$6680 / MOV SI,$6666 / MOV DI,$6666 instead of
+   an FLD of the extended constant in the code segment.
+
+   Found the same way as FixMath's, one span later. *)
+{$N+}
+
 {$G+}   { 286: the whole segment is ENTER-framed -- Obj_Transform 108b:0e03
           opens ENTER $1136, Tri_Fill 108b:0461 ENTER $28. Under the $G-
           default the compiler multiplies with MUL and doubles the shifts,
