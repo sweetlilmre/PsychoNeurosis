@@ -386,6 +386,11 @@ label = "Demo_Scene5 preamble"
 investigation = "part1-s4s5-palette"
 note = "Scene5 in the binary flushes keys, does ClearScreen($A000,0), then AllocWork (12c5:0a60: GetMem+clear of the work buffer), THEN Load rewrites the DAC -- so the palette swap happens over black. Ours went straight into Load, recolouring scene 4's still-displayed frame for the whole file read and backdrop build. Scene5 rebuilt to the binary's structure (also: palette is a Load local passed to VGA.SetPalette768, FreeMem(Work) on exit, and P1S5 needs $G+). Opcode-identical modulo fixups after the fix."
 
+[plan.row."002 1008:0362"]
+label = "P2S1: a global file handle, unrolled plane writes, and inlined star loops"
+investigation = "pacing"
+note = "Part 002 92.6 to 95.4 percent. LoadFrames (1008:00b9): ENTER 80 is 128 bytes and no BP slot is touched, because the .DAT handle is a GLOBAL at DS:4A86 - 1008:00bd is MOV DI,4A86 / PUSH DS / PUSH DI for Assign, Reset, Seek, BlockRead and Close alike, where a local would be LEA DI,[BP-n] / PUSH SS / PUSH DI. The 128 bytes are declared and never read. And the four planes are written out LONGHAND with the literals 0, 1, 2 and 3, not looped: a for-loop needs a counter and the frame has no room for one. DoorLoop (1008:0362): ENTER 08 is the frame counter, FOUR BYTES NOBODY READS, and the star index; the star loops are INLINED, which is why the same 167-byte block recurs at 1008:039a, 0441, 04eb and 0592. Ghidra on the _fpu variant confirmed the whole routine including the unrolled plane writes and the 0x55 and 0x19 frame counts. Its remaining span is a re-anchoring artefact of length changes earlier, not a code difference: the phase-3 tail is instruction-for-instruction what the source emits."
+
 [plan.row."002 108b:00bf"]
 label = "ObjTransform: arrays, inline wrap, dead locals"
 investigation = "pacing"

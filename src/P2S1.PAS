@@ -93,6 +93,11 @@ var
   Star : array[1..NumStars] of TStar;
   { DS:$3DC2 -- 256 RGB triples. }
   Pal  : array[0..767] of Byte;
+  { DS:$4A86 -- the .DAT handle is a GLOBAL, not a local of LoadFrames.
+    1008:00bd is `MOV DI,$4A86 / PUSH DS / PUSH DI` for every one of Assign,
+    Reset, Seek, BlockRead and Close; a local would be
+    `LEA DI,[BP-n] / PUSH SS / PUSH DI`. }
+  DatFile : file;
 
 { The one-based pixel index Scene1_DoorLoop uses. }
 function DoorPix(X, Y : Integer) : Word;
@@ -354,21 +359,33 @@ end;
   -------------------------------------------------------------------------- }
 procedure LoadFrames;
 var
-  F : file;
-  P : Integer;
+  { ENTER $80 is 128 bytes and NOT ONE BP-relative slot is touched -- the
+    handle is a global and the plane loop is unrolled, so nothing here is
+    read. 128 bytes declared and never used, which is this unit's habit
+    elsewhere too. }
+  Unused : array[1..128] of Byte;
 begin
-  Assign(F, 'neurosis.dat');
-  Reset(F, 1);
-  Seek(F, DataOfs);
-  BlockRead(F, Pal, 768);
-  for P := 0 to 3 do
-  begin
-    SelectPlane(P);
-    BlockRead(F, VirtScr^, 64000);
-    CopyScreen(VirtScrSeg, VGASeg);
-  end;
-  BlockRead(F, Door, DoorSize);
-  Close(F);
+  Assign(DatFile, 'neurosis.dat');
+  Reset(DatFile, 1);
+  Seek(DatFile, DataOfs);
+  BlockRead(DatFile, Pal, 768);
+  { THE FOUR PLANES ARE WRITTEN OUT LONGHAND, not looped: 1008:00fd, 0127 and
+    the two after them push the literals 0, 1, 2 and 3 into SelectPlane. A
+    `for P := 0 to 3` needs a counter and the frame has no room for one. }
+  SelectPlane(0);
+  BlockRead(DatFile, VirtScr^, 64000);
+  CopyScreen(VirtScrSeg, VGASeg);
+  SelectPlane(1);
+  BlockRead(DatFile, VirtScr^, 64000);
+  CopyScreen(VirtScrSeg, VGASeg);
+  SelectPlane(2);
+  BlockRead(DatFile, VirtScr^, 64000);
+  CopyScreen(VirtScrSeg, VGASeg);
+  SelectPlane(3);
+  BlockRead(DatFile, VirtScr^, 64000);
+  CopyScreen(VirtScrSeg, VGASeg);
+  BlockRead(DatFile, Door, DoorSize);
+  Close(DatFile);
 end;
 
 { --------------------------------------------------------------------------
@@ -421,69 +438,69 @@ end;
   drawn in -- so a star that got covered is left alone rather than punching a
   hole in the artwork.
   -------------------------------------------------------------------------- }
-procedure DrawStars;
-var
-  I : Integer;
-begin
-  for I := 1 to NumStars do
-    if Door[DoorPix(Star[I].X, Star[I].Y)] = SkyColour then
-      Door[DoorPix(Star[I].X, Star[I].Y)] := Star[I].C;
-end;
-
-procedure EraseStars;
-var
-  I : Integer;
-begin
-  for I := 1 to NumStars do
-    if Door[DoorPix(Star[I].X, Star[I].Y)] = Star[I].C then
-      Door[DoorPix(Star[I].X, Star[I].Y)] := SkyColour;
-end;
-
-procedure DriftStars;
-var
-  I : Integer;
-begin
-  for I := 1 to NumStars do
-  begin
-    Inc(Star[I].X);
-    if Star[I].X > StarMaxX then Star[I].X := 1;
-  end;
-end;
-
 procedure DoorLoop;
 var
-  Frame : Integer;
-  P     : Integer;
+  { ENTER $08 is eight bytes: the frame counter, FOUR BYTES NOBODY READS, and
+    the star index. 1008:0362's slots are [BP-$02] with 6 references and
+    [BP-$08] with 46, and nothing touches [BP-$04] or [BP-$06]. The star
+    loops are INLINED here -- there is no DrawStars, EraseStars or DriftStars
+    routine in the original, which is why the same 167-byte block recurs at
+    1008:039a, 0441, 04eb and 0592. }
+  Frame  : Integer;                    { [BP-$02] }
+  Unread : LongInt;                    { [BP-$06], four bytes, never read }
+  I      : Integer;                    { [BP-$08], 46 references }
 begin
   { phase 1 -- the door rolls up, 85 rows }
   Frame := 0;
   repeat
     DoorRaiseOneRow(@Door);
-    DrawStars;
+    { DrawStars, inline }
+    for I := 1 to NumStars do
+      if Door[DoorPix(Star[I].X, Star[I].Y)] = SkyColour then
+        Door[DoorPix(Star[I].X, Star[I].Y)] := Star[I].C;
     BlitBitmapX(@Door, DoorX, DoorY, DoorBase);
-    EraseStars;
-    DriftStars;
+    { EraseStars, inline }
+    for I := 1 to NumStars do
+      if Door[DoorPix(Star[I].X, Star[I].Y)] = Star[I].C then
+        Door[DoorPix(Star[I].X, Star[I].Y)] := SkyColour;
+    { DriftStars, inline }
+    for I := 1 to NumStars do
+    begin
+      Inc(Star[I].X);
+      if Star[I].X > StarMaxX then Star[I].X := 1;
+    end;
     Inc(Frame);
   until Frame = RaiseFrames;
 
   { phase 2 -- hold, and bring the palette up }
   Frame := 0;
   repeat
-    DrawStars;
+    { DrawStars, inline }
+    for I := 1 to NumStars do
+      if Door[DoorPix(Star[I].X, Star[I].Y)] = SkyColour then
+        Door[DoorPix(Star[I].X, Star[I].Y)] := Star[I].C;
     BlitBitmapX(@Door, DoorX, DoorY, DoorBase);
-    EraseStars;
-    DriftStars;
+    { EraseStars, inline }
+    for I := 1 to NumStars do
+      if Door[DoorPix(Star[I].X, Star[I].Y)] = Star[I].C then
+        Door[DoorPix(Star[I].X, Star[I].Y)] := SkyColour;
+    { DriftStars, inline }
+    for I := 1 to NumStars do
+    begin
+      Inc(Star[I].X);
+      if Star[I].X > StarMaxX then Star[I].X := 1;
+    end;
     PaletteBrightenStep;
     Inc(Frame);
   until Frame = HoldFrames;
 
   { phase 3 -- blank all four planes, then fade the palette out }
   ClearScreen(VirtScrSeg, 0);                  { 1008:0619, once }
-  for P := 0 to 3 do
-  begin
-    SelectPlane(P);
-    CopyScreen(VirtScrSeg, VGASeg);
-  end;
+  { longhand, as LoadFrames does it -- the frame has no counter to spare }
+  SelectPlane(0);  CopyScreen(VirtScrSeg, VGASeg);
+  SelectPlane(1);  CopyScreen(VirtScrSeg, VGASeg);
+  SelectPlane(2);  CopyScreen(VirtScrSeg, VGASeg);
+  SelectPlane(3);  CopyScreen(VirtScrSeg, VGASeg);
   SceneFadeOut;
 end;
 
