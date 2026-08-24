@@ -1830,6 +1830,12 @@ begin
     the one that measures better, not because it is believed. }
   MScale := Round(MViewW / ScaleDivisor * ScaleFactor * 65536.0);
 
+  { ONLY THE ENTERPRISE INCREMENTS ITS INDICES AND HALVES ITS COLOUR. The four
+    loaders are NOT one template: 108b:1df6 has `INC AX` on object 1's face
+    index and 108b:1e1d halves its colour, and objects 2, 3 and 4 have neither
+    -- 108b:1fca reads the index and stores it straight. All four DO halve
+    their vertex components. Writing all four the same way broke the revolver,
+    the sailboat and the quad, and a watched run is what caught it. }
   { 108b:1cf0 -- Enterprise }
   BuildObject(1, NVertEnterprise, NFaceEnterprise);
   for I := 1 to Obj[1].VertCount do
@@ -1872,10 +1878,10 @@ begin
     for K := 1 to Obj[2].Face[I].Count do
     begin
       Inc(P);
-      Obj[2].Face[I].Idx[K] := FaceRevolver[P + 1] + 1;
+      Obj[2].Face[I].Idx[K] := FaceRevolver[P + 1];
     end;
     Inc(P);
-    Obj[2].Face[I].Colour := FaceRevolver[P + 1] div 2;
+    Obj[2].Face[I].Colour := FaceRevolver[P + 1];
     Obj[2].Face[I].Spare1 := 0;
     Obj[2].Face[I].Spare2 := 0;
     Inc(P);
@@ -1900,10 +1906,10 @@ begin
     for K := 1 to Obj[3].Face[I].Count do
     begin
       Inc(P);
-      Obj[3].Face[I].Idx[K] := FaceSailboat[P + 1] + 1;
+      Obj[3].Face[I].Idx[K] := FaceSailboat[P + 1];
     end;
     Inc(P);
-    Obj[3].Face[I].Colour := FaceSailboat[P + 1] div 2;
+    Obj[3].Face[I].Colour := FaceSailboat[P + 1];
     Obj[3].Face[I].Spare1 := 0;
     Obj[3].Face[I].Spare2 := 0;
     Inc(P);
@@ -1929,10 +1935,10 @@ begin
     for K := 1 to Obj[4].Face[I].Count do
     begin
       Inc(P);
-      Obj[4].Face[I].Idx[K] := FaceQuad[P + 1] + 1;
+      Obj[4].Face[I].Idx[K] := FaceQuad[P + 1];
     end;
     Inc(P);
-    Obj[4].Face[I].Colour := FaceQuad[P + 1] div 2;
+    Obj[4].Face[I].Colour := FaceQuad[P + 1];
     Obj[4].Face[I].Spare1 := 0;
     Obj[4].Face[I].Spare2 := 0;
     Inc(P);
