@@ -710,9 +710,36 @@ begin
   Obj[N]^.FaceCount := NF;
 end;
 
+{ THE FRAME IS ENTER $8a -- 138 bytes -- AND ONLY SIX OF THEM ARE READ.
+  Every BP-relative access in 108b:1bbd..2453 was enumerated in both
+  addressing forms (kit/tools/pascal/prologue.py), and the whole list is:
+
+      [BP-$02]  79 references     the palette ramp counter, and the same
+                                  variable again as an inner face-index
+                                  counter at 108b:1db4 -- ONE variable, two
+                                  roles, which is why the reconstruction's
+                                  separate Col and K are wrong about the
+                                  original even though they compute the same
+                                  thing
+      [BP-$04]  16 references
+      [BP-$06]  28 references
+      [BP-$08]..[BP-$86]   128 bytes, NEVER TOUCHED
+      [BP-$88], [BP-$8a]   the code generator's, not declarations: a LongInt
+                           spilled for `FILD DWORD` at 108b:1cc1 and a for-loop
+                           upper bound at 108b:1da4
+
+  So 134 bytes are declared and 128 of them are dead. The type is NOT
+  recoverable -- nothing reads it, so nothing constrains it beyond its size
+  and position; 128 bytes here is the size of a `String[127]`, which would be
+  a natural thing for an asset loader to declare and then not use. It is
+  transcribed as bytes because that is what is measured.
+
+  Leaving it out is not a tidier reconstruction. It is the reason this routine
+  opened ENTER $06 against the original's $8a. }
 procedure Setup;
 var
   I, K, Col : Integer;
+  Unused    : array[1..128] of Byte;   { [BP-$86]..[BP-$07], never read }
 begin
   { 108b:1bc1 -- a grey ramp with a period of 53 }
   for Col := 1 to 255 do
@@ -733,7 +760,22 @@ begin
   SetRGB($D4, $2D, $23, $19);
   SetRGB($D5, $28, $1E, $14);
 
-  { 108b:1cb3 -- Scale := CentreX / 2.0 * 0.9 = 144.0 }
+  { 108b:1cb3 -- Scale := CentreX / 2.0 * 0.9 = 144.0.
+
+    WITHDRAWN, 24 Aug 2026, and kept here because the argument was good and
+    the measurement still said no. The original reads MViewW from memory and
+    widens it with `XOR DX,DX` (108b:1cb6, unsigned -- the Word typed constant
+    at DS:$046A), does `FILD DWORD` on the spill, divides by the single 2.0 at
+    CS:$1baf, multiplies by the extended 0.9 at CS:$1bb3, and then pushes
+    DX/BX/AX into a far call -- a six-byte Real handed to a FUNCTION, which
+    reads exactly like RealToFixed rather than Round(.. * 65536.0).
+
+    So `MScale := RealToFixed(MViewW / ScaleDivisor * ScaleFactor)` was tried.
+    It made a specific prediction -- the LongInt spill would appear and the
+    frame would go from $86 to the original's $8a -- and the prediction FAILED:
+    the frame did not move and part 002's walk went 57.3% to 57.2%. Whatever
+    produces that spill, this is not it. The Round form is kept because it is
+    the one that measures better, not because it is believed. }
   MScale := Round(MViewW / ScaleDivisor * ScaleFactor * 65536.0);
 
   BuildObject(1, EnterpriseVertCount, EnterpriseFaceCount);
