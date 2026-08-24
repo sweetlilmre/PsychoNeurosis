@@ -36,6 +36,21 @@ unit P2S2;
    an FLD of the extended constant in the code segment.
 
    Found the same way as FixMath's, one span later. *)
+(* DATA ALIGNMENT OFF, and the frame layout is what says so.
+
+   In Obj_SortFaces 108b:0e03 the original puts its whole-object local Tmp at
+   [BP-$0B51] -- an ODD offset -- and opens ENTER $1136. Under TP7's dollar-A-
+   plus default the same declarations land Tmp at [BP-$0B52] and the frame at
+   $1138: the compiler word-aligns each local, and TObj is an odd 2897 bytes,
+   so it pads. There were TWO such gaps, which is why the locals above Tmp
+   shifted by one byte and those below it by two.
+
+   SizeOf(TObj) is 2897 either way -- Turbo Pascal packs record FIELDS
+   regardless, and this switch governs only where a VARIABLE starts. So the
+   record layout was never the discrepancy, and looking there first cost a
+   while. *)
+{$A-}
+
 {$N+}
 
 {$G+}   { 286: the whole segment is ENTER-framed -- Obj_Transform 108b:0e03

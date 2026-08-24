@@ -41,6 +41,7 @@
 {$S-}   { 1102:0000 opens ENTER $26,0 with no stack check. }
 
 unit P5S3;
+{$A-}   { data alignment off -- measured, see the note in P2S2.PAS }
 
 {$G+}   { 286: RenderPatch 1102:0000 opens ENTER $26; the whole segment is
           ENTER-framed. }

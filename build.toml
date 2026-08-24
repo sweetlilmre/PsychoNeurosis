@@ -39,6 +39,17 @@ binpath = "C:\\TP\\BIN"
 # RTL does not patch.
 switches = "/ED: /UD:;C:\\TP\\UNITS /ID:;D:\\GEN /$S-"
 
+[compiler.tp6]
+# For SETTLING a compiler-version question, not for building the demo.
+# TP6's install is FLAT: TPC.EXE sits in C:\TP6, not a BIN
+# subdirectory, and its own TPC.CFG beside it carries the unit path.
+dialect = "tp6"
+switches = "/ED: /ID:;D:\\GEN /$S- /$X+ /$G+"
+
+[compiler.tp61]
+dialect = "tp6"
+switches = "/ED: /ID:;D:\\GEN /$S- /$X+ /$G+"
+
 [assembler]
 # TP7's built-in assembler stops at the 286 ({$G+} is documented as "Generate
 # 80286 Code Switch"), so the demo's 386 fixed-point maths comes in through

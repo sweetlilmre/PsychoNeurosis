@@ -9,6 +9,7 @@
   =========================================================================== }
 
 unit P1S5;
+{$A-}   { data alignment off -- measured, see the note in P2S2.PAS }
 
 {$G+}   { 286: the binary's Scene5 pushes immediates (68 00 A0 at 12c5:0a9c)
           and closes with LEAVE -- $G+ codegen throughout the segment. }
