@@ -32,8 +32,8 @@ procedure RunPart3;
 implementation
 
 uses Crt, VGA, DemoVT,
-     Part3Tunnel, Part3Stars, Part3Morph, Part3Globe,
-     Part3Blocks, Part3Waves, Part3Sprites;
+     Part3Sprites, Part3Waves, Part3Blocks, Part3Globe,
+     Part3Morph, Part3Stars, Part3Tunnel;
 
 procedure FlushKeys;
 begin

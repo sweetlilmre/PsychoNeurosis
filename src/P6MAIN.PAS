@@ -20,7 +20,7 @@ procedure RunPart6;
 
 implementation
 
-uses Crt, VGA, DemoVT, P6S1, P6S2, P6S3, P6S4;
+uses Crt, VGA, DemoVT, P6S4, P6S3, P6S2, P6S1;
 
 var
   SavedVol : Byte;                { DS:$70ec }
