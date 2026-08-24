@@ -1858,9 +1858,21 @@ begin
     re-running. It is still wrong: the walk went 18,409 aligned bytes to
     18,408. Whatever 108b:1cd4's six-byte Real is handed to, writing it
     as RealToFixed does not reproduce it, and that is now measured from
-    two different starting states. }
+    two different starting states.
+
+    AND ON THE THIRD TEST IT LANDS, so both of those refutations were
+    CONFOUNDED. The first was measured while the frame was still $86 for
+    unrelated reasons; the second while FixMath compiled under the N-minus
+    default, which changes this call site's shape entirely -- a software-Real
+    call takes its argument a different way from an 80x87 one. With FixMath
+    on 80x87 code the RealToFixed form gains four aligned bytes AND makes the
+    executable smaller, 40,512 down to 40,480 against the original's 38,832.
+    Two measurements, both the right way.
+
+    The lesson the register keeps re-learning: a refutation is only as good as
+    what else was wrong at the time. }
   SetupDone := 1;                     { 108b:1cae, written and never read }
-  MScale := Round(MViewW / ScaleDivisor * ScaleFactor * 65536.0);
+  MScale := RealToFixed(MViewW / ScaleDivisor * ScaleFactor);
 
   { ONLY THE ENTERPRISE INCREMENTS ITS INDICES AND HALVES ITS COLOUR. The four
     loaders are NOT one template: 108b:1df6 has `INC AX` on object 1's face

@@ -55,6 +55,22 @@ unit FixMath;
   skipping. A switch is set to match the emitted code, never to make the
   rebuild faster. *)
 {$S+}
+(* 80x87 CODE ON. 142a:004b calls one runtime routine and then executes x87
+   instructions -- 142a:0050 is INT $3C, which under E-plus is what an 80x87
+   opcode ships as. This unit had NO N directive at all, so it took the
+   N-minus default: floating point became far calls into the software
+   six-byte Real library, which is a different instruction stream entirely
+   and shows as `MOV CX,$91 / XOR SI,SI / XOR DI,DI` before the call.
+
+   A trap is positive evidence OF 80x87 code, not against it -- the N-minus
+   setting emits no 80x87 instructions and therefore no traps either. That
+   has been got wrong three times in this corpus; the register's
+   part5-386-trio resolution is the long form.
+
+   THIS IS THE PER-VERTEX PATH: ObjTransform calls FixedToInt once per vertex
+   and FixedToInt calls RealToFixed, so whichever way this compiles is paid
+   about seventy-five times a frame. *)
+{$N+}
 
 interface
 
