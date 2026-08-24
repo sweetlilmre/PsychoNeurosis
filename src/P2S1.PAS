@@ -459,9 +459,14 @@ var
   Unread : LongInt;                    { [BP-$06], four bytes, never read }
   I      : Integer;                    { [BP-$08], 46 references }
 begin
-  { phase 1 -- the door rolls up, 85 rows }
-  Frame := 0;
-  repeat
+  { phase 1 -- the door rolls up. A `for`, NOT a `repeat`: the original's
+    counter is incremented on the loop's BACK EDGE, after the test -- 1008:060a
+    compares [BP-$02] and only then reaches the INC -- which is exactly how
+    Turbo Pascal lays out `for`. Written as `repeat ... Inc(Frame) until` the
+    increment lands BEFORE the compare, and the loop also ran one iteration
+    short: `for Frame := 0 to $55` turns 86 times, not 85. }
+  for Frame := 0 to RaiseFrames do
+  begin
     DoorRaiseOneRow(@Door);
     { DrawStars, inline }
     for I := 1 to NumStars do
@@ -478,12 +483,11 @@ begin
       Inc(Star[I].X);
       if Star[I].X > StarMaxX then Star[I].X := 1;
     end;
-    Inc(Frame);
-  until Frame = RaiseFrames;
+  end;
 
-  { phase 2 -- hold, and bring the palette up }
-  Frame := 0;
-  repeat
+  { phase 2 -- hold, and bring the palette up. Same shape. }
+  for Frame := 0 to HoldFrames do
+  begin
     { DrawStars, inline }
     for I := 1 to NumStars do
       if Door[DoorPix(Star[I].X, Star[I].Y)] = SkyColour then
@@ -500,8 +504,7 @@ begin
       if Star[I].X > StarMaxX then Star[I].X := 1;
     end;
     PaletteBrightenStep;
-    Inc(Frame);
-  until Frame = HoldFrames;
+  end;
 
   { phase 3 -- blank all four planes, then fade the palette out }
   ClearScreen(VirtScrSeg, 0);                  { 1008:0619, once }

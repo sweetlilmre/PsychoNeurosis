@@ -162,6 +162,12 @@ var
   SetupDone : Byte;
   { DS:$8ED1 -- a LongInt frame counter, and what drives the text. }
   Frame  : LongInt;
+  { DS:$A043 -- the .DAT handle is a GLOBAL here too, exactly as it is in
+    P2S1: 108b:2467 is `MOV DI,$A043 / PUSH DS / PUSH DI` for Assign, Reset,
+    Seek, BlockRead and Close alike, where a local would be
+    `LEA DI,[BP-n] / PUSH SS / PUSH DI`. 128 bytes, so it ends at $A0C2 --
+    which is exactly where Banner's pointer starts. }
+  DatFile : file;
   { DS:$A0C7 and DS:$A0C8 -- two BYTES, and they are GLOBALS, not locals of
     Scene2. The volume ramp at 108b:2564 stores every GetVolume result to a
     fixed address rather than to a stack slot, and they sit immediately before
@@ -2305,16 +2311,20 @@ var
     whole frame is the untyped `file`, which is 128 bytes in Turbo Pascal.
     There was a `Vol : Byte` here that the routine wrote and never read, and
     it put the frame at $82. The saved volume is a global -- see SaveVol. }
-  F : file;
+  { 128 bytes declared and never read, as LoadFrames has: the handle is the
+    global DatFile and no BP-relative slot in this routine is touched. }
+  Unused : array[1..128] of Byte;
 begin
-  New(Font);
+  Assign(DatFile, 'neurosis.dat');
+  Reset(DatFile, 1);
+  Seek(DatFile, DataOfs);
+  { THE ALLOCATIONS COME AFTER THE SEEK. 108b:2482 pushes $3200 into GetMem
+    only once the file is positioned, where this had both allocations at the
+    very top of the routine. }
   GetMem(Banner, SizeOf(TBanner));
-
-  Assign(F, 'neurosis.dat');
-  Reset(F, 1);
-  Seek(F, DataOfs);
-  BlockRead(F, Banner^, SizeOf(TBanner));
-  BlockRead(F, Font^, SizeOf(TFont));
+  BlockRead(DatFile, Banner^, SizeOf(TBanner));
+  New(Font);
+  BlockRead(DatFile, Font^, SizeOf(TFont));
 
   MusicStart;                          { 108b:24be }
   Frame := 0;                          { 108b:24c3 }
@@ -2322,10 +2332,10 @@ begin
   BuildRowTable80;                     { 108b:24d0 }
   FlipPage(0);                         { 108b:24d5 }
 
-  BlockRead(F, Pal, 768);
+  BlockRead(DatFile, Pal, 768);
   Setup;                               { 108b:24f0 }
-  BlockRead(F, Rewind, SizeOf(TRewind));
-  Close(F);
+  BlockRead(DatFile, Rewind, SizeOf(TRewind));
+  Close(DatFile);
 
   { 108b:2513 -- six fixed colours before the choreography }
   SetRGB(1, $3F, $3F, $3F);
