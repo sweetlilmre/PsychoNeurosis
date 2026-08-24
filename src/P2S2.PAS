@@ -59,9 +59,8 @@ const
   ScaleDivisor = 2.0;
   ScaleFactor  = 0.9;
 
-  { 108b:0461 -- DS:$066E..$0675, initialised data. }
-  ClipYMin = 0;    ClipYMax = 239;
-  ClipXMin = 0;    ClipXMax = 319;
+  { The clip box moved to a TYPED constant block beside Tri_Fill, which
+    is the only reader and reads it FROM MEMORY. }
 
   StarCount = 500;                { $1F4 }
   TextY1    = 210;                { $D2 }
@@ -153,8 +152,11 @@ var
   RowOfs : array[0..Rows - 1] of Word;
   { the snapshot Obj_SortFaces works from }
   FaceCopy : array[1..MaxFaces] of TFace;
-  { Tri_Fill's per-scanline edge buffer, DS:$A2AA }
-  EdgeL, EdgeR : array[0..Rows] of Integer;
+  { Tri_Fill's per-scanline span buffer, DS:$A2AA, immediately after
+    RowOfs -- which ends at $A2A9, 240 words from $A0CA. ONE
+    INTERLEAVED array of (left, right) pairs, not two arrays: the
+    walk stores a word and advances its byte index by 2 each time. }
+  Span : array[0..2 * Rows + 1] of Integer;
 
   { the two typed messages -- Pascal strings at DS:$046E and DS:$056E }
   Msg1 : String;
@@ -393,126 +395,933 @@ begin
 end;
 
 { --------------------------------------------------------------------------
-  108b:0461 -- Tri_Fill(X1, Y1, X2, Y2, X3, Y3, Colour)
+  108b:0461 -- Tri_Fill, and it is HAND-WRITTEN ASSEMBLER
 
-  A scanline triangle filler writing through the Map Mask, with the clip box
-  from DS:$066E..$0675 and the same two nibble-mask tables the rectangle fill
-  in P2View uses. The original passes the first two vertices in BX/CX and
-  DX/SI and the rest on the stack, sorts the three by Y with a chain of XCHGs,
-  walks two edges into a per-scanline buffer at DS:$A2AA, then fills the spans
-  backwards from the last scanline. Direction does not matter for a solid
-  fill, so it is written forwards here.
+  It had been transcribed as Pascal with a nested Edge procedure and a
+  different algorithm, which is why all 1,276 bytes of 108b:0442..093e were
+  the largest unaligned span anywhere. Four things say assembler, and no
+  Borland Pascal code generator does any of them:
 
-  It writes to WritePage through the 80-byte row table BuildRowTable80 fills.
+    108b:092b  PUSH BP  ...  MOV BP, $50 / SUB BP, CX  ...  POP BP
+        BP used as a scratch register inside a framed routine. Every
+        BP-relative operand in that stretch is read BEFORE the clobber.
+    108b:0992  SHR CX,1 / REP STOSW / ADC CX,CX / REP STOSB
+        the word-then-odd-byte fill inline. FillChar is a far call into the
+        RTL and is never inlined.
+    108b:05c5  MOV ES,BX / MOV BX,DX / MOV [BX+..],DI / MOV BX,ES
+        a general-purpose value parked in a SEGMENT register so BX can be
+        borrowed as an index. All eight registers are live here.
+    the calling convention below -- four arguments in registers.
+
+  And one MEASUREMENT, which is the one that does not rely on reading style.
+  Of the 62 two-byte register-to-register ALU and MOV ops in this routine, 62
+  use the store direction (`MOV AX,BX` as 89 D8) and NONE the load direction
+  (8B C3). Every compiled-Pascal routine in this same segment is mixed --
+  DrawText 56%, Obj_SortFaces 57%, Scene2_Setup 36%, Obj_SetRotation 27% --
+  and so is DEMOMATH.OBJ at 30%, which TASM assembled. A 62-of-62 split is
+  not a tendency, it is a tool that only ever emits one form.
+
+  WHICH tool the rebuild then answered, and it is worth recording that the
+  first reading of that measurement was WRONG. Because TASM came out mixed
+  too, the inference drawn from it was that Tri_Fill's producer was neither
+  the Pascal code generator nor TASM -- something foreign -- and that
+  transcribing it through Borland's own assembler would therefore cost
+  roughly 62 one-bit differences. Both halves of that were wrong. Borland's
+  BASM emits the store direction consistently, so the split identifies BASM
+  rather than excluding it, and the rebuild is byte-for-byte identical
+  through all 64 bytes of the prologue and sort chain, `89 D8` and `89 D1`
+  and `89 F2` included.
+
+  WHAT THE REBUILD MEASURES, and it is the reason to believe the rest of this
+  comment: 1,250 of 1,360 bytes identical, 91.9%, in 56 differing runs of
+  which NONE is longer than two bytes and none is an opcode. Fifty-four are
+  DGROUP addresses, which is what the coverage walk's default rule exists to
+  forgive -- $066E against our clip box, $A2AA against our Span, $A0CA
+  against RowOfs, $A69A against WritePage. The other two are single bytes at
+  108b:04b6 and 108b:04ce, where a conditional has to bridge to a target too
+  far for a short jump and BASM picks the opposite sense to the original's:
+  ours is `JL` to a bridge that jumps to the flat-top walk, the original's is
+  `JGE` to a bridge that jumps to the exit. The two are the same branch and
+  the same behaviour. Poly_FillFan below rebuilds byte-identical, all 88.
+
+  THE CALLING CONVENTION. Four arguments arrive in registers and three on
+  the stack, and Poly_FillFan below is the only caller and cooperates:
+
+      BX = X1   CX = Y1   DX = X2   SI = Y2
+      [BP+$08] = X3   [BP+$06] = Y3   [BP+$04] = Colour     RET 6
+
+  so only the last three can be declared. X1, Y1, X2 and Y2 are spilled to
+  the first four locals immediately and then live in AX, BX, CX, DX.
+
+  WHAT IT DOES. A scanline triangle filler. It sorts the three vertices by
+  Y, computes each edge's step as a floor division -- quotient and remainder
+  kept separately, with the `if numerator < 0 then Dec(quotient);
+  Inc(remainder, denominator)` correction spelled out at 108b:0516 and
+  five more places -- then walks two edges down the triangle writing an
+  (XL, XR) pair per scanline into the buffer at DS:$A2AA, and finally fills
+  the spans BACKWARDS from the last scanline through the Map Mask.
+
+  There are FOUR walk variants, not one, and which runs is decided by shape:
+
+      108b:0715   Y1 = Y2, a flat top
+      108b:07fb   Y2 = Y3, a flat bottom
+      108b:0595   the general case, third vertex on one side
+      108b:0653   the general case, third vertex on the other
+
+  and the two general ones are chosen by a 32-bit cross product at
+  108b:0570 -- (X2-X1)*(Y3-Y1) against (X3-X1)*(Y2-Y1), high words compared
+  signed and low words unsigned, with equality meaning degenerate and
+  exiting. Each general variant is itself two loops: the first runs to Y2
+  with the short edge, the second to Y3 with the third edge swapped in.
+
+  Two instructions in the fill loop are DEAD in the original and are kept,
+  for the same reason the dead declared locals are kept -- they are what the
+  author wrote: `MOV SI, FillY` at 108b:0976 and the `MOV BP,$50 /
+  SUB BP,CX / DEC BP` at 108b:097c, whose result is never read before
+  POP BP restores it.
   -------------------------------------------------------------------------- }
-procedure TriFill(X1, Y1, X2, Y2, X3, Y3 : Integer; Colour : Byte);
-var
-  T, Y     : Integer;
-  XL, XR   : Integer;
-  D        : Word;
-  LM, RM   : Byte;
-  Mid, I   : Integer;
+const
+  { DS:$066E..$067D, initialised data, and contiguous in exactly this order.
+    TYPED constants, not plain ones: the code reads them FROM MEMORY
+    (`CMP DI, [$066E]` at 108b:04eb), so a plain const would fold into the
+    instruction as an immediate and the reads would vanish. Verified against
+    the binary by pattern rather than by arithmetic -- the eight clip bytes
+    00 00 EF 00 00 00 3F 01 occur ONCE in the file, at 0x90ce, which puts
+    DGROUP's initialised data at 0x8a60, and MViewW/MViewH at DS:$046A and
+    the mask pair at DS:$0676 both land where that base predicts. }
+  ClipYMin : Integer = 0;
+  ClipYMax : Integer = 239;
+  ClipXMin : Integer = 0;
+  ClipXMax : Integer = 319;
+  { The same four values P2View's FillRect uses, but a SECOND COPY in this
+    unit's own data -- P2View's pair is at DS:$0CF0/$0CF4. Tri_Fill reads
+    these, at $0676 and $067A. }
+  LeftMask4  : array[0..3] of Byte = ($0F, $0E, $0C, $08);
+  RightMask4 : array[0..3] of Byte = ($0F, $01, $03, $07);
 
-  procedure Edge(AX, AY, BX_, BY : Integer);
-  var
-    Row  : Integer;
-    Num  : LongInt;
-  begin
-    if BY = AY then Exit;
-    for Row := AY to BY - 1 do
+{ @asm 002 108b:0461 }
+procedure TriFill(X3, Y3 : Integer; Colour : Byte); assembler;
+var
+  { Twenty Integers, 40 bytes, and ENTER $28 is the whole frame -- the slot
+    walk finds nothing below [BP-$28], so there is no compiler temporary.
+    First declared is nearest BP, so the order here IS the original's. }
+  SX1, SY1, SX2, SY2 : Integer;     { [BP-$02]..[BP-$08], the sorted vertices }
+  NumA, NumB, NumC   : Integer;     { [BP-$0A]..[BP-$0E], the three dividends }
+  DenA, DenB, DenC   : Integer;     { [BP-$10]..[BP-$14], the three divisors  }
+  RemA, RemB, RemC   : Integer;     { [BP-$16]..[BP-$1A], floored remainders  }
+  StepA, StepB, StepC : Integer;    { [BP-$1C]..[BP-$20], floored quotients   }
+  FillL, FillR       : Integer;     { [BP-$22], [BP-$24], the clipped span    }
+  FillY              : Integer;     { [BP-$26], the scanline being filled     }
+  SpanIdx            : Integer;     { [BP-$28], a BYTE index into Span        }
+(* EQUIVALENT PASCAL -- REFERENCE ONLY, and it is NOT what is compiled. The
+  assembler below is the transcription; this says what it means, so that a
+  reader can follow the four walk variants without holding the register
+  allocation in their head. It is deliberately not a working procedure: the
+  four register arguments cannot be expressed, and the two dead instructions
+  and the clip-clamped loop bounds are elided here but present below.
+
+    procedure TriFill(X1, Y1, X2, Y2, X3, Y3 : Integer; Colour : Byte);
+    var Step, Rem, Den : array['A'..'C'] of Integer;
+        L, R, EL, ER, Y, Idx : Integer;
+
+      procedure Edge(var Step, Rem, Den : Integer; DX, DY : Integer);
+      begin                             { one edge's floored DDA setup      }
+        Den  := DY;
+        Step := DX div DY;              { truncated ...                     }
+        Rem  := DX mod DY;
+        if DX < 0 then                  { ... then floored, by hand         }
+        begin Dec(Step); Inc(Rem, Den) end;
+      end;
+
+      procedure Walk(var AL, AR : Integer; SL, SR : Char);
+      begin                             { one scanline of both edges        }
+        if Y >= ClipYMin then
+        begin
+          Span[Idx] := AL; Span[Idx + 1] := AR; Inc(Idx, 2);
+        end;
+        Inc(EL, Rem[SL]);
+        if EL > 0 then begin Dec(EL, Den[SL]); Inc(AL) end;
+        Inc(AL, Step[SL]);
+        Inc(ER, Rem[SR]);
+        if ER > 0 then begin Dec(ER, Den[SR]); Inc(AR) end;
+        Inc(AR, Step[SR]);
+        Inc(Y);
+      end;
+
     begin
-      if (Row >= 0) and (Row <= Rows) then
+      if (X1 = X2) and (X2 = X3) then Exit;
+      SortThreeByY(X1, Y1, X2, Y2, X3, Y3);
+      if (Y1 = Y2) and (Y2 = Y3) then Exit;
+      if Y3 < ClipYMin then Exit;
+      if Y1 > ClipYMax then Exit;
+
+      Edge(Step['A'], Rem['A'], Den['A'], X2 - X1, Y2 - Y1);
+      Edge(Step['B'], Rem['B'], Den['B'], X3 - X1, Y3 - Y1);
+      if Y3 - Y2 > 0 then
+        Edge(Step['C'], Rem['C'], Den['C'], X3 - X2, Y3 - Y2);
+
+      { which side the middle vertex falls on, as a 32-bit cross product }
+      if LongInt(X2 - X1) * (Y3 - Y1) = LongInt(X3 - X1) * (Y2 - Y1) then
+        Exit;                           { collinear                         }
+      if LongInt(X2 - X1) * (Y3 - Y1) > LongInt(X3 - X1) * (Y2 - Y1) then
+      begin                             { 108b:0595 -- A then C on the right }
+        L := X1; R := X1; Y := Y1; Idx := 0; EL := 0; ER := 0;
+        while Y < Y2 do Walk(L, R, 'B', 'A');
+        while Y < Y3 do Walk(L, R, 'B', 'C');
+      end
+      else
+      begin                             { 108b:0653 -- A then C on the left  }
+        L := X1; R := X1; Y := Y1; Idx := 0; EL := 0; ER := 0;
+        while Y < Y2 do Walk(L, R, 'A', 'B');
+        while Y < Y3 do Walk(L, R, 'C', 'B');
+      end;
+      { and 108b:0715 / 108b:07fb are the Y1=Y2 and Y2=Y3 cases, which need
+        only one loop each and start L and R on the two ends of the flat edge }
+
+      for Y := Y3 downto Y1 + 1 do      { 108b:08dd -- BACKWARDS            }
       begin
-        Num := LongInt(BX_ - AX) * (Row - AY);
-        T := AX + Num div (BY - AY);
-        if T < EdgeL[Row] then EdgeL[Row] := T;
-        if T > EdgeR[Row] then EdgeR[Row] := T;
+        Dec(Idx, 2);
+        R := Span[Idx + 1];  if R > ClipXMax then R := ClipXMax;
+        L := Span[Idx];      if L < ClipXMin then L := ClipXMin;
+        if (Y < ClipYMin) or (Y > ClipYMax) then Continue;
+        D    := RowOfs[Y] + (L shr 2) + WritePage;
+        Mid  := ((R - 1) - (L and $FFFC)) shr 2;
+        LM   := LeftMask4[L and 3];
+        RM   := RightMask4[R and 3];
+        if R <= L then Continue;
+        if Mid = 0 then LM := LM and RM;
+        Port[$3C4] := 2;
+        Port[$3C5] := LM;  Mem[$A000 : D] := Colour;
+        if Mid > 0 then
+        begin
+          if Mid > 1 then
+          begin
+            Port[$3C5] := $0F;
+            FillChar(Mem[$A000 : D + 1], Mid - 1, Colour);
+          end;
+          Port[$3C5] := RM;  Mem[$A000 : D + Mid] := Colour;
+        end;
       end;
     end;
-  end;
+    EQUIVALENT PASCAL ends here -- REFERENCE ONLY, none of it compiled  *)
+asm
+  { ---- 108b:0465 spill the four register arguments, keeping a copy ------- }
+  MOV  SX1, BX            { SX1 := X1                                       }
+  MOV  AX, BX             { AX now carries X1                               }
+  MOV  SY1, CX            { SY1 := Y1                                       }
+  MOV  BX, CX             { BX now carries Y1                               }
+  MOV  SX2, DX            { SX2 := X2                                       }
+  MOV  CX, DX             { CX now carries X2                               }
+  MOV  SY2, SI            { SY2 := Y2                                       }
+  MOV  DX, SI             { DX now carries Y2                               }
+                          { from here AX=X1 BX=Y1 CX=X2 DX=Y2               }
+  { ---- 108b:0479 degenerate: all three X equal is a zero-width sliver ---- }
+  CMP  AX, CX             { X1 against X2                                   }
+  JNE  @@SortY            { differ -- not that degeneracy                   }
+  CMP  CX, X3             { X2 against X3                                   }
+  JNE  @@SortY            { differ                                          }
+  JMP  @@Done             { X1 = X2 = X3, nothing to fill                   }
 
-begin
-  { degenerate: all three the same point, or two identical Y with equal X }
-  if (X1 = X2) and (X2 = X3) then Exit;
-  if (Y1 = Y2) and (Y2 = Y3) then Exit;
+  { ---- 108b:0485 sort the three vertices by Y, three compare-and-swap ---- }
+@@SortY:                  { <- SortY                                      }
+  CMP  BX, DX             { Y1 against Y2                                   }
+  JG   @@Swap12           { out of order                                    }
+  JMP  @@Test23           { in order                                        }
+@@Swap12:                 { <- Swap12                                     }
+  XCHG CX, AX             { swap X1 and X2                                  }
+  XCHG BX, DX             { swap Y1 and Y2                                  }
+@@Test23:                 { <- Test23                                     }
+  CMP  DX, Y3             { Y2 against Y3                                   }
+  JG   @@Swap23           { out of order                                    }
+  JMP  @@Flat1            { in order -- the sort is finished                }
+@@Swap23:                 { <- Swap23                                     }
+  XCHG X3, CX             { swap X2 and X3, X3 being on the stack           }
+  XCHG Y3, DX             { swap Y2 and Y3                                  }
+  CMP  BX, DX             { Y1 against the new Y2                           }
+  JG   @@Swap12b          { out of order again                              }
+  JMP  @@Flat1            { sorted                                          }
+@@Swap12b:                { <- Swap12b                                    }
+  XCHG CX, AX             { swap X1 and X2                                  }
+  XCHG BX, DX             { swap Y1 and Y2                                  }
 
-  { sort by Y, the XCHG chain at 108b:0485..108b:04a2 }
-  if Y1 > Y2 then
-  begin
-    T := X1; X1 := X2; X2 := T;  T := Y1; Y1 := Y2; Y2 := T;
-  end;
-  if Y2 > Y3 then
-  begin
-    T := X2; X2 := X3; X3 := T;  T := Y2; Y2 := Y3; Y3 := T;
-  end;
-  if Y1 > Y2 then
-  begin
-    T := X1; X1 := X2; X2 := T;  T := Y1; Y1 := Y2; Y2 := T;
-  end;
+  { ---- 108b:04a4 pick the variant: flat top, flat bottom, or general ----- }
+@@Flat1:                  { <- Flat1                                      }
+  CMP  BX, DX             { Y1 = Y2 ?                                       }
+  JE   @@IsFlatTop        { yes -- the flat-top walk                        }
+  JMP  @@Flat2            { no                                              }
+@@IsFlatTop:              { <- IsFlatTop                                  }
+  CMP  DX, Y3             { Y2 = Y3 as well ?                               }
+  JNE  @@FlatTopOrder     { no -- a real flat top                           }
+  JMP  @@Done             { all three Y equal, nothing to fill              }
+@@FlatTopOrder:           { <- FlatTopOrder                               }
+  CMP  AX, CX             { X1 against X2, the flat edge                    }
+  JG   @@FlatTopSwap      { X1 > X2, swap so X1 is the left end             }
+  JGE  @@Done             { equal -- zero-width, nothing to fill            }
+  JMP  @@FlatTop          { already left-to-right                           }
+@@FlatTopSwap:            { <- FlatTopSwap                                }
+  XCHG CX, AX             { swap X1 and X2                                  }
+  JMP  @@FlatTop          { to FlatTop                                    }
 
-  if Y3 < ClipYMin then Exit;
-  if Y1 > ClipYMax then Exit;
+@@Flat2:                  { <- Flat2                                      }
+  CMP  DX, Y3             { Y2 = Y3 ?                                       }
+  JE   @@IsFlatBot        { yes -- the flat-bottom walk                     }
+  JMP  @@General          { no -- the general case                          }
+@@IsFlatBot:              { <- IsFlatBot                                  }
+  CMP  CX, X3             { X2 against X3, the flat edge                    }
+  JG   @@FlatBotSwap      { X2 > X3, swap so X2 is the left end             }
+  JGE  @@Done             { equal -- zero-width                             }
+  JMP  @@FlatBot          { already left-to-right                           }
+@@FlatBotSwap:            { <- FlatBotSwap                                }
+  XCHG X3, CX             { swap X2 and X3                                  }
+  JMP  @@FlatBot          { to FlatBot                                    }
 
-  for Y := Y1 to Y3 do
-    if (Y >= 0) and (Y <= Rows) then
-    begin
-      EdgeL[Y] := 32767;
-      EdgeR[Y] := -32768;
-    end;
+  { ======== 108b:04dc THE GENERAL CASE ==================================== }
+@@General:                { <- General                                    }
+  MOV  SX1, AX            { re-spill, the sort moved them                   }
+  MOV  SY1, BX            { SY1 := BX                                     }
+  MOV  SX2, CX            { SX2 := CX                                     }
+  MOV  SY2, DX            { SY2 := DX                                     }
+  MOV  DI, Y3             { the bottom vertex                               }
+  CMP  DI, ClipYMin       { entirely above the clip box ?                   }
+  JGE  @@GenInBox         { >= : to GenInBox                              }
+  JMP  @@Done             { to Done                                       }
+@@GenInBox:               { <- GenInBox                                   }
+  MOV  DI, SY1            { the top vertex                                  }
+  CMP  DI, ClipYMax       { entirely below the clip box ?                   }
+  JLE  @@GenEdges         { <= : to GenEdges                              }
+  JMP  @@Done             { to Done                                       }
 
-  Edge(X1, Y1, X3, Y3);
-  Edge(X1, Y1, X2, Y2);
-  Edge(X2, Y2, X3, Y3);
+  { ---- 108b:0500 edge A, vertex 1 to vertex 2 --------------------------- }
+@@GenEdges:               { <- GenEdges                                   }
+  MOV  BX, DX             { Y2                                              }
+  SUB  BX, SY1            { DenA := Y2 - Y1                                 }
+  MOV  DenA, BX           { DenA := BX                                    }
+  MOV  AX, SX2            { AX := SX2                                     }
+  SUB  AX, SX1            { NumA := X2 - X1                                 }
+  MOV  NumA, AX           { NumA := AX                                    }
+  MOV  CX, AX             { keep the numerator's sign                       }
+  CWD                     { sign-extend AX into DX:AX                       }
+  IDIV BX                 { AX := quotient, DX := remainder, both truncated }
+  CMP  CX, 0              { was the numerator negative ?                    }
+  JGE  @@GenAOk           { no -- truncation was already floor              }
+  DEC  AX                 { floor the quotient                              }
+  ADD  DX, BX             { and bring the remainder back positive           }
+@@GenAOk:                 { <- GenAOk                                     }
+  MOV  StepA, AX          { StepA := AX                                   }
+  MOV  RemA, DX           { RemA := DX                                    }
 
-  for Y := Y1 to Y3 - 1 do
-  begin
-    if (Y < ClipYMin) or (Y > ClipYMax) then Continue;
-    XL := EdgeL[Y];
-    XR := EdgeR[Y];
-    if XL > XR then Continue;
-    if XR > ClipXMax then XR := ClipXMax;       { 108b:08f6 }
-    if XL < ClipXMin then XL := ClipXMin;       { 108b:090e }
-    if XR <= XL then Continue;
+  { ---- 108b:0524 edge B, vertex 1 to vertex 3, the long edge ------------ }
+  MOV  BX, Y3             { BX := Y3                                      }
+  SUB  BX, SY1            { DenB := Y3 - Y1                                 }
+  MOV  DenB, BX           { DenB := BX                                    }
+  MOV  AX, X3             { AX := X3                                      }
+  SUB  AX, SX1            { NumB := X3 - X1                                 }
+  MOV  NumB, AX           { NumB := AX                                    }
+  MOV  CX, AX             { CX := AX                                      }
+  CWD                     { sign-extend AX into DX:AX                     }
+  IDIV BX                 { AX := DX:AX div BX, DX := the remainder       }
+  CMP  CX, 0              { compare CX with 0                             }
+  JGE  @@GenBOk           { >= : to GenBOk                                }
+  DEC  AX                 { AX := AX - 1                                  }
+  ADD  DX, BX             { DX := DX + BX                                 }
+@@GenBOk:                 { <- GenBOk                                     }
+  MOV  StepB, AX          { StepB := AX                                   }
+  MOV  RemB, DX           { RemB := DX                                    }
 
-    D   := RowOfs[Y] + (Word(XL) shr 2) + WritePage;
-    LM  := LeftMaskOf(XL);
-    RM  := RightMaskOf(XR);
-    Mid := ((XR - 1) - (XL and $FFFC)) shr 2;
-    if Mid = 0 then LM := LM and RM;
+  { ---- 108b:0549 edge C, vertex 2 to vertex 3, skipped when flat -------- }
+  MOV  BX, Y3             { BX := Y3                                      }
+  SUB  BX, SY2            { Y3 - Y2                                         }
+  JLE  @@GenCross         { not positive -- edge C is never walked          }
+  MOV  DenC, BX           { DenC := BX                                    }
+  MOV  AX, X3             { AX := X3                                      }
+  SUB  AX, SX2            { NumC := X3 - X2                                 }
+  MOV  NumC, AX           { NumC := AX                                    }
+  MOV  CX, AX             { CX := AX                                      }
+  CWD                     { sign-extend AX into DX:AX                     }
+  IDIV BX                 { AX := DX:AX div BX, DX := the remainder       }
+  CMP  CX, 0              { compare CX with 0                             }
+  JGE  @@GenCOk           { >= : to GenCOk                                }
+  DEC  AX                 { AX := AX - 1                                  }
+  ADD  DX, BX             { DX := DX + BX                                 }
+@@GenCOk:                 { <- GenCOk                                     }
+  MOV  StepC, AX          { StepC := AX                                   }
+  MOV  RemC, DX           { RemC := DX                                    }
 
-    Port[$3C4] := 2;
-    Port[$3C5] := LM;
-    Mem[$A000 : D] := Colour;
-    if Mid > 0 then
-    begin
-      Port[$3C5] := $0F;
-      for I := 1 to Mid - 1 do
-        Mem[$A000 : D + I] := Colour;
-      Port[$3C5] := RM;
-      Mem[$A000 : D + Mid] := Colour;
-    end;
-  end;
+  { ---- 108b:0570 the winding test, 32-bit, decides which side is which -- }
+@@GenCross:               { <- GenCross                                   }
+  MOV  AX, NumA           { X2 - X1                                         }
+  IMUL DenB               { * (Y3 - Y1), signed, into DX:AX                 }
+  MOV  BX, AX             { park the low word                               }
+  MOV  CX, DX             { park the high word                              }
+  MOV  AX, NumB           { X3 - X1                                         }
+  IMUL DenA               { * (Y2 - Y1), into DX:AX                         }
+  CMP  CX, DX             { high words, SIGNED                              }
+  JG   @@WalkAC           { first product is the greater                    }
+  JGE  @@CrossLow         { equal -- the low words decide                   }
+  JMP  @@WalkBB           { to WalkBB                                     }
+@@CrossLow:               { <- CrossLow                                   }
+  CMP  BX, AX             { low words, UNSIGNED, as a 32-bit compare needs  }
+  JA   @@WalkAC           { above, unsigned : to WalkAC                   }
+  JAE  @@GenDegenerate    { both products equal -- the three are collinear  }
+  JMP  @@WalkBB           { to WalkBB                                     }
+@@GenDegenerate:          { <- GenDegenerate                              }
+  JMP  @@Done             { to Done                                       }
+
+  { ======== 108b:0595 general walk, edges A then C on the RIGHT ==========
+    DI is the left X and steps edge B; SI is the right X and steps edge A,
+    then edge C once Y passes Y2. AX is DI's error, BX is SI's error, CX is
+    the scanline, DX is the byte index into Span. -------------------------- }
+@@WalkAC:                 { <- WalkAC                                     }
+  MOV  AX, 0              { DI's error accumulator                          }
+  MOV  BX, 0              { SI's error accumulator                          }
+  MOV  CX, SY1            { start at the top vertex                         }
+  MOV  DI, SX1            { both edges start at X1                          }
+  MOV  SI, DI             { SI := DI                                      }
+  XOR  DX, DX             { Span is written from the beginning              }
+  CMP  CX, ClipYMin       { does the walk start above the clip box ?        }
+  JGE  @@AC1              { >= : to AC1                                   }
+  MOV  DX, ClipYMin       { it does -- the first STORED scanline is the top }
+  MOV  SY1, DX            { of the box, and SY1 is where the fill will stop }
+  MOV  DX, SY1            { DX := SY1                                     }
+  CMP  DX, Y3             { is the whole triangle above the box ?           }
+  JNE  @@AC1a             { <> : to AC1a                                  }
+  JMP  @@Done             { to Done                                       }
+@@AC1a:                   { <- AC1a                                       }
+  XOR  DX, DX             { DX := 0                                       }
+@@AC1:                    { <- AC1                                        }
+  CMP  CX, ClipYMin       { above the box -- step the edges but store nothing }
+  JL   @@AC1Step          { < : to AC1Step                                }
+  MOV  ES, BX             { park SI's error so BX can index Span            }
+  MOV  BX, DX             { BX := DX                                      }
+  MOV  [BX + OFFSET Span], DI      { the left end                           }
+  MOV  BX, ES             { unpark                                          }
+  ADD  DX, 2              { DX := DX + 2                                  }
+  MOV  ES, BX             { ES := BX                                      }
+  MOV  BX, DX             { BX := DX                                      }
+  MOV  [BX + OFFSET Span], SI      { the right end                          }
+  MOV  BX, ES             { BX := ES                                      }
+  ADD  DX, 2              { DX := DX + 2                                  }
+@@AC1Step:                { <- AC1Step                                    }
+  ADD  AX, RemB           { DI's error += edge B's remainder                }
+  JLE  @@AC1StepDI        { <= : to AC1StepDI                             }
+  SUB  AX, DenB           { crossed -- pull it back                         }
+  INC  DI                 { and take the extra pixel                        }
+@@AC1StepDI:              { <- AC1StepDI                                  }
+  ADD  DI, StepB          { DI := DI + StepB                              }
+  ADD  BX, RemA           { SI's error += edge A's remainder                }
+  JLE  @@AC1StepSI        { <= : to AC1StepSI                             }
+  SUB  BX, DenA           { BX := BX - DenA                               }
+  INC  SI                 { SI := SI + 1                                  }
+@@AC1StepSI:              { <- AC1StepSI                                  }
+  ADD  SI, StepA          { SI := SI + StepA                              }
+  INC  CX                 { next scanline                                   }
+  CMP  CX, ClipYMax       { off the bottom of the box ?                     }
+  JL   @@AC1More          { < : to AC1More                                }
+  MOV  Y3, CX             { yes -- the fill starts here instead of at Y3    }
+  JMP  @@Fill             { to Fill                                       }
+@@AC1More:                { <- AC1More                                    }
+  CMP  CX, SY2            { still in the first half ?                       }
+  JL   @@AC1              { < : to AC1                                    }
+  { ---- 108b:0609 second half: SI switches from edge A to edge C --------- }
+@@AC2:                    { <- AC2                                        }
+  CMP  CX, ClipYMin       { compare CX with ClipYMin                      }
+  JL   @@AC2Step          { < : to AC2Step                                }
+  MOV  ES, BX             { ES := BX                                      }
+  MOV  BX, DX             { BX := DX                                      }
+  MOV  [BX + OFFSET Span], DI { [BX + OFFSET Span] := DI                      }
+  MOV  BX, ES             { BX := ES                                      }
+  ADD  DX, 2              { DX := DX + 2                                  }
+  MOV  ES, BX             { ES := BX                                      }
+  MOV  BX, DX             { BX := DX                                      }
+  MOV  [BX + OFFSET Span], SI { [BX + OFFSET Span] := SI                      }
+  MOV  BX, ES             { BX := ES                                      }
+  ADD  DX, 2              { DX := DX + 2                                  }
+@@AC2Step:                { <- AC2Step                                    }
+  ADD  AX, RemB           { AX := AX + RemB                               }
+  JLE  @@AC2StepDI        { <= : to AC2StepDI                             }
+  SUB  AX, DenB           { AX := AX - DenB                               }
+  INC  DI                 { DI := DI + 1                                  }
+@@AC2StepDI:              { <- AC2StepDI                                  }
+  ADD  DI, StepB          { DI := DI + StepB                              }
+  ADD  BX, RemC           { edge C now                                      }
+  JLE  @@AC2StepSI        { <= : to AC2StepSI                             }
+  SUB  BX, DenC           { BX := BX - DenC                               }
+  INC  SI                 { SI := SI + 1                                  }
+@@AC2StepSI:              { <- AC2StepSI                                  }
+  ADD  SI, StepC          { SI := SI + StepC                              }
+  INC  CX                 { CX := CX + 1                                  }
+  CMP  CX, ClipYMax       { compare CX with ClipYMax                      }
+  JL   @@AC2More          { < : to AC2More                                }
+  MOV  Y3, CX             { Y3 := CX                                      }
+@@AC2More:                { <- AC2More                                    }
+  CMP  CX, Y3             { compare CX with Y3                            }
+  JL   @@AC2              { < : to AC2                                    }
+  JMP  @@Fill             { to Fill                                       }
+
+  { ======== 108b:0653 general walk, edges A then C on the LEFT ===========
+    The mirror of the above: DI steps edge A then edge C, SI steps edge B
+    the whole way down. ---------------------------------------------------- }
+@@WalkBB:                 { <- WalkBB                                     }
+  MOV  AX, 0              { AX := 0                                       }
+  MOV  BX, 0              { BX := 0                                       }
+  MOV  CX, SY1            { CX := SY1                                     }
+  MOV  DI, SX1            { DI := SX1                                     }
+  MOV  SI, SX1            { SI := SX1                                     }
+  XOR  DX, DX             { DX := 0                                       }
+  CMP  CX, ClipYMin       { compare CX with ClipYMin                      }
+  JGE  @@BB1              { >= : to BB1                                   }
+  MOV  DX, ClipYMin       { DX := ClipYMin                                }
+  MOV  SY1, DX            { SY1 := DX                                     }
+  MOV  DX, SY1            { DX := SY1                                     }
+  CMP  DX, Y3             { compare DX with Y3                            }
+  JNE  @@BB1a             { <> : to BB1a                                  }
+  JMP  @@Done             { to Done                                       }
+@@BB1a:                   { <- BB1a                                       }
+  XOR  DX, DX             { DX := 0                                       }
+@@BB1:                    { <- BB1                                        }
+  CMP  CX, ClipYMin       { compare CX with ClipYMin                      }
+  JL   @@BB1Step          { < : to BB1Step                                }
+  MOV  ES, BX             { ES := BX                                      }
+  MOV  BX, DX             { BX := DX                                      }
+  MOV  [BX + OFFSET Span], DI { [BX + OFFSET Span] := DI                      }
+  MOV  BX, ES             { BX := ES                                      }
+  ADD  DX, 2              { DX := DX + 2                                  }
+  MOV  ES, BX             { ES := BX                                      }
+  MOV  BX, DX             { BX := DX                                      }
+  MOV  [BX + OFFSET Span], SI { [BX + OFFSET Span] := SI                      }
+  MOV  BX, ES             { BX := ES                                      }
+  ADD  DX, 2              { DX := DX + 2                                  }
+@@BB1Step:                { <- BB1Step                                    }
+  ADD  AX, RemA           { DI takes edge A here                            }
+  JLE  @@BB1StepDI        { <= : to BB1StepDI                             }
+  SUB  AX, DenA           { AX := AX - DenA                               }
+  INC  DI                 { DI := DI + 1                                  }
+@@BB1StepDI:              { <- BB1StepDI                                  }
+  ADD  DI, StepA          { DI := DI + StepA                              }
+  ADD  BX, RemB           { SI takes the long edge B                        }
+  JLE  @@BB1StepSI        { <= : to BB1StepSI                             }
+  SUB  BX, DenB           { BX := BX - DenB                               }
+  INC  SI                 { SI := SI + 1                                  }
+@@BB1StepSI:              { <- BB1StepSI                                  }
+  ADD  SI, StepB          { SI := SI + StepB                              }
+  INC  CX                 { CX := CX + 1                                  }
+  CMP  CX, ClipYMax       { compare CX with ClipYMax                      }
+  JL   @@BB1More          { < : to BB1More                                }
+  MOV  Y3, CX             { Y3 := CX                                      }
+  JMP  @@Fill             { to Fill                                       }
+@@BB1More:                { <- BB1More                                    }
+  CMP  CX, SY2            { compare CX with SY2                           }
+  JL   @@BB1              { < : to BB1                                    }
+  { ---- 108b:06c8 second half: DI switches from edge A to edge C --------- }
+@@BB2:                    { <- BB2                                        }
+  CMP  CX, ClipYMin       { compare CX with ClipYMin                      }
+  JL   @@BB2Step          { < : to BB2Step                                }
+  MOV  ES, BX             { ES := BX                                      }
+  MOV  BX, DX             { BX := DX                                      }
+  MOV  [BX + OFFSET Span], DI { [BX + OFFSET Span] := DI                      }
+  MOV  BX, ES             { BX := ES                                      }
+  ADD  DX, 2              { DX := DX + 2                                  }
+  MOV  ES, BX             { ES := BX                                      }
+  MOV  BX, DX             { BX := DX                                      }
+  MOV  [BX + OFFSET Span], SI { [BX + OFFSET Span] := SI                      }
+  MOV  BX, ES             { BX := ES                                      }
+  ADD  DX, 2              { DX := DX + 2                                  }
+@@BB2Step:                { <- BB2Step                                    }
+  ADD  AX, RemC           { AX := AX + RemC                               }
+  JLE  @@BB2StepDI        { <= : to BB2StepDI                             }
+  SUB  AX, DenC           { AX := AX - DenC                               }
+  INC  DI                 { DI := DI + 1                                  }
+@@BB2StepDI:              { <- BB2StepDI                                  }
+  ADD  DI, StepC          { DI := DI + StepC                              }
+  ADD  BX, RemB           { BX := BX + RemB                               }
+  JLE  @@BB2StepSI        { <= : to BB2StepSI                             }
+  SUB  BX, DenB           { BX := BX - DenB                               }
+  INC  SI                 { SI := SI + 1                                  }
+@@BB2StepSI:              { <- BB2StepSI                                  }
+  ADD  SI, StepB          { SI := SI + StepB                              }
+  INC  CX                 { CX := CX + 1                                  }
+  CMP  CX, ClipYMax       { compare CX with ClipYMax                      }
+  JL   @@BB2More          { < : to BB2More                                }
+  MOV  Y3, CX             { Y3 := CX                                      }
+  JMP  @@Fill             { to Fill                                       }
+@@BB2More:                { <- BB2More                                    }
+  CMP  CX, Y3             { compare CX with Y3                            }
+  JL   @@BB2              { < : to BB2                                    }
+  JMP  @@Fill             { to Fill                                       }
+
+  { ======== 108b:0715 flat top: Y1 = Y2, so two edges leave the top ====== }
+@@FlatTop:                { <- FlatTop                                    }
+  MOV  SX1, AX            { SX1 := AX                                     }
+  MOV  SY1, BX            { SY1 := BX                                     }
+  MOV  SX2, CX            { SX2 := CX                                     }
+  MOV  SY2, DX            { SY2 := DX                                     }
+  MOV  DI, Y3             { DI := Y3                                      }
+  CMP  DI, ClipYMin       { compare DI with ClipYMin                      }
+  JGE  @@FTInBox          { >= : to FTInBox                               }
+  JMP  @@Done             { to Done                                       }
+@@FTInBox:                { <- FTInBox                                    }
+  MOV  DI, SY1            { DI := SY1                                     }
+  CMP  DI, ClipYMax       { compare DI with ClipYMax                      }
+  JLE  @@FTEdges          { <= : to FTEdges                               }
+  JMP  @@Done             { to Done                                       }
+@@FTEdges:                { <- FTEdges                                    }
+  MOV  BX, Y3             { BX := Y3                                      }
+  SUB  BX, SY1            { DenA := Y3 - Y1                                 }
+  MOV  DenA, BX           { DenA := BX                                    }
+  MOV  AX, X3             { AX := X3                                      }
+  SUB  AX, SX1            { NumA := X3 - X1, the left edge                   }
+  MOV  NumA, AX           { NumA := AX                                    }
+  MOV  CX, AX             { CX := AX                                      }
+  CWD                     { sign-extend AX into DX:AX                     }
+  IDIV BX                 { AX := DX:AX div BX, DX := the remainder       }
+  CMP  CX, 0              { compare CX with 0                             }
+  JGE  @@FTAOk            { >= : to FTAOk                                 }
+  DEC  AX                 { AX := AX - 1                                  }
+  ADD  DX, BX             { DX := DX + BX                                 }
+@@FTAOk:                  { <- FTAOk                                      }
+  MOV  StepA, AX          { StepA := AX                                   }
+  MOV  RemA, DX           { RemA := DX                                    }
+  MOV  BX, Y3             { BX := Y3                                      }
+  SUB  BX, SY2            { DenB := Y3 - Y2                                 }
+  MOV  DenB, BX           { DenB := BX                                    }
+  MOV  AX, X3             { AX := X3                                      }
+  SUB  AX, SX2            { NumB := X3 - X2, the right edge                 }
+  MOV  NumB, AX           { NumB := AX                                    }
+  MOV  CX, AX             { CX := AX                                      }
+  CWD                     { sign-extend AX into DX:AX                     }
+  IDIV BX                 { AX := DX:AX div BX, DX := the remainder       }
+  CMP  CX, 0              { compare CX with 0                             }
+  JGE  @@FTBOk            { >= : to FTBOk                                 }
+  DEC  AX                 { AX := AX - 1                                  }
+  ADD  DX, BX             { DX := DX + BX                                 }
+@@FTBOk:                  { <- FTBOk                                      }
+  MOV  StepB, AX          { StepB := AX                                   }
+  MOV  RemB, DX           { RemB := DX                                    }
+  MOV  AX, 0              { AX := 0                                       }
+  MOV  BX, 0              { BX := 0                                       }
+  MOV  CX, SY1            { CX := SY1                                     }
+  MOV  DI, SX1            { the left end starts at X1                       }
+  MOV  SI, SX2            { the right end at X2 -- the flat edge            }
+  XOR  DX, DX             { DX := 0                                       }
+  CMP  CX, ClipYMin       { compare CX with ClipYMin                      }
+  JGE  @@FT1              { >= : to FT1                                   }
+  MOV  DX, ClipYMin       { DX := ClipYMin                                }
+  MOV  SY1, DX            { SY1 := DX                                     }
+  MOV  DX, SY1            { DX := SY1                                     }
+  CMP  DX, Y3             { compare DX with Y3                            }
+  JNE  @@FT1a             { <> : to FT1a                                  }
+  JMP  @@Done             { to Done                                       }
+@@FT1a:                   { <- FT1a                                       }
+  XOR  DX, DX             { DX := 0                                       }
+@@FT1:                    { <- FT1                                        }
+  CMP  CX, ClipYMin       { compare CX with ClipYMin                      }
+  JL   @@FT1Step          { < : to FT1Step                                }
+  MOV  ES, BX             { ES := BX                                      }
+  MOV  BX, DX             { BX := DX                                      }
+  MOV  [BX + OFFSET Span], DI { [BX + OFFSET Span] := DI                      }
+  MOV  BX, ES             { BX := ES                                      }
+  ADD  DX, 2              { DX := DX + 2                                  }
+  MOV  ES, BX             { ES := BX                                      }
+  MOV  BX, DX             { BX := DX                                      }
+  MOV  [BX + OFFSET Span], SI { [BX + OFFSET Span] := SI                      }
+  MOV  BX, ES             { BX := ES                                      }
+  ADD  DX, 2              { DX := DX + 2                                  }
+@@FT1Step:                { <- FT1Step                                    }
+  ADD  AX, RemA           { AX := AX + RemA                               }
+  JLE  @@FT1StepDI        { <= : to FT1StepDI                             }
+  SUB  AX, DenA           { AX := AX - DenA                               }
+  INC  DI                 { DI := DI + 1                                  }
+@@FT1StepDI:              { <- FT1StepDI                                  }
+  ADD  DI, StepA          { DI := DI + StepA                              }
+  ADD  BX, RemB           { BX := BX + RemB                               }
+  JLE  @@FT1StepSI        { <= : to FT1StepSI                             }
+  SUB  BX, DenB           { BX := BX - DenB                               }
+  INC  SI                 { SI := SI + 1                                  }
+@@FT1StepSI:              { <- FT1StepSI                                  }
+  ADD  SI, StepB          { SI := SI + StepB                              }
+  INC  CX                 { CX := CX + 1                                  }
+  CMP  CX, ClipYMax       { compare CX with ClipYMax                      }
+  JL   @@FT1More          { < : to FT1More                                }
+  MOV  Y3, CX             { Y3 := CX                                      }
+  JMP  @@Fill             { to Fill                                       }
+@@FT1More:                { <- FT1More                                    }
+  CMP  CX, Y3             { compare CX with Y3                            }
+  JL   @@FT1              { < : to FT1                                    }
+  JMP  @@Fill             { to Fill                                       }
+
+  { ======== 108b:07fb flat bottom: Y2 = Y3, two edges meet at the top ==== }
+@@FlatBot:                { <- FlatBot                                    }
+  MOV  SX1, AX            { SX1 := AX                                     }
+  MOV  SY1, BX            { SY1 := BX                                     }
+  MOV  SX2, CX            { SX2 := CX                                     }
+  MOV  SY2, DX            { SY2 := DX                                     }
+  MOV  DI, Y3             { DI := Y3                                      }
+  CMP  DI, ClipYMin       { compare DI with ClipYMin                      }
+  JGE  @@FBInBox          { >= : to FBInBox                               }
+  JMP  @@Done             { to Done                                       }
+@@FBInBox:                { <- FBInBox                                    }
+  MOV  DI, SY1            { DI := SY1                                     }
+  CMP  DI, ClipYMax       { compare DI with ClipYMax                      }
+  JLE  @@FBEdges          { <= : to FBEdges                               }
+  JMP  @@Done             { to Done                                       }
+@@FBEdges:                { <- FBEdges                                    }
+  MOV  BX, SY2            { BX := SY2                                     }
+  SUB  BX, SY1            { DenA := Y2 - Y1                                 }
+  MOV  DenA, BX           { DenA := BX                                    }
+  MOV  AX, SX2            { AX := SX2                                     }
+  SUB  AX, SX1            { NumA := X2 - X1, the left edge                  }
+  MOV  NumA, AX           { NumA := AX                                    }
+  MOV  CX, AX             { CX := AX                                      }
+  CWD                     { sign-extend AX into DX:AX                     }
+  IDIV BX                 { AX := DX:AX div BX, DX := the remainder       }
+  CMP  CX, 0              { compare CX with 0                             }
+  JGE  @@FBAOk            { >= : to FBAOk                                 }
+  DEC  AX                 { AX := AX - 1                                  }
+  ADD  DX, BX             { DX := DX + BX                                 }
+@@FBAOk:                  { <- FBAOk                                      }
+  MOV  StepA, AX          { StepA := AX                                   }
+  MOV  RemA, DX           { RemA := DX                                    }
+  MOV  BX, Y3             { BX := Y3                                      }
+  SUB  BX, SY1            { DenB := Y3 - Y1                                 }
+  MOV  DenB, BX           { DenB := BX                                    }
+  MOV  AX, X3             { AX := X3                                      }
+  SUB  AX, SX1            { NumB := X3 - X1, the right edge                 }
+  MOV  NumB, AX           { NumB := AX                                    }
+  MOV  CX, AX             { CX := AX                                      }
+  CWD                     { sign-extend AX into DX:AX                     }
+  IDIV BX                 { AX := DX:AX div BX, DX := the remainder       }
+  CMP  CX, 0              { compare CX with 0                             }
+  JGE  @@FBBOk            { >= : to FBBOk                                 }
+  DEC  AX                 { AX := AX - 1                                  }
+  ADD  DX, BX             { DX := DX + BX                                 }
+@@FBBOk:                  { <- FBBOk                                      }
+  MOV  StepB, AX          { StepB := AX                                   }
+  MOV  RemB, DX           { RemB := DX                                    }
+  MOV  AX, 0              { AX := 0                                       }
+  MOV  BX, 0              { BX := 0                                       }
+  MOV  CX, SY1            { CX := SY1                                     }
+  MOV  DI, SX1            { both edges leave the same apex                  }
+  MOV  SI, SX1            { SI := SX1                                     }
+  XOR  DX, DX             { DX := 0                                       }
+  CMP  CX, ClipYMin       { compare CX with ClipYMin                      }
+  JGE  @@FB1              { >= : to FB1                                   }
+  MOV  DX, ClipYMin       { DX := ClipYMin                                }
+  MOV  SY1, DX            { SY1 := DX                                     }
+  MOV  DX, SY1            { DX := SY1                                     }
+  CMP  DX, Y3             { compare DX with Y3                            }
+  JNE  @@FB1a             { <> : to FB1a                                  }
+  JMP  @@Done             { to Done                                       }
+@@FB1a:                   { <- FB1a                                       }
+  XOR  DX, DX             { DX := 0                                       }
+@@FB1:                    { <- FB1                                        }
+  CMP  CX, ClipYMin       { compare CX with ClipYMin                      }
+  JL   @@FB1Step          { < : to FB1Step                                }
+  MOV  ES, BX             { ES := BX                                      }
+  MOV  BX, DX             { BX := DX                                      }
+  MOV  [BX + OFFSET Span], DI { [BX + OFFSET Span] := DI                      }
+  MOV  BX, ES             { BX := ES                                      }
+  ADD  DX, 2              { DX := DX + 2                                  }
+  MOV  ES, BX             { ES := BX                                      }
+  MOV  BX, DX             { BX := DX                                      }
+  MOV  [BX + OFFSET Span], SI { [BX + OFFSET Span] := SI                      }
+  MOV  BX, ES             { BX := ES                                      }
+  ADD  DX, 2              { DX := DX + 2                                  }
+@@FB1Step:                { <- FB1Step                                    }
+  ADD  AX, RemA           { AX := AX + RemA                               }
+  JLE  @@FB1StepDI        { <= : to FB1StepDI                             }
+  SUB  AX, DenA           { AX := AX - DenA                               }
+  INC  DI                 { DI := DI + 1                                  }
+@@FB1StepDI:              { <- FB1StepDI                                  }
+  ADD  DI, StepA          { DI := DI + StepA                              }
+  ADD  BX, RemB           { BX := BX + RemB                               }
+  JLE  @@FB1StepSI        { <= : to FB1StepSI                             }
+  SUB  BX, DenB           { BX := BX - DenB                               }
+  INC  SI                 { SI := SI + 1                                  }
+@@FB1StepSI:              { <- FB1StepSI                                  }
+  ADD  SI, StepB          { SI := SI + StepB                              }
+  INC  CX                 { CX := CX + 1                                  }
+  CMP  CX, ClipYMax       { compare CX with ClipYMax                      }
+  JL   @@FB1More          { < : to FB1More                                }
+  MOV  Y3, CX             { Y3 := CX                                      }
+  JMP  @@Fill             { to Fill                                       }
+@@FB1More:                { <- FB1More                                    }
+  CMP  CX, Y3             { compare CX with Y3                            }
+  JL   @@FB1              { < : to FB1                                    }
+
+  { ======== 108b:08dd fill the collected spans, LAST scanline first ======
+    DX still holds one past the last word written, so the walk backwards is
+    free. Direction matters to the bytes even though it cannot matter to a
+    solid fill, so it is kept. -------------------------------------------- }
+@@Fill:                   { <- Fill                                       }
+  CLD                     { STOSB/STOSW forwards within a span              }
+  MOV  CX, Y3             { the last scanline the walk actually stored      }
+  MOV  AX, $A000          { AX := $A000                                   }
+  MOV  ES, AX             { ES:DI addresses video memory from here          }
+  SUB  DX, 2              { step back onto the last word                    }
+  MOV  SpanIdx, DX        { SpanIdx := DX                                 }
+@@FillRow:                { <- FillRow                                    }
+  MOV  FillY, CX          { FillY := CX                                   }
+  MOV  BX, SpanIdx        { BX := SpanIdx                                 }
+  MOV  DX, [BX + OFFSET Span]      { the right end                          }
+  CMP  DX, ClipXMax       { compare DX with ClipXMax                      }
+  JLE  @@FillRIn          { <= : to FillRIn                               }
+  MOV  DX, ClipXMax       { clip right                                      }
+@@FillRIn:                { <- FillRIn                                    }
+  MOV  FillR, DX          { FillR := DX                                   }
+  SUB  SpanIdx, 2         { SpanIdx := SpanIdx - 2                        }
+  MOV  BX, SpanIdx        { BX := SpanIdx                                 }
+  MOV  DX, [BX + OFFSET Span]      { the left end                           }
+  CMP  DX, ClipXMin       { compare DX with ClipXMin                      }
+  JGE  @@FillLIn          { >= : to FillLIn                               }
+  MOV  DX, ClipXMin       { clip left                                       }
+@@FillLIn:                { <- FillLIn                                    }
+  MOV  FillL, DX          { FillL := DX                                   }
+  SUB  SpanIdx, 2         { SpanIdx := SpanIdx - 2                        }
+  CMP  CX, ClipYMin       { the scanline itself may be outside the box      }
+  JL   @@FillNext         { < : to FillNext                               }
+  CMP  CX, ClipYMax       { compare CX with ClipYMax                      }
+  JG   @@FillNext         { > : to FillNext                               }
+  PUSH BP                 { BP becomes a scratch register below             }
+  MOV  BX, CX             { BX := CX                                      }
+  ADD  BX, BX             { Y * 2, a word index                             }
+  MOV  DI, [BX + OFFSET RowOfs]    { DI := RowOfs[Y], the 80-byte row table }
+  MOV  BX, FillL          { BX := FillL                                   }
+  SHR  BX, 2              { X div 4 -- four pixels to the byte in Mode X    }
+  ADD  DI, BX             { DI := DI + BX                                 }
+  ADD  DI, WritePage      { and the page being drawn on                     }
+  MOV  DX, $3C4           { Sequencer address register                      }
+  MOV  AL, 2              { register 2 -- Map Mask                          }
+  OUT  DX, AL             { write AL to port DX                           }
+  INC  DX                 { DX now addresses the data register              }
+  MOV  SI, FillL          { SI := FillL                                   }
+  AND  SI, 3              { the left end's plane                            }
+  MOV  BH, [SI + OFFSET LeftMask4]     { both masks packed into one register }
+  MOV  SI, FillR          { SI := FillR                                   }
+  AND  SI, 3              { the right end's plane                           }
+  MOV  BL, [SI + OFFSET RightMask4] { BL := [SI + OFFSET RightMask4]                }
+  MOV  CX, FillR          { CX := FillR                                   }
+  MOV  SI, FillL          { SI := FillL                                   }
+  CMP  CX, SI             { empty or inverted span ?                        }
+  JLE  @@FillPop          { <= : to FillPop                               }
+  DEC  CX                 { the last pixel is exclusive                     }
+  AND  SI, $FFFC          { back to the byte the left end sits in           }
+  SUB  CX, SI             { CX := CX - SI                                 }
+  SHR  CX, 1              { CX := CX shr 1                                }
+  SHR  CX, 1              { CX := how many whole bytes past the first       }
+  JNE  @@FillWide         { <> : to FillWide                              }
+  AND  BH, BL             { one byte only -- both masks apply to it         }
+@@FillWide:               { <- FillWide                                   }
+  MOV  SI, FillY          { DEAD in the original: SI is never read again    }
+  MOV  AH, Colour         { AH carries the colour for every store below     }
+  MOV  BP, $50            { DEAD in the original: 80, the row stride, minus }
+  SUB  BP, CX             { the byte count, less one -- and never read      }
+  DEC  BP                 { before POP BP puts the frame pointer back       }
+  MOV  AL, BH             { the left mask                                   }
+  OUT  DX, AL             { write AL to port DX                           }
+  MOV  AL, AH             { AL := AH                                      }
+  STOSB                   { the first, partly-masked byte                   }
+  DEC  CX                 { CX := CX - 1                                  }
+  JS   @@FillPop          { that was the whole span                         }
+  JE   @@FillRight        { nothing in the middle                          }
+  MOV  AL, $0F            { all four planes for the middle                  }
+  OUT  DX, AL             { write AL to port DX                           }
+  MOV  AL, AH             { AL := AH                                      }
+  SHR  CX, 1              { bytes to words                                  }
+  REP  STOSW              { fill CX words with AX                         }
+  ADC  CX, CX             { the carry out of SHR is the odd byte            }
+  REP  STOSB              { fill CX bytes with AL                         }
+@@FillRight:              { <- FillRight                                  }
+  MOV  AL, BL             { the right mask                                  }
+  OUT  DX, AL             { write AL to port DX                           }
+  MOV  AL, AH             { AL := AH                                      }
+  STOSB                   { the last, partly-masked byte                    }
+@@FillPop:                { <- FillPop                                    }
+  POP  BP                 { the frame pointer is a frame pointer again      }
+@@FillNext:               { <- FillNext                                   }
+  MOV  CX, FillY          { CX := FillY                                   }
+  DEC  CX                 { upwards, one scanline at a time                 }
+  CMP  CX, SY1            { back at the top vertex ?                        }
+  JLE  @@Done             { <= : to Done                                  }
+  JMP  @@FillRow          { to FillRow                                    }
+@@Done:                   { <- Done                                       }
 end;
 
 { --------------------------------------------------------------------------
-  108b:09b1 -- Poly_FillFan(Pts, Count, Colour, Page)
+  108b:09b1 -- Poly_FillFan(Pts, Count, Colour, Page), ALSO assembler
 
-  `if Count < 3 then exit`, then Count-2 triangles all sharing the first
-  point. The Page parameter is passed but never read -- Tri_Fill takes the
-  page from the global instead.
+  It is the only caller of Tri_Fill and it cooperates with that private
+  register interface -- BX, CX, DX and SI loaded, three words pushed -- which
+  no Pascal caller could do, so it is assembler too. It takes its own
+  arguments the ordinary Pascal way.
+
+  `RET $0A` is ten bytes of parameters where the body reads only eight, and
+  the unread pair is the LOWEST, at [BP+$04]: Page is declared and never
+  looked at, because Tri_Fill takes the page from the WritePage global
+  instead. That parameter had been left out of the reconstruction's
+  signature, which made the epilogue RET 8.
+
+  Count - 3 into the counter and `DEC` / `JNS` runs it Count-2 times, one
+  triangle per step, all of them sharing Pts[1]. ES:DI is saved into locals
+  across each call and restored after, because Tri_Fill uses both.
   -------------------------------------------------------------------------- }
 type
   TPointList = array[1..FaceVerts] of record X, Y : Integer end;
 
-procedure FillFan(var Pts : TPointList; Count : Integer; Colour : Byte);
+{ @asm 002 108b:09b1 }
+procedure FillFan(var Pts : TPointList; Count : Integer; Colour : Byte;
+                  Page : Word); assembler;
 var
-  I : Integer;
-begin
-  if Count < 3 then Exit;
-  for I := 2 to Count - 1 do
-    TriFill(Pts[1].X, Pts[1].Y,
-            Pts[I].X, Pts[I].Y,
-            Pts[I + 1].X, Pts[I + 1].Y, Colour);
+  FanX1, FanY1 : Integer;     { [BP-$02], [BP-$04], the shared first vertex }
+  FanLeft      : Integer;     { [BP-$06], triangles still to do             }
+  FanSeg, FanOfs : Word;      { [BP-$08], [BP-$0A], ES:DI across the call   }
+(* EQUIVALENT PASCAL -- REFERENCE ONLY, and it is NOT what is compiled. The
+  assembler below is the transcription. This cannot be a working procedure
+  either, because the call it makes passes four arguments in registers.
+
+    procedure FillFan(var Pts : TPointList; Count : Integer;
+                      Colour : Byte; Page : Word);
+    var I : Integer;
+    begin
+      if Count < 3 then Exit;           { a fan needs three points          }
+      for I := 2 to Count - 1 do        { Count-2 triangles, DEC/JNS below  }
+        TriFill(Pts[1].X, Pts[1].Y,     { the shared first vertex           }
+                Pts[I].X, Pts[I].Y,
+                Pts[I + 1].X, Pts[I + 1].Y, Colour);
+      { Page is declared and never read -- TriFill takes the page from the
+        WritePage global. It is what makes the epilogue RET $0A and not 8. }
+    end;
+    EQUIVALENT PASCAL ends here -- REFERENCE ONLY, none of it compiled  *)
+asm
+  MOV  CX, Count          { CX := Count                                   }
+  CMP  CX, 3              { a fan needs three points                        }
+  JL   @@FanDone          { < : to FanDone                                }
+  SUB  CX, 3              { CX := CX - 3                                  }
+  MOV  FanLeft, CX        { Count-3, so DEC/JNS turns Count-2 times         }
+  LES  DI, Pts            { ES:DI := the point list                         }
+  MOV  AX, ES:[DI]        { AX := ES:[DI]                                 }
+  MOV  FanX1, AX          { the vertex every triangle shares                }
+  MOV  AX, ES:[DI + 2]    { AX := ES:[DI + 2]                             }
+  MOV  FanY1, AX          { FanY1 := AX                                   }
+@@FanTri:                 { <- FanTri                                     }
+  ADD  DI, 4              { on to the next pair                             }
+  MOV  BX, FanX1          { Tri_Fill's X1, in a register                    }
+  MOV  CX, FanY1          { Y1                                              }
+  MOV  DX, ES:[DI]        { X2                                              }
+  MOV  SI, ES:[DI + 2]    { Y2                                              }
+  MOV  AX, ES:[DI + 4]    { AX := ES:[DI + 4]                             }
+  PUSH AX                 { X3, on the stack                                }
+  MOV  AX, ES:[DI + 6]    { AX := ES:[DI + 6]                             }
+  PUSH AX                 { Y3                                             }
+  MOV  AX, WORD PTR Colour  { the WORD, as 108b:09ed does -- a Byte value    }
+  PUSH AX                 { parameter still occupies a whole stack word     }
+  MOV  FanSeg, ES         { Tri_Fill uses ES:DI, so keep them               }
+  MOV  FanOfs, DI         { FanOfs := DI                                  }
+  CALL TriFill            { call TriFill                                  }
+  MOV  ES, FanSeg         { ES := FanSeg                                  }
+  MOV  DI, FanOfs         { DI := FanOfs                                  }
+  DEC  FanLeft            { FanLeft := FanLeft - 1                        }
+  JNS  @@FanTri           { not negative : to FanTri                      }
+@@FanDone:                { <- FanDone                                    }
 end;
 
 { [transcribed] 108b:0b42 star loop -- 500 points through P2View's Plot. }
@@ -650,7 +1459,7 @@ begin
       Pts[K].X := O.Scr[O.Face[F].Idx[K]].X;
       Pts[K].Y := O.Scr[O.Face[F].Idx[K]].Y;
     end;
-    FillFan(Pts, O.Face[F].Count, O.Face[F].Colour);
+    FillFan(Pts, O.Face[F].Count, O.Face[F].Colour, WritePage);
   end;
 end;
 

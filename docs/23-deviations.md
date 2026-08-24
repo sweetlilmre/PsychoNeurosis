@@ -364,3 +364,16 @@ Findings from that comparison belong here. The first one:
 
 - **The globe in part 003 scene 4 is not horizontally centred in the original
   either.** Not a defect in the reconstruction.
+
+## Tri_Fill's two bridged conditionals, `108b:04b6` and `108b:04ce`
+
+**Two single bytes, and the behaviour is identical.** `TriFill` is transcribed verbatim as a Borland `assembler` procedure and rebuilds 1,250 of its 1,360 bytes identical. Fifty-four of the 56 differing runs are DGROUP addresses, which is the reconstruction's data layout rather than its code. The other two are one byte each, at `108b:04b6` and `108b:04ce`, and they are the same construct in the flat-top and flat-bottom cases:
+
+    original   JGE  <bridge>      ; bridge jumps to the exit
+               JMP  <flat walk>
+    ours       JL   <bridge>      ; bridge jumps to the flat walk
+               JMP  <exit>
+
+A conditional jump can only reach +/-127 bytes, and both targets here are over a thousand away, so the assembler must invert one branch and bridge it with a near `JMP`. Borland's assembler picks the opposite sense to the original's producer. The two forms take the same branch on the same comparison and arrive at the same place; only which of the two destinations gets the short hop differs.
+
+**Not worth fixing.** Matching it exactly means writing an artificial label so the `JGE` is the bridged one, which buys two bytes the coverage walk already forgives -- its default rule excuses isolated runs shorter than three -- at the cost of a construct in the source that exists only to satisfy a byte comparison.

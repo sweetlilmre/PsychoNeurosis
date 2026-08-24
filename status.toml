@@ -6,7 +6,7 @@
 # [plan] is DECIDED: investigation order is the priority order.
 
 [coverage]
-targets = 78
+targets = 80
 
 [routine."DEMOVT.GetVolume"]
 matched = 21
@@ -395,6 +395,11 @@ note = "DONE, and the span is gone from the list. ObjTransform at 108b:00bf was 
 label = "TObj vectors are records, read under nested with"
 investigation = "pacing"
 note = "SETTLED BY A PROBE, not by an argument, and the probe is committed as probe/WITHTMP.PAS. ObjTransform's declared locals had already been matched byte for byte -- the loop counter lands at [BP-$0a] in both -- and the rebuild still opened ENTER $30 against the original's $36. The six-byte gap was entirely COMPILER TEMP: the original spills two far pointers, @O at [BP-$32] loaded once from [BP+$10], and a scratch field address at [BP-$36] RECOMPUTED per group (@O.Accum at 108b:00cc, @O.Angle at 108b:01b6), with every access through the second reading es:[di], es:[di+4], es:[di+8] rather than a displacement from @O. The probe compiles one routine FOUR ways with byte-identical declarations so that any frame difference is the construct and nothing else: arrays plain $30, arrays with $34, records plain $30, RECORDS WITH $36. IT TAKES BOTH CHANGES AND NEITHER ALONE, which is why guessing at either one would have failed and been read as the hypothesis being wrong. The probe's prologue is also instruction-for-instruction the original's, both temps at the same offsets, differing only in the field displacements its own record layout produces. Applied: TObj's Angle, Trans, Pivot and Accum become TVec3 records rather than array[1..3] of LongInt, and ObjTransform is rewritten with `with O do` around the routine and `with Accum do` and `with Angle do` around the two groups. Pivot is deliberately NOT inside a `with` -- 108b:018f reloads [BP-$32] and adds $B39, so the original reaches it through @O. One further correction fell out of the probe's disassembly: the wrap is `X := X + 3600`, not `Inc(X, 3600)`. The original loads the pair into AX:DX, adds and stores back at 108b:00e8..00f8; Inc compiles to an in-place ADD/ADC on memory. Same arithmetic, four bytes apart. RESULT: ObjTransform now opens ENTER $36, part 002 moves 51.0% to 53.0%, and routines.py is unchanged at 74 locked, 0 failing. Only 21 call sites needed the field-name change and all were in this unit."
+
+[plan.row."002 108b:0461"]
+label = "Tri_Fill and Poly_FillFan are hand asm, not Pascal"
+investigation = "pacing"
+note = "Transcribed as Borland assembler procedures. Tri_Fill 1250 of 1360 bytes identical (91.9 percent), 56 differing runs, none longer than two bytes and no opcode among them: 54 are DGROUP addresses and 2 are BASM bridging a long conditional with the opposite sense. Poly_FillFan byte-identical, all 88. The 1276-byte span at 108b:0442..093e closed and part 002 went 57.3 to 64.3 percent, plus 1339 bytes, the largest single move recorded. Owed: a watched TPART2 run, because this is the per-frame polygon filler and pacing is what the investigation is about."
 
 [plan.row."002 108b:0e03"]
 label = "$G-/$N- codegen vs the binary's"

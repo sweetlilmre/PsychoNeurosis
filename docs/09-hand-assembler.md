@@ -8,7 +8,7 @@ paraphrasing them into Pascal, so it matters that we can tell them apart.
 
 **Compiled Borland Pascal 7:**
 
-- `ENTER` / `LEAVE` with BP-relative locals
+- ~~`ENTER` / `LEAVE` with BP-relative locals~~ -- **WITHDRAWN, 24 Aug 2026.** This is not a tell in either direction and it cost this project the largest unaligned span in the corpus. Borland emits its standard frame for an `assembler` procedure that declares local variables, so a hand-written routine with locals opens `ENTER n, 0` exactly like a compiled one. `Tri_Fill` at `108b:0461` opens `ENTER $28` over 40 bytes of declared locals and is hand assembler throughout; it was read as compiled Pascal for that reason, transcribed as Pascal, and 1,276 bytes never aligned.
 - calls into RTL helpers for range checks, long arithmetic, Real conversion
 - a multiply where a lookup table would do
 - arguments on the stack, results in AX/DX
@@ -21,6 +21,10 @@ paraphrasing them into Pascal, so it matters that we can tell them apart.
 - precomputed offset tables instead of multiplies
 - fully unrolled bodies — BP7 does not unroll loops
 - arguments arriving in registers (BX/CX/DX) rather than on the stack
+- **BP used as a scratch register** between a `PUSH BP` and a `POP BP` inside a framed routine. The code generator will not clobber its own frame pointer, and every BP-relative operand in such a stretch is necessarily read before the clobber.
+- **a general-purpose value parked in a segment register** — `MOV ES,BX` to free BX as an index — which no code generator has any notion of doing
+- **`REP STOSW` / `ADC CX,CX` / `REP STOSB` inline**, the word-then-odd-byte fill. `FillChar` is a far call into the runtime and is never inlined.
+- **every two-byte register-to-register op in the store direction** (`MOV AX,BX` as `89 D8`, not `8B C3`). This one is a measurement rather than an impression and it is the strongest of the set: the general form, what it can and cannot identify, and a conclusion it was first read wrong are in the wiki, [`direction-bit-names-basm`](../kit/wiki/observations/direction-bit-names-basm/observation.md).
 
 ## Confirmed hand assembler
 
@@ -41,6 +45,8 @@ straight into `MOV DX,$3DA`, out via `RETF`.
 | `VGA_Set400Lines` | `1139:02f2` | bare CRTC read-modify-write |
 | `Morph_TransformPoint` | `1139:0096` | args in BX/CX/DX, results in DI/BX |
 | `ModeX_PlotPixel` | `1139:01bb` | consumes DI/BX directly |
+| `Tri_Fill` | `108b:0461` | 62 of 62 reg-to-reg ops store direction; BP clobbered; `ES` parked; inline `REP STOSW`; X1/Y1/X2/Y2 in BX/CX/DX/SI |
+| `Poly_FillFan` | `108b:09b1` | loads BX/CX/DX/SI for the call above, which no Pascal caller can do |
 
 ## Strong candidates, not yet transcribed
 
