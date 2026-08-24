@@ -89,13 +89,16 @@ type
     Spare2 : Byte;
     Depth  : Integer;
   end;
+  { Named so a renderer's local copy can be ASSIGNED from the field: an
+    anonymous array type is not assignment-compatible with another. }
+  TFaceArray = array[1..MaxFaces] of TFace;
   TVec3 = record X, Y, Z : LongInt end;   { +0, +4, +8 }
   TObj = record
     VertCount : Integer;                        { +$000 }
     FaceCount : Integer;                        { +$002 }
     Vert  : array[1..MaxVerts] of TVertex;      { +$004 }
     Scr   : array[1..MaxVerts] of TScreen;      { +$388 }
-    Face  : array[1..MaxFaces] of TFace;        { +$54A }
+    Face  : TFaceArray;                         { +$54A }
     { RECORDS, NOT array[1..3], and a probe settled it rather than an
       argument. ObjTransform's frame is ENTER $36 and the reconstruction's
       was $30 with the declared locals already matching byte for byte; the
@@ -413,20 +416,22 @@ var
   BestKey : Integer;                          { [BP-$112e] -- INTEGER, not LongInt }
   Best    : Integer;                          { [BP-$1130] }
   Slot    : Integer;                          { [BP-$1132] }
-  N       : Integer;                          { [BP-$1134] -- FaceCount, re-read }
-  C       : Integer;                          { [BP-$1136] -- Face[F].Count }
+  { AND NOTHING BELOW SLOT. [BP-$1134] and [BP-$1136] are the CODE
+    GENERATOR'S loop-bound temporaries, not declarations -- 108b:0e1a reads
+    Tmp.FaceCount into [BP-$1134] and then compares against it, which is
+    what a `for` limit that is not a constant costs. Declaring them produced
+    both ours and the compiler's and put the frame over at $113c. The same
+    mistake was made in all three renderers; see the note there. }
 begin
   Tmp := O;                                   { 108b:0e15, Move of $B51 bytes }
-  N := Tmp.FaceCount;                         { 108b:0e1a }
-  for F := 1 to N do
+  for F := 1 to Tmp.FaceCount do              { the limit temp is 108b:0e1a }
   begin
     { THE ACCUMULATOR IS THE DEPTH FIELD ITSELF and it is SIXTEEN BIT. The
       reconstruction summed into a LongInt and divided that; the original adds
       each vertex's D straight into Tmp.Face[F].Depth with a word ADD at
       108b:0e85 and stores it back each time. }
     Tmp.Face[F].Depth := 0;                   { 108b:0e3f }
-    C := Tmp.Face[F].Count;                   { 108b:0e48 }
-    for K := 1 to C do
+    for K := 1 to Tmp.Face[F].Count do        { the limit temp is 108b:0e48 }
       Tmp.Face[F].Depth := Tmp.Face[F].Depth
                          + Tmp.Scr[Tmp.Face[F].Idx[K]].D;
     { AND THE DIVISOR IS THE FIELD, NOT C. 108b:0eab is
@@ -441,8 +446,7 @@ begin
   repeat
     BestKey := 0;                             { 108b:0ecb }
     Best    := 0;                             { 108b:0ed3 }
-    N := Tmp.FaceCount;                       { 108b:0ed7 -- re-read per pass }
-    for F := 1 to N do
+    for F := 1 to Tmp.FaceCount do            { re-read per pass, 108b:0ed7 }
       if Tmp.Face[F].Depth < BestKey then     { 108b:0eff, smallest key wins }
       begin
         BestKey := Tmp.Face[F].Depth;
@@ -1387,15 +1391,6 @@ asm
 @@FanDone:                { <- FanDone                                    }
 end;
 
-{ [transcribed] 108b:0b42 star loop -- 500 points through P2View's Plot. }
-procedure DrawStars;
-var
-  I : Integer;
-begin
-  for I := 1 to StarCount do
-    Plot(Star[I].X, Star[I].Y, Star[I].Z);
-end;
-
 { --------------------------------------------------------------------------
   108b:0422 -- DrawSprite
 
@@ -1510,47 +1505,175 @@ end;
       B   500 stars, then the badge
       C   nothing
   -------------------------------------------------------------------------- }
-procedure RenderFaces(var O : TObj);
+{ 108b:0b42 -- takes the object BY VALUE }
+procedure RenderA(O : TObj);
 var
-  F, K : Integer;
-  Pts  : TPointList;
+  { ENTER $1154 = 4,436 bytes, and the FIRST 2,897 of them are the value
+    parameter's own copy at [BP-$0b51] -- the compiler's, not ours. The
+    declared locals start below it, so Pts is nearer BP than Faces. }
+  Pts   : TPointList;                    { [BP-$0b71], 32 bytes }
+  { A LOCAL COPY OF THE FACE ARRAY, taken before anything else runs:
+    108b:0b6a pushes both addresses and $5D7 = 1,495 and calls the runtime
+    Move. Count, Idx and Colour are all read from this copy afterwards, while
+    the screen coordinates come from the value parameter's copy. }
+  Faces : TFaceArray;                    { [BP-$1148], 1,495 bytes }
+  F     : Integer;                       { [BP-$114a], 14 references }
+  K     : Integer;                       { [BP-$114c] }
+  { ONE declared Byte, written 0 at the top of every face and never read --
+    108b:0bd7 is `MOV BYTE PTR [BP-$114f], 0`. It is a declaration and not a
+    temporary because the frame does not close without it: the compiler's own
+    temporaries come to six bytes here, and 2,897 + 1,531 + 6 rounds to
+    $1152, two short of the original's $1154. With this byte the declared
+    total is odd, the frame rounds up, and $1154 is exact. }
+  Flag  : Byte;
+  { AND NOTHING ELSE BEYOND IT. The eight bytes below K -- a byte at [BP-$114f] written
+    0 and never read, and words at [BP-$1151] and [BP-$1153] -- are the CODE
+    GENERATOR'S, not declarations. 108b:0bb9 reads O.FaceCount into
+    [BP-$1151] and then compares against it: that is a `for` loop's upper
+    bound evaluated once into a temporary, which is what a non-constant limit
+    costs. Declaring them as locals produced BOTH ours and the compiler's and
+    put the frame 8 bytes over at $115c.
+
+    Two things follow that are worth keeping. A WORD AT AN ODD BP OFFSET IS
+    NOT PROOF OF A ONE-BYTE LOCAL DECLARED BEFORE IT -- it can be a
+    temporary, and here it is. And `prologue.py`'s note that no bytes lie
+    beyond the lowest touched slot does NOT mean there are no temporaries:
+    it cannot see a temporary that is touched, which every loop bound is. }
 begin
+  Faces := O.Face;
+  { the starfield, inline -- 108b:0b6f reads Star[F] at stride 6 straight out
+    of DGROUP, X at +0, Y at +2 and Z as the colour byte at +4 }
+  for F := 1 to StarCount do
+    Plot(Star[F].X, Star[F].Y, Star[F].Z);
   for F := 1 to O.FaceCount do
   begin
-    for K := 1 to O.Face[F].Count do
+    Flag := 0;
+    for K := 1 to Faces[F].Count do
     begin
-      Pts[K].X := O.Scr[O.Face[F].Idx[K]].X;
-      Pts[K].Y := O.Scr[O.Face[F].Idx[K]].Y;
+      Pts[K].X := O.Scr[Faces[F].Idx[K]].X;
+      Pts[K].Y := O.Scr[Faces[F].Idx[K]].Y;
     end;
-    FillFan(Pts, O.Face[F].Count, O.Face[F].Colour, WritePage);
+    { Count is read AGAIN here rather than reusing C -- 108b:0c61 is a fresh
+      `PUSH WORD PTR [BP+DI-$115F]` -- and the colour is a byte widened with
+      XOR AH,AH. }
+    FillFan(Pts, Faces[F].Count, Faces[F].Colour, WritePage);
   end;
-end;
-
-procedure FlipAndSwap;
-begin
+  { FlipAndSwap, inline }
   FlipPage(WritePage);
   PageIndex := (PageIndex + 1) mod 2;
 end;
 
-procedure RenderA(var O : TObj);
+{ 108b:0ca1 -- takes the object BY VALUE }
+procedure RenderB(O : TObj);
+var
+  { ENTER $1154 = 4,436 bytes, and the FIRST 2,897 of them are the value
+    parameter's own copy at [BP-$0b51] -- the compiler's, not ours. The
+    declared locals start below it, so Pts is nearer BP than Faces. }
+  Pts   : TPointList;                    { [BP-$0b71], 32 bytes }
+  { A LOCAL COPY OF THE FACE ARRAY, taken before anything else runs:
+    108b:0cc9 pushes both addresses and $5D7 = 1,495 and calls the runtime
+    Move. Count, Idx and Colour are all read from this copy afterwards, while
+    the screen coordinates come from the value parameter's copy. }
+  Faces : TFaceArray;                    { [BP-$1148], 1,495 bytes }
+  F     : Integer;                       { [BP-$114a], 14 references }
+  K     : Integer;                       { [BP-$114c] }
+  { ONE declared Byte, written 0 at the top of every face and never read --
+    108b:0bd7 is `MOV BYTE PTR [BP-$114f], 0`. It is a declaration and not a
+    temporary because the frame does not close without it: the compiler's own
+    temporaries come to six bytes here, and 2,897 + 1,531 + 6 rounds to
+    $1152, two short of the original's $1154. With this byte the declared
+    total is odd, the frame rounds up, and $1154 is exact. }
+  Flag  : Byte;
+  { AND NOTHING ELSE BEYOND IT. The eight bytes below K -- a byte at [BP-$114f] written
+    0 and never read, and words at [BP-$1151] and [BP-$1153] -- are the CODE
+    GENERATOR'S, not declarations. 108b:0bb9 reads O.FaceCount into
+    [BP-$1151] and then compares against it: that is a `for` loop's upper
+    bound evaluated once into a temporary, which is what a non-constant limit
+    costs. Declaring them as locals produced BOTH ours and the compiler's and
+    put the frame 8 bytes over at $115c.
+
+    Two things follow that are worth keeping. A WORD AT AN ODD BP OFFSET IS
+    NOT PROOF OF A ONE-BYTE LOCAL DECLARED BEFORE IT -- it can be a
+    temporary, and here it is. And `prologue.py`'s note that no bytes lie
+    beyond the lowest touched slot does NOT mean there are no temporaries:
+    it cannot see a temporary that is touched, which every loop bound is. }
 begin
-  DrawStars;
-  RenderFaces(O);
-  FlipAndSwap;
+  Faces := O.Face;
+  { the starfield, inline -- 108b:0cce reads Star[F] at stride 6 straight out
+    of DGROUP, X at +0, Y at +2 and Z as the colour byte at +4 }
+  for F := 1 to StarCount do
+    Plot(Star[F].X, Star[F].Y, Star[F].Z);
+  DrawRewind;
+  for F := 1 to O.FaceCount do
+  begin
+    Flag := 0;
+    for K := 1 to Faces[F].Count do
+    begin
+      Pts[K].X := O.Scr[Faces[F].Idx[K]].X;
+      Pts[K].Y := O.Scr[Faces[F].Idx[K]].Y;
+    end;
+    { Count is read AGAIN here rather than reusing C -- 108b:0dc0 is a fresh
+      `PUSH WORD PTR [BP+DI-$115F]` -- and the colour is a byte widened with
+      XOR AH,AH. }
+    FillFan(Pts, Faces[F].Count, Faces[F].Colour, WritePage);
+  end;
+  { FlipAndSwap, inline }
+  FlipPage(WritePage);
+  PageIndex := (PageIndex + 1) mod 2;
 end;
 
-procedure RenderB(var O : TObj);
-begin
-  DrawStars;
-  DrawRewind;                          { 108b:0d18 }
-  RenderFaces(O);
-  FlipAndSwap;
-end;
+{ 108b:0a2d -- takes the object BY VALUE }
+procedure RenderC(O : TObj);
+var
+  { ENTER $1154 = 4,436 bytes, and the FIRST 2,897 of them are the value
+    parameter's own copy at [BP-$0b51] -- the compiler's, not ours. The
+    declared locals start below it, so Pts is nearer BP than Faces. }
+  Pts   : TPointList;                    { [BP-$0b71], 32 bytes }
+  { A LOCAL COPY OF THE FACE ARRAY, taken before anything else runs:
+    108b:0a55 pushes both addresses and $5D7 = 1,495 and calls the runtime
+    Move. Count, Idx and Colour are all read from this copy afterwards, while
+    the screen coordinates come from the value parameter's copy. }
+  Faces : TFaceArray;                    { [BP-$1148], 1,495 bytes }
+  F     : Integer;                       { [BP-$114a], 14 references }
+  K     : Integer;                       { [BP-$114c] }
+  { ONE declared Byte, written 0 at the top of every face and never read --
+    108b:0bd7 is `MOV BYTE PTR [BP-$114f], 0`. It is a declaration and not a
+    temporary because the frame does not close without it: the compiler's own
+    temporaries come to six bytes here, and 2,897 + 1,531 + 6 rounds to
+    $1152, two short of the original's $1154. With this byte the declared
+    total is odd, the frame rounds up, and $1154 is exact. }
+  Flag  : Byte;
+  { AND NOTHING ELSE BEYOND IT. The eight bytes below K -- a byte at [BP-$114f] written
+    0 and never read, and words at [BP-$1151] and [BP-$1153] -- are the CODE
+    GENERATOR'S, not declarations. 108b:0bb9 reads O.FaceCount into
+    [BP-$1151] and then compares against it: that is a `for` loop's upper
+    bound evaluated once into a temporary, which is what a non-constant limit
+    costs. Declaring them as locals produced BOTH ours and the compiler's and
+    put the frame 8 bytes over at $115c.
 
-procedure RenderC(var O : TObj);
+    Two things follow that are worth keeping. A WORD AT AN ODD BP OFFSET IS
+    NOT PROOF OF A ONE-BYTE LOCAL DECLARED BEFORE IT -- it can be a
+    temporary, and here it is. And `prologue.py`'s note that no bytes lie
+    beyond the lowest touched slot does NOT mean there are no temporaries:
+    it cannot see a temporary that is touched, which every loop bound is. }
 begin
-  RenderFaces(O);
-  FlipAndSwap;
+  Faces := O.Face;
+  for F := 1 to O.FaceCount do
+  begin
+    Flag := 0;
+    for K := 1 to Faces[F].Count do
+    begin
+      Pts[K].X := O.Scr[Faces[F].Idx[K]].X;
+      Pts[K].Y := O.Scr[Faces[F].Idx[K]].Y;
+    end;
+    { Count is read AGAIN here rather than reusing C -- 108b:0b4c is a fresh
+      `PUSH WORD PTR [BP+DI-$115F]` -- and the colour is a byte widened with
+      XOR AH,AH. }
+    FillFan(Pts, Faces[F].Count, Faces[F].Colour, WritePage);
+  end;
+  { FlipAndSwap, inline }
+  FlipPage(WritePage);
+  PageIndex := (PageIndex + 1) mod 2;
 end;
 
 { --------------------------------------------------------------------------

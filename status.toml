@@ -247,9 +247,9 @@ outcome = "differs"
 achieved = "R2"
 observer = "maintainer"
 date = "2026-08-24"
-confirmed_at = "e1ac3690039d"
+confirmed_at = "1d74244951db"
 fingerprint = "def2481f9e409647"
-note = "Watched beside ORIG2 after the Tri_Fill and Poly_FillFan transcription. Still slower than the original. The polygon filler is no longer the whole story, so the remaining pacing cause in part 002 is elsewhere and more routines in this segment may be hand assembler transcribed as Pascal."
+note = "Watched beside ORIG2 after Choreography was inlined and ObjSortFaces rebuilt to copy the object into its frame. MEASURABLY BETTER: still slower than the original but by much less. That is the first evidence for the addressing-mode hypothesis - the original copies the object into the stack frame once and then works SS-relative, where the reconstruction read through the far var pointer per access. Look for the same pattern in the other per-frame routines."
 
 [observation."TPART3"]
 harness = "TPART3"
@@ -405,6 +405,16 @@ note = "Three defects in one 100-byte routine, now byte-identical bar the far-ca
 label = "Tri_Fill and Poly_FillFan are hand asm, not Pascal"
 investigation = "pacing"
 note = "Transcribed as Borland assembler procedures. Tri_Fill 1250 of 1360 bytes identical (91.9 percent), 56 differing runs, none longer than two bytes and no opcode among them: 54 are DGROUP addresses and 2 are BASM bridging a long conditional with the opposite sense. Poly_FillFan byte-identical, all 88. The 1276-byte span at 108b:0442..093e closed and part 002 went 57.3 to 64.3 percent, plus 1339 bytes, the largest single move recorded. Owed: a watched TPART2 run, because this is the per-frame polygon filler and pacing is what the investigation is about."
+
+[plan.row."002 108b:0a2d"]
+label = "The three renderers take the object BY VALUE and inline their helpers"
+investigation = "pacing"
+note = "Same trade as ObjSortFaces and the watched run says it is the right one. All three open ENTER 1154h and begin with the compilers value-parameter copy - MOV BX,SS / MOV ES,BX / CLD / LEA DI,[BP-0B51] / LDS SI,[BP+04] / REP MOVSB - so each takes the object by value and copies 2897 bytes into its own frame, then addresses SS-relative throughout. They also inline DrawStars, RenderFaces and FlipAndSwap, none of which exists as a routine in the original. All three frames now match exactly. Part 002 75.0 to 78.3 percent."
+
+[plan.row."002 108b:0bb9"]
+label = "Loop-limit temporaries must not be declared"
+investigation = "pacing"
+note = "Four routines in this segment had the compilers for-limit temporaries transcribed as declared locals, which produces both theirs and the compilers and puts the frame over: three renderers 8 bytes over, ObjSortFaces 2. It also forced invented padding bytes, because two of the temporaries sit at ODD offsets and the sub-rule that an odd offset means a preceding one-byte local holds for declarations, not for temporaries. Handing them back to the compiler took the walk 77.4 to 78.3 percent and made all three renderer frames exact. The general rule is the wikis loop-limit-is-a-temporary and prologue.py no longer implies that a touched slot is a declaration."
 
 [plan.row."002 108b:0e03"]
 label = "ObjSortFaces copies the whole object into its frame"
