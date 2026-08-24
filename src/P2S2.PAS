@@ -156,6 +156,10 @@ var
   MCos1, MSin1, MCos2, MSin2, MCos3, MSin3 : LongInt;
   { DS:$87C4 -- the projection scale, 16.16 }
   MScale : LongInt;
+  { DS:$8ED0 -- ONE BYTE, written 1 by Scene2_Setup at 108b:1cae and never
+    read: the whole segment holds exactly that one reference. Declared
+    immediately before Frame, which is what puts it at $8ED0. }
+  SetupDone : Byte;
   { DS:$8ED1 -- a LongInt frame counter, and what drives the text. }
   Frame  : LongInt;
   { DS:$A0C7 and DS:$A0C8 -- two BYTES, and they are GLOBALS, not locals of
@@ -1837,6 +1841,7 @@ begin
     18,408. Whatever 108b:1cd4's six-byte Real is handed to, writing it
     as RealToFixed does not reproduce it, and that is now measured from
     two different starting states. }
+  SetupDone := 1;                     { 108b:1cae, written and never read }
   MScale := Round(MViewW / ScaleDivisor * ScaleFactor * 65536.0);
 
   { ONLY THE ENTERPRISE INCREMENTS ITS INDICES AND HALVES ITS COLOUR. The four
