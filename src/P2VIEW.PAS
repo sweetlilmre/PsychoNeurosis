@@ -18,6 +18,17 @@
 
 unit P2View;
 
+(* 286 CODE ON. Every routine in segment 140c ends `LEAVE / RETF` -- 140c:01de
+   is C9 CB -- and LEAVE is a 286 instruction that Turbo Pascal emits only
+   under the G-plus switch; the G-minus epilogue is POP BP / RETF.
+
+   prologue.py reads this segment as G-minus and it is NOT WRONG so much as
+   BLIND here: it decides by counting ENTER against PUSH BP, and NO routine in
+   this unit declares a local, so both switches emit PUSH BP / MOV BP,SP and
+   there is no ENTER for either to produce. With no locals the entry tells you
+   nothing and only the EXIT does. *)
+{$G+}
+
 interface
 
 const

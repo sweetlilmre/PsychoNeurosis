@@ -1830,6 +1830,13 @@ begin
     the frame did not move and part 002's walk went 57.3% to 57.2%. Whatever
     produces that spill, this is not it. The Round form is kept because it is
     the one that measures better, not because it is believed. }
+  { REFUTED TWICE. Tried again on 24 Aug 2026 once the frame reached $8a
+    on its own -- the first refutation had been confounded by the two
+    loop-limit temporaries being declared as locals, so it was worth
+    re-running. It is still wrong: the walk went 18,409 aligned bytes to
+    18,408. Whatever 108b:1cd4's six-byte Real is handed to, writing it
+    as RealToFixed does not reproduce it, and that is now measured from
+    two different starting states. }
   MScale := Round(MViewW / ScaleDivisor * ScaleFactor * 65536.0);
 
   { ONLY THE ENTERPRISE INCREMENTS ITS INDICES AND HALVES ITS COLOUR. The four
