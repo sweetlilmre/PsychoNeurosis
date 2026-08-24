@@ -35,6 +35,15 @@
 
 unit P2S1;
 
+(* I/O CHECKING OFF. Under the default {$I+} Turbo Pascal emits a far CALL to
+   the runtime's check after every I/O operation that can fail, and the
+   original has none: 1008:00d3 calls Reset and 1008:00d8 goes straight on to
+   the next argument setup. Measured -- adding this removed exactly that call.
+   The command-line form does NOT work here: /$I- was added to build.toml's
+   switch line and the extra call was still emitted, so it was taken out again
+   rather than left sitting in the config looking effective. *)
+{$I-}
+
 interface
 
 procedure Scene1;

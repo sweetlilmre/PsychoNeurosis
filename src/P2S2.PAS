@@ -25,6 +25,9 @@
 
 unit P2S2;
 
+{ I/O checking off -- see the note in P2S1. }
+{$I-}
+
 {$G+}   { 286: the whole segment is ENTER-framed -- Obj_Transform 108b:0e03
           opens ENTER $1136, Tri_Fill 108b:0461 ENTER $28. Under the $G-
           default the compiler multiplies with MUL and doubles the shifts,
@@ -2004,7 +2007,7 @@ end;
       FillRect(0, 0, 320, H, WritePage, 0)          H = 200 or 240
       ObjSortFaces(O)
       RenderA / RenderB / RenderC
-      Inc(Frame)                                    phases 1..11 only
+      Frame := Frame + 1                            phases 1..11 only
       Present                                       phases 1..11 only
 
   PA, PB and PC are the three angle accumulators the phases nudge; they are
@@ -2059,7 +2062,7 @@ begin
     FillRect(0, 0, ScrWidth, 200, WritePage, 0);
     ObjSortFaces(Obj[1]);
     RenderA(Obj[1]);
-    Inc(Frame);
+    Frame := Frame + 1;
     Present;
   end;
   SyncPattern(2, 1);
@@ -2071,7 +2074,7 @@ begin
     FillRect(0, 0, ScrWidth, 200, WritePage, 0);
     ObjSortFaces(Obj[1]);
     RenderA(Obj[1]);
-    Inc(Frame);
+    Frame := Frame + 1;
     Present;
   end;
   for I := 1 to  20 do
@@ -2082,7 +2085,7 @@ begin
     FillRect(0, 0, ScrWidth, 200, WritePage, 0);
     ObjSortFaces(Obj[1]);
     RenderA(Obj[1]);
-    Inc(Frame);
+    Frame := Frame + 1;
     Present;
   end;
 
@@ -2095,7 +2098,7 @@ begin
     FillRect(0, 0, ScrWidth, 200, WritePage, 0);
     ObjSortFaces(Obj[1]);
     RenderA(Obj[1]);
-    Inc(Frame);
+    Frame := Frame + 1;
     Present;
   end;
   for I := 1 to 50 do
@@ -2107,7 +2110,7 @@ begin
     FillRect(0, 0, ScrWidth, 200, WritePage, 0);
     ObjSortFaces(Obj[1]);
     RenderA(Obj[1]);
-    Inc(Frame);
+    Frame := Frame + 1;
     Present;
   end;
   for I := 1 to 50 do
@@ -2118,7 +2121,7 @@ begin
     FillRect(0, 0, ScrWidth, 200, WritePage, 0);
     ObjSortFaces(Obj[1]);
     RenderA(Obj[1]);
-    Inc(Frame);
+    Frame := Frame + 1;
     Present;
   end;
 
@@ -2163,7 +2166,7 @@ begin
     FillRect(0, 0, ScrWidth, 200, WritePage, 0);
     ObjSortFaces(Obj[1]);
     RenderB(Obj[1]);
-    Inc(Frame);
+    Frame := Frame + 1;
     Present;
   end;
   SyncPattern(4, 1);
@@ -2176,7 +2179,7 @@ begin
     FillRect(0, 0, ScrWidth, 200, WritePage, 0);
     ObjSortFaces(Obj[1]);
     RenderB(Obj[1]);
-    Inc(Frame);
+    Frame := Frame + 1;
     Present;
   end;
   for I := 1 to 12 do
@@ -2188,7 +2191,7 @@ begin
     FillRect(0, 0, ScrWidth, 200, WritePage, 0);
     ObjSortFaces(Obj[1]);
     RenderB(Obj[1]);
-    Inc(Frame);
+    Frame := Frame + 1;
     Present;
   end;
   for I := 1 to  5 do
@@ -2199,7 +2202,7 @@ begin
     FillRect(0, 0, ScrWidth, 200, WritePage, 0);
     ObjSortFaces(Obj[1]);
     RenderB(Obj[1]);
-    Inc(Frame);
+    Frame := Frame + 1;
     Present;
   end;
   for I := 1 to 45 do
@@ -2210,7 +2213,7 @@ begin
     FillRect(0, 0, ScrWidth, 200, WritePage, 0);
     ObjSortFaces(Obj[1]);
     RenderB(Obj[1]);
-    Inc(Frame);
+    Frame := Frame + 1;
     Present;
   end;
 

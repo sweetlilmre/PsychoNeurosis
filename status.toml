@@ -441,6 +441,11 @@ label = "Choreography inlines the phase body; PA/PB/PC are Integer locals"
 investigation = "pacing"
 note = "The original has no PhaseFrame, BannerBeat or ClearBannerStrip: prologue.py finds no candidate between 108b:11c1 and 108b:1bbd and the phase body sits inline at 108b:1287, so the reconstruction had three routines the original does not, shifting every routine after them. Inlined all three. PA, PB and PC are LOCALS and INTEGERS, declared PC, PB, PA in slot order, widened with CWD at the call (108b:12a0); six further bytes at BP-08, BP-0a and BP-0c are declared and never read. Frame now matches at ENTER 30e. Part 002 64.3 to 72.1 percent."
 
+[plan.row."002 108b:12e7"]
+label = "Frame := Frame + 1, and I/O checking is OFF per unit"
+investigation = "pacing"
+note = "Part 002 95.4 to 96.2 percent. Choreography is fully aligned. Two findings. Inc(Frame) versus Frame := Frame + 1: 108b:12e7 loads the LongInt into AX:DX, adds 1 with ADD/ADC and stores both words back, where Inc emits an in-place ADD/ADC on memory. The same rule this unit already carried for Obj_SetRotation and ObjTranslate, missed at eleven more sites, each worth 20 bytes in a phase body. AND I/O CHECKING IS OFF: under the default the compiler emits a far CALL to the runtime check after every I/O operation that can fail, and 1008:00d8 goes straight on to the next argument setup. Applied per unit to P2S1 and P2S2. IT IS NOT GLOBAL, and the byte-exact artefacts proved it: adding it to STARTUP.PAS broke TPART0 immediately, so STARTUP is compiled the other way. Reverted and TPART0 is byte-identical again. The command-line form does not work - /$I- was added to build.tomls switch line and the extra call was still emitted, so it was taken out rather than left in the config looking effective."
+
 [plan.row."002 108b:1bbd"]
 label = "Scene2_Setup: 128 dead bytes, order still wrong"
 investigation = "pacing"
