@@ -219,11 +219,35 @@ procedure Project(var X, Y, Z : LongInt);               external; { 108b:362F }
   component. The call sites pass sign-extended LongInts of which the routine
   reads only the low word.
   -------------------------------------------------------------------------- }
-procedure ObjTranslate(var O : TObj; DX, DY, DZ : Integer);
+procedure ObjTranslate(var O : TObj; DX, DY, DZ : LongInt);     { 108b:03be }
 begin
-  Inc(O.Trans.X, IntToFixed(DX));
-  Inc(O.Trans.Y, IntToFixed(DY));
-  Inc(O.Trans.Z, IntToFixed(DZ));
+  { ENTER $04 is FOUR BYTES OF FRAME AND NO DECLARED LOCAL, so the whole
+    frame is one far-pointer temp: 108b:03c5 does `ADD DI, $B2D` once, spills
+    the result to [BP-$04]/[BP-$02], and every access afterwards is
+    es:[di], es:[di+4], es:[di+8] -- offsets 0, 4 and 8 from the Trans base
+    rather than $B2D, $B31 and $B35 from @O. That is `with O.Trans`, and
+    without it the compiler recomputes the address per statement and the
+    frame is empty. probe/WITHTMP.PAS settled the general rule.
+
+    DX, DY and DZ are LongInt because `RET $10` is sixteen bytes of
+    parameters -- the far pointer plus three four-byte values, at [BP+$04],
+    [BP+$08] and [BP+$0c]. Each is read as a single WORD and handed to
+    IntToFixed, whose parameter is an Integer; Turbo Pascal's integer types
+    are assignment-compatible so the compiler truncates, which is exactly the
+    `PUSH WORD PTR [BP+$0c]` at 108b:03cf. }
+  with O.Trans do
+  begin
+    { `X := X + e`, NOT `Inc(X, e)`, and this unit already had the rule
+      written down for Obj_SetRotation without applying it here. The original
+      loads the pair into AX:DX, adds, and stores back -- 108b:03da is
+      `ADD AX, es:[DI]` / `ADC DX, es:[DI+2]` / `MOV es:[DI], AX` /
+      `MOV es:[DI+2], DX` -- where Inc compiles to an in-place ADD/ADC on
+      memory in two instructions. Same arithmetic, and it was the whole
+      remaining 50-byte difference in this routine. }
+    X := X + IntToFixed(DX);
+    Y := Y + IntToFixed(DY);
+    Z := Z + IntToFixed(DZ);
+  end;
 end;
 
 { --------------------------------------------------------------------------
@@ -360,35 +384,74 @@ end;
   -------------------------------------------------------------------------- }
 procedure ObjSortFaces(var O : TObj);
 var
-  F, K, Slot, Best : Integer;
-  BestKey, Sum     : LongInt;
+  { ENTER $1136 is 4,406 bytes and the seven scalars are the DEEPEST slots,
+    so 4,392 bytes of aggregate are declared before them. 4,392 is
+    2,897 + 1,495 exactly -- one whole TObj and one array[1..MaxFaces] of
+    TFace -- and only the first of those is ever addressed.
+
+    THE WHOLE OBJECT IS COPIED INTO THE FRAME. 108b:0e0c takes
+    `LEA DI, [BP-$0B51]`, pushes $B51 and calls the runtime's Move, and every
+    access afterwards is SS-relative off BP: `[BP+DI-$61E]` is
+    Tmp.Face[F].Count, `[BP+DI-$609]` is its Depth at field offset $15, and
+    `[BP+DI-$7CB]` is Tmp.Scr[Idx].D. Nothing in the body reads through the
+    var parameter at all after the copy.
+
+    That is worth more than the byte count. The reconstruction worked through
+    the far `var` pointer for every read, which costs an ES: override and a
+    segment load per access; the original pays one bulk copy and then uses
+    near addressing throughout. It is a candidate mechanism for the pacing
+    investigation -- ours slower wherever 3-D code runs -- and it is the
+    opposite of what a bulk copy looks like from the outside. }
+  Tmp     : TObj;                             { [BP-$0b51] }
+  { 1,495 BYTES DECLARED AND NEVER ADDRESSED. The arithmetic does not close
+    without them and no instruction in 108b:0e03..0f66 reaches that range.
+    Transcribed for the same reason the dead scalars elsewhere in this unit
+    are: it is what the author declared. }
+  Unused  : array[1..MaxFaces] of TFace;      { [BP-$1128] }
+  F       : Integer;                          { [BP-$112a], 17 references }
+  K       : Integer;                          { [BP-$112c] }
+  BestKey : Integer;                          { [BP-$112e] -- INTEGER, not LongInt }
+  Best    : Integer;                          { [BP-$1130] }
+  Slot    : Integer;                          { [BP-$1132] }
+  N       : Integer;                          { [BP-$1134] -- FaceCount, re-read }
+  C       : Integer;                          { [BP-$1136] -- Face[F].Count }
 begin
-  for F := 1 to O.FaceCount do
+  Tmp := O;                                   { 108b:0e15, Move of $B51 bytes }
+  N := Tmp.FaceCount;                         { 108b:0e1a }
+  for F := 1 to N do
   begin
-    FaceCopy[F] := O.Face[F];
-    Sum := 0;
-    for K := 1 to FaceCopy[F].Count do
-      Inc(Sum, O.Scr[FaceCopy[F].Idx[K]].D);
-    if FaceCopy[F].Count <> 0 then
-      FaceCopy[F].Depth := Sum div FaceCopy[F].Count
-    else
-      FaceCopy[F].Depth := 0;
+    { THE ACCUMULATOR IS THE DEPTH FIELD ITSELF and it is SIXTEEN BIT. The
+      reconstruction summed into a LongInt and divided that; the original adds
+      each vertex's D straight into Tmp.Face[F].Depth with a word ADD at
+      108b:0e85 and stores it back each time. }
+    Tmp.Face[F].Depth := 0;                   { 108b:0e3f }
+    C := Tmp.Face[F].Count;                   { 108b:0e48 }
+    for K := 1 to C do
+      Tmp.Face[F].Depth := Tmp.Face[F].Depth
+                         + Tmp.Scr[Tmp.Face[F].Idx[K]].D;
+    { AND THE DIVISOR IS THE FIELD, NOT C. 108b:0eab is
+      `IDIV WORD PTR [BP+DI-$61E]`, a fresh read of Tmp.Face[F].Count, and
+      there is NO ZERO GUARD -- the reconstruction had `if Count <> 0`, which
+      the original does not. A face with no vertices would divide-error here
+      in 1994 too, so the data never has one. }
+    Tmp.Face[F].Depth := Tmp.Face[F].Depth div Tmp.Face[F].Count;
   end;
 
-  Slot := 1;
+  Slot := 1;                                  { 108b:0ec5 }
   repeat
-    Best    := 0;
-    BestKey := 0;
-    for F := 1 to O.FaceCount do
-      if FaceCopy[F].Depth < BestKey then
+    BestKey := 0;                             { 108b:0ecb }
+    Best    := 0;                             { 108b:0ed3 }
+    N := Tmp.FaceCount;                       { 108b:0ed7 -- re-read per pass }
+    for F := 1 to N do
+      if Tmp.Face[F].Depth < BestKey then     { 108b:0eff, smallest key wins }
       begin
-        BestKey := FaceCopy[F].Depth;
+        BestKey := Tmp.Face[F].Depth;
         Best    := F;
       end;
-    if Best > 0 then
+    if Best > 0 then                          { 108b:0f20 }
     begin
-      O.Face[Slot] := FaceCopy[Best];
-      FaceCopy[Best].Depth := 0;
+      O.Face[Slot] := Tmp.Face[Best];         { 108b:0f44, Move of 23 bytes }
+      Tmp.Face[Best].Depth := 0;
       Inc(Slot);
     end;
   until Best = 0;
@@ -1676,52 +1739,29 @@ end;
   passed to ObjTransform in the order (PC, PA, PB), which is how 108b:12a0
   pushes them.
   =========================================================================== }
-var
-  PA, PB, PC : LongInt;
-
-procedure PhaseFrame(var O : TObj; DX, DY, DZ : Integer;
-                     ClearH : Integer; Kind : Integer; Counted : Boolean);
-begin
-  ObjTranslate(O, DX, DY, DZ);
-  ObjTransform(O, PC, PA, PB);
-  WritePage := PageBase[PageIndex];
-  FillRect(0, 0, ScrWidth, ClearH, WritePage, 0);
-  ObjSortFaces(O);
-  case Kind of
-    0 : RenderA(O);
-    1 : RenderB(O);
-    2 : RenderC(O);
-  end;
-  if Counted then
-  begin
-    Inc(Frame);
-    Present;
-  end;
-end;
-
-procedure ClearBannerStrip;
-begin
-  WritePage := PageBase[0];
-  FillRect(0, BannerTop, ScrWidth, Rows, WritePage, 0);
-  WritePage := PageBase[1];
-  FillRect(0, BannerTop, ScrWidth, Rows, WritePage, 0);
-end;
-
-procedure BannerBeat;
-var
-  I : Integer;
-begin
-  SyncPattern(3, 1);                  { 108b:15ca }
-  WaitRetrace;
-  DrawBanner;
-  for I := 1 to 50 do WaitRetrace;
-  ClearBannerStrip;
-end;
-
 procedure Choreography;
 var
-  I   : Integer;
-  Buf : array[0..767] of Byte;
+  { 108b:11c1 opens ENTER $30e = 782 bytes, and the buffer is the last
+    declaration, so it runs from [BP-$30e] to [BP-$0f] and fourteen bytes of
+    scalars sit above it. PA, PB and PC are LOCALS here and INTEGERS, not the
+    unit-level LongInts this had before: 108b:12a0 reads [BP-$02], [BP-$06]
+    and [BP-$04] as words and widens each with CWD before the push, which is
+    what an Integer actual for a LongInt formal compiles to.
+
+    Declaration order is the slot order, first declared nearest BP, and the
+    call at 108b:12a0 passes them as (PC, PA, PB) -- so PC is [BP-$02], PB is
+    [BP-$04] and PA is [BP-$06], which fixes the order below. }
+  PC, PB, PA : Integer;          { [BP-$02], [BP-$04], [BP-$06] }
+  { SIX BYTES DECLARED AND NEVER READ. Nothing in 108b:11c1..1bbd addresses
+    [BP-$08], [BP-$0a] or [BP-$0c] -- the slot walk's one-reference rows there
+    are its disp16 scan matching inside immediates, which it warns about, and
+    the disassembly has no such operand. They are transcribed because the
+    frame is 782 bytes and the arithmetic does not close without them; what
+    the author declared and never used is not recoverable, and three Integers
+    is the shape that fits. }
+  Dead1, Dead2, Dead3 : Integer; { [BP-$08], [BP-$0a], [BP-$0c] }
+  I   : Integer;                 { [BP-$0e], 62 references }
+  Buf : array[0..767] of Byte;   { [BP-$30e] }
 begin
   { 108b:11c5 -- a blue ramp into colours 70..90 }
   for I := $46 to $5A do
@@ -1739,43 +1779,168 @@ begin
   FillRect(0, 0, ScrWidth, Rows, Page0Base, 0);
   FillRect(0, 0, ScrWidth, Rows, Page1Base, 0);
 
-  for I := 1 to 100 do PhaseFrame(Obj[1]^,  0, 0,  3, 200, 0, True);
+  for I := 1 to 100 do
+  begin
+    ObjTranslate(Obj[1]^, 0, 0, 3);
+    ObjTransform(Obj[1]^, PC, PA, PB);
+    WritePage := PageBase[PageIndex];
+    FillRect(0, 0, ScrWidth, 200, WritePage, 0);
+    ObjSortFaces(Obj[1]^);
+    RenderA(Obj[1]^);
+    Inc(Frame);
+    Present;
+  end;
   SyncPattern(2, 1);
-  for I := 1 to  80 do PhaseFrame(Obj[1]^,  0, 0,  3, 200, 0, True);
-  for I := 1 to  20 do PhaseFrame(Obj[1]^, -1, 0,  3, 200, 0, True);
+  for I := 1 to  80 do
+  begin
+    ObjTranslate(Obj[1]^, 0, 0, 3);
+    ObjTransform(Obj[1]^, PC, PA, PB);
+    WritePage := PageBase[PageIndex];
+    FillRect(0, 0, ScrWidth, 200, WritePage, 0);
+    ObjSortFaces(Obj[1]^);
+    RenderA(Obj[1]^);
+    Inc(Frame);
+    Present;
+  end;
+  for I := 1 to  20 do
+  begin
+    ObjTranslate(Obj[1]^, -1, 0, 3);
+    ObjTransform(Obj[1]^, PC, PA, PB);
+    WritePage := PageBase[PageIndex];
+    FillRect(0, 0, ScrWidth, 200, WritePage, 0);
+    ObjSortFaces(Obj[1]^);
+    RenderA(Obj[1]^);
+    Inc(Frame);
+    Present;
+  end;
 
   for I := 1 to 50 do
   begin
     Inc(PB, 5);  Dec(PC, 2);
-    PhaseFrame(Obj[1]^, -2, 0, 2, 200, 0, True);
+    ObjTranslate(Obj[1]^, -2, 0, 2);
+    ObjTransform(Obj[1]^, PC, PA, PB);
+    WritePage := PageBase[PageIndex];
+    FillRect(0, 0, ScrWidth, 200, WritePage, 0);
+    ObjSortFaces(Obj[1]^);
+    RenderA(Obj[1]^);
+    Inc(Frame);
+    Present;
   end;
   for I := 1 to 50 do
   begin
     Dec(PB, 5);  Inc(PA, 20);  Inc(PC, 2);
-    PhaseFrame(Obj[1]^, -3, 0, 0, 200, 0, True);
+    ObjTranslate(Obj[1]^, -3, 0, 0);
+    ObjTransform(Obj[1]^, PC, PA, PB);
+    WritePage := PageBase[PageIndex];
+    FillRect(0, 0, ScrWidth, 200, WritePage, 0);
+    ObjSortFaces(Obj[1]^);
+    RenderA(Obj[1]^);
+    Inc(Frame);
+    Present;
   end;
-  for I := 1 to 50 do PhaseFrame(Obj[1]^, -3, 0, 0, 200, 0, True);
+  for I := 1 to 50 do
+  begin
+    ObjTranslate(Obj[1]^, -3, 0, 0);
+    ObjTransform(Obj[1]^, PC, PA, PB);
+    WritePage := PageBase[PageIndex];
+    FillRect(0, 0, ScrWidth, 200, WritePage, 0);
+    ObjSortFaces(Obj[1]^);
+    RenderA(Obj[1]^);
+    Inc(Frame);
+    Present;
+  end;
 
-  BannerBeat;                          { 108b:15ca }
+  { 108b:15ca -- the banner beat, inline: the original has no procedure here }
+  SyncPattern(3, 1);
+  WaitRetrace;
+  DrawBanner;
+  for I := 1 to 50 do WaitRetrace;
+  { and the strip clear, also inline -- 108b:15f0 }
+  WritePage := PageBase[0];
+  FillRect(0, BannerTop, ScrWidth, Rows, WritePage, 0);
+  WritePage := PageBase[1];
+  FillRect(0, BannerTop, ScrWidth, Rows, WritePage, 0);
   Delay(300);
-  BannerBeat;                          { 108b:1630 }
+  { 108b:15ca -- the banner beat, inline: the original has no procedure here }
+  SyncPattern(3, 1);
+  WaitRetrace;
+  DrawBanner;
+  for I := 1 to 50 do WaitRetrace;
+  { and the strip clear, also inline -- 108b:15f0 }
+  WritePage := PageBase[0];
+  FillRect(0, BannerTop, ScrWidth, Rows, WritePage, 0);
+  WritePage := PageBase[1];
+  FillRect(0, BannerTop, ScrWidth, Rows, WritePage, 0);
   Delay(300);
-  BannerBeat;                          { 108b:1696 }
+  { 108b:15ca -- the banner beat, inline: the original has no procedure here }
+  SyncPattern(3, 1);
+  WaitRetrace;
+  DrawBanner;
+  for I := 1 to 50 do WaitRetrace;
+  { and the strip clear, also inline -- 108b:15f0 }
+  WritePage := PageBase[0];
+  FillRect(0, BannerTop, ScrWidth, Rows, WritePage, 0);
+  WritePage := PageBase[1];
+  FillRect(0, BannerTop, ScrWidth, Rows, WritePage, 0);
 
-  for I := 1 to 12 do PhaseFrame(Obj[1]^, 12, 0, 0, 200, 1, True);
+  for I := 1 to 12 do
+  begin
+    ObjTranslate(Obj[1]^, 12, 0, 0);
+    ObjTransform(Obj[1]^, PC, PA, PB);
+    WritePage := PageBase[PageIndex];
+    FillRect(0, 0, ScrWidth, 200, WritePage, 0);
+    ObjSortFaces(Obj[1]^);
+    RenderB(Obj[1]^);
+    Inc(Frame);
+    Present;
+  end;
   SyncPattern(4, 1);
   for I := 1 to 12 do
   begin
     Inc(PB, 20);  Dec(PA, 80);  Dec(PC, 8);
-    PhaseFrame(Obj[1]^, 12, 0, 0, 200, 1, True);
+    ObjTranslate(Obj[1]^, 12, 0, 0);
+    ObjTransform(Obj[1]^, PC, PA, PB);
+    WritePage := PageBase[PageIndex];
+    FillRect(0, 0, ScrWidth, 200, WritePage, 0);
+    ObjSortFaces(Obj[1]^);
+    RenderB(Obj[1]^);
+    Inc(Frame);
+    Present;
   end;
   for I := 1 to 12 do
   begin
     Dec(PB, 20);  Inc(PC, 8);
-    PhaseFrame(Obj[1]^, 8, 0, -8, 200, 1, True);
+    ObjTranslate(Obj[1]^, 8, 0, -8);
+    ObjTransform(Obj[1]^, PC, PA, PB);
+    WritePage := PageBase[PageIndex];
+    FillRect(0, 0, ScrWidth, 200, WritePage, 0);
+    ObjSortFaces(Obj[1]^);
+    RenderB(Obj[1]^);
+    Inc(Frame);
+    Present;
   end;
-  for I := 1 to  5 do PhaseFrame(Obj[1]^, 4, 0, -12, 200, 1, True);
-  for I := 1 to 45 do PhaseFrame(Obj[1]^, 0, 0, -12, 200, 1, True);
+  for I := 1 to  5 do
+  begin
+    ObjTranslate(Obj[1]^, 4, 0, -12);
+    ObjTransform(Obj[1]^, PC, PA, PB);
+    WritePage := PageBase[PageIndex];
+    FillRect(0, 0, ScrWidth, 200, WritePage, 0);
+    ObjSortFaces(Obj[1]^);
+    RenderB(Obj[1]^);
+    Inc(Frame);
+    Present;
+  end;
+  for I := 1 to 45 do
+  begin
+    ObjTranslate(Obj[1]^, 0, 0, -12);
+    ObjTransform(Obj[1]^, PC, PA, PB);
+    WritePage := PageBase[PageIndex];
+    FillRect(0, 0, ScrWidth, 200, WritePage, 0);
+    ObjSortFaces(Obj[1]^);
+    RenderB(Obj[1]^);
+    Inc(Frame);
+    Present;
+  end;
 
   { 108b:1941 }
   PA := 0;  PB := 0;  PC := 0;
@@ -1790,7 +1955,12 @@ begin
   for I := 1 to 120 do
   begin
     Inc(PB, 10);  Dec(PA, 40);  Dec(PC, 8);
-    PhaseFrame(Obj[2]^, -20, 0, 10, Rows, 2, False);
+    ObjTranslate(Obj[2]^, -20, 0, 10);
+    ObjTransform(Obj[2]^, PC, PA, PB);
+    WritePage := PageBase[PageIndex];
+    FillRect(0, 0, ScrWidth, Rows, WritePage, 0);
+    ObjSortFaces(Obj[2]^);
+    RenderC(Obj[2]^);
   end;
 
   { 108b:1a26 }
@@ -1802,7 +1972,12 @@ begin
   for I := 1 to 120 do
   begin
     Inc(PA, 10);  Inc(PB, 10);  Inc(PC, 10);
-    PhaseFrame(Obj[3]^, 20, 0, 10, Rows, 2, False);
+    ObjTranslate(Obj[3]^, 20, 0, 10);
+    ObjTransform(Obj[3]^, PC, PA, PB);
+    WritePage := PageBase[PageIndex];
+    FillRect(0, 0, ScrWidth, Rows, WritePage, 0);
+    ObjSortFaces(Obj[3]^);
+    RenderC(Obj[3]^);
   end;
 
   { 108b:1af2 }
