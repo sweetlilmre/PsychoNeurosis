@@ -20,7 +20,7 @@ const
   { the USS Enterprise -- vertices DS:$0004 }
   NVertEnterprise = 75;
   NFaceEnterprise = 55;
-  VertEnterprise : array[1..75, 1..3] of Integer = (
+  VertEnterprise : array[0..74, 0..2] of Integer = (
     (0, 0, 0), (30, -30, 140),
     (-30, -30, 140), (-70, -30, 95),
     (-70, -30, 45), (-30, -30, 0),
@@ -96,7 +96,7 @@ const
   { a revolver, modelled along Y -- vertices DS:$067E }
   NVertRevolver = 68;
   NFaceRevolver = 64;
-  VertRevolver : array[1..68, 1..3] of Integer = (
+  VertRevolver : array[0..67, 0..2] of Integer = (
     (-45, 235, -35), (45, 235, -35),
     (-45, 235, 35), (45, 235, 35),
     (0, 235, 55), (0, 235, -55),
@@ -170,7 +170,7 @@ const
   { a sailboat, modelled along Y -- vertices DS:$0B06 }
   NVertSailboat = 32;
   NFaceSailboat = 21;
-  VertSailboat : array[1..32, 1..3] of Integer = (
+  VertSailboat : array[0..31, 0..2] of Integer = (
     (-295, -95, -5), (300, -95, 0),
     (-380, 15, 0), (-380, 15, 0),
     (-380, 15, 0), (-175, -50, 50),
@@ -205,7 +205,7 @@ const
   { a single quad -- vertices DS:$0CAE }
   NVertQuad = 4;
   NFaceQuad = 1;
-  VertQuad : array[1..4, 1..3] of Integer = (
+  VertQuad : array[0..3, 0..2] of Integer = (
     (-100, -100, 0), (100, -100, 0),
     (100, 100, 0), (-100, 100, 0)
   );

@@ -136,7 +136,14 @@ def emit_p002():
         # so the only place a literal belongs is beside the table it counts.
         out.append(f"  NVert{name} = {nv};")
         out.append(f"  NFace{name} = {nf};")
-        out.append(fmt(f"Vert{name}", f"array[1..{nv}, 1..3] of Integer", verts, 9, group=3))
+        # ZERO-BASED, and the loader indexes it [I - 1, 0..2]. Not a
+        # preference: TP7 folds an array's low bound into the addressing
+        # displacement for a BARE VARIABLE subscript, and the original does
+        # not fold -- it computes the -1 at runtime and leaves the array's
+        # own offset in the displacement. An expression subscript into a
+        # zero-based array reproduces both halves. Worth 42 bytes across
+        # the four loaders; measured, not preferred.
+        out.append(fmt(f"Vert{name}", f"array[0..{nv - 1}, 0..2] of Integer", verts, 9, group=3))
 
         faces, p = [], 0
         for _ in range(nf):

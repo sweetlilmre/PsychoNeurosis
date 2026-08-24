@@ -1916,9 +1916,9 @@ begin
   Obj[1].FaceCount := NFaceEnterprise;
   for I := 1 to Obj[1].VertCount do
   begin
-    Obj[1].Vert[I].X := IntToFixed(VertEnterprise[I, 1] div 2);
-    Obj[1].Vert[I].Y := IntToFixed(VertEnterprise[I, 2] div 2);
-    Obj[1].Vert[I].Z := IntToFixed(VertEnterprise[I, 3] div 2);
+    Obj[1].Vert[I].X := IntToFixed(VertEnterprise[I - 1, 0] div 2);
+    Obj[1].Vert[I].Y := IntToFixed(VertEnterprise[I - 1, 1] div 2);
+    Obj[1].Vert[I].Z := IntToFixed(VertEnterprise[I - 1, 2] div 2);
   end;
   P := 0;
   for I := 1 to Obj[1].FaceCount do
@@ -1954,9 +1954,9 @@ begin
   Obj[2].FaceCount := NFaceRevolver;
   for I := 1 to Obj[2].VertCount do
   begin
-    Obj[2].Vert[I].X := IntToFixed(VertRevolver[I, 1] div 2);
-    Obj[2].Vert[I].Y := IntToFixed(VertRevolver[I, 2] div 2);
-    Obj[2].Vert[I].Z := IntToFixed(VertRevolver[I, 3] div 2);
+    Obj[2].Vert[I].X := IntToFixed(VertRevolver[I - 1, 0] div 2);
+    Obj[2].Vert[I].Y := IntToFixed(VertRevolver[I - 1, 1] div 2);
+    Obj[2].Vert[I].Z := IntToFixed(VertRevolver[I - 1, 2] div 2);
   end;
   P := 0;
   for I := 1 to Obj[2].FaceCount do
@@ -1992,9 +1992,9 @@ begin
   Obj[3].FaceCount := NFaceSailboat;
   for I := 1 to Obj[3].VertCount do
   begin
-    Obj[3].Vert[I].X := IntToFixed(VertSailboat[I, 1] div 2);
-    Obj[3].Vert[I].Y := IntToFixed(VertSailboat[I, 2] div 2);
-    Obj[3].Vert[I].Z := IntToFixed(VertSailboat[I, 3] div 2);
+    Obj[3].Vert[I].X := IntToFixed(VertSailboat[I - 1, 0] div 2);
+    Obj[3].Vert[I].Y := IntToFixed(VertSailboat[I - 1, 1] div 2);
+    Obj[3].Vert[I].Z := IntToFixed(VertSailboat[I - 1, 2] div 2);
   end;
   P := 0;
   for I := 1 to Obj[3].FaceCount do
@@ -2030,9 +2030,9 @@ begin
   Obj[4].FaceCount := NFaceQuad;
   for I := 1 to Obj[4].VertCount do
   begin
-    Obj[4].Vert[I].X := IntToFixed(VertQuad[I, 1] div 2);
-    Obj[4].Vert[I].Y := IntToFixed(VertQuad[I, 2] div 2);
-    Obj[4].Vert[I].Z := IntToFixed(VertQuad[I, 3] div 2);
+    Obj[4].Vert[I].X := IntToFixed(VertQuad[I - 1, 0] div 2);
+    Obj[4].Vert[I].Y := IntToFixed(VertQuad[I - 1, 1] div 2);
+    Obj[4].Vert[I].Z := IntToFixed(VertQuad[I - 1, 2] div 2);
   end;
   P := 0;
   for I := 1 to Obj[4].FaceCount do
