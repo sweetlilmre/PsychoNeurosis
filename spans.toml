@@ -70,3 +70,36 @@ segs = [0x100f, 0x1095, 0x1118, 0x11bb, 0x11ee, 0x1217, 0x1279]
 exe  = "TPART7.EXE"
 rtl  = 0x110c
 segs = [0x100b, 0x100f, 0x1099, 0x10fb]
+
+# THE THREE THAT ALREADY REBUILD BYTE-IDENTICAL, and they are here as a CHECK
+# ON THIS FILE rather than as work. artefact.py holds all three at R7 -- TPART0,
+# TPART9 and TPSYCHO reproduce their originals exactly -- so the coverage walk
+# has a KNOWN ANSWER for them, and anything below 100% is a defect in these
+# segment lists or in spans.py, never in the reconstruction. Nothing else in
+# this file can be checked that way, which is the whole reason they are here.
+#
+# SEGMENT 0x1000 IS INCLUDED FOR THESE and excluded for parts 001-007. That is
+# not an inconsistency. For a part, 0x1000 is the program block and a HARNESS
+# supplies its own, so it can never match by construction; these three are not
+# harnesses -- each rebuilds the whole program -- so their main belongs in the
+# walk like any other segment.
+#
+# NEUROSIS.008 IS ABSENT AND CANNOT BE ADDED HERE. It is DemoVT, third-party,
+# and this repository holds no reconstruction of it -- run/ORIG8.EXE is a copy
+# of the original, not a rebuild. Its byte-exact rebuild is a different repo's
+# job. A row here could only ever measure the original against itself.
+
+[part."000"]
+exe  = "TPART0.EXE"
+rtl  = 0x1213
+segs = [0x1000, 0x11ad, 0x11b1]
+
+[part."009"]
+exe  = "TPART9.EXE"
+rtl  = 0x1069
+segs = [0x1000, 0x1007]
+
+[part."psycho"]
+exe  = "TPSYCHO.EXE"
+rtl  = 0x1019
+segs = [0x1000, 0x100b]

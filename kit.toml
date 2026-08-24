@@ -80,6 +80,11 @@ first_para = 0x1000
 "006" = "work/split/NEUROSIS_006.exe"
 "007" = "work/split/NEUROSIS_007.exe"
 "009" = "work/split/NEUROSIS_009.exe"
+# The launcher is not a NEUROSIS.NNN part, but it IS a rebuild this project
+# measures -- TPSYCHO is byte-identical to it and artefact.py holds it at R7 --
+# so the coverage walk needs a path for it like any other target. Release only:
+# spans.py reads this table and nothing reads an "original" for the launcher.
+"psycho" = "work/split/PSYCHO_EXE.exe"
 
 [encaudit]
 # Where to look for text I/O that leaves the encoding to the locale. This was a
