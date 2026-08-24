@@ -101,10 +101,13 @@ var
   { DS:$40BD, $40BF, $40C1 -- stride 5, indices 1..50. }
   Star : array[1..NumStars] of TStar;
   { DS:$3DC2 -- 256 RGB triples. }
-  { FLAT, and measured: making this TPalette the way P2S2's is cost part 002
-    53 aligned bytes, so this unit's loader really does index it flat. The
-    same source shape is not the same code in both units. }
-  Pal  : array[0..767] of Byte;
+  { 256 entries of THREE BYTES. 1008:0206 reads [DI+$3DC2], [DI+$3DC3] and
+    [DI+$3DC4] off ONE 3*Col index -- the components are addressing
+    displacements. This was tried once on its own and cost 53 aligned bytes,
+    which was the wrong conclusion drawn from a half-change: the loop counter
+    has to become a Byte at the same time, because with an Integer counter the
+    compiler shapes the index differently and neither half lands. }
+  Pal  : TPalette;
   { DS:$4A86 -- the .DAT handle is a GLOBAL, not a local of LoadFrames.
     1008:00bd is `MOV DI,$4A86 / PUSH DS / PUSH DI` for every one of Assign,
     Reset, Seek, BlockRead and Close; a local would be
@@ -414,7 +417,10 @@ end;
   -------------------------------------------------------------------------- }
 procedure Init;
 var
-  Col : Integer;
+  { A BYTE, not an Integer: 1008:01ec writes `MOV BYTE PTR [BP-$01], 0` and
+    1008:01f2 increments it with `INC BYTE PTR`. ENTER $02 is that one byte
+    rounded up. }
+  Col : Byte;
 begin
   for Col := 0 to 255 do
     SetRGB(Col, 0, 0, 0);
@@ -422,7 +428,7 @@ begin
   LoadFrames;
 
   for Col := 0 to 255 do
-    SetRGB(Col, Pal[Col * 3], Pal[Col * 3 + 1], Pal[Col * 3 + 2]);
+    SetRGB(Col, Pal[Col, 0], Pal[Col, 1], Pal[Col, 2]);
 
   Door[0] := DoorW;
   Door[1] := DoorH;

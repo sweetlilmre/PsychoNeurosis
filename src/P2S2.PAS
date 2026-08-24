@@ -122,9 +122,15 @@ type
   { DS:$5448, 1,550 bytes -- assets/part002/font_5x5.bin }
   TFont = array[0..FontCount * 25 - 1] of Byte;
   { the GetMem'd 12,800 bytes -- assets/part002/banner_320x40.png }
-  TBanner = array[0..BannerH * ScrWidth - 1] of Byte;
+  TBanner = array[0..BannerH - 1, 0..ScrWidth - 1] of Byte;
   { DS:$8ED5, 1,462 bytes -- assets/part002/rewind_button.bin }
-  TRewind = array[1..RewindW * RewindH] of Byte;
+  { TWO-DIMENSIONAL. 108b:0443 is `IMUL DI, [BP-$04], $22` then `ADD DI, AX`
+    and reads `[DI-$714E]` -- Y multiplied by the row width directly, X added,
+    and the whole bias folded into the displacement: $8ED5 - 35, which is
+    base + (Y-1)*34 + (X-1). That is `Rewind[Y, X]` on a 2-D array. Flat with
+    `Rewind[(Y-1)*RewindW + X]`, the compiler emits a DEC and multiplies the
+    decremented value instead of folding. }
+  TRewind = array[1..RewindH, 1..RewindW] of Byte;
 
 var
   { FOUR FIXED DGROUP BLOCKS, and $B51 apart at $5A56, $65A7, $70F8 and
@@ -1438,7 +1444,7 @@ var
 begin
   for Y := 1 to RewindH do
     for X := 1 to RewindW do
-      Plot(X, Y, Rewind[(Y - 1) * RewindW + X]);
+      Plot(X, Y, Rewind[Y, X]);
 end;
 
 { --------------------------------------------------------------------------
@@ -1506,9 +1512,9 @@ begin
     for Y := BannerTop to Rows - 1 do
     begin
       WritePage := PageBase[0];
-      Plot(X, Y, Banner^[(Y - BannerTop) * ScrWidth + X]);
+      Plot(X, Y, Banner^[Y - BannerTop, X]);
       WritePage := PageBase[1];
-      Plot(X, Y, Banner^[(Y - BannerTop) * ScrWidth + X]);
+      Plot(X, Y, Banner^[Y - BannerTop, X]);
     end;
 end;
 
