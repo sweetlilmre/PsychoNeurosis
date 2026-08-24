@@ -34,33 +34,55 @@
 
 unit P5S2;
 
-{$N+}   { WHY THIS IS HERE: THE ORIGINAL WAS COMPILED THIS WAY. Not because it
-          made our build faster -- that is a consequence and it is not the
-          reason. The 80x87 instructions at 1096:051a cannot exist unless the
-          unit that produced them was compiled $N+, so matching the original
-          means compiling $N+, and it would still mean that if the rebuild
-          ran no quicker at all.
+{$N+}   { FIRST, SO NOBODY HAS TO REDISCOVER IT: THERE IS NOT ONE RAW 80x87
+          OPCODE IN THE SHIPPED 1994 BINARY, AND THAT IS NOT AN ARGUMENT
+          AGAINST $N+. Under $E+ every 80x87 instruction ships with its
+          two-byte WAIT ESC prefix overwritten by a two-byte INT 34h..3Dh, so
+          what is IN the file is traps. The author had no coprocessor and
+          Turbo Pascal's emulator executed every one of them in 1994. Ours
+          ships and runs them exactly the same way; $E+ was never touched.
 
-          The motion-table build at 1096:051a is 80x87 CODE: FILD the index,
-          FDIV by a SINGLE 180.0 at CS:$03c9, FLD the ten-byte EXTENDED Pi at
-          CS:$03cd, and the $N+ RTL's Sin/Cos/Round on the stack top. Under
-          the $N- default the same 3,424 trig calls go through the software
-          six-byte-Real RTL instead. Two watched runs bracket that change and
-          nothing else about the unit moved between them: the pause was there
-          on 21 Aug 2026 and gone on 24 Aug. WHY it is gone is NOT measured.
-          It is certainly not that we acquired a coprocessor -- neither build
-          has one, and both run the same emulator over the same traps -- so
-          any account of the speed has to be about the two code paths, and
-          nobody has timed them. The plan's part5-386-trio symptom; the 386
-          trio itself was already transcribed.
+          WHY $N+ IS HERE ANYWAY: THE ORIGINAL WAS COMPILED THAT WAY, and the
+          traps are the proof rather than the objection. $N- emits no 80x87
+          instructions at all, so it produces NO TRAPS EITHER -- floating
+          point becomes far calls into the software six-byte-Real library and
+          there is nothing for an emulator to emulate. A trap can only exist
+          if an 80x87 instruction was emitted, so 12 traps in this loop mean
+          $N+. It is a fidelity choice: it would still be the right switch if
+          the rebuild ran no quicker, and it would still be right if the
+          rebuild ran SLOWER.
 
-          $N SAYS WHICH CODE IS EMITTED. IT SAYS NOTHING ABOUT THE EMULATOR,
-          and conflating the two is a mistake this project has now made twice.
-          Those 80x87 instructions SHIP as INT 34h..3Dh traps of identical
-          length under $E+ -- 14 of them sit at 1096:051a in the shipped
-          binary -- and THE AUTHOR HAD NO COPROCESSOR, so in 1994 the emulator
-          executed every one. The RTL patches them back to real opcodes at
-          startup only where a coprocessor is present. See
+          MEASURED, 24 Aug 2026, and this is the check that does not depend on
+          anyone reading a trap correctly: building this unit $N- and walking
+          every byte of part 005 against the 1994 file drops the alignment
+          from 80.4% to 79.2%, 137 bytes FURTHER from the original. Had the
+          original been $N-, that number would have moved the other way.
+
+          THE MOTION TABLE, 1096:051a..0591 -- the loop body, entered by the
+          JMP at 1096:0514. FILD the index, FDIV by a SINGLE 180.0 at CS:$03c9,
+          FLD the ten-byte EXTENDED Pi at CS:$03cd, and the $N+ RTL's Sin
+          (CS:$32ad), Cos (CS:$32b2) and Round on the stack top. It carries
+          TWELVE traps; the fourteen an earlier note put "at 1096:051a" is the
+          count for the whole of Demo_Scene2, 1096:03d7..06b7, and the number
+          was right with the wrong extent attached to it.
+
+          The counter at DS:$63ca runs 0 to 2000 inclusive -- 1096:050f seeds
+          it, 1096:0592 tests against $7D0 -- so the loop turns 2001 times and
+          makes 4,002 trig calls, two a turn. An earlier note said 3,424; that
+          figure is not reproducible from this loop and has been dropped.
+
+          Under the $N- default those same 4,002 calls go through the software
+          six-byte-Real RTL instead. Two watched runs bracket the switch with
+          nothing else in the unit moving between them: the pause was there on
+          21 Aug 2026 and gone on 24 Aug. WHY it is gone is NOT MEASURED. It
+          is certainly not that anything acquired a coprocessor -- neither
+          build has one and both run the emulator over the same traps -- so
+          any account of the speed is about two different pieces of SOFTWARE
+          doing floating point, and nobody has timed them.
+
+          $N SAYS WHICH CODE IS EMITTED. $E SAYS HOW IT SHIPS. Conflating them
+          is a mistake this project has now made three times, the third time
+          inside a corrected account of the first two. See
           docs/23-deviations.md, `NOT a deviation: the x87 emulator traps`. }
 
 interface

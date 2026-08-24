@@ -121,8 +121,18 @@ deviation, no speed difference from this mechanism.
 
 One measured detail worth keeping: byte comparisons against the `_fpu`
 files show 2-byte `CD 3x` vs `9B Dx` holes at every FPU instruction — that
-is the readability patch, not a transcription error. `tools/shapediff.py`
-compares against the BASE binaries for exactly this reason.
+is the readability patch, not a transcription error. `kit/tools/pascal/spans.py`
+compares against the BASE binaries for exactly this reason, and says so in its
+own docstring; the `tools/shapediff.py` this paragraph used to name is archived
+under `archive/pre-kit-scripts`.
+
+### And the corollary that keeps being missed: no raw x87 opcode is evidence of nothing
+
+**There is not one raw 80x87 opcode in any shipped 1994 binary, and that is not an argument that the demo was built `$N-`.** The maintainer raised exactly that on 24 Aug 2026, and it is the strongest form of the confusion: what is in the file is traps, because `$E+` overwrote every instruction's `WAIT ESC` prefix. `$N-` emits no 80x87 instructions at all, so it leaves **no traps either** — floating point becomes far calls into the software six-byte-`Real` library, and there is nothing for an emulator to emulate. **A trap is therefore positive evidence of `$N+`.** `$N` decides which code is emitted; `$E` decides how it ships; the demo is `$N+` `$E+` and never had a coprocessor.
+
+Settled without anyone having to read a trap correctly, on 24 Aug 2026: P5S2 was built both ways and every byte of part 005 walked against `bin/NEUROSIS.005`. `$N+` aligns **80.4%**, `$N-` aligns **79.2%** — so `$N-` moves the rebuild 137 bytes *further* from the 1994 file. Had the original been `$N-`, that number would have gone the other way. `kit/wiki/observations/n-and-e-are-different/` carries the general form.
+
+Two figures in the older record are corrected there and in `status.toml`: the motion-table loop body at `1096:051a..0591` carries **12** traps, not 14 — 14 is the count for the whole of `Demo_Scene2`, `1096:03d7..06b7` — and the loop makes **4,002** trig calls, not 3,424, since the counter at `DS:$63ca` is seeded at `1096:050f` and tested against `$7D0` at `1096:0592`, so it turns 2001 times at two calls a turn.
 
 ---
 
