@@ -166,6 +166,56 @@ implementation
 
 uses Crt;   { FlushKeys needs KeyPressed/ReadKey }
 
+{ ROUTINE ORDER IS THE ORIGINAL'S. Turbo Pascal emits a unit's code in
+  implementation order, so the order here IS the segment layout, and a
+  far call from another unit encodes the callee's OFFSET. Part 002's VGA
+  segment runs SetMode13h at 1436:0000, VirtScrAlloc at 1436:0006 and
+  VirtScrFree at 1436:0033 before anything else; these three sat after
+  CopyScreen here, which put CopyScreen at offset $9c against the
+  original's $128 and made every far call to it differ in four bytes --
+  a run the coverage walk's rule cannot forgive. }
+{ EQUIVALENT PASCAL -- REFERENCE ONLY, and not what is compiled:
+
+      procedure SetMode13h;
+      begin
+        asm MOV AX, $0013; INT $10 end;
+      end;
+
+  which is the same two instructions with a stack frame around them. The
+  original has no frame, so the procedure is `assembler`.
+
+  NO @asm MARKER HERE, deliberately. A marker is a claim that the bytes can
+  be compared, and this routine is stripped from every harness we build --
+  nothing in the reconstruction references it, so routines.py reported it
+  NOT FOUND in any built image. That the ORIGINAL's part 002 does carry it at
+  1436:0000 means something there calls it and nothing here does. }
+procedure SetMode13h; assembler;
+asm
+  { SIX BYTES: 1436:0000 is `MOV AX,$13 / INT $10 / RETF` and nothing else.
+    BuildRowTable was called from here and does not belong -- the row table
+    is built by the unit's INITIALIZATION, which is what 1436:017f is:
+    seventeen bytes of `PUSH BP / MOV BP,SP / CALL $015A / LEAVE / RETF`,
+    emitted last as a unit's initialization always is. There is no frame
+    either -- six bytes leaves no room for one -- so this is `assembler`. }
+  MOV  AX, $0013        { BIOS function 0, mode $13: 320x200, 256 colours   }
+  INT  $10              { the video BIOS                                    }
+end;
+
+procedure VirtScrAlloc;
+begin
+  GetMem(VirtScr, 64000);
+  VirtScrSeg := Seg(VirtScr^);
+  FillChar(VirtScr^, 64000, 0);
+end;
+
+procedure VirtScrFree;
+begin
+  { TWENTY-ONE BYTES at 1436:0033, and all of them are the FreeMem: push the
+    far pointer, push 64000, call, leave, return. There is no nil guard and
+    nothing is cleared afterwards. }
+  FreeMem(VirtScr, 64000);
+end;
+
 { --------------------------------------------------------------------------
   12f8:0048 -- plot one pixel via the row table.
 
@@ -587,15 +637,6 @@ end;
 { 12f8:0000 -- mode 13h and nothing else, then the row table. The asm block
   is two instructions because a BIOS call has no Pascal equivalent; Intr()
   would push a Registers record the original does not have. }
-procedure SetMode13h;
-begin
-  asm
-    MOV  AX, $0013      { BIOS function 0, mode $13: 320x200, 256 colours   }
-    INT  $10            { the video BIOS                                    }
-  end;
-  BuildRowTable;
-end;
-
 { --------------------------------------------------------------------------
   12f8:0033 -- back to 80-column colour text.
 
@@ -618,23 +659,6 @@ end;
   The FillChar is in the binary -- 11e3:0027 in part 004, 1436:0027 in part
   002 -- and was missing from this transcription until the units were
   consolidated. }
-procedure VirtScrAlloc;
-begin
-  GetMem(VirtScr, 64000);
-  VirtScrSeg := Seg(VirtScr^);
-  FillChar(VirtScr^, 64000, 0);
-end;
-
-procedure VirtScrFree;
-begin
-  if VirtScr <> nil then
-  begin
-    FreeMem(VirtScr, 64000);
-    VirtScr := nil;
-    VirtScrSeg := 0;
-  end;
-end;
-
 procedure ClearVirtual;
 begin
   ClearScreen(VirtScrSeg, 0);
@@ -764,8 +788,8 @@ begin
 end;
 
 begin
-  VirtScr    := nil;
-  VirtScrSeg := 0;
+  { 1436:017f -- the unit's initialization, and it does ONE thing. }
+  BuildRowTable;
 end.
 
 { ===========================================================================
@@ -776,3 +800,4 @@ end.
   DS:$9F1E-ish -- because the logical line there is 160 bytes per plane, not
   320. The two coexist; do not conflate them.
   =========================================================================== }
+
