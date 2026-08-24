@@ -280,9 +280,9 @@ outcome = "differs"
 achieved = "R2"
 observer = "maintainer"
 date = "2026-08-24"
-confirmed_at = "25c775d57656"
+confirmed_at = "48d92f4cceb0"
 fingerprint = "d8f38bc0784b1fb0"
-note = "TPART5 beside ORIG5, watched. The multi-second black-screen pause between scenes 2 and 3 is GONE: the reconstruction now performs almost identically to the original. What remains is that TPART5 runs marginally slower overall, with a slight delay or slowdown in the rotozoom setup -- the stage where the pieces of the image build up out of the pixel shower into shape. The observer judged the part good enough to move down the priority ladder. Recorded as differs rather than matches because a difference was seen; the residual belongs to the pacing investigation, not to this one."
+note = "TPART5 beside ORIG5, watched, second pass and the one the resolution was waiting for. THE PAUSE IS GONE -- confirmed directly this time rather than inferred from a whole-part impression, so the 21 Aug to 24 Aug before/after stands and no other cause needs looking for. Scene by scene: scene 1 runs at the same pace as the original; scene 2 is overall slower, and the observer split it -- THE IMAGE BUILD IS SLOWER WHILE THE ROTOZOOM ITSELF LOOKS THE SAME; scene 3 runs at the same pace, displaced only by the time scene 2 lost. THAT SPLIT IS THE MOST USEFUL THING IN THIS RUN, because it separates two routines that sit side by side in one segment and points at exactly one of them. The image build is Shatter at 1096:0042, which is compiled Pascal and carries a 426-byte unaligned span -- part 005's largest. The rotozoom is RotozoomFrame at 1096:0000, which is hand assembler transcribed verbatim and locked, and it is the half that looks right. So the eye, the coverage walk and the transcription state all agree, and they agree in both directions: the routine that is verbatim performs, the routine that is Pascal-ised does not. Recorded as differs because differences were seen; the residual is pacing row 005 1096:0042."
 
 [observation."TPART6"]
 harness = "TPART6"

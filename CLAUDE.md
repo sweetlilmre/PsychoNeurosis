@@ -24,7 +24,7 @@ Asphyxia's first megademo, 1994. Borland Pascal 7 plus hand-written assembler, r
 
     git submodule update --init kit
     uv venv .venv
-    uv pip install --python .venv/Scripts/python.exe pyyaml
+    uv pip install --python .venv/Scripts/python.exe pyyaml capstone
 
 **This target has no checks of its own any more.** `paslint` and `encaudit` were the last two and they are the kit's, on its list in [`kit/WORKING.md`](kit/WORKING.md) -- neither says anything about this demo, and both had a constant where a project's answer belonged. Moving `paslint` fixed a check that could not fail: its source directory was hardcoded, so in the sibling repository it reported *0 problems in 0 files* and passed. Run the kit's list and nothing else.
 
