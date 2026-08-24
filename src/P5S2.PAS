@@ -32,6 +32,15 @@
 {$S-}   { 1096:0042 opens ENTER $26,0 with no stack check, the same as scene 1
           and unlike this part's copy of FixMath. }
 
+{$G+}   { 286, AND THE EVIDENCE WAS ALREADY IN THE LINE ABOVE. `ENTER` is a
+          286 instruction and Turbo Pascal emits it only under $G+; without it
+          a framed routine opens PUSH BP / MOV BP,SP / SUB SP,n. Both framed
+          routines in this segment open ENTER -- $26,0 at 1096:0042 and $04,0
+          at 1096:03d7 -- so the original was compiled $G+ and this unit was
+          not. The switch had been added to eight other units on exactly this
+          evidence and this one was missed, while its own comment quoted the
+          instruction that proves it. }
+
 unit P5S2;
 
 {$N+}   { FIRST, SO NOBODY HAS TO REDISCOVER IT: THERE IS NOT ONE RAW 80x87
