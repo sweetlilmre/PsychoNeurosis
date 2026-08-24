@@ -118,6 +118,11 @@ var
   { 1 shl (x mod 4) -- the Map Mask value for each column. }
   PlaneOf  : array[0..LogWidth - 1] of Byte;
 
+  { The byte RotateBandsFine lifts out of each band before shifting it. Every
+    reference in 1015:0191 is indexed BY THE BAND, so the original kept fifteen
+    of them rather than one scalar. }
+  RotTmp   : array[0..BandCount - 1] of Byte;
+
   Angle, Radius : Real;
   PanX, PanY    : Integer;
 
@@ -231,25 +236,70 @@ end;
   Unrolled in the original -- fifteen explicit moves per band.
   -------------------------------------------------------------------------- }
 procedure RotateBandsFine;
-
-  procedure RotateEachBand(var T : TColourTable);
-  var
-    Band, I : Word;
-    Tmp     : Byte;
-  begin
-    for Band := 0 to BandCount - 1 do
-    begin
-      Tmp := T[Band * BandSize];
-      for I := Band * BandSize to Band * BandSize + BandSize - 2 do
-        T[I] := T[I + 1];
-      T[Band * BandSize + BandSize - 1] := Tmp;
-    end;
-  end;
-
+var
+  Band : Integer;
 begin
-  RotateEachBand(Red);
-  RotateEachBand(Green);
-  RotateEachBand(Blue);
+  { UNROLLED, and not a nested procedure taking `var T`. 1015:0191 names the
+    three tables at their own displacements and writes fifteen explicit moves
+    per band per table -- no parameter is ever loaded, and there is no inner
+    loop counter. Our version was a nested RotateEachBand(var T) called three
+    times, which cost 1145 bytes of the coverage walk in one span. }
+  for Band := 0 to BandCount - 1 do
+  begin
+    { Red -- DS:$0002 }
+    RotTmp[Band] := Red[Band * BandSize];
+    Red[Band * BandSize] := Red[Band * BandSize + 1];
+    Red[Band * BandSize + 1] := Red[Band * BandSize + 2];
+    Red[Band * BandSize + 2] := Red[Band * BandSize + 3];
+    Red[Band * BandSize + 3] := Red[Band * BandSize + 4];
+    Red[Band * BandSize + 4] := Red[Band * BandSize + 5];
+    Red[Band * BandSize + 5] := Red[Band * BandSize + 6];
+    Red[Band * BandSize + 6] := Red[Band * BandSize + 7];
+    Red[Band * BandSize + 7] := Red[Band * BandSize + 8];
+    Red[Band * BandSize + 8] := Red[Band * BandSize + 9];
+    Red[Band * BandSize + 9] := Red[Band * BandSize + 10];
+    Red[Band * BandSize + 10] := Red[Band * BandSize + 11];
+    Red[Band * BandSize + 11] := Red[Band * BandSize + 12];
+    Red[Band * BandSize + 12] := Red[Band * BandSize + 13];
+    Red[Band * BandSize + 13] := Red[Band * BandSize + 14];
+    Red[Band * BandSize + 14] := RotTmp[Band];
+
+    { Green -- DS:$00E3 }
+    RotTmp[Band] := Green[Band * BandSize];
+    Green[Band * BandSize] := Green[Band * BandSize + 1];
+    Green[Band * BandSize + 1] := Green[Band * BandSize + 2];
+    Green[Band * BandSize + 2] := Green[Band * BandSize + 3];
+    Green[Band * BandSize + 3] := Green[Band * BandSize + 4];
+    Green[Band * BandSize + 4] := Green[Band * BandSize + 5];
+    Green[Band * BandSize + 5] := Green[Band * BandSize + 6];
+    Green[Band * BandSize + 6] := Green[Band * BandSize + 7];
+    Green[Band * BandSize + 7] := Green[Band * BandSize + 8];
+    Green[Band * BandSize + 8] := Green[Band * BandSize + 9];
+    Green[Band * BandSize + 9] := Green[Band * BandSize + 10];
+    Green[Band * BandSize + 10] := Green[Band * BandSize + 11];
+    Green[Band * BandSize + 11] := Green[Band * BandSize + 12];
+    Green[Band * BandSize + 12] := Green[Band * BandSize + 13];
+    Green[Band * BandSize + 13] := Green[Band * BandSize + 14];
+    Green[Band * BandSize + 14] := RotTmp[Band];
+
+    { Blue -- DS:$01C4 }
+    RotTmp[Band] := Blue[Band * BandSize];
+    Blue[Band * BandSize] := Blue[Band * BandSize + 1];
+    Blue[Band * BandSize + 1] := Blue[Band * BandSize + 2];
+    Blue[Band * BandSize + 2] := Blue[Band * BandSize + 3];
+    Blue[Band * BandSize + 3] := Blue[Band * BandSize + 4];
+    Blue[Band * BandSize + 4] := Blue[Band * BandSize + 5];
+    Blue[Band * BandSize + 5] := Blue[Band * BandSize + 6];
+    Blue[Band * BandSize + 6] := Blue[Band * BandSize + 7];
+    Blue[Band * BandSize + 7] := Blue[Band * BandSize + 8];
+    Blue[Band * BandSize + 8] := Blue[Band * BandSize + 9];
+    Blue[Band * BandSize + 9] := Blue[Band * BandSize + 10];
+    Blue[Band * BandSize + 10] := Blue[Band * BandSize + 11];
+    Blue[Band * BandSize + 11] := Blue[Band * BandSize + 12];
+    Blue[Band * BandSize + 12] := Blue[Band * BandSize + 13];
+    Blue[Band * BandSize + 13] := Blue[Band * BandSize + 14];
+    Blue[Band * BandSize + 14] := RotTmp[Band];
+  end;
 end;
 
 { --------------------------------------------------------------------------

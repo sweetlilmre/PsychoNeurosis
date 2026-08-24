@@ -820,22 +820,56 @@ end;
 procedure FadeStep;
 var
   Pal : array[0..767] of Byte;
-  I   : Integer;
 begin
-  GetPalette768(Pal);
-  { 1139:0372 loads DI with $300 -- 768, one PAST the last byte of the buffer
-    -- and steps down three at a time until DI goes negative, so it also
-    touches 768, -1 and -2. Those three are not palette: 768 is [BP], the
-    saved BP, and -1 and -2 are dead stack below the frame. The original gets
-    away with it because LEAVE reads BP before popping and Demo_Scene3 keeps
-    nothing in BP.
+  GetPalette768(Pal);                  { 1139:036f }
 
-    Only 0..767 ever reach the DAC, so the loop is written over exactly those
-    and the result is bit-identical. Reproducing the overrun would mean
-    corrupting this frame instead, which is not the same frame and did in fact
-    hang the scene when it was written literally. }
-  for I := 767 downto 0 do
-    if Pal[I] <> 0 then Dec(Pal[I]);   { 1139:0375 -- saturating, never wraps }
+  (* The loop below, as Pascal:
+
+         for I := 767 downto 0 do
+           if Pal[I] <> 0 then Dec(Pal[I]);
+
+     which is the same result and NOT the same code. Written that way the
+     compiler gives I a stack slot and the routine opens ENTER $302; the
+     original opens ENTER $300, exactly the buffer, so the index never reaches
+     memory. Three unrolled steps, DI decremented between each, and the loop
+     leaving on the sign flag are all hand assembler, and 555 bytes of the
+     coverage walk said so before the frame did. *)
+  asm
+    MOV  DI, $02FF               { the LAST byte of the buffer -- see below     }
+@Next:                           { <- three bytes a pass, one DAC triple        }
+    MOV  AL, BYTE PTR Pal[DI]             { [BP+DI-$300]: this component                 }
+    OR   AL, AL                  { already zero?                                }
+    JZ   @Skip1                  {   yes: leave it, the fade SATURATES          }
+    DEC  AL                      { one step darker                              }
+    MOV  BYTE PTR Pal[DI], AL             { and back into the buffer                     }
+@Skip1:
+    DEC  DI                      { the next component down                      }
+    MOV  AL, BYTE PTR Pal[DI]             { unrolled rather than looped -- the original  }
+    OR   AL, AL                  {   has three copies of this block between one }
+    JZ   @Skip2                  {   MOV DI and one JNS                         }
+    DEC  AL
+    MOV  BYTE PTR Pal[DI], AL
+@Skip2:
+    DEC  DI
+    MOV  AL, BYTE PTR Pal[DI]
+    OR   AL, AL
+    JZ   @Skip3
+    DEC  AL
+    MOV  BYTE PTR Pal[DI], AL
+@Skip3:
+    DEC  DI                      { past this triple                             }
+    JNS  @Next                   { DI went negative: every byte has been done   }
+  end;
+
+  { THE ONE DELIBERATE DIFFERENCE is the constant above: the original loads
+    $0300, not $02FF. That is 768 -- one PAST the last byte of a 0..767 buffer
+    -- so its first pass writes [BP+0], the saved BP, and its last two writes
+    land below the frame. It survives because LEAVE reads BP before popping and
+    the caller keeps nothing there. Reproducing it literally hung the scene
+    when it was tried, and it would corrupt OUR frame, which is not the same
+    frame. $02FF covers 767..0 in the same 256 passes and stays inside the
+    buffer; it costs two bytes of the immediate and nothing else. }
+
   WaitRetrace;                         { 1139:03a4 }
   SetPalette768(Pal);                  { 1139:03af }
 end;
@@ -845,6 +879,10 @@ end;
   -------------------------------------------------------------------------- }
 procedure InitScene;
 begin
+  { called here rather than from Scene3: 1139:03b4's first
+    instruction is the call to THIS routine, and a call ahead of it
+    puts every one of the scene's eight blocks three bytes adrift. }
+  BindShapes;
   LogicalWidth := 80;          { DS:$76B6 -- 640 logical pixels per row }
   SetModeX;                    { 1192:002a -- mode 13h -> Mode-X }
   Set400Lines;                 { and now 320x400 }
@@ -862,51 +900,25 @@ end;
   Eight scripted segments of 45 frames (63 for the last). Odd segments hold a
   shape, even segments morph to the next one. The closing segment also fades.
   -------------------------------------------------------------------------- }
-procedure Scene3;
-
-  { one frame of the common loop; returns True if a key was pressed }
-  function Frame(Morphing : Boolean) : Boolean;
-  begin
-    ClearPage;
-    if Morphing then DrawMorph else DrawShape;
-    FlipPage;
-    WaitRetrace;
-    StepAngles;
-    Frame := KeyPressed;
-  end;
-
-  { Each returns True if a key was pressed. Every keypress test in the
-    original is `JMP 1139:0583` -- the scene's own RETF -- so a key abandons
-    the WHOLE scene. These were procedures whose Exit only left the segment,
-    so a keypress skipped to the next shape instead of quitting. }
-  function Hold(N : Integer) : Boolean;
-  begin
-    Hold := True;
-    Frames := N;
-    repeat
-      if Frame(False) then Exit;
-      Dec(Frames);
-    until Frames = 0;
-    Hold := False;
-  end;
-
-  function MorphTo_(FromShape, ToShape : Word; N : Integer) : Boolean;
-  begin
-    MorphTo_ := True;
-    MorphFrom := FromShape;
-    MorphTo   := ToShape;
-    MorphStep := 0;
-    Frames    := N;
-    repeat
-      if Frame(True) then Exit;
-      Dec(Frames);
-    until Frames = 0;
-    CurShape := MorphTo;
-    MorphTo_ := False;
-  end;
-
+{ --------------------------------------------------------------------------
+  Morph_CheckKey (1139:0670)
+  The scene tests for a key through its OWN routine, not through Crt's
+  KeyPressed: 1139:040a is a near CALL and CALLF never appears in the
+  loop. The result is tested `OR DX,DX`, which is two bytes, exactly as
+  `OR AL,AL` is here.
+  -------------------------------------------------------------------------- }
+function CheckKey : Boolean;
 begin
-  BindShapes;
+  CheckKey := KeyPressed;
+end;
+
+procedure Scene3;
+begin
+  { EIGHT INLINE BLOCKS, no helpers. 1139:03b4 repeats the same six
+    calls eight times over; a Frame/Hold/MorphTo_ trio reads better and
+    is 476 bytes of different code. Every keypress test in the original
+    is a jump to the scene's own RETF, so a key abandons the WHOLE
+    scene -- which is why these are Exit and not a broken-out loop. }
   InitScene;
   PageOfs := PageOfsB;
   CurShape  := OfsSphere;
@@ -915,24 +927,111 @@ begin
   StepX := SpinX;  StepY := SpinY;  StepZ := SpinZ;
   AngX  := 0;      AngY  := 0;      AngZ  := 0;
 
-  if Hold(SegFrames) then Exit;                          { 1: sphere }
-  if MorphTo_(OfsSphere, OfsCube, SegFrames) then Exit;  { 2: sphere -> cube }
-  if Hold(SegFrames) then Exit;                          { 3: cube }
-  if MorphTo_(OfsCube, OfsGrid, SegFrames) then Exit;    { 4: cube -> grid }
-  if Hold(SegFrames) then Exit;                          { 5: grid }
-  if MorphTo_(OfsGrid, OfsCube, SegFrames) then Exit;    { 6: grid -> cube }
-  if Hold(SegFrames) then Exit;                          { 7: cube }
+  Frames := SegFrames;
+  repeat
+    ClearPage;
+    DrawShape;
+    FlipPage;
+    WaitRetrace;
+    StepAngles;
+    if CheckKey then Exit;
+    Dec(Frames);
+  until Frames = 0;
 
-  { 8: morph back to shape 0 while fading the palette out }
+  MorphFrom := OfsSphere;
+  MorphTo   := OfsCube;
+  MorphStep := 0;
+  Frames := SegFrames;
+  repeat
+    ClearPage;
+    DrawMorph;
+    FlipPage;
+    WaitRetrace;
+    StepAngles;
+    if CheckKey then Exit;
+    Dec(Frames);
+  until Frames = 0;
+
+  CurShape := MorphTo;
+  Frames := SegFrames;
+  repeat
+    ClearPage;
+    DrawShape;
+    FlipPage;
+    WaitRetrace;
+    StepAngles;
+    if CheckKey then Exit;
+    Dec(Frames);
+  until Frames = 0;
+
+  MorphFrom := OfsCube;
+  MorphTo   := OfsGrid;
+  MorphStep := 0;
+  Frames := SegFrames;
+  repeat
+    ClearPage;
+    DrawMorph;
+    FlipPage;
+    WaitRetrace;
+    StepAngles;
+    if CheckKey then Exit;
+    Dec(Frames);
+  until Frames = 0;
+
+  CurShape := MorphTo;
+  Frames := SegFrames;
+  repeat
+    ClearPage;
+    DrawShape;
+    FlipPage;
+    WaitRetrace;
+    StepAngles;
+    if CheckKey then Exit;
+    Dec(Frames);
+  until Frames = 0;
+
+  MorphFrom := OfsGrid;
+  MorphTo   := OfsCube;
+  MorphStep := 0;
+  Frames := SegFrames;
+  repeat
+    ClearPage;
+    DrawMorph;
+    FlipPage;
+    WaitRetrace;
+    StepAngles;
+    if CheckKey then Exit;
+    Dec(Frames);
+  until Frames = 0;
+
+  CurShape := MorphTo;
+  Frames := SegFrames;
+  repeat
+    ClearPage;
+    DrawShape;
+    FlipPage;
+    WaitRetrace;
+    StepAngles;
+    if CheckKey then Exit;
+    Dec(Frames);
+  until Frames = 0;
+
+  { 8: morph back to the sphere while the palette fades out }
   MorphFrom := OfsCube;
   MorphTo   := OfsSphere;
   MorphStep := 0;
-  Frames    := LastFrames;
+  Frames := LastFrames;
   repeat
     FadeStep;
-    if Frame(True) then Exit;
+    ClearPage;
+    DrawMorph;
+    FlipPage;
+    WaitRetrace;
+    StepAngles;
+    if CheckKey then Exit;
     Dec(Frames);
   until Frames = 0;
+
 end;
 
 end.
