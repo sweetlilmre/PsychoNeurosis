@@ -101,6 +101,9 @@ var
   { DS:$40BD, $40BF, $40C1 -- stride 5, indices 1..50. }
   Star : array[1..NumStars] of TStar;
   { DS:$3DC2 -- 256 RGB triples. }
+  { FLAT, and measured: making this TPalette the way P2S2's is cost part 002
+    53 aligned bytes, so this unit's loader really does index it flat. The
+    same source shape is not the same code in both units. }
   Pal  : array[0..767] of Byte;
   { DS:$4A86 -- the .DAT handle is a GLOBAL, not a local of LoadFrames.
     1008:00bd is `MOV DI,$4A86 / PUSH DS / PUSH DI` for every one of Assign,

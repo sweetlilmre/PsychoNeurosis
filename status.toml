@@ -441,6 +441,11 @@ label = "Present inlines Emit; its whole frame is a compiler temporary"
 investigation = "pacing"
 note = "ENTER 100h is 256 bytes and every one is the code generators: 108b:0fd4 LEAs it and hands it to the runtime Char-to-String helper at 14b1:3882, which is what passing Msg1[i] to DrawTexts String parameter costs. No declared locals at all, no Emit procedure (no prologue candidate between 0f66 and 1101), and no index guard. The outer Frame > 100 test is redundant and really there: three tests precede the first message, two comparing against 100. Also DrawBanner has TWO Integers not three - the palette loop reuses X - and DrawText has FOUR not five, its deepest slot being the Length(S) limit temp, with no G variable and no range test because -FontFirst is folded into the base displacement. Part 002 78.3 to 80.4 percent."
 
+[plan.row."002 108b:1113"]
+label = "P2S2s palette is 256 THREE-BYTE elements, and P2S1s is not"
+investigation = "pacing"
+note = "Part 002 97.6 to 97.8 percent. 108b:1113 computes 3*X straight into DI and then reads [DI+5148], [DI+5149] and [DI+514A]: the plus one and plus two are ADDRESSING DISPLACEMENTS, which is what an element of three bytes gives you. Declared flat as array[0..767] of Byte, Pal[X * 3 + 1] has to COMPUTE the offset - an INC AX and a MOV DI,AX per component that the original does not have. Changed to TPalette and indexed Pal[X, 0..2]. AND THE SAME CHANGE IN P2S1 MADE IT WORSE, by 53 aligned bytes, so that units loader really does index a flat array: the same source shape is not the same code in both units, and it was worth trying and reverting rather than assuming symmetry. Also this iteration: the side-by-side differ was locking onto the wrong routine, because a best-Hamming-match over the whole image finds any routine with the same shape - LoadFrames and Demo_Scene2 both do Assign/Reset/Seek/BlockRead. It anchors through align.locate on the enclosing routine now, which is the walks own rule and cannot pick a different routine."
+
 [plan.row."002 108b:11c1"]
 label = "Choreography inlines the phase body; PA/PB/PC are Integer locals"
 investigation = "pacing"

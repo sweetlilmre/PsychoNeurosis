@@ -138,7 +138,13 @@ var
   Font   : ^TFont;
   Banner : ^TBanner;                            { the GetMem'd 12,800 bytes }
   Rewind : TRewind;
-  Pal    : array[0..767] of Byte;               { DS:$5148 }
+  { DS:$5148 -- 256 entries of THREE BYTES, not 768 flat bytes. 108b:1113
+    computes 3*X straight into DI and then reads [DI+$5148], [DI+$5149] and
+    [DI+$514A]: the +1 and +2 are ADDRESSING DISPLACEMENTS, which is what an
+    element of three bytes gives you. Declared flat, `Pal[X * 3 + 1]` has to
+    compute the +1 -- an INC AX and a MOV DI,AX per component that the
+    original does not have. }
+  Pal    : TPalette;
 
 { --------------------------------------------------------------------------
   THE SHARED 386 MATHS MODULE.
@@ -1494,7 +1500,7 @@ var
   X, Y : Integer;                      { [BP-$02] 14 refs, [BP-$04] 7 refs }
 begin
   for X := 100 to 200 do
-    SetRGB(X, Pal[X * 3], Pal[X * 3 + 1], Pal[X * 3 + 2]);
+    SetRGB(X, Pal[X, 0], Pal[X, 1], Pal[X, 2]);
 
   for X := 0 to ScrWidth - 1 do
     for Y := BannerTop to Rows - 1 do
