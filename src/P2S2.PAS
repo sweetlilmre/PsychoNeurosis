@@ -155,6 +155,12 @@ var
   MScale : LongInt;
   { DS:$8ED1 -- a LongInt frame counter, and what drives the text. }
   Frame  : LongInt;
+  { DS:$A0C7 and DS:$A0C8 -- two BYTES, and they are GLOBALS, not locals of
+    Scene2. The volume ramp at 108b:2564 stores every GetVolume result to a
+    fixed address rather than to a stack slot, and they sit immediately before
+    RowOfs, which is what puts them here in the var block. }
+  SaveVol : Byte;
+  CurVol  : Byte;
   { DS:$A0CA -- RowOfs80[I] = I * 80. }
   RowOfs : array[0..Rows - 1] of Word;
   { the snapshot Obj_SortFaces works from }
@@ -1748,13 +1754,6 @@ end;
       108b:201b  ->  $70C8 - $B21 = $65A7   object 2
       108b:21f1  ->  $7C19 - $B21 = $70F8   object 3
       108b:23cc  ->  $876A - $B21 = $7C49   object 4 }
-procedure BuildObject(N, NV, NF : Integer);
-begin
-  FillChar(Obj[N], SizeOf(TObj), 0);
-  Obj[N].VertCount := NV;
-  Obj[N].FaceCount := NF;
-end;
-
 { THE FRAME IS ENTER $8a -- 138 bytes -- AND ONLY SIX OF THEM ARE READ.
   Every BP-relative access in 108b:1bbd..2453 was enumerated in both
   addressing forms (kit/tools/pascal/prologue.py), and the whole list is:
@@ -1835,9 +1834,16 @@ begin
     index and 108b:1e1d halves its colour, and objects 2, 3 and 4 have neither
     -- 108b:1fca reads the index and stores it straight. All four DO halve
     their vertex components. Writing all four the same way broke the revolver,
-    the sailboat and the quad, and a watched run is what caught it. }
-  { 108b:1cf0 -- Enterprise }
-  BuildObject(1, NVertEnterprise, NFaceEnterprise);
+    the sailboat and the quad, and a watched run is what caught it.
+
+    THERE IS NO FillChar EITHER. The objects are DGROUP, so they arrive zeroed,
+    and the original writes only the fields it wants -- distinguishing a plain
+    `:= 0` (XOR AX,AX and two stores) from `:= IntToFixed(0)` (a PUSH and a
+    call). Both forms appear below because both are in the binary. }
+  { 108b:1cc4 -- Enterprise. The counts are written as immediates before the
+    loops and read back OUT of the object by them. }
+  Obj[1].VertCount := NVertEnterprise;
+  Obj[1].FaceCount := NFaceEnterprise;
   for I := 1 to Obj[1].VertCount do
   begin
     Obj[1].Vert[I].X := IntToFixed(VertEnterprise[I, 1] div 2);
@@ -1859,12 +1865,23 @@ begin
     Obj[1].Face[I].Spare2 := 0;
     Inc(P);
   end;
-  { 108b:1eb1 }
+  Obj[1].Angle.X := 0;
+  Obj[1].Angle.Y := 0;
+  Obj[1].Angle.Z := 0;
+  Obj[1].Accum.X := 0;
+  Obj[1].Accum.Y := 0;
+  Obj[1].Accum.Z := 0;
+  Obj[1].Trans.X := 0;
+  Obj[1].Trans.Y := 0;
   Obj[1].Trans.Z := IntToFixed(-850);
   Obj[1].Pivot.X := IntToFixed(150);
+  Obj[1].Pivot.Y := 0;
+  Obj[1].Pivot.Z := IntToFixed(0);
 
-  { 108b:1f4a -- Revolver }
-  BuildObject(2, NVertRevolver, NFaceRevolver);
+  { 108b:1ec0 -- Revolver. The counts are written as immediates before the
+    loops and read back OUT of the object by them. }
+  Obj[2].VertCount := NVertRevolver;
+  Obj[2].FaceCount := NFaceRevolver;
   for I := 1 to Obj[2].VertCount do
   begin
     Obj[2].Vert[I].X := IntToFixed(VertRevolver[I, 1] div 2);
@@ -1886,13 +1903,23 @@ begin
     Obj[2].Face[I].Spare2 := 0;
     Inc(P);
   end;
-  { 108b:204b }
+  Obj[2].Angle.X := 0;
+  Obj[2].Angle.Y := 0;
+  Obj[2].Angle.Z := 0;
+  Obj[2].Accum.X := 0;
+  Obj[2].Accum.Y := 0;
+  Obj[2].Accum.Z := 0;
   Obj[2].Trans.X := IntToFixed(1500);
+  Obj[2].Trans.Y := 0;
   Obj[2].Trans.Z := IntToFixed(-1500);
   Obj[2].Pivot.X := IntToFixed(150);
+  Obj[2].Pivot.Y := 0;
+  Obj[2].Pivot.Z := IntToFixed(0);
 
-  { 108b:2120 -- Sailboat }
-  BuildObject(3, NVertSailboat, NFaceSailboat);
+  { 108b:2096 -- Sailboat. The counts are written as immediates before the
+    loops and read back OUT of the object by them. }
+  Obj[3].VertCount := NVertSailboat;
+  Obj[3].FaceCount := NFaceSailboat;
   for I := 1 to Obj[3].VertCount do
   begin
     Obj[3].Vert[I].X := IntToFixed(VertSailboat[I, 1] div 2);
@@ -1914,14 +1941,23 @@ begin
     Obj[3].Face[I].Spare2 := 0;
     Inc(P);
   end;
-  { 108b:2221 -- writes $7C25 and $7C2D, which are $70F8 + $B2D + 0 and + 8.
-    X and Z, NOT X and Y: leaving Z at zero puts the object on the projection
-    plane and the divide at 108b:3656 blows the whole thing across the screen. }
+  Obj[3].Angle.X := 0;
+  Obj[3].Angle.Y := 0;
+  Obj[3].Angle.Z := 0;
+  Obj[3].Accum.X := 0;
+  Obj[3].Accum.Y := 0;
+  Obj[3].Accum.Z := 0;
   Obj[3].Trans.X := IntToFixed(-1500);
+  Obj[3].Trans.Y := 0;
   Obj[3].Trans.Z := IntToFixed(-1500);
+  Obj[3].Pivot.X := IntToFixed(0);
+  Obj[3].Pivot.Y := IntToFixed(0);
+  Obj[3].Pivot.Z := IntToFixed(0);
 
-  { 108b:22fb -- Quad }
-  BuildObject(4, NVertQuad, NFaceQuad);
+  { 108b:2271 -- Quad. The counts are written as immediates before the
+    loops and read back OUT of the object by them. }
+  Obj[4].VertCount := NVertQuad;
+  Obj[4].FaceCount := NFaceQuad;
   for I := 1 to Obj[4].VertCount do
   begin
     Obj[4].Vert[I].X := IntToFixed(VertQuad[I, 1] div 2);
@@ -1943,8 +1979,18 @@ begin
     Obj[4].Face[I].Spare2 := 0;
     Inc(P);
   end;
-  { 108b:240c -- writes $877E = $7C49 + $B2D + 8, so this is Z. }
+  Obj[4].Angle.X := 0;
+  Obj[4].Angle.Y := 0;
+  Obj[4].Angle.Z := 0;
+  Obj[4].Accum.X := 0;
+  Obj[4].Accum.Y := 0;
+  Obj[4].Accum.Z := 0;
+  Obj[4].Trans.X := 0;
+  Obj[4].Trans.Y := 0;
   Obj[4].Trans.Z := IntToFixed(-1000);
+  Obj[4].Pivot.X := IntToFixed(0);
+  Obj[4].Pivot.Y := IntToFixed(0);
+  Obj[4].Pivot.Z := IntToFixed(0);
 end;
 
 { ===========================================================================
@@ -2240,8 +2286,11 @@ end;
   -------------------------------------------------------------------------- }
 procedure Scene2;
 var
-  F   : file;
-  Vol : Byte;
+  { ENTER $80 is 128 bytes and no BP-relative slot is touched at all: the
+    whole frame is the untyped `file`, which is 128 bytes in Turbo Pascal.
+    There was a `Vol : Byte` here that the routine wrote and never read, and
+    it put the frame at $82. The saved volume is a global -- see SaveVol. }
+  F : file;
 begin
   New(Font);
   GetMem(Banner, SizeOf(TBanner));
@@ -2274,15 +2323,27 @@ begin
   Choreography;                        { 108b:2561 }
 
   { 108b:2564 -- ramp the volume to zero, then stop }
-  Vol := GetVolume;
-  while GetVolume > 0 do
-  begin
-    SetVolume(GetVolume - 1);
+  { 108b:2564 -- the ramp, and the body really is written out TWICE with a
+    test between the halves. Every GetVolume result goes to CurVol and the
+    sequence is: read, step down, read, and if that is not yet zero do the
+    three again, then Delay and test. Reading it as a `while GetVolume > 0`
+    loop gave one copy of the body and a different test. }
+  SaveVol := GetVolume;
+  repeat
+    CurVol := GetVolume;
+    SetVolume(CurVol - 1);
+    CurVol := GetVolume;
+    if CurVol <> 0 then
+    begin
+      CurVol := GetVolume;
+      SetVolume(CurVol - 1);
+      CurVol := GetVolume;
+    end;
     Delay(10);
-  end;
+  until CurVol = 0;
   SyncPattern(1, 1);
   MusicStop;
-  SetVolume(Vol);
+  SetVolume(SaveVol);
 
   FreeMem(Banner, SizeOf(TBanner));
   Dispose(Font);
