@@ -38,6 +38,24 @@
 
 unit FixMath;
 
+(* STACK CHECKING ON, AND THIS UNIT IS THE ONLY ONE THAT HAS IT. Every entry
+  point in the original opens `MOV AX,<frame size>` then a far CALL to
+  14b1:0530 BEFORE `SUB SP,n` -- 142a:0037 for RealToFixed, 142a:0074 for
+  FixedToInt, 142a:0003 for IntToFixed -- which is what Turbo Pascal emits
+  under {$S+}. build.toml passes /$S- on the command line for the whole
+  project, so this unit has to say otherwise for itself.
+
+  The hot routines elsewhere do NOT have it and must not get it: P2View's
+  Plot at 140c:00b1 and FillRect at 140c:011e open `PUSH BP / MOV BP,SP` and
+  go straight into the body, and P2S2's ObjTransform opens a bare ENTER.
+
+  IT MAKES THE REBUILD SLOWER, and that is the right direction. FixedToInt is
+  called once per vertex and calls RealToFixed once itself, so the original
+  pays roughly 150 of these checks per frame that the reconstruction was
+  skipping. A switch is set to match the emitted code, never to make the
+  rebuild faster. *)
+{$S+}
+
 interface
 
 function IntToFixed(V : Integer) : LongInt;      far;   { 1483:0000 }
