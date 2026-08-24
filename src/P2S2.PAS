@@ -90,16 +90,26 @@ type
     Spare2 : Byte;
     Depth  : Integer;
   end;
+  TVec3 = record X, Y, Z : LongInt end;   { +0, +4, +8 }
   TObj = record
     VertCount : Integer;                        { +$000 }
     FaceCount : Integer;                        { +$002 }
     Vert  : array[1..MaxVerts] of TVertex;      { +$004 }
     Scr   : array[1..MaxVerts] of TScreen;      { +$388 }
     Face  : array[1..MaxFaces] of TFace;        { +$54A }
-    Angle : array[1..3] of LongInt;             { +$B21 }
-    Trans : array[1..3] of LongInt;             { +$B2D }
-    Pivot : array[1..3] of LongInt;             { +$B39 }
-    Accum : array[1..3] of LongInt;             { +$B45 }
+    { RECORDS, NOT array[1..3], and a probe settled it rather than an
+      argument. ObjTransform's frame is ENTER $36 and the reconstruction's
+      was $30 with the declared locals already matching byte for byte; the
+      six-byte gap is two far-pointer spills the compiler makes for NESTED
+      `with` over a RECORD. probe/WITHTMP.PAS compiles the same routine four
+      ways with identical declarations -- arrays plain $30, arrays with $34,
+      records plain $30, RECORDS WITH $36 -- so it takes both changes and
+      neither alone. Confirmed in the rebuild: ObjTransform now opens
+      ENTER $36 and part 002's coverage walk moved 51.0% to 53.0%. }
+    Angle : TVec3;                              { +$B21 }
+    Trans : TVec3;                              { +$B2D }
+    Pivot : TVec3;                              { +$B39 }
+    Accum : TVec3;                              { +$B45 }
   end;
   TObjPtr = ^TObj;
 
@@ -209,9 +219,9 @@ procedure Project(var X, Y, Z : LongInt);               external; { 108b:362F }
   -------------------------------------------------------------------------- }
 procedure ObjTranslate(var O : TObj; DX, DY, DZ : Integer);
 begin
-  Inc(O.Trans[1], IntToFixed(DX));
-  Inc(O.Trans[2], IntToFixed(DY));
-  Inc(O.Trans[3], IntToFixed(DZ));
+  Inc(O.Trans.X, IntToFixed(DX));
+  Inc(O.Trans.Y, IntToFixed(DY));
+  Inc(O.Trans.Z, IntToFixed(DZ));
 end;
 
 { --------------------------------------------------------------------------
@@ -276,36 +286,52 @@ var
   V       : array[1..3] of LongInt;   { [BP-$22] -- the working vertex }
   P       : array[1..3] of LongInt;   { [BP-$2e] -- the rotated pivot }
 begin
-  if O.Accum[1] < 0 then Inc(O.Accum[1], 3600);   { 108b:00d6 }
-  if O.Accum[2] < 0 then Inc(O.Accum[2], 3600);   { 108b:0100 }
-  if O.Accum[3] < 0 then Inc(O.Accum[3], 3600);   { 108b:012c }
-  SinCos(O.Accum[1], MCos1, MSin1);
-  SinCos(O.Accum[2], MCos2, MSin2);
-  SinCos(O.Accum[3], MCos3, MSin3);
-
-  Move(O.Pivot, P, 12);                           { 108b:0198 }
-  RotatePoint(P[1], P[2], P[3]);
-
-  if A1 < 0 then Inc(A1, 3600);                   { 108b:01c3 }
-  if A2 < 0 then Inc(A2, 3600);                   { 108b:01e3 }
-  if A3 < 0 then Inc(A3, 3600);                   { 108b:0203 }
-  O.Angle[1] := A1;  O.Angle[2] := A2;  O.Angle[3] := A3;
-  SinCos(A1, MCos1, MSin1);
-  SinCos(A2, MCos2, MSin2);
-  SinCos(A3, MCos3, MSin3);
-
-  for I := 1 to O.VertCount do
+  with O do                             { 108b:00c3 -- @O into [BP-$32] }
   begin
-    Move(O.Vert[I], V, 12);                       { 108b:02b2 }
-    RotatePoint(V[1], V[2], V[3]);
-    V[1] := V[1] + P[1] + O.Trans[1];
-    V[2] := V[2] + P[2] + O.Trans[2];
-    V[3] := V[3] + P[3] + O.Trans[3];             { 108b:033b }
-    Project(V[1], V[2], V[3]);                    { 108b:035a }
-    { both come back zero-extended, so the low word carries the sign }
-    O.Scr[I].X := Integer(V[1]);                  { 108b:0370 }
-    O.Scr[I].Y := Integer(V[2]);                  { 108b:0388 }
-    O.Scr[I].D := FixedToInt(V[3]);               { 108b:0393 -- AFTER Project }
+    with Accum do                       { 108b:00cc -- @O.Accum into [BP-$36] }
+    begin
+      { X := X + 3600, NOT Inc(X, 3600). The original loads the pair into
+        AX:DX, adds, and stores back (108b:00e8..00f8); Inc compiles to an
+        in-place ADD/ADC on memory. Same arithmetic, four bytes apart. }
+      if X < 0 then X := X + 3600;      { 108b:00d6 }
+      if Y < 0 then Y := Y + 3600;      { 108b:0100 }
+      if Z < 0 then Z := Z + 3600;      { 108b:012c }
+      SinCos(X, MCos1, MSin1);          { 108b:0154, through the same temp }
+      SinCos(Y, MCos2, MSin2);
+      SinCos(Z, MCos3, MSin3);
+    end;
+
+    { Pivot is reached through @O, not through a temp of its own -- 108b:018f
+      reloads [BP-$32] and adds $B39 -- so it is NOT inside a `with`. }
+    Move(Pivot, P, 12);                 { 108b:0198 }
+    RotatePoint(P[1], P[2], P[3]);
+
+    with Angle do                       { 108b:01b6 -- @O.Angle into [BP-$36] }
+    begin
+      { the scratch temp is set up BEFORE these wraps, which is what says the
+        `with` opens here rather than after them }
+      if A1 < 0 then A1 := A1 + 3600;   { 108b:01c3 }
+      if A2 < 0 then A2 := A2 + 3600;   { 108b:01e3 }
+      if A3 < 0 then A3 := A3 + 3600;   { 108b:0203 }
+      X := A1;  Y := A2;  Z := A3;
+      SinCos(A1, MCos1, MSin1);
+      SinCos(A2, MCos2, MSin2);
+      SinCos(A3, MCos3, MSin3);
+    end;
+
+    for I := 1 to VertCount do
+    begin
+      Move(Vert[I], V, 12);             { 108b:02b2 }
+      RotatePoint(V[1], V[2], V[3]);
+      V[1] := V[1] + P[1] + Trans.X;
+      V[2] := V[2] + P[2] + Trans.Y;
+      V[3] := V[3] + P[3] + Trans.Z;    { 108b:033b }
+      Project(V[1], V[2], V[3]);        { 108b:035a }
+      { both come back zero-extended, so the low word carries the sign }
+      Scr[I].X := Integer(V[1]);        { 108b:0370 }
+      Scr[I].Y := Integer(V[2]);        { 108b:0388 }
+      Scr[I].D := FixedToInt(V[3]);     { 108b:0393 -- AFTER Project }
+    end;
   end;
 end;
 
@@ -724,8 +750,8 @@ begin
     Obj[1]^.Face[I].Colour := EnterpriseFaces[I, FaceVerts + 1];
   end;
   { 108b:1e8c -- translation (0, 0, -850), pivot (150, 0, 0) }
-  Obj[1]^.Trans[3] := IntToFixed(-850);
-  Obj[1]^.Pivot[1] := IntToFixed(150);
+  Obj[1]^.Trans.Z := IntToFixed(-850);
+  Obj[1]^.Pivot.X := IntToFixed(150);
 
   BuildObject(2, RevolverVertCount, RevolverFaceCount);
   for I := 1 to RevolverVertCount do
@@ -741,9 +767,9 @@ begin
     Obj[2]^.Face[I].Colour := RevolverFaces[I, FaceVerts + 1];
   end;
   { 108b:204b }
-  Obj[2]^.Trans[1] := IntToFixed(1500);
-  Obj[2]^.Trans[3] := IntToFixed(-1500);
-  Obj[2]^.Pivot[1] := IntToFixed(150);
+  Obj[2]^.Trans.X := IntToFixed(1500);
+  Obj[2]^.Trans.Z := IntToFixed(-1500);
+  Obj[2]^.Pivot.X := IntToFixed(150);
 
   BuildObject(3, SailboatVertCount, SailboatFaceCount);
   for I := 1 to SailboatVertCount do
@@ -761,8 +787,8 @@ begin
   { 108b:2221 -- writes $7C25 and $7C2D, which are $70F8 + $B2D + 0 and + 8.
     X and Z, NOT X and Y: leaving Z at zero puts the object on the projection
     plane and the divide at 108b:3656 blows the whole thing across the screen. }
-  Obj[3]^.Trans[1] := IntToFixed(-1500);
-  Obj[3]^.Trans[3] := IntToFixed(-1500);
+  Obj[3]^.Trans.X := IntToFixed(-1500);
+  Obj[3]^.Trans.Z := IntToFixed(-1500);
 
   BuildObject(4, QuadVertCount, QuadFaceCount);
   for I := 1 to QuadVertCount do
@@ -778,7 +804,7 @@ begin
     Obj[4]^.Face[I].Colour := QuadFaces[I, FaceVerts + 1];
   end;
   { 108b:240c -- writes $877E = $7C49 + $B2D + 8, so this is Z. }
-  Obj[4]^.Trans[3] := IntToFixed(-1000);
+  Obj[4]^.Trans.Z := IntToFixed(-1000);
 end;
 
 { ===========================================================================
