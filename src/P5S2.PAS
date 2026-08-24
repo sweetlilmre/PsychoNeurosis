@@ -34,13 +34,25 @@
 
 unit P5S2;
 
-{$N+}   { The motion-table build at 1096:051a is 80x87 CODE: FILD the index,
+{$N+}   { WHY THIS IS HERE: THE ORIGINAL WAS COMPILED THIS WAY. Not because it
+          made our build faster -- that is a consequence and it is not the
+          reason. The 80x87 instructions at 1096:051a cannot exist unless the
+          unit that produced them was compiled $N+, so matching the original
+          means compiling $N+, and it would still mean that if the rebuild
+          ran no quicker at all.
+
+          The motion-table build at 1096:051a is 80x87 CODE: FILD the index,
           FDIV by a SINGLE 180.0 at CS:$03c9, FLD the ten-byte EXTENDED Pi at
           CS:$03cd, and the $N+ RTL's Sin/Cos/Round on the stack top. Under
           the $N- default the same 3,424 trig calls go through the software
-          six-byte-Real RTL instead, which took long enough to read as a
-          multi-second black-screen pause in the part run -- the plan's
-          part5-386-trio symptom; the 386 trio itself was already transcribed.
+          six-byte-Real RTL instead. Two watched runs bracket that change and
+          nothing else about the unit moved between them: the pause was there
+          on 21 Aug 2026 and gone on 24 Aug. WHY it is gone is NOT measured.
+          It is certainly not that we acquired a coprocessor -- neither build
+          has one, and both run the same emulator over the same traps -- so
+          any account of the speed has to be about the two code paths, and
+          nobody has timed them. The plan's part5-386-trio symptom; the 386
+          trio itself was already transcribed.
 
           $N SAYS WHICH CODE IS EMITTED. IT SAYS NOTHING ABOUT THE EMULATOR,
           and conflating the two is a mistake this project has now made twice.
