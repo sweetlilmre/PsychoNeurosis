@@ -45,3 +45,8 @@ docs/continuation.md
 # the same rule that keeps docs/continuation.md out. kit.toml holds the
 # relative ones and IS committed.
 kit.local.toml
+
+# codegen.py's output. probe/*.PAS is the record -- a probe is a measurement
+# and belongs in the repository -- but the .TPU it compiles to is build output
+# and was swept in by a `git add probe/` on 24 Aug.
+probe/out/
