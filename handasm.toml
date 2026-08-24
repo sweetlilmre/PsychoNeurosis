@@ -1,0 +1,55 @@
+# Ground truth for `kit/tools/pascal/handasm.py --expect`.
+#
+# These are routines somebody has ALREADY established by hand, by reading the
+# bytes -- they are not the detector's output fed back to it. They live here
+# rather than in the kit because they are facts about one binary, and the kit
+# may not name a target.
+#
+# The asm rows come from `docs/09-hand-assembler.md`'s confirmed table, which
+# was built by reading prologues and body shapes long before any detector
+# existed. The pascal rows are routines whose transcription REBUILDS and is
+# locked or nearly so, which is the strongest evidence available that the
+# original was compiled from Pascal: a Pascal source that reproduces the
+# original's bytes is not a coincidence anybody has managed by accident.
+#
+# A row that reads `NO ROUTINE` is not a detector failure -- it means the
+# prologue scan finds no candidate at that address, which for the assembler
+# routines with no prologue at all is the expected answer and is exactly the
+# blind spot `handasm.py` documents. Those are commented out with the reason.
+
+[expect]
+
+asm = [
+  # Part 002, segment 108b -- the pair this detector was built after.
+  "002 108b:0461",      # Tri_Fill, the polygon scan converter
+  "002 108b:09b1",      # Poly_FillFan, its only caller
+
+  # Part 002, segment 1008 -- P2S1's Mode X blitter, transcribed 19 Aug.
+  "002 1008:002d",      # BlitBitmapX
+
+  # Part 003. The whole VGA unit is hand assembler -- see docs/05-vga-unit.md.
+  "003 12f8:00ad",      # VGA_CopyScreen, REP MOVSW with CX=32000
+  "003 12f8:00c9",      # VGA_ClearScreen, REP STOSW with CX=32000
+  "003 12f8:0048",      # VGA_PutPixel, row table then STOSB, no multiply
+  "003 12f8:007f",      # VGA_GetRGB, LES DI on var params, STOSB per channel
+  "003 1139:0096",      # Morph_TransformPoint, args in BX/CX/DX
+  "003 1139:01bb",      # ModeX_PlotPixel, consumes DI/BX directly
+
+  # VGA_WaitRetrace at 12f8:009f has NO PROLOGUE AT ALL, which is why it is
+  # the clincher in docs/09 and why it cannot appear here: a prologue scan
+  # cannot bound a routine that has no prologue. Same for the SetPalette768 /
+  # GetPalette768 / Set400Lines trio at 1139:0335, 1139:034d and 1139:02f2.
+]
+
+pascal = [
+  # Compiled Pascal, and the reason to believe it is that our Pascal source
+  # rebuilds these. Each is in the same segment as an asm row above, so the
+  # `direction` ratio has its comparison group inside one binary.
+  "002 108b:0422",      # DrawRewind, pushes three words and far-calls Plot
+  "002 108b:0a09",      # BuildRowTable80, RowOfs[I] := I * 80
+  "002 108b:00bf",      # Obj_SetRotation, var parameter read from [BP+$10]
+  "002 108b:0e03",      # Obj_SortFaces
+  "002 108b:1bbd",      # Scene2_Setup
+  "002 108b:11c1",      # Scene2_Choreography
+  "002 108b:0000",      # DrawText
+]
