@@ -343,9 +343,14 @@ begin
       if A2 < 0 then A2 := A2 + 3600;   { 108b:01e3 }
       if A3 < 0 then A3 := A3 + 3600;   { 108b:0203 }
       X := A1;  Y := A2;  Z := A3;
-      SinCos(A1, MCos1, MSin1);
-      SinCos(A2, MCos2, MSin2);
-      SinCos(A3, MCos3, MSin3);
+      { ON THE FIELDS, not on the parameters. 108b:024f is
+        `PUSH WORD PTR ES:[DI]` and 108b:0262 is `ES:[DI+4]` -- the values the
+        three lines above just stored, read back through the `with` temp. The
+        values are identical either way, so this is shape and not behaviour;
+        it was the last divergence in ObjTransform. }
+      SinCos(X, MCos1, MSin1);
+      SinCos(Y, MCos2, MSin2);
+      SinCos(Z, MCos3, MSin3);
     end;
 
     for I := 1 to VertCount do

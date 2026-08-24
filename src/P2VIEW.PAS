@@ -35,7 +35,12 @@ var
   WritePage : Word;
   { DS:$0CEC -- which of the two pages is being drawn into. Initialised data;
     the compiled-in value is 1. The renderers toggle it after every flip. }
-  PageIndex : Integer;
+  { WORD, not Integer. The page swap at the end of every renderer is
+    `INC AX / XOR DX,DX / MOV CX,2 / DIV CX` at 108b:0c8e -- zero-extend
+    and an UNSIGNED divide, which is what `mod` on a Word compiles to.
+    Declared Integer it came out `CWD` and `IDIV`, and that was the only
+    difference left in all three renderer tails. }
+  PageIndex : Word;
   { DS:$A69C -- SetMode400 fills this then hands it to SetMode. }
   Crtc : TCrtcTable;
 

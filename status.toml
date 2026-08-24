@@ -416,6 +416,11 @@ label = "Loop-limit temporaries must not be declared"
 investigation = "pacing"
 note = "Four routines in this segment had the compilers for-limit temporaries transcribed as declared locals, which produces both theirs and the compilers and puts the frame over: three renderers 8 bytes over, ObjSortFaces 2. It also forced invented padding bytes, because two of the temporaries sit at ODD offsets and the sub-rule that an odd offset means a preceding one-byte local holds for declarations, not for temporaries. Handing them back to the compiler took the walk 77.4 to 78.3 percent and made all three renderer frames exact. The general rule is the wikis loop-limit-is-a-temporary and prologue.py no longer implies that a touched slot is a declaration."
 
+[plan.row."002 108b:0c8e"]
+label = "The scene-2 per-frame path is now byte-identical, and it is STILL slower"
+investigation = "pacing"
+note = "Measured after a watched run said timing is identical up to the Enterprise scene and then diverges rapidly, which puts the cause in the scene-2 per-frame path. Every span in that path was enumerated: ObjTransform 34 bytes, DrawRewind 29, and 25/25/71 in the three renderer tails - and NOT ONE of them was in a loop that runs per vertex, per face or per star. The renderer tails differed only in PageIndex being declared Integer where the original has WORD: the page swap is INC AX / XOR DX,DX / MOV CX,2 / DIV CX at 108b:0c8e, zero-extend and an unsigned divide, where ours emitted CWD and IDIV. ObjTransforms 34 were SinCos called on the parameters where the original reads back the fields it just stored - identical values, shape only. Both fixed; the scene-2 per-frame path is down to 45 bytes, 29 of them DrawRewind which only RenderB calls. CONCLUSION: our per-frame instruction stream for the Enterprise scene is the originals, the object data matches the DAT carve (75 verts, 55 faces, 118 triangles a frame), the phase counts match, and it is still at least a second slower over 350 frames. The transcription is not the cause and the search should move to data or environment."
+
 [plan.row."002 108b:0e03"]
 label = "ObjSortFaces copies the whole object into its frame"
 investigation = "pacing"
