@@ -131,6 +131,11 @@ def emit_p002():
         for i in range(nv):
             verts.extend(struct.unpack_from("<hhh", raw, base + voff + i * 6))
         out.append(f"\n  {{ {note} -- vertices DS:${voff:04X} }}")
+        # The counts are emitted rather than written into the loader by hand:
+        # Scene2_Setup reads them back OUT of the object it just filled,
+        # so the only place a literal belongs is beside the table it counts.
+        out.append(f"  NVert{name} = {nv};")
+        out.append(f"  NFace{name} = {nf};")
         out.append(fmt(f"Vert{name}", f"array[1..{nv}, 1..3] of Integer", verts, 9, group=3))
 
         faces, p = [], 0

@@ -124,9 +124,13 @@ type
   TRewind = array[1..RewindW * RewindH] of Byte;
 
 var
-  { The four objects. In the original they are four fixed DGROUP blocks $B51
-    apart at $5A56, $65A7, $70F8 and $7C49. }
-  Obj    : array[1..4] of TObjPtr;
+  { FOUR FIXED DGROUP BLOCKS, and $B51 apart at $5A56, $65A7, $70F8 and
+    $7C49 -- which is contiguous, so it is one array of four and not four
+    separate variables. The reconstruction had them as heap pointers and
+    New()'d them, so every call site loaded a far pointer out of a variable
+    where the original has an immediate: 108b:1287 is `MOV DI, $5A56 /
+    PUSH DS / PUSH DI`, and no pointer is read at all. }
+  Obj    : array[1..4] of TObj;
   Star   : array[1..StarCount] of TStar;
   Font   : ^TFont;
   Banner : ^TBanner;                            { the GetMem'd 12,800 bytes }
@@ -1746,10 +1750,9 @@ end;
       108b:23cc  ->  $876A - $B21 = $7C49   object 4 }
 procedure BuildObject(N, NV, NF : Integer);
 begin
-  New(Obj[N]);
-  FillChar(Obj[N]^, SizeOf(TObj), 0);
-  Obj[N]^.VertCount := NV;
-  Obj[N]^.FaceCount := NF;
+  FillChar(Obj[N], SizeOf(TObj), 0);
+  Obj[N].VertCount := NV;
+  Obj[N].FaceCount := NF;
 end;
 
 { THE FRAME IS ENTER $8a -- 138 bytes -- AND ONLY SIX OF THEM ARE READ.
@@ -1780,12 +1783,19 @@ end;
   opened ENTER $06 against the original's $8a. }
 procedure Setup;
 var
-  I, K, Col : Integer;
-  Unused    : array[1..128] of Byte;   { [BP-$86]..[BP-$07], never read }
+  { THREE Integers and the 128 dead bytes, and the frame closes at $8a rather
+    than $86 because the two loop limits read out of the object at 108b:1cf3
+    and 108b:1da1 become the code generator's temporaries at [BP-$88] and
+    [BP-$8a]. Declaring them would produce both. }
+  I : Integer;      { [BP-$02], 79 refs -- the outer index, and the palette
+                      ramp counter earlier in the routine }
+  K : Integer;      { [BP-$04], 16 refs -- the inner face-index counter }
+  P : Integer;      { [BP-$06], 28 refs -- the flat face stream's position }
+  Unused : array[1..128] of Byte;      { [BP-$86]..[BP-$07], never read }
 begin
   { 108b:1bc1 -- a grey ramp with a period of 53 }
-  for Col := 1 to 255 do
-    SetRGB(Col, (Col mod 53) + 10, (Col mod 53) + 10, (Col mod 53) + 10);
+  for I := 1 to 255 do
+    SetRGB(I, (I mod 53) + 10, (I mod 53) + 10, (I mod 53) + 10);
 
   { 108b:1c05 -- the thirteen overrides, in the order the code writes them }
   SetRGB($18, $0A, $00, $3C);
@@ -1820,75 +1830,115 @@ begin
     the one that measures better, not because it is believed. }
   MScale := Round(MViewW / ScaleDivisor * ScaleFactor * 65536.0);
 
-  BuildObject(1, EnterpriseVertCount, EnterpriseFaceCount);
-  for I := 1 to EnterpriseVertCount do
+  { 108b:1cf0 -- Enterprise }
+  BuildObject(1, NVertEnterprise, NFaceEnterprise);
+  for I := 1 to Obj[1].VertCount do
   begin
-    Obj[1]^.Vert[I].X := IntToFixed(EnterpriseVerts[I, 1]);
-    Obj[1]^.Vert[I].Y := IntToFixed(EnterpriseVerts[I, 2]);
-    Obj[1]^.Vert[I].Z := IntToFixed(EnterpriseVerts[I, 3]);
+    Obj[1].Vert[I].X := IntToFixed(VertEnterprise[I, 1] div 2);
+    Obj[1].Vert[I].Y := IntToFixed(VertEnterprise[I, 2] div 2);
+    Obj[1].Vert[I].Z := IntToFixed(VertEnterprise[I, 3] div 2);
   end;
-  for I := 1 to EnterpriseFaceCount do
+  P := 0;
+  for I := 1 to Obj[1].FaceCount do
   begin
-    Obj[1]^.Face[I].Count := EnterpriseFaces[I, 0];
-    for K := 1 to FaceVerts do Obj[1]^.Face[I].Idx[K] := EnterpriseFaces[I, K];
-    Obj[1]^.Face[I].Colour := EnterpriseFaces[I, FaceVerts + 1];
+    Obj[1].Face[I].Count := FaceEnterprise[P + 1];
+    for K := 1 to Obj[1].Face[I].Count do
+    begin
+      Inc(P);
+      Obj[1].Face[I].Idx[K] := FaceEnterprise[P + 1] + 1;
+    end;
+    Inc(P);
+    Obj[1].Face[I].Colour := FaceEnterprise[P + 1] div 2;
+    Obj[1].Face[I].Spare1 := 0;
+    Obj[1].Face[I].Spare2 := 0;
+    Inc(P);
   end;
-  { 108b:1e8c -- translation (0, 0, -850), pivot (150, 0, 0) }
-  Obj[1]^.Trans.Z := IntToFixed(-850);
-  Obj[1]^.Pivot.X := IntToFixed(150);
+  { 108b:1eb1 }
+  Obj[1].Trans.Z := IntToFixed(-850);
+  Obj[1].Pivot.X := IntToFixed(150);
 
-  BuildObject(2, RevolverVertCount, RevolverFaceCount);
-  for I := 1 to RevolverVertCount do
+  { 108b:1f4a -- Revolver }
+  BuildObject(2, NVertRevolver, NFaceRevolver);
+  for I := 1 to Obj[2].VertCount do
   begin
-    Obj[2]^.Vert[I].X := IntToFixed(RevolverVerts[I, 1]);
-    Obj[2]^.Vert[I].Y := IntToFixed(RevolverVerts[I, 2]);
-    Obj[2]^.Vert[I].Z := IntToFixed(RevolverVerts[I, 3]);
+    Obj[2].Vert[I].X := IntToFixed(VertRevolver[I, 1] div 2);
+    Obj[2].Vert[I].Y := IntToFixed(VertRevolver[I, 2] div 2);
+    Obj[2].Vert[I].Z := IntToFixed(VertRevolver[I, 3] div 2);
   end;
-  for I := 1 to RevolverFaceCount do
+  P := 0;
+  for I := 1 to Obj[2].FaceCount do
   begin
-    Obj[2]^.Face[I].Count := RevolverFaces[I, 0];
-    for K := 1 to FaceVerts do Obj[2]^.Face[I].Idx[K] := RevolverFaces[I, K];
-    Obj[2]^.Face[I].Colour := RevolverFaces[I, FaceVerts + 1];
+    Obj[2].Face[I].Count := FaceRevolver[P + 1];
+    for K := 1 to Obj[2].Face[I].Count do
+    begin
+      Inc(P);
+      Obj[2].Face[I].Idx[K] := FaceRevolver[P + 1] + 1;
+    end;
+    Inc(P);
+    Obj[2].Face[I].Colour := FaceRevolver[P + 1] div 2;
+    Obj[2].Face[I].Spare1 := 0;
+    Obj[2].Face[I].Spare2 := 0;
+    Inc(P);
   end;
   { 108b:204b }
-  Obj[2]^.Trans.X := IntToFixed(1500);
-  Obj[2]^.Trans.Z := IntToFixed(-1500);
-  Obj[2]^.Pivot.X := IntToFixed(150);
+  Obj[2].Trans.X := IntToFixed(1500);
+  Obj[2].Trans.Z := IntToFixed(-1500);
+  Obj[2].Pivot.X := IntToFixed(150);
 
-  BuildObject(3, SailboatVertCount, SailboatFaceCount);
-  for I := 1 to SailboatVertCount do
+  { 108b:2120 -- Sailboat }
+  BuildObject(3, NVertSailboat, NFaceSailboat);
+  for I := 1 to Obj[3].VertCount do
   begin
-    Obj[3]^.Vert[I].X := IntToFixed(SailboatVerts[I, 1]);
-    Obj[3]^.Vert[I].Y := IntToFixed(SailboatVerts[I, 2]);
-    Obj[3]^.Vert[I].Z := IntToFixed(SailboatVerts[I, 3]);
+    Obj[3].Vert[I].X := IntToFixed(VertSailboat[I, 1] div 2);
+    Obj[3].Vert[I].Y := IntToFixed(VertSailboat[I, 2] div 2);
+    Obj[3].Vert[I].Z := IntToFixed(VertSailboat[I, 3] div 2);
   end;
-  for I := 1 to SailboatFaceCount do
+  P := 0;
+  for I := 1 to Obj[3].FaceCount do
   begin
-    Obj[3]^.Face[I].Count := SailboatFaces[I, 0];
-    for K := 1 to FaceVerts do Obj[3]^.Face[I].Idx[K] := SailboatFaces[I, K];
-    Obj[3]^.Face[I].Colour := SailboatFaces[I, FaceVerts + 1];
+    Obj[3].Face[I].Count := FaceSailboat[P + 1];
+    for K := 1 to Obj[3].Face[I].Count do
+    begin
+      Inc(P);
+      Obj[3].Face[I].Idx[K] := FaceSailboat[P + 1] + 1;
+    end;
+    Inc(P);
+    Obj[3].Face[I].Colour := FaceSailboat[P + 1] div 2;
+    Obj[3].Face[I].Spare1 := 0;
+    Obj[3].Face[I].Spare2 := 0;
+    Inc(P);
   end;
   { 108b:2221 -- writes $7C25 and $7C2D, which are $70F8 + $B2D + 0 and + 8.
     X and Z, NOT X and Y: leaving Z at zero puts the object on the projection
     plane and the divide at 108b:3656 blows the whole thing across the screen. }
-  Obj[3]^.Trans.X := IntToFixed(-1500);
-  Obj[3]^.Trans.Z := IntToFixed(-1500);
+  Obj[3].Trans.X := IntToFixed(-1500);
+  Obj[3].Trans.Z := IntToFixed(-1500);
 
-  BuildObject(4, QuadVertCount, QuadFaceCount);
-  for I := 1 to QuadVertCount do
+  { 108b:22fb -- Quad }
+  BuildObject(4, NVertQuad, NFaceQuad);
+  for I := 1 to Obj[4].VertCount do
   begin
-    Obj[4]^.Vert[I].X := IntToFixed(QuadVerts[I, 1]);
-    Obj[4]^.Vert[I].Y := IntToFixed(QuadVerts[I, 2]);
-    Obj[4]^.Vert[I].Z := IntToFixed(QuadVerts[I, 3]);
+    Obj[4].Vert[I].X := IntToFixed(VertQuad[I, 1] div 2);
+    Obj[4].Vert[I].Y := IntToFixed(VertQuad[I, 2] div 2);
+    Obj[4].Vert[I].Z := IntToFixed(VertQuad[I, 3] div 2);
   end;
-  for I := 1 to QuadFaceCount do
+  P := 0;
+  for I := 1 to Obj[4].FaceCount do
   begin
-    Obj[4]^.Face[I].Count := QuadFaces[I, 0];
-    for K := 1 to FaceVerts do Obj[4]^.Face[I].Idx[K] := QuadFaces[I, K];
-    Obj[4]^.Face[I].Colour := QuadFaces[I, FaceVerts + 1];
+    Obj[4].Face[I].Count := FaceQuad[P + 1];
+    for K := 1 to Obj[4].Face[I].Count do
+    begin
+      Inc(P);
+      Obj[4].Face[I].Idx[K] := FaceQuad[P + 1] + 1;
+    end;
+    Inc(P);
+    Obj[4].Face[I].Colour := FaceQuad[P + 1] div 2;
+    Obj[4].Face[I].Spare1 := 0;
+    Obj[4].Face[I].Spare2 := 0;
+    Inc(P);
   end;
   { 108b:240c -- writes $877E = $7C49 + $B2D + 8, so this is Z. }
-  Obj[4]^.Trans.Z := IntToFixed(-1000);
+  Obj[4].Trans.Z := IntToFixed(-1000);
 end;
 
 { ===========================================================================
@@ -1951,35 +2001,35 @@ begin
 
   for I := 1 to 100 do
   begin
-    ObjTranslate(Obj[1]^, 0, 0, 3);
-    ObjTransform(Obj[1]^, PC, PA, PB);
+    ObjTranslate(Obj[1], 0, 0, 3);
+    ObjTransform(Obj[1], PC, PA, PB);
     WritePage := PageBase[PageIndex];
     FillRect(0, 0, ScrWidth, 200, WritePage, 0);
-    ObjSortFaces(Obj[1]^);
-    RenderA(Obj[1]^);
+    ObjSortFaces(Obj[1]);
+    RenderA(Obj[1]);
     Inc(Frame);
     Present;
   end;
   SyncPattern(2, 1);
   for I := 1 to  80 do
   begin
-    ObjTranslate(Obj[1]^, 0, 0, 3);
-    ObjTransform(Obj[1]^, PC, PA, PB);
+    ObjTranslate(Obj[1], 0, 0, 3);
+    ObjTransform(Obj[1], PC, PA, PB);
     WritePage := PageBase[PageIndex];
     FillRect(0, 0, ScrWidth, 200, WritePage, 0);
-    ObjSortFaces(Obj[1]^);
-    RenderA(Obj[1]^);
+    ObjSortFaces(Obj[1]);
+    RenderA(Obj[1]);
     Inc(Frame);
     Present;
   end;
   for I := 1 to  20 do
   begin
-    ObjTranslate(Obj[1]^, -1, 0, 3);
-    ObjTransform(Obj[1]^, PC, PA, PB);
+    ObjTranslate(Obj[1], -1, 0, 3);
+    ObjTransform(Obj[1], PC, PA, PB);
     WritePage := PageBase[PageIndex];
     FillRect(0, 0, ScrWidth, 200, WritePage, 0);
-    ObjSortFaces(Obj[1]^);
-    RenderA(Obj[1]^);
+    ObjSortFaces(Obj[1]);
+    RenderA(Obj[1]);
     Inc(Frame);
     Present;
   end;
@@ -1987,35 +2037,35 @@ begin
   for I := 1 to 50 do
   begin
     Inc(PB, 5);  Dec(PC, 2);
-    ObjTranslate(Obj[1]^, -2, 0, 2);
-    ObjTransform(Obj[1]^, PC, PA, PB);
+    ObjTranslate(Obj[1], -2, 0, 2);
+    ObjTransform(Obj[1], PC, PA, PB);
     WritePage := PageBase[PageIndex];
     FillRect(0, 0, ScrWidth, 200, WritePage, 0);
-    ObjSortFaces(Obj[1]^);
-    RenderA(Obj[1]^);
+    ObjSortFaces(Obj[1]);
+    RenderA(Obj[1]);
     Inc(Frame);
     Present;
   end;
   for I := 1 to 50 do
   begin
     Dec(PB, 5);  Inc(PA, 20);  Inc(PC, 2);
-    ObjTranslate(Obj[1]^, -3, 0, 0);
-    ObjTransform(Obj[1]^, PC, PA, PB);
+    ObjTranslate(Obj[1], -3, 0, 0);
+    ObjTransform(Obj[1], PC, PA, PB);
     WritePage := PageBase[PageIndex];
     FillRect(0, 0, ScrWidth, 200, WritePage, 0);
-    ObjSortFaces(Obj[1]^);
-    RenderA(Obj[1]^);
+    ObjSortFaces(Obj[1]);
+    RenderA(Obj[1]);
     Inc(Frame);
     Present;
   end;
   for I := 1 to 50 do
   begin
-    ObjTranslate(Obj[1]^, -3, 0, 0);
-    ObjTransform(Obj[1]^, PC, PA, PB);
+    ObjTranslate(Obj[1], -3, 0, 0);
+    ObjTransform(Obj[1], PC, PA, PB);
     WritePage := PageBase[PageIndex];
     FillRect(0, 0, ScrWidth, 200, WritePage, 0);
-    ObjSortFaces(Obj[1]^);
-    RenderA(Obj[1]^);
+    ObjSortFaces(Obj[1]);
+    RenderA(Obj[1]);
     Inc(Frame);
     Present;
   end;
@@ -2055,12 +2105,12 @@ begin
 
   for I := 1 to 12 do
   begin
-    ObjTranslate(Obj[1]^, 12, 0, 0);
-    ObjTransform(Obj[1]^, PC, PA, PB);
+    ObjTranslate(Obj[1], 12, 0, 0);
+    ObjTransform(Obj[1], PC, PA, PB);
     WritePage := PageBase[PageIndex];
     FillRect(0, 0, ScrWidth, 200, WritePage, 0);
-    ObjSortFaces(Obj[1]^);
-    RenderB(Obj[1]^);
+    ObjSortFaces(Obj[1]);
+    RenderB(Obj[1]);
     Inc(Frame);
     Present;
   end;
@@ -2068,46 +2118,46 @@ begin
   for I := 1 to 12 do
   begin
     Inc(PB, 20);  Dec(PA, 80);  Dec(PC, 8);
-    ObjTranslate(Obj[1]^, 12, 0, 0);
-    ObjTransform(Obj[1]^, PC, PA, PB);
+    ObjTranslate(Obj[1], 12, 0, 0);
+    ObjTransform(Obj[1], PC, PA, PB);
     WritePage := PageBase[PageIndex];
     FillRect(0, 0, ScrWidth, 200, WritePage, 0);
-    ObjSortFaces(Obj[1]^);
-    RenderB(Obj[1]^);
+    ObjSortFaces(Obj[1]);
+    RenderB(Obj[1]);
     Inc(Frame);
     Present;
   end;
   for I := 1 to 12 do
   begin
     Dec(PB, 20);  Inc(PC, 8);
-    ObjTranslate(Obj[1]^, 8, 0, -8);
-    ObjTransform(Obj[1]^, PC, PA, PB);
+    ObjTranslate(Obj[1], 8, 0, -8);
+    ObjTransform(Obj[1], PC, PA, PB);
     WritePage := PageBase[PageIndex];
     FillRect(0, 0, ScrWidth, 200, WritePage, 0);
-    ObjSortFaces(Obj[1]^);
-    RenderB(Obj[1]^);
+    ObjSortFaces(Obj[1]);
+    RenderB(Obj[1]);
     Inc(Frame);
     Present;
   end;
   for I := 1 to  5 do
   begin
-    ObjTranslate(Obj[1]^, 4, 0, -12);
-    ObjTransform(Obj[1]^, PC, PA, PB);
+    ObjTranslate(Obj[1], 4, 0, -12);
+    ObjTransform(Obj[1], PC, PA, PB);
     WritePage := PageBase[PageIndex];
     FillRect(0, 0, ScrWidth, 200, WritePage, 0);
-    ObjSortFaces(Obj[1]^);
-    RenderB(Obj[1]^);
+    ObjSortFaces(Obj[1]);
+    RenderB(Obj[1]);
     Inc(Frame);
     Present;
   end;
   for I := 1 to 45 do
   begin
-    ObjTranslate(Obj[1]^, 0, 0, -12);
-    ObjTransform(Obj[1]^, PC, PA, PB);
+    ObjTranslate(Obj[1], 0, 0, -12);
+    ObjTransform(Obj[1], PC, PA, PB);
     WritePage := PageBase[PageIndex];
     FillRect(0, 0, ScrWidth, 200, WritePage, 0);
-    ObjSortFaces(Obj[1]^);
-    RenderB(Obj[1]^);
+    ObjSortFaces(Obj[1]);
+    RenderB(Obj[1]);
     Inc(Frame);
     Present;
   end;
@@ -2125,29 +2175,29 @@ begin
   for I := 1 to 120 do
   begin
     Inc(PB, 10);  Dec(PA, 40);  Dec(PC, 8);
-    ObjTranslate(Obj[2]^, -20, 0, 10);
-    ObjTransform(Obj[2]^, PC, PA, PB);
+    ObjTranslate(Obj[2], -20, 0, 10);
+    ObjTransform(Obj[2], PC, PA, PB);
     WritePage := PageBase[PageIndex];
     FillRect(0, 0, ScrWidth, Rows, WritePage, 0);
-    ObjSortFaces(Obj[2]^);
-    RenderC(Obj[2]^);
+    ObjSortFaces(Obj[2]);
+    RenderC(Obj[2]);
   end;
 
   { 108b:1a26 }
   PA := 270;  PB := 180;  PC := 180;
   FillRect(0, 0, ScrWidth, Rows, Page0Base, 0);
   FillRect(0, 0, ScrWidth, Rows, Page1Base, 0);
-  ObjTransform(Obj[3]^, PC, PA, PB);
+  ObjTransform(Obj[3], PC, PA, PB);
 
   for I := 1 to 120 do
   begin
     Inc(PA, 10);  Inc(PB, 10);  Inc(PC, 10);
-    ObjTranslate(Obj[3]^, 20, 0, 10);
-    ObjTransform(Obj[3]^, PC, PA, PB);
+    ObjTranslate(Obj[3], 20, 0, 10);
+    ObjTransform(Obj[3], PC, PA, PB);
     WritePage := PageBase[PageIndex];
     FillRect(0, 0, ScrWidth, Rows, WritePage, 0);
-    ObjSortFaces(Obj[3]^);
-    RenderC(Obj[3]^);
+    ObjSortFaces(Obj[3]);
+    RenderC(Obj[3]);
   end;
 
   { 108b:1af2 }
@@ -2159,13 +2209,13 @@ begin
   for I := 1 to 99 do
   begin
     { 108b:1b53 -- here the nudge comes AFTER the translate, not before }
-    ObjTranslate(Obj[4]^, 0, 0, 10);
+    ObjTranslate(Obj[4], 0, 0, 10);
     Inc(PA, 37);  Inc(PB, 10);
-    ObjTransform(Obj[4]^, PC, PA, PB);
+    ObjTransform(Obj[4], PC, PA, PB);
     WritePage := PageBase[PageIndex];
     FillRect(0, 0, ScrWidth, Rows, WritePage, 0);
-    ObjSortFaces(Obj[4]^);
-    RenderC(Obj[4]^);
+    ObjSortFaces(Obj[4]);
+    RenderC(Obj[4]);
   end;
 end;
 
