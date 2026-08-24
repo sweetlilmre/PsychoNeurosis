@@ -53,7 +53,10 @@ implementation
 uses VGA, ModeX, Crt;
 
 const
-  NumPoints  = 765;        { $2FD -- points actually drawn per shape }
+  NumPoints  = 765;        { $2FD -- points actually DRAWN per shape }
+  ShapeSlots = 800;        { and the slot is bigger than that: the six
+                             shape blocks are contiguous and 4,800 bytes
+                             apart, $0636 + 4 * 4800 = $5136 = ShapeCube }
   SlotSize   = 4800;       { 800 points x 6 bytes -- spacing between shapes }
   ShapeBase  = $0636;
   Shape0     = $0636;
@@ -113,7 +116,7 @@ type
   { 765 points of (X, Y, Z). Declared two-dimensional because that is what
     the data is; Morph_DrawMorph walks it with pointer arithmetic (six
     bytes per point) and does not care either way. }
-  TShape = array[1..NumPoints, 1..3] of Integer;
+  TShape = array[1..ShapeSlots, 1..3] of Integer;
 
 { Both of these are TYPED CONSTANTS living in the executable's initialised
   data, not tables built at run time -- a plain `var` would land in BSS and

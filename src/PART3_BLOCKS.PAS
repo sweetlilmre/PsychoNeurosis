@@ -52,9 +52,6 @@ type
     address arithmetic in the original. }
   TOrder = array[0..Frames - 1, 1..BlocksX, 1..BlocksY] of Word;
 
-var
-  Order : TOrder;         { held on the stack in the original -- 13K of it }
-
 { [transcribed] The palette ramp, read off the x87 stream at 11f3:0085:
 
       FILD  word ptr [BP-8]              ; I
@@ -132,6 +129,12 @@ var
   X, Y       : Integer;
   P          : Word;
   F          : file;
+  { LAST, and on the STACK -- the original's frame is ENTER $343C with the
+    file record and the order table at the bottom of it. As a unit-level var
+    this was 13,104 bytes of DGROUP that the original never spends there, and
+    it is what took the data segment over 64K once the six shape slots were
+    carved: TP7 stops with Error 49, which the build did not report. }
+  Order      : TOrder;
 begin
   Assign(F, 'neurosis.dat');
   Reset(F, 1);
