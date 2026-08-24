@@ -541,6 +541,33 @@ begin
   SetPalette768(@Buf);                     { 11e3:02AC }
 end;
 
+{ ORDER: this sits between PaletteDim and WaitRetrace because that is
+  where 1436:00d6 puts it -- PaletteDim ends at $00D6, this runs to
+  $011A and WaitRetrace's fourteen bytes follow, with CopyScreen at
+  $0128. Declared near the end of the unit instead, CopyScreen landed
+  at $00E4 and every far call to it from another segment differed in
+  four bytes.
+
+  prologue.py reports ONE routine of 82 bytes at $00D6 and there are
+  two: WaitRetrace has no standard prologue, so the scan cannot see it
+  and folds it into its neighbour. The `call $011A` inside the reported
+  extent is what gives it away -- a routine does not call into its own
+  middle. }
+procedure PaletteFadeOut(Pause : Word);
+var
+  Buf  : TPalette;                { [BP-$302] }
+  Step : Byte;                    { [BP-$303] }
+begin
+  GetPalette768(@Buf);                        { 1491:033B }
+  for Step := 0 to $3F do
+  begin
+    WaitRetrace;                              { 1491:034A }
+    SetPalette768(@Buf);                      { 1491:0354 }
+    PaletteDim(@Buf);                         { 1491:035E }
+    Delay(Pause);                             { 1491:0364 }
+  end;
+end;
+
 { --------------------------------------------------------------------------
   12f8:009f -- wait for the start of vertical retrace.
 
@@ -736,21 +763,6 @@ end;
 
   Called once in the whole demo, from Demo_Scene2 at 1082:05BB with Pause=10.
   -------------------------------------------------------------------------- }
-procedure PaletteFadeOut(Pause : Word);
-var
-  Buf  : TPalette;                { [BP-$302] }
-  Step : Byte;                    { [BP-$303] }
-begin
-  GetPalette768(@Buf);                        { 1491:033B }
-  for Step := 0 to $3F do
-  begin
-    WaitRetrace;                              { 1491:034A }
-    SetPalette768(@Buf);                      { 1491:0354 }
-    PaletteDim(@Buf);                         { 1491:035E }
-    Delay(Pause);                             { 1491:0364 }
-  end;
-end;
-
 { --------------------------------------------------------------------------
   DrawLine -- Bresenham. Part 001's copy of this unit is LARGER than part
   003's precisely because it carries this routine (1491:0048); parts that
