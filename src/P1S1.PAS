@@ -28,7 +28,13 @@ const
 type
   TSaveBank = array[1..NumBouncers, 0..BounceH * BounceW - 1] of Byte;
   TCell     = array[0..BounceH * BounceW - 1] of Byte;
-  TLensTab  = array[0..BounceH * BounceW - 1] of Word;
+  { 1641 words, not 1600, and the extra 41 are not slack -- BuildLens walks a
+    QUADRANT and mirrors, so it also writes row 20 and column 20, whose index
+    is (20+20)*40 + (20+20) = 1640. Two measurements agree: the unit init at
+    1012:0008 clears 3282 bytes (`PUSH $0CD2` at 1012:000d), and in the
+    original DS:$4FD6 - DS:$4304 = $0CD2 = 1641 words exactly, so Cell begins
+    where this table ends. }
+  TLensTab  = array[0..BounceW * (BounceH + 1)] of Word;
 
 var
   { The saved background under each bouncer. There is NO sprite bitmap: the
@@ -227,38 +233,82 @@ end;
                          the rim -- a roughly even 2x magnification with a
                          slight barrel to it.
 
-  The original walks X and Y from 0 up and writes all four quadrants each
-  iteration; the formula is symmetric, so walking the full range once is the
-  same thing and reads better.
+  THE ORIGINAL WALKS ONE QUADRANT AND MIRRORS IT. X and Y each run 0 to 20 --
+  twenty-one values, not twenty -- and every iteration writes FOUR entries,
+  one per sign pairing, with SX and SY carrying the same signs as X and Y:
+
+      Lens[( Y+20)*40 + ( X+20)] := ( SY+20)*40 + ( SX+20)   1012:01d8
+      Lens[(-Y+20)*40 + (-X+20)] := (-SY+20)*40 + (-SX+20)   1012:0208
+      Lens[(-Y+20)*40 + ( X+20)] := (-SY+20)*40 + ( SX+20)   1012:0240
+      Lens[( Y+20)*40 + (-X+20)] := ( SY+20)*40 + (-SX+20)   1012:0274
+
+  A previous reconstruction walked -20..19 once instead, on the argument that
+  the formula is symmetric so one full pass is the same thing. For the 1600
+  cells the blit reads it IS the same thing -- but it is not the same code,
+  and it is not the same table: 0..20 mirrored reaches index 1640, which is
+  why the table is 1641 words and why the loop bound above is 20 and not 19.
+  It is also four times less square root: 441 evaluations instead of 1600.
+
+  Two Real locals, not one. The frame is ENTER $1C (1012:0004) = 28 bytes:
+  four Integers, two six-byte Reals, and two LongInt temporaries the compiler
+  needs to reach `fild dword`. S is at [BP-$0E] and Scale at [BP-$14], and S
+  is read exactly once, which is what says it is a variable and not a temp.
+
+  LensR IS READ FROM MEMORY, so it cannot be an untyped constant here.
+  1012:012e is `MOV AX,[$0002]` / `MUL WORD PTR [$0002]` -- had 40 been an
+  untyped constant the compiler would have folded it to `MOV AX,1600`. The
+  word at DS:$0002 in the shipped binary is initialised data and reads 40.
+  Our own DGROUP puts this typed constant at a different offset; the shape
+  matches, the address does not, and that is the whole of the difference.
   -------------------------------------------------------------------------- }
 const
-  LensR   = 40;        { DS:$0002 }
-  LensK   = 1.0;       { CS:$0000 }
-  LensCut = 300;       { the disc: X*X + Y*Y <= 300 }
+  LensK   = 1.0;       { CS:$0000, added as a single: 1012:014b FADD CS:[0] }
+  LensCut = 300;       { the disc: X*X + Y*Y <= 300 -- 1012:003b CMP AX,$12C }
   LensOfs = 400;       { the 20*20 term inside the square root }
+  LensArc = 20;        { one quadrant: 1012:02a8 CMP WORD PTR [BP-8],$14 }
+
+const
+  { WORD, not Integer, and the frame size is what proves it. 1012:0135 widens
+    the product with `XOR DX,DX` -- unsigned -- and 1012:015e widens the bare
+    LensR the same way into a LongInt temporary before `FILD DWORD`. An
+    Integer would go to the x87 through `FILD WORD` with no temporary at all,
+    and the frame would be ENTER $18 rather than the ENTER $1C at 1012:0004. }
+  LensR : Word = 40;      { DS:$0002 -- read, never folded; see above }
 
 procedure BuildLens;
 var
-  X, Y, D2, SX, SY : Integer;
-  Scale            : Real;
+  SX, SY, Y, X : Integer;
+  S, Scale     : Real;
 begin
-  for Y := -20 to 19 do
-    for X := -20 to 19 do
+  FillChar(LensTab, SizeOf(LensTab), 0);   { 1012:0008, 3282 bytes }
+  for Y := 0 to LensArc do
+    for X := 0 to LensArc do
     begin
-      D2 := X * X + Y * Y;
-      if D2 > LensCut then
+      if X * X + Y * Y > LensCut then
       begin
-        { outside the disc -- map the pixel to itself, so the blit is a no-op }
-        SX := X;
-        SY := Y;
+        { OUTSIDE THE DISC -- the pixel maps to itself, and the original does
+          not route that through SX and SY. 1012:0043 reads [BP-6] and [BP-8]
+          straight into the index arithmetic, so the identity case carries its
+          own four stores rather than falling into a shared tail. }
+        LensTab[( Y + 20) * BounceW + ( X + 20)] := ( Y + 20) * BounceW + ( X + 20);
+        LensTab[(-Y + 20) * BounceW + (-X + 20)] := (-Y + 20) * BounceW + (-X + 20);
+        LensTab[(-Y + 20) * BounceW + ( X + 20)] := (-Y + 20) * BounceW + ( X + 20);
+        LensTab[( Y + 20) * BounceW + (-X + 20)] := ( Y + 20) * BounceW + (-X + 20);
       end
       else
       begin
-        Scale := LensR / (LensR + Sqrt(LensR * LensR - (D2 - LensOfs)) + LensK);
-        SX := Round(Scale * X);
-        SY := Round(Scale * Y);
+        { the sum is RECOMPUTED here, not held: the frame has room for four
+          Integers and there are four, so the original has no D2 variable.
+          1012:0116 repeats the two MULs the test at 1012:002b already did. }
+        S     := Sqrt(LensR * LensR - (X * X + Y * Y - LensOfs)) + LensK;
+        Scale := LensR / (LensR + S);
+        SX    := Round(Scale * X);
+        SY    := Round(Scale * Y);
+        LensTab[( Y + 20) * BounceW + ( X + 20)] := ( SY + 20) * BounceW + ( SX + 20);
+        LensTab[(-Y + 20) * BounceW + (-X + 20)] := (-SY + 20) * BounceW + (-SX + 20);
+        LensTab[(-Y + 20) * BounceW + ( X + 20)] := (-SY + 20) * BounceW + ( SX + 20);
+        LensTab[( Y + 20) * BounceW + (-X + 20)] := ( SY + 20) * BounceW + (-SX + 20);
       end;
-      LensTab[(Y + 20) * BounceW + (X + 20)] := (SY + 20) * BounceW + (SX + 20);
     end;
 end;
 

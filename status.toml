@@ -365,6 +365,11 @@ finding = "part 006 looked identical bar possibly slight timing; a careful scene
 seen_in = "TPART6"
 state = "open"
 
+[plan.row."001 1012:0004"]
+label = "BuildLens quadrant walk"
+investigation = "pacing"
+note = "BuildLens (1012:0004, ENTER $1C) was the coverage walk's largest span in part 001 -- the whole 696-byte routine unaligned while routines.py had nothing to say, because nobody had declared it. The frame size read the source's var block and three corrections fell out of it, none visible in the statements: the original WALKS ONE QUADRANT AND MIRRORS, X and Y each 0..20 with four sign-paired stores per iteration and a separate set of four in each branch (the identity branch indexes from X and Y directly at 1012:0043, never through SX/SY); it holds no D2, recomputing X*X+Y*Y at 1012:0116; it names its Sqrt intermediate, so two Real locals; and the lens radius is a typed constant of type WORD read from DS:$0002, not an untyped const -- 1012:012e is MOV AX,[$0002] / MUL WORD PTR [$0002] where a fold would have emitted MOV AX,1600, and 1012:0135/015e widen it with XOR DX,DX, unsigned, which is what forces the two LongInt conversion slots the ENTER counts. The table is therefore 1641 words, not 1600: mirroring reaches index (20+20)*40+(20+20) = 1640, the unit init clears 3282 bytes at 1012:0008, and in the shipped binary Cell at DS:$4FD6 begins exactly $0CD2 after LensTab at DS:$4304. No overrun and no deviation -- the size was measured for. After the fix the routine aligns in full and part 001's coverage walk moved 66.6% -> 68.4%; routines.py unchanged at 74 locked, 0 failing. Generalised as the wiki observation `The frame is bigger than your locals account for`. Init-time only, so this is alignment rather than a per-frame pacing gain: 441 square roots where the reconstruction did 1600."
+
 [plan.row."001 10e3:0148"]
 label = "Mosaic block sampling BASM"
 investigation = "pacing"
