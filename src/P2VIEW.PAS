@@ -33,6 +33,10 @@ var
   { DS:$A696, $A698, $A69A. }
   PageBase : array[0..1] of Word;
   WritePage : Word;
+  { DS:$A69C -- SetMode400 fills this then hands it to SetMode. }
+  Crtc : TCrtcTable;
+
+const
   { DS:$0CEC -- which of the two pages is being drawn into. Initialised data;
     the compiled-in value is 1. The renderers toggle it after every flip. }
   { WORD, not Integer. The page swap at the end of every renderer is
@@ -40,9 +44,7 @@ var
     and an UNSIGNED divide, which is what `mod` on a Word compiles to.
     Declared Integer it came out `CWD` and `IDIV`, and that was the only
     difference left in all three renderer tails. }
-  PageIndex : Word;
-  { DS:$A69C -- SetMode400 fills this then hands it to SetMode. }
-  Crtc : TCrtcTable;
+  PageIndex : Word = 1;
 
 procedure FillCrtcTable(var T : TCrtcTable);                        { 140c:0000 }
 { @asm 002 140c:0045 }
@@ -435,8 +437,11 @@ end;
 
 { 140c:01ca -- the unit's initialisation. }
 begin
+  { THREE STORES AND NOTHING ELSE. 140c:01ca is `XOR AX,AX / MOV [$A696],AX
+    / MOV WORD PTR [$A698],$4B00 / MOV AX,[$A696] / MOV [$A69A],AX`. There is
+    no PageIndex assignment: DS:$0CEC arrives carrying 1 as INITIALISED DATA,
+    which is a typed constant, not a var written here. }
   PageBase[0] := Page0Base;
   PageBase[1] := Page1Base;
   WritePage   := PageBase[0];
-  PageIndex   := 1;                   { DS:$0CEC, the compiled-in value }
 end.
