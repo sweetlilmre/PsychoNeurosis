@@ -454,7 +454,8 @@ resolution = "THE FIRE'S RESEED HAD TWO DEFECTS AND THEY COMPOUND. 95.6 to 96.2 
 name = "part3-var-bundle"
 finding = "part 003's variable layout needs four separate changes and every one of them measures WORSE on its own, because each fixes one unit's addresses while leaving the next unit's wrong."
 seen_in = "TPART3"
-state = "open"
+state = "resolved"
+resolution = "RESOLVED, AND THE DECISION IT WAS WAITING ON EVAPORATED. All four changes landed together plus two more the bundle exposed, and part 003 went 89.1 to 90.6 percent with its initialised data BYTE-IDENTICAL. The four were: the driver's two volume Words at $9F1A/$9F1C; a harness that does not write through the text RTL; PART3_STARS' file record as a LOCAL of Demo_Scene2; and Tunnel's two-byte hole at $A7EE. THE TWO THE BUNDLE EXPOSED ARE THE INTERESTING ONES. First, Tunnel declared `Unread : LongInt` AFTER its file record, four bytes added at some point to make the block reach $A880 -- and it had been compensating for PanX/PanY, Angle/Radius and RotTmp all being in the wrong places. With those corrected the file record ends at $A880 on its own, so the four bytes became a surplus that pushed every PART3_STARS variable up by four. A declaration that exists to make a total come out is one to re-examine the moment anything under it moves. Second, PART3_STARS needs BOTH a local file record AND a unit-level one. The ENTER $80 at 10b8:0592 proves the local; removing the unit-level declaration moved every variable from $BE90 up by exactly 128. The two pieces of evidence that looked contradictory were measuring different things, and the unit declares a second record it never opens. AND THE HARNESS QUESTION IS ANSWERED WITHOUT A TRADE. The 2-byte cost was worth 752 bytes of the walk on this part alone -- 90.6 against 85.2 -- but printing through BIOS teletype, INT $10 function $0E, avoids the text RTL entirely while KEEPING the prompt. Write(s, #13, #10) does not; that was measured too. The generator does it for every harness now, so nobody has to choose between an exact data segment and a usable harness."
 
 [[plan.investigation]]
 name = "part6-scene1-jerky"
@@ -462,6 +463,12 @@ finding = "part 006 scene 1 is reported JERKY from a watched run beside ORIG6 on
 seen_in = "TPART6"
 state = "resolved"
 resolution = "NO CAUSE FOUND FOR THE JERKINESS, and this resolution says so rather than offering a theory. What was checked and cleared: the {$N+} trap streams are identical; the whooshtext segment has ONE span over 16 bytes and it is in LoadGlyph, which runs per glyph and not per frame; the per-frame inner loop is hand assembler already transcribed verbatim; and THIS SESSION'S OWN P6S1 CHANGE IS NOT THE CAUSE -- the `if Major <= Minor` fix emits JB at the branch exactly as the original does, verified byte for byte. Scene 1's remaining candidates are outside 1095: the rate MusicPoll is called at, and whether the scene draws straight to $A000 without a retrace wait in a way that differs. Neither is measured. WHAT THE LOOK DID YIELD is three frames in P6S1 each exactly TWO BYTES too big -- Sign $06 against $04, BuildPath $4c against $4a, Whoosh $114 against $112. One cause was likelier than three and the first guess was wrong: {$A-} changed nothing and is REFUTED for this unit. Two were separate redundant declarations. Sign had a local R and assigned `Sign := R` at the end; the original's $04 is the function result plus the FPU status word and leaves no room for a variable, so it assigns the function name directly in each branch. BuildPath declared Limit and then looped `to Limit`, which costs the variable AND the compiler's bound temporary; `for I := 0 to Round(Major)` gives the temporary alone. Both frames now match. Whoosh's two bytes are NOT found -- its declarations account for $112 exactly, so ours is generating a temporary the original does not, and the [BP-$104] filler it carries is separately justified by there being no reference to that slot. None of this moved the coverage walk, which forgives a two-byte displacement, so the gain here is fidelity and not a number."
+
+[[plan.investigation]]
+name = "part4-sixteen-bytes"
+finding = "part 004's initialised data was `identical` and is now 16 bytes SHORT, and its coverage fell 96.5 to 94.5 percent, because the harness stopped contributing text-RTL constants to DGROUP."
+seen_in = "TPART4"
+state = "open"
 
 [plan.row."001 1012:0004"]
 label = "BuildLens quadrant walk"
@@ -692,6 +699,11 @@ note = "The TRUE cause: LoadCurves builds the scene's own palette after the Bloc
 label = "Waves_Step erase/draw BASM"
 investigation = "part3-s6-left-dark"
 note = "Erase/draw is hand BASM with ES/CX set only in the erase branch; a skipped erase makes the draw store the colour byte into the curve table at 356+NewX (back half of curve 0). Original's left-half brightness is that corruption plus unerased litter; our Pascal-isation had fixed the bug. Block now transcribed verbatim, fragment target @asm 003 120f:01b1 +59 StepEraseDraw."
+
+[plan.row."004 gen/harness"]
+label = "part 004 is one paragraph of typed constants short; the harness was hiding it"
+investigation = "part4-sixteen-bytes"
+target = "R0"
 
 [plan.row."005 1096:0000"]
 label = "P5MAIN's scene units are named backwards, and that is the measurement"

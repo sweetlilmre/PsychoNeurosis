@@ -134,12 +134,17 @@ var
   DisplayCount : Integer;                               { DS:$BE0C }
   WaypointIdx  : Integer;                               { DS:$BE0E }
 
-  { DS:$BE10, 128 bytes -- the untyped file record Scene2 reads the waypoint
-    table through. UNIT-LEVEL in the original, not a local: this unit's last
-    var is WaypointIdx at $BE0E and the morph unit's first is SinX at $BE92,
-    and 128 bytes is exactly what sits between them. Nothing else in either
-    unit is that size. }
-  F            : file;
+  { A SECOND 128-BYTE RECORD, UNIT-LEVEL AND NEVER REFERENCED, and it is here
+    because two pieces of evidence that looked contradictory are both true.
+    Demo_Scene2's own file record is a LOCAL -- 10b8:0592 opens ENTER $80,0 and
+    10b8:0596 passes LEA DI,[BP-$80] to Assign -- so the handle the scene uses
+    is in its frame. But there is ALSO a 128-byte gap between this unit's last
+    referenced variable and PART3_MORPH's first, and removing it moved every
+    variable in the part from $BE90 upward down by exactly 128. So the unit
+    declares a second record it never opens, and the ENTER operand and the gap
+    were measuring different things. }
+  FUnused      : file;
+
 
 { --------------------------------------------------------------------------
   DegToRad (10b8:0487)
@@ -408,6 +413,15 @@ end;
           See docs/07-part3-scene2-stars.md.
   -------------------------------------------------------------------------- }
 procedure Scene2;
+var
+  { A LOCAL, and the frame settles it against the note this replaces. 10b8:0592
+    opens ENTER $80,0 and 10b8:0596 passes LEA DI,[BP-$80] to Assign, so the
+    file record is a frame slot -- 128 bytes of it, which is the whole frame.
+    The note it replaces argued unit-level from a 128-byte GAP between this
+    unit's last variable and the morph unit's first; a gap of the right size is
+    circumstantial where an ENTER operand is not, so the gap belongs to
+    something else and is still unaccounted for. }
+  F : file;                     { [BP-$80] }
 begin
   Assign(F, 'neurosis.dat');
   Reset(F, 1);

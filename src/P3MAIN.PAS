@@ -76,9 +76,17 @@ end;
   silently renamed; the two units disagree and that is worth resolving
   separately rather than papering over here.
   -------------------------------------------------------------------------- }
-procedure RunPart3;
+{ DS:$9F1A and DS:$9F1C -- UNIT-LEVEL Words, not locals of RunPart3, and the
+  stores say both halves of that. Each is written `XOR AH,AH` then a WORD store
+  (1000:00f7 and 1000:0101 are A3, not A2), so the Byte GetVolume returns is
+  widened into a Word variable; and they are at fixed DS addresses rather than
+  BP-relative, so they are in nobody's frame. SetVolume takes a Byte, which is
+  why 1000:012b reads SavedVol back with MOV AL. }
 var
-  Saved : Byte;
+  SavedVol : Word;      { DS:$9F1A }
+  Vol      : Word;      { DS:$9F1C }
+
+procedure RunPart3;
 begin
   SetMode13h;
   VirtScrAlloc;
@@ -99,14 +107,19 @@ begin
   Scene7;   FlushKeys;
 
   { 1000:00f0 -- ramp the volume down, stop, then put it back }
-  Saved := GetVolume;
-  while GetVolume > 0 do
-  begin
-    SetVolume(GetVolume - 1);
-    Delay(10);
-  end;
-  MusicStop;
-  SetVolume(Saved);
+  { A REPEAT, and GetVolume is called TWICE a turn. 1000:00fa stores it into
+    Vol, 1000:0109 passes Vol-1 to SetVolume, and 1000:010e stores it AGAIN
+    before the Delay -- and that second value is what 1000:011f tests. There is
+    no test before the first turn, so it is repeat..until and not while. }
+  SavedVol := GetVolume;              { 1000:00f0 }
+  repeat
+    Vol := GetVolume;                 { 1000:00fa }
+    SetVolume(Vol - 1);               { 1000:0109 }
+    Vol := GetVolume;                 { 1000:010e }
+    Delay(10);                        { 1000:011a }
+  until Vol = 0;                      { 1000:011f }
+  MusicStop;                          { 1000:0126 }
+  SetVolume(SavedVol);                { 1000:012f }
 
   VirtScrFree;
   Halt(0);

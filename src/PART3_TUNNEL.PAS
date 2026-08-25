@@ -162,6 +162,11 @@ var
   { The byte RotateBandsFine lifts out of each band before shifting it. Every
     reference in 1015:0191 is indexed BY THE BAND, so the original kept fifteen
     of them rather than one scalar. }
+  Spare         : Word;         { $A7EE -- NEVER REFERENCED, and it is real:
+                                  Radius ends at $A7ED and 1015:0191 stores
+                                  through [DI+$A7EF], so RotTmp[1] is at $A7F0
+                                  and two bytes sit between them. }
+
   RotTmp   : array[1..BandCount] of Byte;   { $A7F0, 1-based: DI = Band+1 }
 
   { UNIT-LEVEL, and the chain of addresses is what says so. This unit's vars run
@@ -178,11 +183,15 @@ var
     here. }
   F             : file;
 
-  { FOUR MORE BYTES THIS UNIT DECLARES AND NOBODY READS. $A872..$A87F is
-    fourteen bytes with not one reference to it anywhere in the part, and
-    PART3_STARS' first variable is at $A880, so all fourteen are this unit's.
-    With the file record above, our block still finished four bytes early. }
-  Unread        : LongInt;
+  { NO `Unread : LongInt` HERE ANY MORE, and its removal is the measurement.
+    Four bytes were declared at this point to make the block reach $A880,
+    because with PanX/PanY, Angle/Radius and RotTmp all in the wrong places the
+    block really did finish four bytes early. It was compensating for them. With
+    the order corrected above and the $A7EE hole declared, RotTmp[1] lands at
+    $A7F0 exactly and the file record then ends at $A880 on its own -- so these
+    four bytes became a surplus that pushed PART3_STARS' every variable up by
+    four. A declaration that exists to make a total come out is a declaration to
+    re-examine the moment anything under it moves. }
 
 { --------------------------------------------------------------------------
   VGA_SetMode (1192:002a) -- mode 13h, then unchain into Mode-X.
