@@ -538,6 +538,13 @@ resolution = "CLOSED. Every part's trap stream now matches the original OPCODE F
 name = "part1-depthsort-nested"
 finding = "part 001's 52 spans trace to eight length changes, and FOURTEEN of them -- more than a quarter -- come from one place: 12c5:0000, the very first routine in P1S5. IDENTIFIED, NOT IMPLEMENTED."
 seen_in = "TPART1"
+state = "resolved"
+resolution = "THE READING IS FINISHED; THE WORK IS NOT, AND IT MOVED TO part1-sortall-restructure. This entry is resolved as an IDENTIFICATION only -- no source changed on it, and marking it resolved without saying so would read as a fix. Ghidra settled the part my own scans could not. 12c5:0621 is MOV DI,$A5F6 / PUSH DS / PUSH DI / CALL 0x190, so the routine at 12c5:0190 takes the point array as a FAR POINTER PARAMETER. For a near call that puts the offset at [BP+4] and the segment at [BP+6], which is exactly what DepthSort's LES DI, SS:[link+4] loads. Every earlier reading of that slot was wrong because I assumed the routine had no parameters, and I went round it three times before asking the tool that answers identification questions directly -- which is the lesson the memory note about Ghidra already carries. AND 12c5:0190 IS SORT-ONLY: its decompilation is two DepthSort calls and a return. So it is not our RenderObject, which also runs the two drawing loops; those belong to the caller at 12c5:061d, which opens ENTER $0A. CONFIRMED DETAILS. Records are SIX BYTES and ONE-BASED: the arithmetic is Arr + I*6 - 6 for the record and - 2 for the sort key, so the key sits at offset +4 within it. The pivot is cached in a local. The swap is three Move calls through a six-byte temp, which is what a record assignment already compiles to, so our swap shape is right. The recursion passes the same static link down, and RET 6 accounts for two Integer parameters plus the link."
+
+[[plan.investigation]]
+name = "part1-sortall-restructure"
+finding = "part 001: DepthSort must become a NESTED procedure inside a SORT-ONLY routine that takes the point array as a Pointer parameter, with the two drawing loops moving up into its caller. Fourteen of the part's 52 spans depend on it, including the largest at 292 bytes. FULLY SPECIFIED by part1-depthsort-nested; this entry is the implementation and it is NOT started. The shape is: procedure SortAll(Arr : Pointer) at 12c5:0190, near, one Pointer parameter, containing nested procedure DepthSort(Lo, Hi : Integer) at 12c5:0000 which reads Arr^; SortAll's body is DepthSort(1, PtCount) then DepthSort(PtCount + 1, PtCount * 2); and the caller at 12c5:061d passes @Scr, with Scr at DS:$A5F6, before running the drawing loops itself. Do it in ONE measured step -- part 003's var bundle is the precedent for why piecemeal reads as a regression."
+seen_in = "TPART1"
 state = "open"
 
 [plan.row."001 1012:0004"]
@@ -583,6 +590,16 @@ target = "R0"
 [plan.row."001 12c5:0000"]
 label = "DepthSort is NESTED: [BP+4] is a static link to a Pointer parameter"
 investigation = "part1-depthsort-nested"
+target = "R0"
+
+[plan.row."001 12c5:0190"]
+label = "SortAll(Arr : Pointer) is sort-only; DepthSort nests inside it"
+investigation = "part1-sortall-restructure"
+target = "R0"
+
+[plan.row."001 12c5:061d"]
+label = "the drawing loops belong to the caller, which passes @Scr"
+investigation = "part1-sortall-restructure"
 target = "R0"
 
 [plan.row."001 12c5:075e"]
