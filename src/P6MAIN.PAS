@@ -20,7 +20,12 @@ procedure RunPart6;
 
 implementation
 
-uses Crt, VGA, DemoVT, P6S4, P6S3, P6S2, P6S1;
+{ P6S2 LAST, so it comes FIRST in DGROUP -- the data segment runs backwards
+  down this clause. The original's variable region opens with P6S2's Cells at
+  DS:$70EE and its block ends at $737D, exactly where P6S1's Path begins at
+  $737E; its constants open with P6S2's CellShape at DS:$000A too. Named the
+  other way round P6S1 came first and every variable in the part was out. }
+uses Crt, VGA, DemoVT, P6S4, P6S3, P6S1, P6S2;
 
 var
   SavedVol : Byte;                { DS:$70ec }
