@@ -130,7 +130,13 @@ type
   end;
   TDots   = array[1..MaxDots] of TDot;
   TTab    = array[0..TabTop] of Integer;
-  TPal768 = array[0..767] of Byte;
+  { TWO-DIMENSIONAL, entry by channel, and the upload loop is what says so.
+    1096:042a builds C*3 in DI and then reads the three channels as
+    [DI-$5DA6], [DI-$5DA5] and [DI-$5DA4] -- three consecutive displacements
+    off ONE index. A flat array[0..767] subscripted Pal[C*3+1] adds the 1 at
+    run time and builds the index in AX instead. Same 768 bytes. Part 004's
+    scene palette turned out to be the same shape for the same reason. }
+  TPal768 = array[0..255, 0..2] of Byte;
 
 var
   I1, I2, I3 : Integer;           { DS:$63c8, $63ca, $63cc }
@@ -302,13 +308,18 @@ begin
           Dots^[Count].FromY := Random(200);     { 1096:017c }
         end;
 
-      Inc(X);                                    { 1096:0180 }
+      { ASSIGNMENTS, NOT Inc AND Dec. 1096:0180 is MOV AX,[BP-4] / INC AX /
+        MOV [BP-4],AX -- nine bytes through the accumulator -- where Inc emits
+        INC WORD PTR [BP-4], which is three; 1096:01a4 is the same shape for
+        the row. Six bytes between them, and everything after out of step. See
+        the wiki's `Inc is not an assignment`. }
+      X := X + 1;                                { 1096:0180 }
       if (Count = MaxDots) or (X > 319) then     { 1096:0187, 1096:018e }
       begin
         if X > 319 then                          { 1096:0198 }
         begin
           X := 0;                                { 1096:019f }
-          Dec(Y);                                { 1096:01a7 }
+          Y := Y - 1;                            { 1096:01a4 }
         end;
         if (Count = MaxDots) or (Y < 1) then Break;   { 1096:01ab, 01b2 }
       end;
@@ -384,7 +395,7 @@ begin
   Seek(F, DataOfs);
   BlockRead(F, Pal, SizeOf(Pal));                { 1096:0416 }
   for I1 := 0 to 255 do                          { 1096:041b -- DS:$63C8 }
-    SetRGB(I1, Pal[I1 * 3], Pal[I1 * 3 + 1], Pal[I1 * 3 + 2]);
+    SetRGB(I1, Pal[I1, 0], Pal[I1, 1], Pal[I1, 2]);   { 1096:042a }
   BlockRead(F, VirtScr^, 64000);                 { 1096:0476 }
   Close(F);                                      { 1096:0480 }
 

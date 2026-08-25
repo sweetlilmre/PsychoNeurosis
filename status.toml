@@ -778,6 +778,25 @@ seen_in = "TPART4"
 state = "resolved"
 resolution = "RESOLVED in the batch that found it: part 004 96.5 -> 99.0%, which is the bar. The 101 bytes left are five spans of seventeen or fewer, and the largest of them is the trailing WriteLn's two RTL call targets and the address of `Output` -- addresses that move with the runtime build and no edit closes. A WATCHED TPART4 RUN IS NOW OWED: the explosion's flash is deliberately redder than it was, the part prints a number to the console when it ends, and Spawn's field writes go through a `with`."
 
+[[plan.investigation]]
+name = "part5-batch"
+finding = "PART 005 97.4 -> 98.1%, and the biggest thing left is now DIAGNOSED RATHER THAN GUESSED. Three code fixes first. P5S2's collect loop steps X and Y by ASSIGNMENT, not Inc and Dec -- 1096:0180 is MOV AX,[BP-4] / INC AX / MOV [BP-4],AX, nine bytes through the accumulator where Inc emits three, and 1096:01a4 is the same shape for the row. P5S2's palette is TWO-DIMENSIONAL: 1096:042a builds C*3 in DI and reads the three channels as [DI-$5DA6], [DI-$5DA5] and [DI-$5DA4], three consecutive displacements off ONE index, where a flat Pal[C*3+1] adds the 1 at run time and builds the index in AX. That is the SECOND unit today to want that shape -- part 004's scene palette was the first. P5S3's RenderPatch: LimY and LimX were declared variables where [BP-$23] and [BP-$25] are the two `for` limits' TEMPORARIES, and the nine bytes that had been 'unaccounted for' between Pixel and Size are SX, SY and four spare. THE ODD OFFSET IS THE CHECK: Size sits at [BP-$1B], and only a one-byte local above it can put a word on an odd boundary. Five spare bytes put it at [BP-$1C] and every reference below a byte out; four put it exactly right, and 33 declared plus two temporaries rounds to $26."
+seen_in = "TPART5"
+state = "resolved"
+resolution = "RESOLVED: part 005 97.4 -> 98.1%. What is left is two investigations of its own -- part5-dgroup-32 (99 bytes, and now diagnosed to the byte) and part5-registers-held (41 bytes, and not understood). All parts rebuilt, three byte-exact artefacts hold, paslint clean, part 005's traps identical opcode for opcode."
+
+[[plan.investigation]]
+name = "part5-dgroup-32"
+finding = "PART 005's REMAINING 99-BYTE SPAN IS A DGROUP ORDER DEFECT, AND IT IS 32 BYTES. Every one of P5S2's variables is exactly 32 higher than the original's -- I1 $63E8 against $63C8, TabSin $63F2 against $63D2, TabCos $7394 against $7374, TabU $8336 against $8316, TabV $92D8 against $92B8 -- while P5S1's are all at +0 and P5S1's EdgeBuf ends at exactly $63C8, which is where scene 2's block begins in the original. AND THE TOTALS ARE BOTH IDENTICAL, which is what makes it an ORDER defect and not a size one: dgimage reports 11,648 bytes against 11,648 with no differing byte, and the MZ header's minalloc is 3,082 paragraphs in both. So nothing is missing and nothing is surplus -- 32 bytes are in the wrong PLACE, sitting between P5S1's block and P5S2's, and P5S2's own Spare is 30 short of the gap it fills to compensate. That is the '30 bytes not accounted for' the Spare's note has carried for days: it is not 30 unexplained bytes, it is a 32-byte block on the wrong side of a unit boundary. WHERE THE 32 BELONG. The original puts P5S3's shared maths variables at $A662 -- 1102:0027 pushes MCos1 at $A662 and MSin1 at $A666, 1102:0018 MCos2 at $A66A and MSin2 at $A66E, and MScale is at $A67A -- which is immediately after P5S2's file record ends at $A661. Six LongInts plus MScale is 28 bytes and the block is 32. So they are the FIRST variables of scene 3's block, and in our link order something 32 bytes wide has landed in front of scene 2's instead. WHAT TO DO. Find what our build places at $63C8 -- the wiki's `DGROUP order reverses the uses clause` is the page for it -- and once it moves, P5S2's Spare becomes 128, WHICH IS A FILE RECORD'S SIZE. This target has found five routines and one unit declaring a file they never open; a sixth at exactly 128 bytes would stop being a number that balances and start being a declaration that was read. Worth the 99-byte span and probably the 13-byte one at 1096:0277 with it. AND A SECOND, SMALLER ONE IN THE SAME FAMILY: dsmap shows +2 at $A5DC and nowhere else, so two bytes sit between Speed and Index in ours that do not in the original."
+seen_in = "TPART5"
+state = "open"
+
+[[plan.investigation]]
+name = "part5-registers-held"
+finding = "AND ONE THING IN P5S3 THAT NO PASCAL SPELLING HAS PRODUCED. 1102:0079 computes CX + Col - Half into AX and then compares AX TWICE -- CMP AX,$13F / JG and CMP AX,0 / JL -- with no store anywhere; 1102:008c does the same into BX for the row; and 1102:00a0 then uses BOTH registers for the address, ADD BX,BX / MOV DI,[BX-$55F6] / ADD DI,AX. So two values are computed once each and held in registers across four comparisons and an address computation. OURS STORES THEM. Declaring SX and SY gives MOV [BP-$13],AX and then CMP [BP-$13],$13F -- Turbo Pascal has no peephole that keeps the accumulator, which our own build proves, and writing the expression out twice instead would evaluate it twice. Neither spelling is the original's. That is 41 bytes at 1102:0082 and it is the only thing in part 005 that is not understood; the frame around it is now exact. Worth a probe rather than another guess -- and worth checking whether it is the same phenomenon as the register-allocation difference part 006 records at 100f:0543, where the original builds an index in DI and ours goes through AX."
+seen_in = "TPART5"
+state = "open"
+
 [plan.row."001 1012:0004"]
 label = "BuildLens quadrant walk"
 investigation = "pacing"
@@ -1373,6 +1392,21 @@ label = "29 IOCheck calls the original has none of -- FIXED"
 investigation = "part4-order"
 target = "R0"
 
+[plan.row."005 $63C8"]
+label = "P5S2's whole block is +32; both totals identical, so it is ORDER"
+investigation = "part5-dgroup-32"
+target = "R0"
+
+[plan.row."005 $A5DC"]
+label = "and a separate +2 between Speed and Index"
+investigation = "part5-dgroup-32"
+target = "R0"
+
+[plan.row."005 $A662"]
+label = "the original's MCos1 -- scene 3's block starts with the 32"
+investigation = "part5-dgroup-32"
+target = "R0"
+
 [plan.row."005 1096:0000"]
 label = "P5MAIN's scene units are named backwards, and that is the measurement"
 investigation = "part5-dgroup-order"
@@ -1392,6 +1426,11 @@ note = "PARKED at the observer's call on 24 Aug 2026, with part 005 at 88.1% and
 label = "Scene2 motion-table build"
 investigation = "part5-386-trio"
 note = "The investigation's premise was stale: the 386 trio (SinCos/RotatePoint/Project) HAS been transcribed since the 19 Aug part-005 re-read (P5S3, verified fragments). The cost was the motion-table build in Demo_Scene2 -- loop body 1096:051a..0591, entered by the JMP at 1096:0514 -- which is 80x87 code in the original: FILD the index, FDIV by a SINGLE 180.0 at CS:$03c9, FLD the ten-byte EXTENDED Pi at CS:$03cd, then the RTL's Sin (CS:$32ad), Cos (CS:$32b2) and Round. P5S2 compiled under the $N- default, sending those calls through the software six-byte-Real RTL instead. Fixed by {$N+} on P5S2, and the reason is fidelity rather than speed: $N- emits no 80x87 instructions and therefore no emulator traps at all, so the traps in the 1994 file are positive evidence of $N+. TWO FIGURES CORRECTED HERE, both measured against bin/NEUROSIS.005 on 24 Aug 2026. The loop body carries TWELVE traps, not fourteen -- fourteen is the count for the whole of Demo_Scene2 at 1096:03d7..06b7, so the number was right with the wrong extent attached to it. And the loop makes 4,002 trig calls, not 3,424: the counter at DS:$63ca is seeded at 1096:050f and tested against $7D0 at 1096:0592, so it turns 2001 times at two calls a turn. 3,424 is not reproducible from this loop and is dropped. There is no raw 80x87 opcode anywhere in the shipped binary and there is none in ours either; both ship $E+ traps and both are executed by the emulator, since the demo never had a coprocessor. Settled independently of anyone reading a trap by building the unit both ways: $N+ aligns part 005 at 80.4%, $N- at 79.2%, so $N- moves the rebuild 137 bytes further from the 1994 file."
+
+[plan.row."005 1102:0079"]
+label = "two values held in registers across four compares"
+investigation = "part5-registers-held"
+target = "R0"
 
 [plan.row."005 bss +384"]
 label = "the only SURPLUS; a surplus is easier to place than a shortfall"

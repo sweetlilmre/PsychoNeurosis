@@ -136,16 +136,31 @@ var
     var block. Size and Half were declared first and took the slots nearest BP,
     which pushed X, Y and Z down four bytes each -- and the three pointers
     pushed for Project are where this part's largest span begins. }
-  Col, Row       : Integer;       { [BP-2],   [BP-4]   }
-  X, Y, Z        : LongInt;       { [BP-8], [BP-$0C], [BP-$10] }
+  { THE NINE UNACCOUNTED BYTES ARE WHERE SX AND SY LIVE, and the two slots at
+    the bottom are not declarations at all. 1102:0004 puts Size at [BP-$1B] and
+    Pixel is at [BP-$11], so nine bytes sit between them; and [BP-$23] and
+    [BP-$25] are the two `for` limits' TEMPORARIES -- 1102:0043 copies Size
+    into [BP-$23] and 1102:004c compares against that slot every iteration,
+    which is store-then-compare, what a `for` over a non-constant limit does.
+    Declaring LimY and LimX produced both the variables AND the temporaries.
+
+    So SX and SY go into the nine, leaving FOUR bytes that nothing references,
+    and the arithmetic closes on the odd offset Size sits at: Pixel is one byte
+    at [BP-$11], SX and SY take [BP-$13] and [BP-$15], four spare bytes take
+    [BP-$19]..[BP-$16], and Size then lands at [BP-$1B] -- an odd offset, which
+    is the check, because only a one-byte local above it can produce one. Five
+    spare bytes put it at [BP-$1C] and every reference below it a byte out.
+    2+2+4+4+4+1 + 2+2+4 + 2+2+2+2 is 33, plus the two temporaries is 37, and
+    Turbo Pascal rounds that up to 38 = $26. }
+  Col, Row       : Integer;       { [BP-$02], [BP-$04] }
+  X, Y, Z        : LongInt;       { [BP-$08], [BP-$0C], [BP-$10] }
   Pixel          : Byte;          { [BP-$11] }
+  SX, SY         : Integer;       { [BP-$13], [BP-$15] }
+  Spare          : array[1..4] of Byte;   { [BP-$19]..[BP-$16], never read }
   Size, Half     : Integer;       { [BP-$1B], [BP-$1D] }
   ScreenX        : Integer;       { [BP-$1F] }
   ScreenY        : Integer;       { [BP-$21] }
-  LimY, LimX     : Integer;       { [BP-$23], [BP-$25] }
-  { no recorded offset for these two, so they go last -- and nine bytes
-    between Pixel and Size are still unaccounted for }
-  SX, SY         : Integer;
+  { and [BP-$23], [BP-$25] are the compiler's, not ours }
 begin
   Size := Patch;                                 { 1102:0004 }
   Half := Size div 2;                            { 1102:0010 }
@@ -154,11 +169,9 @@ begin
   SinCos(0, MCos1, MSin1);                       { 1102:0031 }
   SinCos(0, MCos3, MSin3);                       { 1102:0040 }
 
-  LimY := Size;
-  for Row := 1 to LimY do
+  for Row := 1 to Size do                        { 1102:0043 }
   begin
-    LimX := Size;
-    for Col := 1 to LimX do
+    for Col := 1 to Size do                      { 1102:005c }
     begin
       Pixel := 0;                                { 1102:0075 }
       SX := CX + Col - Half;                     { 1102:0079 }
