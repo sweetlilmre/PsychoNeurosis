@@ -253,7 +253,7 @@ def emit_p006_text():
 
 
 def emit_p006_cells():
-    """The whoosh board: array[1..26, 1..16, 1..8] of Byte.
+    """The whoosh board: array[1..27, 1..16, 1..8] of Byte.
 
     Stored [band][column][rowInBand]; each band is one 8-wide x 16-tall letter
     lying on its side, because the board is drawn transposed (map row -> screen
@@ -261,10 +261,18 @@ def emit_p006_cells():
     """
     raw, base = dg("006")
     A = 0x000A
-    vals = list(raw[base + A: base + A + 26 * 128])
+    # TWENTY-SEVEN BANDS, and DGROUP's own arithmetic is what fixes the count:
+    # the credits text starts at DS:$0D8A in the 1994 file, and $000A plus
+    # 27 * 128 is $0D8A exactly, where 26 bands land it at $0D0A. The
+    # twenty-seventh is all zeroes, which is why nothing in the data itself
+    # gives it away -- it took the two DGROUP images side by side, where the
+    # original has 128 more zeros before the first credit string than ours did.
+    # Worth 128 bytes to every variable in the part, and the part's data was
+    # 128 bytes short of the original's until it was counted.
+    vals = list(raw[base + A: base + A + 27 * 128])
     body = header("""Part 006 scene 2 -- the whoosh board.
 
-  array[1..26, 1..16, 1..8] of Byte, DS:$000A. Each band is one letter cell
+  array[1..27, 1..16, 1..8] of Byte, DS:$000A. Each band is one letter cell
   block; the value is the CELL TYPE drawn at that grid position (1 = letter,
   0 = nothing; Whoosh_Load pre-fills the whole board with 2 = background).
 
@@ -276,13 +284,17 @@ def emit_p006_cells():
                 only ones Whoosh_Load copies onto the board.
   Bands 17..26 spell "0,000 DOTS" and are NEVER USED -- dead data left in the
                 executable. The scroll text boasts "4000 DOTS", so this was
-                presumably an earlier version of the same gag.""")
-    # CELLSHAPE, and all TWENTY-SIX bands. The truncated 16-band copy in
+                presumably an earlier version of the same gag.
+  Band     27 is entirely ZERO and is never drawn either. It is here because
+                the credits text that follows it in DGROUP is at $0D8A, and
+                $000A + 27 * 128 is $0D8A; twenty-six bands put every variable
+                in the part 128 bytes low.""")
+    # CELLSHAPE, and all TWENTY-SEVEN bands. The truncated 16-band copy in
     # P6SHAPE.INC was read from the same DS:$000A with a shorter length, and
-    # its own generator no longer exists. Bands 17..26 are never drawn -- the
+    # its own generator no longer exists. Bands 17..27 are never drawn -- the
     # same shape as part 003's unused shape slots -- but they are in DGROUP
     # and everything declared after them moves if they are left out.
-    body += fmt("CellShape", "array[1..26, 1..16, 1..8] of Byte", vals, 32, group=(16, 8))
+    body += fmt("CellShape", "array[1..27, 1..16, 1..8] of Byte", vals, 32, group=(16, 8))
     OUT.joinpath("P6CELL.INC").write_text(body + "\n", encoding="ascii")
     return len(vals)
 

@@ -102,7 +102,7 @@ const
   read. A hole in the CONSTANT region cannot be filled the same way -- whatever
   is missing there is referenced by something, or the linker would have dropped
   it too. }
-{$I gen/P6CELL.INC}    { const CellShape : array[1..26,1..16,1..8] of Byte }
+{$I gen/P6CELL.INC}    { const CellShape : array[1..27,1..16,1..8] of Byte }
 
 type
   TCells  = array[1..CellRows, 1..GridCols] of Byte;
