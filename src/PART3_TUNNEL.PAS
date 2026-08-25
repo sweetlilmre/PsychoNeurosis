@@ -252,17 +252,63 @@ end;
   225 colours from index 1 up. Note R, G and B come from three separate
   arrays -- the rotations below are what make this worth re-uploading.
   -------------------------------------------------------------------------- }
-procedure UploadPalette;
+{ HAND ASSEMBLER, transcribed verbatim. Three signals, each of which Turbo
+  Pascal's code generator does not produce: LOOP at 1015:0049, the 8-bit
+  pointer arithmetic ADD BL,Ctr / ADC BH,0 -- adding a byte index into the
+  low half of an offset and carrying by hand -- and the three table
+  addresses held in locals rather than folded into each reference.
+
+  THE FRAME IS ENTER $0A AND THE SLOTS ARE ODD: a byte at [BP-2] and words
+  at [BP-5], [BP-7] and [BP-9], which leaves [BP-1], [BP-3] and [BP-10]
+  untouched. Three bytes the original declared and never read, so they are
+  declared here too -- omitting them puts every slot after them at the
+  wrong offset. WHAT they were is not recoverable from the binary; that
+  they exist, and exactly where, is.
+
+  FOR REFERENCE ONLY, the equivalent Pascal -- not what the binary does:
+    Port[$3C8] := 1;
+    for I := 0 to NumColours - 1 do begin
+      Port[$3C9] := Red[I];  Port[$3C9] := Green[I];
+      Port[$3C9] := Blue[I];
+    end;
+}
+procedure UploadPalette; assembler;
 var
-  I : Word;
-begin
-  Port[$3C8] := 1;
-  for I := 0 to NumColours - 1 do
-  begin
-    Port[$3C9] := Red[I];
-    Port[$3C9] := Green[I];
-    Port[$3C9] := Blue[I];
-  end;
+  Pad1 : Byte;    { [BP-1]  -- declared, NEVER READ }
+  Ctr  : Byte;    { [BP-2]  -- the colour counter }
+  Pad2 : Byte;    { [BP-3]  -- declared, NEVER READ }
+  PR   : Word;    { [BP-5]  -- DS offset of Red,   $0002 }
+  PG   : Word;    { [BP-7]  -- DS offset of Green, $00E3 }
+  PB   : Word;    { [BP-9]  -- DS offset of Blue,  $01C4 }
+  Pad3 : Byte;    { [BP-10] -- declared, NEVER READ }
+asm
+  MOV  PR, OFFSET Red        { 1015:0004                                 }
+  MOV  PG, OFFSET Green      { 1015:0009                                 }
+  MOV  PB, OFFSET Blue       { 1015:000e                                 }
+  MOV  DX, $03C8             { 1015:0013  the DAC write-index port       }
+  MOV  AL, 1                 { 1015:0016  colour 1, not 0                }
+  MOV  Ctr, 0                { 1015:0018                                 }
+  OUT  DX, AL                { 1015:001c                                 }
+  INC  DX                    { 1015:001d  $03C9, and DX stays live       }
+  MOV  CX, NumColours        { 1015:001e  $E1 = 225                      }
+@@Next:
+  MOV  BX, PR                { 1015:0021                                 }
+  ADD  BL, Ctr               { 1015:0024  byte index into the low half   }
+  ADC  BH, 0                 { 1015:0027  and carry it by hand           }
+  MOV  AL, [BX]              { 1015:002a                                 }
+  OUT  DX, AL                { 1015:002c                                 }
+  MOV  BX, PG                { 1015:002d                                 }
+  ADD  BL, Ctr               { 1015:0030                                 }
+  ADC  BH, 0                 { 1015:0033                                 }
+  MOV  AL, [BX]              { 1015:0036                                 }
+  OUT  DX, AL                { 1015:0038                                 }
+  MOV  BX, PB                { 1015:0039                                 }
+  ADD  BL, Ctr               { 1015:003c                                 }
+  ADC  BH, 0                 { 1015:003f                                 }
+  MOV  AL, [BX]              { 1015:0042                                 }
+  OUT  DX, AL                { 1015:0044                                 }
+  ADD  Ctr, 1                { 1015:0045  ADD, not INC                   }
+  LOOP @@Next                { 1015:0049                                 }
 end;
 
 { --------------------------------------------------------------------------
@@ -461,6 +507,13 @@ begin
   FreeMem(Buffer, PlaneSize);
 end;
 
+{ The original gives every unit an EMPTY initialisation section, and the
+  main body's opening far calls are the chain that runs them -- eleven of
+  them in this part, one per unit, ending at 1000:0041 where the real body
+  starts. Each stub is five bytes, PUSH BP / MOV BP,SP / LEAVE / RETF, and
+  it sits at the END of the unit's own segment. Without a `begin` here
+  Turbo Pascal emits neither the stub nor the chain entry. }
+begin
 end.
 
 { ===========================================================================

@@ -332,6 +332,13 @@ begin
   FreeMem(DstOfs, TableSize);
 end;
 
+{ The original gives every unit an EMPTY initialisation section, and the
+  main body's opening far calls are the chain that runs them -- eleven of
+  them in this part, one per unit, ending at 1000:0041 where the real body
+  starts. Each stub is five bytes, PUSH BP / MOV BP,SP / LEAVE / RETF, and
+  it sits at the END of the unit's own segment. Without a `begin` here
+  Turbo Pascal emits neither the stub nor the chain entry. }
+begin
 end.
 
 { ===========================================================================

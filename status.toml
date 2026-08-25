@@ -402,6 +402,19 @@ seen_in = "TPART1"
 state = "resolved"
 resolution = "SIX OF ITS NINE PAIRED SEGMENTS WERE OUT OF ORDER, and segpair.py named them: our located order ran P1S5, P1S4, FixMath, P1S3, P1S2, P1S1 where the original runs P1S1, P1S2, P1S3, P1S4, then a 304-byte segment we do not have yet, then P1S5, then FixMath. That is the scene list REVERSED against P1Intro's clause, the same shape as part 005's -- so naming the five scenes backwards puts them in the original's order, and it does: all nine paired segments now match. The DATA improved with it, 420 differing bytes to 393, and the first divergence moved from $0002 to $0018. THE COVERAGE WALK DID NOT MOVE -- 16161 to 16159, two bytes of noise -- which is the third part in one day where a unit-order fix was invisible to it. WHAT IS LEFT AND WHERE TO START: the original carries four zero bytes at $0018, between the 320/200 pair at $0014 and the 50 at $001c, that we do not declare, and the region is still 112 bytes short overall. The 304-byte segment at 12b2 is NOT FOUND by segpair, so it is a unit not yet written rather than one in the wrong place, and it is worth identifying before more declaration work: an absent unit displaces everything after it in DGROUP."
 
+[[plan.investigation]]
+name = "part1-missing-star-unit"
+finding = "part 001's segment 12b2, 304 bytes, is a unit we do not have at all: segpair.py reports it NOT FOUND while every other segment pairs. IDENTIFIED, NOT YET FIXED. WHAT THE SEGMENT IS. A starfield unit, and its three routines are already written -- inside P1S4, where they do not belong. The original gives them a segment of their own and P1S4 calls all three across it. 12b2:0000 StarInit: Randomize, then for 90 records of 9 bytes based at DS:$9dd2 (element 1 at $9ddb), X := Random(320), Y := Random(200), and a three-way Random(3) choosing colour and DX. Fields are X, Y, DX, Spare : Integer and Colour : Byte, confirmed by the displacements +0, +2, +4 and +8. 12b2:00c0 StarStep and 12b2:00f1 StarDraw are HAND ASSEMBLER and ours are Pascal. The proof is the frame: StarStep opens `MOV BX,0` with no prologue at all and ends RETF, and StarDraw opens PUSH BP / MOV BP,SP with no ENTER and no locals, while both of ours declare loop counters that would have to be allocated. Both walk the array with a byte stride -- MOV DX,BX / ADD BX,9 / DEC CX / JNE -- and StarDraw draws with STOSB through the row-offset table at DS:$AB5A. 12b2:0120 IS NOT A ROUTINE TO WRITE. It is the unit's compiler-generated initialisation section, and the main body's first twelve instructions are the init chain that calls one per unit. THAT CHAIN IS A FREE READING OF THE LINK ORDER and it is worth more than this defect: it runs DemoVT, Crt, VGA, FixMath, P1S5, THIS UNIT, P1S4, P1S3, P1S2, P1S1 -- reverse of the segment order, and it places the new unit between P1S5 and P1S4 without any guessing. WHY IT IS NOT FIXED YET, and this is a scope judgement rather than a difficulty: the segment is 304 bytes and part 001 needs 4,042 more aligned bytes for 95 percent. P1S4's own header records the real blocker -- the load image is 1,536 bytes BIGGER than the original's while the BSS is 23,520 bytes SMALLER, so initialised data sits here that belongs in BSS and a large block of variables is missing outright. Extracting this unit is correct and should be done; it will not move part 001 near the target on its own, and part 003 was 1,100 bytes from 95 percent with 1,120 editable, so that went first."
+seen_in = "TPART1"
+state = "open"
+
+[[plan.investigation]]
+name = "part3-init-and-palette"
+finding = "part 003 is at 87.1 percent with 1,120 editable bytes, and its largest span with no upstream cause is 1015:0000..0049 -- the head of Part3Tunnel, 73 bytes."
+seen_in = "TPART3"
+state = "resolved"
+resolution = "TWO DEFECTS, 87.1 to 87.8 percent, and the first is a class that applies to every part. ONE, AND IT IS SYSTEMATIC: THE ORIGINAL GIVES EVERY UNIT AN EMPTY INITIALISATION SECTION. A Turbo Pascal program opens with one far call per unit that has one, in reverse link order, and the original's chain for this part runs thirteen calls before the real body starts at 1000:0041. Ours ran seven, because six units ended with a bare `end.` and TP then emits neither the chain entry nor the five-byte stub -- PUSH BP / MOV BP,SP / LEAVE / RETF -- that sits at the END of the unit's own segment and IS inside the compared range. Part3Tunnel's is at 1015:0a26. Adding `begin end.` to the six units was worth 36 bytes, which is small and exactly the predicted size, so the mechanism is confirmed rather than merely plausible. Swept across every part: only part 002 still has one unit short, and elsewhere ours EXCEEDS the original, which is the harness's own units and not a defect. THE CHAIN IS ALSO A FREE AND EXACT READING OF THE LINK ORDER, better than any content matching: it needs no anchor and no scoring. For this part it gives Tunnel, Stars, Morph, the 1192 unit, Globe, Blocks, Waves, Sprites, VGA, Crt, DemoVT -- which is the segment addresses exactly, so part 003's order was already right and an earlier guess that it was reversed is REFUTED. TWO: Tunnel_UploadPalette at 1015:0000 is HAND ASSEMBLER and ours was four Port[] writes in a for loop. Three signals TP's code generator does not produce: LOOP at 1015:0049; the 8-bit pointer arithmetic ADD BL,Ctr / ADC BH,0, adding a byte index into the low half of an offset and carrying by hand; and the three table addresses held in LOCALS rather than folded into each reference. The frame is ENTER $0A with a byte at [BP-2] and words at [BP-5], [BP-7], [BP-9], leaving [BP-1], [BP-3] and [BP-10] untouched -- three bytes the original declared and never read, declared here too because omitting them puts every slot after them at the wrong offset. WHAT they were is not recoverable; that they exist, and exactly where, is. The transcription closed the whole 73-byte span. WHAT IS LEFT: 997 bytes to 95 percent, and spanwhy puts the weight on three length changes -- 1015:06bc with nine spans, 10b8:0585 with five, 1015:018d with five. Not re-observed; UploadPalette runs once per scene and the init stubs do nothing, so no behaviour should have changed."
+
 [plan.row."001 1012:0004"]
 label = "BuildLens quadrant walk"
 investigation = "pacing"
@@ -413,8 +426,18 @@ investigation = "pacing"
 note = "Scene 3's crawl: the mosaic block sampling (10e3:0148..01cb) is one hand BASM block loading ES/DS once per level and walking blocks register-only, five instructions a pixel; it had been re-expressed as Pascal Mem[] loops that reload a segment register on every one of 128,000 accesses per level. Back in verbatim, fragment @asm 001 10e3:0148 +132 locked at 132. Also recorded as a deviation: the _fpu originals' raw x87 came from a post-build patch a byte-scanner cannot reproduce safely (validated against all six variant pairs and refused), so our $N+ scenes keep TP7's emulator-interrupt encoding -- a bounded per-op cost."
 
 [plan.row."001 12b2:0000"]
-label = "a 304-byte segment segpair cannot find: a unit not yet written"
-investigation = "part1-unit-order"
+label = "StarInit belongs in its own unit, not in P1S4"
+investigation = "part1-missing-star-unit"
+target = "R0"
+
+[plan.row."001 12b2:00c0"]
+label = "StarStep has NO STACK FRAME in the original: hand assembler"
+investigation = "part1-missing-star-unit"
+target = "R0"
+
+[plan.row."001 12b2:00f1"]
+label = "StarDraw has no locals and uses STOSB: hand assembler"
+investigation = "part1-missing-star-unit"
 target = "R0"
 
 [plan.row."001 12c5:075e"]
@@ -562,9 +585,19 @@ label = "REGRESSION: the generator and the sources had drifted, and the build wa
 investigation = "pacing"
 note = "Running tools/emit_pascal_data2.py to regenerate P2OBJ.INC also rewrote P6TEXT.INC, renaming CreditText to Credits and shortening it from 113 entries to 99. P6S4 stopped compiling and the failure cascaded to P6MAIN, TP6S4 and TPART6 - so run/TPART6.EXE was STALE from that commit onward, and so were several other EXEs. I did not notice for four commits because I only ever read the last line of the build output, which is the green check you have not read the output of, verbatim. Every part re-measured from a clean build afterwards: 001 68.7 to 68.6, 003 65.8 to 67.4, 004 56.2 to 56.6, 005 88.4 to 88.7, 006 73.0 to 73.4, 007 86.9 to 87.0 - the rises are the VGA layout work reaching parts whose EXEs had been stale, and the 001 fall is a stale number correcting itself. Fixed at the generator, which is where the drift belonged: it emits CreditText and a FIXED 113 entries now, with the two shape facts named as constants beside the reader rather than derived from however much text the image happens to hold. Verified idempotent and the 99 real strings identical to the pre-break file. One slot differs and the NEW output is the correct one: slot 100 has a length byte of ZERO and the old generator ignored the length byte and captured three bytes of padding as text. Also repaired: two string literals in the generator that a heredoc broke by halving a backslash, which is WORKING.md section 9 first entry, and it hid itself - the generator crashed, the include was left as restored, and a diff of two copies of that untouched file reported idempotent."
 
+[plan.row."003 1015:0000"]
+label = "UploadPalette is hand assembler: LOOP, ADC BH,0, pointers in locals"
+investigation = "part3-init-and-palette"
+target = "R0"
+
 [plan.row."003 1015:0708"]
 label = "UpdateMotion's degrees-to-radians is a NESTED function"
 investigation = "surplus-fpu-sites"
+target = "R0"
+
+[plan.row."003 1015:0a26"]
+label = "every unit wants an EMPTY initialisation section"
+investigation = "part3-init-and-palette"
 target = "R0"
 
 [plan.row."003 120f:0017"]
