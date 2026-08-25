@@ -349,6 +349,11 @@ const
   ScrollFrom   = 140;      { $8C  -- 1012:05a7, after which it slides out }
   ScrollStep   = 2;        { pixels per frame }
 
+var
+  { A GLOBAL, because Bounce_Run's frame has no room for it: ENTER $54 is
+    exactly the counter and the four arrays. }
+  Frame : Integer;
+
 { --------------------------------------------------------------------------
   1012:03bd -- ScrollLeft
 
@@ -415,35 +420,37 @@ end;
                                                ASPHYXIA logo with reflection
           See docs/14-part001-intro.md.
   -------------------------------------------------------------------------- }
-procedure Scene1;
+{ --------------------------------------------------------------------------
+  1012:03e3 -- Bounce_Run.
+
+  ITS FRAME IS ENTER $54 AND THAT IS THE WHOLE DECLARATION LIST: 2 + 4 * 20 is
+  82, and 84 with the two bytes of padding. So the file record and the frame
+  counter that used to share this routine cannot be here -- the file work
+  belongs to Scene1 below, and Frame is a unit-level var.
+
+  The offsets give the order, first declared nearest BP. Which array is which
+  came from the BOUNDS TESTS rather than any name: the one checked against 299
+  is X and the one checked against 179 is Y.
+  -------------------------------------------------------------------------- }
+procedure BounceRun;
 var
-  { THE FOUR BOUNCE ARRAYS ARE LOCALS, and the frame closes to the byte:
-    2 + 4 * 20 is 82 and Bounce_Run opens ENTER $54, which is 84 with the two
-    bytes of padding. The offsets give the order -- first declared nearest BP --
-    and they are I at [BP-2], then the two deltas and then the two positions.
-    Declared as unit-level vars they were addressed absolutely, which shares no
-    bytes with the frame-relative form the original uses throughout. }
-  I     : Integer;                            { [BP-$02] }
-  BDX   : array[1..NumBouncers] of Integer;   { [BP-$16] }
-  BDY   : array[1..NumBouncers] of Integer;   { [BP-$2A] }
-  BX    : array[1..NumBouncers] of Integer;   { [BP-$3E] }
-  BY    : array[1..NumBouncers] of Integer;   { [BP-$52] }
-  F     : file;
-  Frame : Integer;
+  { THE COUNTER IS LAST, not first: 1012:03e7 writes 1 to [BP-$52], and the
+    arrays are addressed [BP+DI-$16], -$2A, -$3E and -$52, which are their
+    bases less the two bytes the compiler folds out of a 1-based subscript.
+    So BDX sits nearest BP and I sits at the bottom.
+
+    Which array is which came from the BOUNDS TESTS rather than any name: the
+    one checked against 299 is X and the one against 179 is Y.
+
+    Four arrays and the counter sum to 82; the routine opens ENTER $54, which
+    is 84, so two more bytes sit below I and nothing reads them. }
+  BDX    : array[1..NumBouncers] of Integer;   { base [BP-$14] }
+  BDY    : array[1..NumBouncers] of Integer;   { base [BP-$28] }
+  BX     : array[1..NumBouncers] of Integer;   { base [BP-$3C] }
+  BY     : array[1..NumBouncers] of Integer;   { base [BP-$50] }
+  I      : Integer;                            { [BP-$52] }
+  Unread : Integer;                            { [BP-$54] }
 begin
-  GetMem(Under, SizeOf(TSaveBank));
-  BuildLens;
-  Assign(F, 'neurosis.dat');
-  Reset(F, 1);
-  LoadLogo;                             { palette + 320x200 screen }
-  Close(F);
-
-  { Two black vertical lines down the right edge -- the artwork evidently
-    has rubbish in its last two columns. }
-  DrawLine(319, 199, 319, 0, 0, VirtScrSeg);
-  DrawLine(318, 199, 318, 0, 0, VirtScrSeg);
-  CopyScreen(VirtScrSeg, $A000);
-
   for I := 1 to NumBouncers do
   begin
     BDX[I] := Random(3) + 2;
@@ -451,6 +458,8 @@ begin
     BX[I]  := Random(250) + 30;
     BY[I]  := Random(150) + 30;
   end;
+
+  CopyScreen(VirtScrSeg, $A000);
 
   { 1012:0442 -- a counted loop, not an open one. }
   Frame := 1;
@@ -481,6 +490,28 @@ begin
     if Frame > ScrollFrom then ScrollLeft;    { 1012:05a7 }
     Inc(Frame);
   until Frame > BounceFrames;                 { 1012:05b1 }
+end;
+
+{ --------------------------------------------------------------------------
+  The scene: load, draw the frame, then hand over to BounceRun.
+  -------------------------------------------------------------------------- }
+procedure Scene1;
+var
+  F : file;
+begin
+  GetMem(Under, SizeOf(TSaveBank));
+  BuildLens;
+  Assign(F, 'neurosis.dat');
+  Reset(F, 1);
+  LoadLogo;                             { palette + 320x200 screen }
+  Close(F);
+
+  { Two black vertical lines down the right edge -- the artwork evidently
+    has rubbish in its last two columns. }
+  DrawLine(319, 199, 319, 0, 0, VirtScrSeg);
+  DrawLine(318, 199, 318, 0, 0, VirtScrSeg);
+
+  BounceRun;
 end;
 
 end.
