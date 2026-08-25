@@ -28,7 +28,16 @@ const
   BounceH     = 40;
 
 type
-  TSaveBank = array[1..NumBouncers, 0..BounceH * BounceW - 1] of Byte;
+  { THE ROW IS 1641 BYTES, NOT 1600, and it is the same index range as the
+    lens table -- which is the point: LensTab[I] is used as a subscript into a
+    bouncer's saved cell, so the two must have the same bound. BuildCell
+    settles the size: 1012:036a is IMUL DI,[BP+4],$669 -- 1641 -- and
+    1012:036f LEA AX,[DI-$37F] takes 895 off it, which is the base minus one
+    row folded into the displacement, giving a base of $02EA.
+
+    And it TILES: $02EA plus ten rows of 1641 is $4304, which is exactly where
+    LensTab begins. }
+  TSaveBank = array[1..NumBouncers, 0..BounceW * (BounceH + 1)] of Byte;
   TCell     = array[0..BounceH * BounceW - 1] of Byte;
   { 1641 words, not 1600, and the extra 41 are not slack -- BuildLens walks a
     QUADRANT and mirrors, so it also writes row 20 and column 20, whose index
@@ -41,7 +50,17 @@ type
 var
   { The saved background under each bouncer. There is NO sprite bitmap: the
     bouncers are lenses over whatever they are sitting on. }
-  Under   : ^TSaveBank;
+  { DS:$02EA -- INLINE IN DGROUP, not on the heap. This was `^TSaveBank` with
+    a GetMem, which is four bytes where the original has 16,410, and it is most
+    of why every absolute data displacement in this part was wrong: the MZ
+    header asks the loader for 16,704 bytes more uninitialised space than our
+    build did.
+
+    BuildCell is the proof. 1012:03a2 is MOV BX,[BP-4] / ADD BX,AX / MOV AL,[BX]
+    -- a DS-relative byte read at an offset computed from the bouncer number.
+    A heap block cannot be reached that way; it would need the pointer loaded
+    into a segment register first. }
+  Under   : TSaveBank;                  { DS:$02EA, 16,410 bytes }
   { DS:$4FD6 -- the single working cell the lens gathers into. }
   Cell    : TCell;
   { DS:$4304 -- the gather table, built once by BuildLens. }
@@ -335,7 +354,7 @@ var
   Spare4  : Byte;                       { [BP-8], never read }
 begin
   for I := BounceH * BounceW - 1 downto 0 do
-    Cell[I] := Under^[N, LensTab[I]];
+    Cell[I] := Under[N, LensTab[I]];
 end;
 
 { Draw order per frame, from Bounce_Run: save the background, build the lens
@@ -343,14 +362,14 @@ end;
   the source -- which is why the erase pass runs in REVERSE order. }
 procedure DrawSprite(N, X, Y : Integer);
 begin
-  SaveUnder(X, Y, @Under^[N], VirtScrSeg);
+  SaveUnder(X, Y, @Under[N], VirtScrSeg);
   BuildCell(N);
   BlitSprite(X, Y, @Cell, VirtScrSeg);
 end;
 
 procedure EraseSprite(N, X, Y : Integer);
 begin
-  BlitSprite(X, Y, @Under^[N], VirtScrSeg);
+  BlitSprite(X, Y, @Under[N], VirtScrSeg);
 end;
 
 { ===========================================================================
@@ -514,7 +533,6 @@ procedure Scene1;
 var
   F : file;
 begin
-  GetMem(Under, SizeOf(TSaveBank));
   BuildLens;
   Assign(F, 'neurosis.dat');
   Reset(F, 1);

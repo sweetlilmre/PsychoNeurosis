@@ -97,23 +97,49 @@ const
   VGASeg    = $A000;
 
 
-var
-  { Row offset lookup, DS:$E772 -- YOfs[y] = y * 320. PutPixel indexes this
-    rather than multiplying, which is why it needs no MUL. }
-  YOfs : array[0..ScrHeight - 1] of Word;
-
 type
   { The DAC in the order the hardware wants it: R, G, B per entry, 0..63. }
   TPalette = array[0..255, 0..2] of Byte;
   PPalette = ^TPalette;
 
 var
+  { THE ORDER OF THESE THREE IS MEASURED, and YOfs came FIRST here, which put
+    every one of them 400 bytes out. Part 001 has VirtScr at DS:$AB54,
+    VirtScrSeg at DS:$AB58 and YOfs at DS:$AB5A -- 1107:0583 pushes [$AB58] as
+    the screen segment and 12b2:010f indexes [$AB5A] after SHL BX,1, so the
+    pointer and its segment precede the table. }
+
   { The virtual screen every part draws into before blitting to $A000.
     64,000 bytes on the heap; VirtScrSeg is its segment, and because GetMem
     returns a normalised pointer the offset is always 0 -- which is why every
     part addresses it as a bare segment. }
-  VirtScr    : Pointer;
-  VirtScrSeg : Word;
+  VirtScr    : Pointer;                 { part 001: DS:$AB54 }
+  VirtScrSeg : Word;                    { part 001: DS:$AB58 }
+  { Row offset lookup, DS:$AB5A in part 001 -- YOfs[y] = y * 320. PutPixel
+    indexes this rather than multiplying, which is why it needs no MUL. }
+  YOfs       : array[0..ScrHeight - 1] of Word;
+
+  { NINETEEN BYTES OF UNIT STATE THAT WERE NOT DECLARED AT ALL, and their
+    absence put Palette 768 bytes early -- which is what a data-reference map
+    showed as a +768 step in the shift between $AB58 and $ACEB.
+
+    Segment 1491 writes sixteen distinct addresses in $ACEA..$ACFC, and the
+    three it never touches -- $ACEF, $ACF1 and $ACF7 -- are the high halves of
+    Words at $ACEE, $ACF0 and $ACF6. That gives the sizes below and they sum to
+    nineteen exactly, from $ACEA to $ACFC inclusive.
+
+    THE PURPOSES ARE NOT KNOWN. 1491:044c..045e sets several of them from one
+    value masked with $7F, zeroes three and sets another to one, which reads
+    like the fade machinery's state, but nothing here is measured beyond the
+    addresses and the widths. Named for what they are: the block that has to be
+    here for Palette to land in the right place. }
+  State1, State2, State3, State4 : Byte;    { $ACEA .. $ACED }
+  StateW1                       : Word;    { $ACEE }
+  StateW2                       : Word;    { $ACF0 }
+  State5, State6, State7, State8 : Byte;   { $ACF2 .. $ACF5 }
+  StateW3                       : Word;    { $ACF6 }
+  State9, StateA, StateB, StateC, StateD : Byte;  { $ACF8 .. $ACFC }
+
   Palette    : TPalette;
 
 procedure SetMode13h;

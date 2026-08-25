@@ -641,6 +641,13 @@ state = "open"
 name = "part1-bss-shortfall"
 finding = "part 001: THE UNINITIALISED DATA SHORTFALL IS 16,704 BYTES, MEASURED FROM THE EXE HEADER, and that is a hard number rather than an inference. The MZ header's minalloc field is the paragraphs of uninitialised data the loader must add beyond the image: the original asks for 3,784 paragraphs (60,544 bytes) and our build for 2,740 (43,840). The difference is 1,044 paragraphs. The stack segment moves with it -- SS is 13ef in the original and 100f in ours -- which is the same fact read a second way. THREE INDEPENDENT MEASUREMENTS NOW AGREE WITHIN ABOUT 300 BYTES: the header says 16,704; dsmap's dominant shift, carried by 38 of 88 paired references, is -16,808; and the largest undocumented gap in the sources' own DS: comments -- between P1S5's last typed constant at $0282 and P1S1's LensTab at $4304 -- is 16,514. Agreement from three different kinds of evidence is what makes this worth acting on, where each alone would not be: I have twice this session built convincing arithmetic on a single measurement and been wrong. WHAT IT IS NOT. Not DemoVT: that unit is correctly a thin client, nine small routines talking to a third-party TSR, and its own header says so. Not the scene units' arrays, which now tile: P1S4's declarations between $6A2F and $AAC2 sum to 16,521 against the original's 16,531. HOW TO FIND IT, and this is the point of having the header number: it gives a CHEAP FEEDBACK LOOP that needs no disassembly. Add or resize one declaration, rebuild, and read minalloc again -- it moves by exactly what you added. So the shortfall can be bisected by unit: comment out a unit's data, watch the number fall, and the difference is that unit's contribution. Do that before reading any more code, because 16,704 bytes is the single largest defect left in the part and every absolute displacement in it is wrong until it is closed."
 seen_in = "TPART1"
+state = "resolved"
+resolution = "THE 16,704-BYTE SHORTFALL IS CLOSED TO 304, and it was ONE DECLARATION. P1S1's `Under` -- the saved background beneath each bouncer -- was `^TSaveBank` with a GetMem, four bytes where the original has 16,410 INLINE in DGROUP. minalloc went from 2,740 paragraphs to 3,765 against the original's 3,784, so the header now agrees to within nineteen paragraphs. THE ROW IS 1641 BYTES, NOT 1600, which the old declaration had. BuildCell settles both the size and the placement: 1012:036a is IMUL DI,[BP+4],$669 and 1012:036f takes 895 off it, which is a base of $02EA with one row folded into the displacement -- and $02EA plus ten rows of 1641 is $4304, exactly where LensTab begins. 1641 is BounceW * (BounceH + 1) + 1, the SAME index range as the lens table, which is the point: LensTab[I] is used as a subscript into a bouncer's saved cell, so the two bounds must match. The old 1600 was BounceW * BounceH, which reads as the obvious size and is wrong. AND THE EVIDENCE HAD BEEN SITTING IN THE PREVIOUS SESSION'S OWN NOTE. It recorded that BuildCell reads its source DS-RELATIVE and flagged that a heap pointer cannot be reached that way, then filed it as `blocked on what lives at DS:$02EA`. What lives there is the array itself. The blocker was the answer. VGA's THREE GLOBALS WERE IN THE WRONG ORDER: the original has VirtScr at $AB54, VirtScrSeg at $AB58 and YOfs at $AB5A -- 1107:0583 pushes [$AB58] as the screen segment and 12b2:010f indexes [$AB5A] after SHL BX,1 -- and ours declared YOfs first, putting all three 400 bytes out. Fixed, and dsmap's two separate shifts across $AAC2..$AB58 merged into one across sixteen sites, which is the confirmation. MEASURED ACROSS THE WHOLE TARGET, because VGA is SHARED BY EVERY PART: all ten parts rebuilt, none regressed, and the three byte-exact artefacts still hold. That check is the point of touching a shared unit at all -- parts 000, 009 and psycho are at 100% and a wrong DGROUP change there would have shown immediately. AND THE HONEST PART: the coverage walk moved THREE BYTES for all of this, 89.9% to 90.0%. Closing a 16.7KB data gap changed every absolute displacement in the part and made few of them correct, because the residual shifts -- -1170 across sixteen sites and -382 across thirty-eight -- still put every reference two bytes wrong inside an otherwise right instruction. The measurement that improved is the one that matters; the walk will follow when the last few hundred bytes are placed."
+
+[[plan.investigation]]
+name = "part1-palette-place"
+finding = "part 001: Palette's position inside VGA is the last placement I could not settle, and it is worth ~768 bytes of the residual. A data-reference map shows a step of +788 between $AB58 and $ACEB, meaning our layout has that many more bytes between them than the original -- and 768 of it is Palette. WHAT IS ESTABLISHED. Segment 1491 writes sixteen distinct byte addresses in $ACEA..$ACFC, and the three it never touches -- $ACEF, $ACF1, $ACF7 -- are the high halves of Words at $ACEE, $ACF0 and $ACF6. That is nineteen bytes exactly, and they were not declared at all. They are now, as a documented state block with the widths measured and the purposes explicitly unknown; 1491:044c..045e sets several from one value masked with $7F, zeroes three and sets one to one, which reads like fade machinery. WHAT ADDING THEM DID: nothing to the walk, and it moved the shift by exactly the nineteen bytes, which means THEY ARE NOT WHAT SEPARATES $AB58 FROM $ACEB. Palette still sits in that gap in our build and does not in the original's. So Palette belongs somewhere else -- either before VirtScr, or after the state block, or in a different unit entirely -- and I could not tell which from the references I have. HOW TO SETTLE IT: find where the original's Palette actually is. SetPalette and GetPalette walk it 768 bytes at a time, so look for the base they use in 1491, and for a REP OUTSB or a 768-count loop. Once its address is known the whole unit tiles, and the -1170 and -382 shifts should collapse together. Do NOT move it on the arithmetic alone: the +788 step says how much is in the wrong place, not which declaration it is, and I have twice acted on that kind of inference this session and been wrong."
+seen_in = "TPART1"
 state = "open"
 
 [plan.row."001 1012:0004"]
@@ -823,6 +830,11 @@ label = "a screen Pointer, its Word segment, and a row table, shared"
 investigation = "part1-stardraw-asm"
 target = "R0"
 
+[plan.row."001 dgroup $ACEA"]
+label = "nineteen bytes of VGA state, widths measured, purposes unknown"
+investigation = "part1-palette-place"
+target = "R0"
+
 [plan.row."001 dgroup $ACEB"]
 label = "a further +368 step, 38 sites"
 investigation = "part1-unit-sizes"
@@ -841,6 +853,11 @@ target = "R0"
 [plan.row."001 header minalloc"]
 label = "the original asks for 16,704 more bytes of BSS than we do"
 investigation = "part1-bss-shortfall"
+target = "R0"
+
+[plan.row."001 vga palette"]
+label = "Palette sits in the $AB58..$ACEB gap and should not"
+investigation = "part1-palette-place"
 target = "R0"
 
 [plan.row."002 1008:0362"]
