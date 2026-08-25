@@ -42,6 +42,14 @@
           survivable. Turning checks back on stops the demo dead. }
 
 unit P7S1;
+{$A-}   { DATA ALIGNMENT OFF, and it only bites once the byte at [BP-$22D]
+          exists. Play's Buf is at an ODD [BP-$231] in the original; under the
+          $A+ default that byte is padded to a word and Buf lands at $232,
+          while packing puts it exactly where the original has it.
+
+          This directive was tried on this unit BEFORE the byte was declared,
+          measured zero and was reverted -- correctly, on the evidence then.
+          A refutation is only as good as what else was wrong at the time. }
 
 interface
 
@@ -94,7 +102,13 @@ type
     Pad  : array[6..21] of Byte;
   end;
 
-  TChunkProc = procedure(Hdr, Data : Pointer);
+  { THE SECOND PARAMETER IS AN UNTYPED VAR, not a Pointer. The original
+    passes the buffer with LES/PUSH ES/PUSH DI -- six bytes -- where a
+    Pointer value parameter compiles to two word pushes and eight. Four
+    handler calls at eight bytes instead of six put every jump in the
+    dispatch out by two and cost the whole 180-byte span. The asm bodies
+    are unaffected: `LDS SI, Data` reads the same four bytes of frame. }
+  TChunkProc = procedure(Hdr : Pointer; var Data);
 
 var
   Names    : array[1..MaxFlics] of String[127];  { DS:$0206 }
@@ -122,7 +136,7 @@ var
 
   -------------------------------------------------------------------------- }
 { @asm 007 100f:0000 FliCopy }
-procedure FliCopy(Hdr, Data : Pointer); far;
+procedure FliCopy(Hdr : Pointer; var Data); far;
 begin
   asm
     PUSH DS                { 100f:0003                                       }
@@ -172,7 +186,7 @@ end;
   no way to express.
   -------------------------------------------------------------------------- }
 { @asm 007 100f:0019 FliSS2 }
-procedure FliSS2(Hdr, Data : Pointer); far;
+procedure FliSS2(Hdr : Pointer; var Data); far;
 begin
   asm
     PUSH DS                { 100f:001c                                       }
@@ -272,7 +286,7 @@ end;
   across the REPs.
   -------------------------------------------------------------------------- }
 { @asm 007 100f:007b FliLC }
-procedure FliLC(Hdr, Data : Pointer); far;
+procedure FliLC(Hdr : Pointer; var Data); far;
 begin
   asm
     PUSH DS                { 100f:007e                                       }
@@ -466,7 +480,7 @@ end;
   discarded because the loop is driven by the width remaining instead.
   -------------------------------------------------------------------------- }
 { @asm 007 100f:0284 FliBrun }
-procedure FliBrun(Hdr, Data : Pointer); far;
+procedure FliBrun(Hdr : Pointer; var Data); far;
 begin
   asm
     PUSH DS                { 100f:0287                                       }
@@ -672,6 +686,15 @@ var
   Ch     : TChunkHdr;               { [BP-$228] }
   N      : Word;                    { [BP-$22A] }
   FrameNo: Word;                    { [BP-$22C] }
+  { ONE BYTE AT [BP-$22D], AND NOTHING READS IT. The frame arithmetic requires
+    it: FrameNo ends at BP-$22B and Buf spans BP-$231 to BP-$22E -- its offset
+    word is the [BP-$231] the routine reads nine times and its segment word the
+    [BP-$22F] it reads twice -- which leaves BP-$22D with nothing in it. A
+    four-byte pointer cannot land on an ODD base by padding: $A+ aligns it to
+    $230 and $A- packs it to $230. Only a byte-sized local in front of it puts
+    Buf where the original has it. What that byte was for is not recoverable
+    from this binary; that it is there is arithmetic. }
+  Unread : Byte;                    { [BP-$22D] }
   Buf    : Pointer;                 { [BP-$231] }
   Speed  : Word;                    { [BP-$233] }
   Key    : Char;                    { [BP-$234] }
@@ -750,10 +773,10 @@ begin
 
       case Ch.Kind of                             { 100f:05e9 }
         18 : ;                                    { 100f:05ed  PSTAMP: skip  }
-         7 : HSS2(@Hdr, Buf);                     { 100f:0606 }
-        12 : HLC(@Hdr, Buf);                      { 100f:061d }
-        16 : HCopy(@Hdr, Buf);                    { 100f:0634 }
-        15 : HBrun(@Hdr, Buf);                    { 100f:064b }
+         7 : HSS2(@Hdr, Buf^);                     { 100f:0606 }
+        12 : HLC(@Hdr, Buf^);                      { 100f:061d }
+        16 : HCopy(@Hdr, Buf^);                    { 100f:0634 }
+        15 : HBrun(@Hdr, Buf^);                    { 100f:064b }
          4 : FliColor256(@Hdr, Buf);              { 100f:0663 }
         11 : FliColor(@Hdr, Buf);                 { 100f:067a }
       else
