@@ -105,13 +105,21 @@ var
   { DS:$B250. 500 six-byte records read straight off the DAT. The walk is
     Waypoints[50] down to Waypoints[1], and it reads Waypoints[0] once on the
     way out -- see RunScene -- so the array starts at zero. }
-  { [0..500] and NOT [1..500], which was tried and measured WORSE. The offsets
-    argue for 500 records: the table is at DS:$B250 and PanY at $BE08, which is
-    3,000 bytes, and DataSize says 3000 three lines above. Making it so moved
-    the morph unit's variables from 4 bytes low to 10, so a zeroth entry is
-    there and SOMETHING ELSE in this unit is six bytes short. The argument is
-    good and the measurement disagrees with it; the measurement wins until the
-    other six bytes are found. }
+  { [0..500] AND THE SIX BYTES ARE NOT THIS UNIT'S. This was tried as [1..500]
+    and measured worse -- the morph unit's variables went from 4 bytes low to 10
+    -- and the conclusion drawn was that something in THIS unit is six bytes
+    short. dsmap.py says otherwise: the references BELOW this array are already
+    ten bytes low. 12f8:01B3 reads `MOV ES,[$9F0E]` and ours reads $9F04, and
+    the same ten-byte shift holds at $9F12, $9F14, $A888 and $A88A -- every one
+    of them at a lower offset than Waypoints.
+
+    So the layout is: this unit's data starts TEN bytes low, and a 501-record
+    array puts six of them back by accident, which is what made [0..500] measure
+    better. The offsets still argue for 500 records -- $B250 to $BE08 is 3,000
+    bytes and DataSize says 3000 three lines above -- and the ten bytes are
+    upstream, in whatever the linker lays down before this unit. Both have to be
+    fixed together: correcting either one alone leaves a non-zero shift, and any
+    non-zero shift breaks the same spans. }
   Waypoints    : array[0..NumWaypoints] of TWaypoint;
 
   { PanY FIRST: the recorded addresses put it at $BE08 and PanX at $BE0A, so
