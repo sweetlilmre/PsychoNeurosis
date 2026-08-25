@@ -116,15 +116,27 @@ procedure Project(var X, Y, Z : LongInt);                 external;
   and the pixel value is added to the PROJECTED Y at 1102:0132, after the
   divide.
   -------------------------------------------------------------------------- }
-procedure RenderPatch(CX, CY : Integer; Angle : LongInt; Seg_ : Word);
+{ EIGHT BYTES OF PARAMETERS -- 1102:017b is `RET 8`, and this build was
+  emitting `RET $0A`. Four words, not three-plus-a-LongInt: dropping Seg_
+  instead was tried and measured 13 bytes WORSE, because the pixel read
+  through the parameter had been matching all along. So it is ANGLE that is
+  two bytes here, and SinCos takes an Integer anyway. }
+procedure RenderPatch(CX, CY : Integer; Angle : Integer; Seg_ : Word);
 var
-  Size, Half     : Integer;       { [BP-$1b], [BP-$1d] }
+  { IN THE ORDER THE RECORDED OFFSETS GIVE. Locals go downward from BP in
+    declaration order, so sorting the offsets ascending recovers the original's
+    var block. Size and Half were declared first and took the slots nearest BP,
+    which pushed X, Y and Z down four bytes each -- and the three pointers
+    pushed for Project are where this part's largest span begins. }
   Col, Row       : Integer;       { [BP-2],   [BP-4]   }
-  X, Y, Z        : LongInt;       { [BP-8], [BP-$0c], [BP-$10] }
+  X, Y, Z        : LongInt;       { [BP-8], [BP-$0C], [BP-$10] }
   Pixel          : Byte;          { [BP-$11] }
-  ScreenX        : Integer;       { [BP-$1f] }
+  Size, Half     : Integer;       { [BP-$1B], [BP-$1D] }
+  ScreenX        : Integer;       { [BP-$1F] }
   ScreenY        : Integer;       { [BP-$21] }
   LimY, LimX     : Integer;       { [BP-$23], [BP-$25] }
+  { no recorded offset for these two, so they go last -- and nine bytes
+    between Pixel and Size are still unaccounted for }
   SX, SY         : Integer;
 begin
   Size := Patch;                                 { 1102:0004 }
@@ -178,12 +190,19 @@ end;
   -------------------------------------------------------------------------- }
 procedure Run;
 var
-  Running  : Boolean;             { [BP-$0f] }
+  { IN THE ORDER THE RECORDED OFFSETS GIVE -- $2, $4, $6, $8, $A, $C, $E, then
+    the Boolean at $F, which is why Running goes LAST and not first. Seven
+    words and a byte is fifteen, and the frame is ENTER $10.
+
+    ANGLE IS TWO BYTES. It cannot be a LongInt: DY_ is at [BP-8] and Angle at
+    [BP-$0A], so there is no room, and 1102:0190 zeroes it with a single word
+    store. That agrees with RenderPatch, whose RET 8 leaves two bytes for it. }
   CX, CY   : Integer;             { [BP-2], [BP-4] }
   DX_, DY_ : Integer;             { [BP-6], [BP-8] }
-  Angle    : LongInt;             { [BP-$0a] }
-  AngStep  : Integer;             { [BP-$0c] }
-  Frame    : Integer;             { [BP-$0e] }
+  Angle    : Integer;             { [BP-$0A] }
+  AngStep  : Integer;             { [BP-$0C] }
+  Frame    : Integer;             { [BP-$0E] }
+  Running  : Boolean;             { [BP-$0F] }
 begin
   Running := True;                               { 1102:0182 }
   CX      := 160;                                { 1102:0186 }

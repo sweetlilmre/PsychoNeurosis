@@ -352,15 +352,17 @@ end;
   as well as turning.
   -------------------------------------------------------------------------- }
 procedure Scene2;
-var
-  I : Integer;
+{ NO LOCALS. Every counter in this routine is one of the unit's own globals --
+  the palette loop runs on I1 at DS:$63C8, exactly as the two below it run on
+  I2 and I3. It was the only loop here still using a local, and a local shifts
+  the frame that the rest of the routine's references are measured against. }
 begin
   Assign(F, 'neurosis.dat');                     { 1096:03e5 }
   Reset(F, 1);
   Seek(F, DataOfs);
   BlockRead(F, Pal, SizeOf(Pal));                { 1096:0416 }
-  for I := 0 to 255 do                           { 1096:041b }
-    SetRGB(I, Pal[I * 3], Pal[I * 3 + 1], Pal[I * 3 + 2]);
+  for I1 := 0 to 255 do                          { 1096:041b -- DS:$63C8 }
+    SetRGB(I1, Pal[I1 * 3], Pal[I1 * 3 + 1], Pal[I1 * 3 + 2]);
   BlockRead(F, VirtScr^, 64000);                 { 1096:0476 }
   Close(F);                                      { 1096:0480 }
 
