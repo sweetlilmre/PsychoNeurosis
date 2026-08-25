@@ -159,14 +159,17 @@ var
   PanX, PanY    : Integer;      { $A7DE, $A7E0 }
   Angle, Radius : Real;         { $A7E2, $A7E8 }
 
+  { THE PALETTE-BLANKING COUNTER, and it is UNIT-LEVEL. 1015:09a0 zeroes
+    [$A7EE], 1015:09a5 increments it and 1015:09a9 reads it back as the colour
+    index -- so Demo_Scene1's `for` runs on this, not on a local. The note that
+    used to sit here called it never-referenced, which was wrong: it also
+    happens to be the two bytes between Radius and RotTmp that the layout
+    needed, and finding a use for them is what settles what they are. }
+  PalIdx        : Word;         { $A7EE }
+
   { The byte RotateBandsFine lifts out of each band before shifting it. Every
     reference in 1015:0191 is indexed BY THE BAND, so the original kept fifteen
     of them rather than one scalar. }
-  Spare         : Word;         { $A7EE -- NEVER REFERENCED, and it is real:
-                                  Radius ends at $A7ED and 1015:0191 stores
-                                  through [DI+$A7EF], so RotTmp[1] is at $A7F0
-                                  and two bytes sit between them. }
-
   RotTmp   : array[1..BandCount] of Byte;   { $A7F0, 1-based: DI = Band+1 }
 
   { UNIT-LEVEL, and the chain of addresses is what says so. This unit's vars run
@@ -589,8 +592,10 @@ end;
 procedure Scene1;
 var
   Buffer : Pointer;
-  I      : Word;
 begin
+  { 1015:0991 -- FIRST, before anything else. ModeX's LogicalWidth is set here
+    and not inside InitTables. }
+  LogicalWidth := 80;
   { Buffer was passed to LoadTexture without ever being allocated -- a wild
     pointer that BlockRead then wrote 64,000 bytes through, four times over.
     That is what hung the scene. }
@@ -599,8 +604,9 @@ begin
   InitTables;
   SetModeX;
 
-  for I := 0 to 255 do                        { blank the palette first }
-    SetRGB(I, 0, 0, 0);
+  { 1015:09a0..09b8 -- the counter is the UNIT-LEVEL PalIdx, not a local. }
+  for PalIdx := 0 to 255 do                   { blank the palette first }
+    SetRGB(PalIdx, 0, 0, 0);
 
   LoadTexture(Buffer);
 

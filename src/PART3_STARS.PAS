@@ -175,8 +175,11 @@ end;
   This is the only floating point in the scene.
   -------------------------------------------------------------------------- }
 procedure Generate;
-var
-  I : Integer;
+{ NO LOCAL COUNTER. 10b8:069d is `MOV WORD PTR [$A88A],2` and 10b8:06a5 is
+  `INC WORD PTR [$A88A]` -- the loop runs on the UNIT-LEVEL Idx, which is
+  already declared at that address and which the var block's own note says is
+  unit-level in the original. A local gave [BP-2] and a frame, and the two
+  never match however the body is written. }
 begin
   GetMem(Live,   ArraySize);                  { 10b8:05f8 }
   GetMem(Source, ArraySize);                  { 10b8:0607 }
@@ -188,22 +191,22 @@ begin
   Live^[1].XOfs := CentreX;
   Live^[1].YOfs := CentreY;
 
-  for I := 2 to NumPoints do                  { 10b8:069d }
+  for Idx := 2 to NumPoints do                  { 10b8:069d }
   begin
     repeat
       Angle := Random(360);
-      Live^[I].X := Round(Cos(DegToRad(Angle)) * TubeRadius);
-      Live^[I].Y := Round(Sin(DegToRad(Angle)) * TubeRadius);
-      Live^[I].XOfs := CentreX;
-      Live^[I].YOfs := CentreY;
-    until (Live^[I].X <> 0) or (Live^[I].Y <> 0);   { 10b8:074e -- re-roll }
-    Live^[I].Z := -I;                         { 10b8:077b }
+      Live^[Idx].X := Round(Cos(DegToRad(Angle)) * TubeRadius);
+      Live^[Idx].Y := Round(Sin(DegToRad(Angle)) * TubeRadius);
+      Live^[Idx].XOfs := CentreX;
+      Live^[Idx].YOfs := CentreY;
+    until (Live^[Idx].X <> 0) or (Live^[Idx].Y <> 0);   { 10b8:074e -- re-roll }
+    Live^[Idx].Z := -Idx;                         { 10b8:077b }
   end;
 
   { 10b8:079c -- copied a record at a time, not in one 7,000-byte Move.
     Source is the reset template every recycled point is rebuilt from. }
-  for I := 1 to NumPoints do
-    Move(Live^[I], Source^[I], RecSize);
+  for Idx := 1 to NumPoints do
+    Move(Live^[Idx], Source^[Idx], RecSize);
 end;
 
 { --------------------------------------------------------------------------
