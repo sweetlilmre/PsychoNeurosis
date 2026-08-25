@@ -534,10 +534,21 @@ seen_in = "TPART1"
 state = "resolved"
 resolution = "CLOSED. Every part's trap stream now matches the original OPCODE FOR OPCODE, all ten of them. Three expressions, and each was already described correctly in a comment beside the code that did not do it -- which is the third time today that the reading was done and only the transcription was not. P1S3's palette ramp, 6 sites: the original computes Round(I * 0.247) THREE TIMES, once per channel -- 10e3:0075, 0088 and 009b each do FILD [BP-2] / FLD the extended constant at CS:$000D / FMULP / Round, pushing each result separately. Ours computed it once into a local V and passed it three times. The comment ten lines above already said `SetRGB(I, Round(I*K), Round(I*K), Round(I*K))`. P1S4 and P1S5's MScale, 3 sites each: RealToFixed, not Round(.. * 65536.0), and MViewW is READ FROM MEMORY rather than folded into the instruction. Part 002's P2S2 had already landed on this form at 108b:1cd4 -- after two refutations that both turned out to be confounded -- so the register already trusted the shape and part 001 was simply not using it. AND THE TWO UNITS DIFFER IN ONE DECLARATION, which the traps name exactly. 1107:097b is FILD WORD straight off the variable, so P1S4's MViewW is an INTEGER; 12c5:0947 is FILD DWORD on a LongInt spill written at 12c5:093f, so P1S5's is a WORD. Getting P1S4's type wrong left one EXTRA trap of the right count -- int 37 where the original has int 3b -- which is how the type was read off rather than guessed. COVERAGE BARELY MOVED: 76.8 to 76.9 percent, 19 bytes. All three sites sit inside spans the walk had already given up on, which is the same blindness this session has now measured on five separate parts. The gain is fidelity and trap parity, not a number."
 
+[[plan.investigation]]
+name = "part1-depthsort-nested"
+finding = "part 001's 52 spans trace to eight length changes, and FOURTEEN of them -- more than a quarter -- come from one place: 12c5:0000, the very first routine in P1S5. IDENTIFIED, NOT IMPLEMENTED."
+seen_in = "TPART1"
+state = "open"
+
 [plan.row."001 1012:0004"]
 label = "BuildLens quadrant walk"
 investigation = "pacing"
 note = "BuildLens (1012:0004, ENTER $1C) was the coverage walk's largest span in part 001 -- the whole 696-byte routine unaligned while routines.py had nothing to say, because nobody had declared it. The frame size read the source's var block and three corrections fell out of it, none visible in the statements: the original WALKS ONE QUADRANT AND MIRRORS, X and Y each 0..20 with four sign-paired stores per iteration and a separate set of four in each branch (the identity branch indexes from X and Y directly at 1012:0043, never through SX/SY); it holds no D2, recomputing X*X+Y*Y at 1012:0116; it names its Sqrt intermediate, so two Real locals; and the lens radius is a typed constant of type WORD read from DS:$0002, not an untyped const -- 1012:012e is MOV AX,[$0002] / MUL WORD PTR [$0002] where a fold would have emitted MOV AX,1600, and 1012:0135/015e widen it with XOR DX,DX, unsigned, which is what forces the two LongInt conversion slots the ENTER counts. The table is therefore 1641 words, not 1600: mirroring reaches index (20+20)*40+(20+20) = 1640, the unit init clears 3282 bytes at 1012:0008, and in the shipped binary Cell at DS:$4FD6 begins exactly $0CD2 after LensTab at DS:$4304. No overrun and no deviation -- the size was measured for. After the fix the routine aligns in full and part 001's coverage walk moved 66.6% -> 68.4%; routines.py unchanged at 74 locked, 0 failing. Generalised as the wiki observation `The frame is bigger than your locals account for`. Init-time only, so this is alignment rather than a per-frame pacing gain: 441 square roots where the reconstruction did 1600."
+
+[plan.row."001 1082:0137"]
+label = "seven spans on one length change; reads as hand assembler"
+investigation = "part1-depthsort-nested"
+target = "R0"
 
 [plan.row."001 10e3:0075"]
 label = "the palette ramp recomputes Round(I*K) once per channel"
@@ -567,6 +578,11 @@ target = "R0"
 [plan.row."001 12b2:00f1"]
 label = "StarDraw has no locals and uses STOSB: hand assembler"
 investigation = "part1-missing-star-unit"
+target = "R0"
+
+[plan.row."001 12c5:0000"]
+label = "DepthSort is NESTED: [BP+4] is a static link to a Pointer parameter"
+investigation = "part1-depthsort-nested"
 target = "R0"
 
 [plan.row."001 12c5:075e"]
