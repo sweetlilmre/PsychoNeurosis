@@ -81,7 +81,13 @@ const
   ClipTop    : Integer = 5;       { DS:$0006 }
   ClipBottom : Integer = 195;     { DS:$0008 }
 
-{$I gen/P6SHAPE.INC}   { const CellShape : array[1..16,1..16,1..8] of Byte }
+{ ALL TWENTY-SIX BANDS. P6SHAPE.INC held the same table read from the same
+  DS:$000A with a shorter length -- sixteen bands, 2,048 bytes -- and its own
+  generator no longer exists. Bands 17..26 are never drawn, exactly as part
+  003's unused shape slots are never drawn, and leaving them out moved every
+  typed constant declared after them: CellShape ended at $080A where the
+  original's ends at $0D0A, and CreditText sits at $0D8A. }
+{$I gen/P6CELL.INC}    { const CellShape : array[1..26,1..16,1..8] of Byte }
 
 type
   TCells  = array[1..CellRows, 1..GridCols] of Byte;

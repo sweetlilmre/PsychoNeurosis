@@ -69,7 +69,12 @@ const
 
 type
   TPath = array[1..Lanes, 1..LaneLen] of Word;
-  TDots = array[0..DotSize - 1] of Byte;
+  { TWO-DIMENSIONAL AND 1-BASED, which is what makes the subscripts fold.
+    1095:0741 is `IMUL AX,[Lane],$C8` then `ADD DI,$FF38` -- the -200 is in
+    the ADDRESS, and that is what a bare subscript on a 1-based array gives.
+    Flat and 0-based, `Dots^[(Lane - 1) * LaneLen]` makes the compiler work
+    the -1 out at run time instead. Same 3,200 bytes either way. }
+  TDots = array[1..Lanes, 1..LaneLen] of Byte;
   TFont = array[0..FontSize - 1] of Byte;
   TPal768 = array[0..767] of Byte;
 
@@ -194,7 +199,7 @@ var Row, Col : Integer;
 begin
   for Row := 2 to 16 do                          { 1095:0618 }
     for Col := 1 to 16 do                        { 1095:0622 }
-      Dots^[(16 - Row) * LaneLen + (16 - Col)] :=
+      Dots^[17 - Row, 17 - Col] :=
         Font^[(Ch - FirstCh) * 256 + (Row - 1) * 16 + (Col - 1)];
 end;
 
@@ -299,8 +304,7 @@ begin
           gives -- Dots as array[1..Lanes, 1..LaneLen] indexed [Lane, 1] -- and
           changing it means reshaping the two other places that index Dots
           linearly. Left as it was until that is done in one piece. }
-        Move(Dots^[(Lane - 1) * LaneLen],
-             Dots^[(Lane - 1) * LaneLen + 1], $A4);
+        Move(Dots^[Lane, 1], Dots^[Lane, 2], $A4);
 
         { AND THE INDEX IS WHATEVER MOVE LEAVES IN SI. The original keeps its
           running index in SI across this call and never reloads it, so what
@@ -311,7 +315,7 @@ begin
           be relied on to survive a Pascal call in the reconstruction, and
           because it is the reason lane L+1 walks lane L's stretch of the
           tables rather than its own. }
-        Idx := Ofs(Dots^) + (Lane - 1) * LaneLen - 1;
+        Idx := Ofs(Dots^[Lane, 1]) - 1;
       end;
     end;
   end;

@@ -258,7 +258,12 @@ def emit_p006_cells():
   Bands 17..26 spell "0,000 DOTS" and are NEVER USED -- dead data left in the
                 executable. The scroll text boasts "4000 DOTS", so this was
                 presumably an earlier version of the same gag.""")
-    body += fmt("WhooshBoard", "array[1..26, 1..16, 1..8] of Byte", vals, 32, group=(16, 8))
+    # CELLSHAPE, and all TWENTY-SIX bands. The truncated 16-band copy in
+    # P6SHAPE.INC was read from the same DS:$000A with a shorter length, and
+    # its own generator no longer exists. Bands 17..26 are never drawn -- the
+    # same shape as part 003's unused shape slots -- but they are in DGROUP
+    # and everything declared after them moves if they are left out.
+    body += fmt("CellShape", "array[1..26, 1..16, 1..8] of Byte", vals, 32, group=(16, 8))
     OUT.joinpath("P6CELL.INC").write_text(body + "\n", encoding="ascii")
     return len(vals)
 
