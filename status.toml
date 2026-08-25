@@ -594,12 +594,29 @@ resolution = "BOTH FRAMES NOW MATCH AND THIS WAS THE BEST ITERATION SO FAR: part
 name = "part1-p1s4-unlocated"
 finding = "part 001: four routines in P1S4 that prologue.py will not pair at all -- 1107:03d7 (no locals), 1107:0446 (ENTER $14), 1107:059f (ENTER $02) and 1107:07a2 (ENTER $202, BuildPoints). Not-located is a STRONGER signal than a frame mismatch: the tool withholds a pairing when the content differs too much, so these have body defects and not merely declaration ones. With every frame in the segment now matching, these four are what is left of P1S4. START WITH 1107:07a2. It was changed twice this session -- the eight row buffers moved out of it to unit level -- so its difference is fresh and its frame should now be $202 exactly, which is a checkable prediction rather than a search. 1107:0446 next: ENTER $14 is 20 bytes and it is the routine DrawStep, whose font subscript is the same arithmetic ShowString's turned out to be, so what was just learned about the raw-Ord index and the low bound of 32 probably applies to it unread. 1107:03d7 has NO locals, which for a called routine means it is either trivial or assembler -- a routine with no frame can only be `assembler`, so check that before assuming it is Pascal."
 seen_in = "TPART1"
+state = "resolved"
+resolution = "RESOLVED FOR THE FRAMES, and worked as a BATCH rather than one fix per session at the maintainer's request -- the per-iteration bookkeeping was costing more than the fixes. Part 001 82.9% -> 83.7%. SIX frames corrected across four units in one pass, and prologue.py now reports no frame DIFFERS anywhere in part 001. 12c5:0413, Vector_Load: ENTER $482 is 1,154 and only [BP-1] and [BP-$481] are ever read. 1 + 256 + 128 + 768 = 1,153 puts Pal's base at exactly [BP-$481], which is the check -- no other arrangement of those sizes lands there. So a Byte counter, 384 bytes nothing reads, and the palette. AND THE FILE RECORD IS A GLOBAL at DS:$AAD4, which also CLOSES THIS UNIT'S BLOCK: 128 bytes from $AAD4 ends at $AB54, exactly dsmap's next shift boundary. 12c5:0a60, AllocWork: ENTER 2 with no local referenced at all -- two bytes declared and never read. Its body also confirms the tail of the DGROUP layout independently: GetMem's result goes to $AAC2 and Seg() of it to $AAC6, which is Work and WorkSeg where the earlier reordering put them. 1082:0000, Title_Load: ENTER $182 is 386 and only [BP-2] is read. 2 + 256 + 128 = 386, and the file record is a global here too -- 1082:003a passes Assign a DS address. 1107:0446, Transform: ENTER $14, and THE ODD OFFSETS DECODE IT. Every referenced slot below the first is odd, which only happens if a one-byte local was declared first. A Byte, three LongInts read at their low and high words, then three Integers: 1 + 12 + 6 = 19, rounded to 20. 12c5:02e3, ObjTransformAll: two bytes of declared-and-unread. 1012:0366, BuildCell: ENTER 8 as three Integers and two Bytes, the split named by the odd [BP-7]. FRAME ONLY -- our body reads just the first of them where the original reads four, so this routine still has a body defect and the walk did not move for it. Recorded that way rather than as a win. AND A NEW KIT TOOL CAME OUT OF THE SWEEP, framehist.py, because prologue.py STRUCTURALLY COULD NOT ANSWER THE QUESTION. It withholds a pairing when two bodies differ too much and says `not located`, and eighteen routines in this part are in that state -- so after editing a declaration there was no way to ask whether the frame came out right. framehist compares the MULTISET of ENTER operands across the whole image and needs no pairing: if the original has one $182 and so do we, that frame exists in our build. It is how $8 was confirmed fixed and how $202 and $482 were found still missing. Its blind spots are written into it -- it cannot tell code from data, so it quarantines implausible operands, and it is blind to $G- routines entirely."
+
+[[plan.investigation]]
+name = "part1-frame-residue"
+finding = "part 001: four frame sizes are still missing and each names a different KIND of work. Run `framehist.py spans.toml 001`. $482 MISSING -- 1012:05bd, AND IT IS A ROUTINE WE HAVE NOT WRITTEN AT ALL, not a frame defect. It takes a String BY VALUE (copied to [BP-$100] at 1012:05c8 by the length-prefixed REP MOVSB) and reads into a 768-byte local at [BP-$400], with an Integer at [BP-$402] and 128 unreferenced bytes below that: 256 + 768 + 2 + 128 = 1,154. P1S1 has no String-taking routine at all, and 1012:05bd sits immediately after the bounce loop's constants at 1012:05b1, so it is whatever loads the next thing. Identify it before writing it. $202 MISSING -- 1107:07a2, BuildPoints, and this one is a BODY defect. The original has ONE 2-byte local plus two 256-byte strings ([BP-2], [BP-$102], [BP-$202] = 514); ours has five small locals. One counter where we have three means the original walks a single index rather than nesting Row and Col, so this is a rewrite and not a declaration change. Do not force the declarations to fit without the body. $6 MISSING -- 1082:0128, BlitClipped, ALSO a body defect and the largest of these: the original has SIX bytes of locals and ours has nineteen. Two Integers are read and two more bytes are dead; ours declares a pointer, six Integers, a Word and a Byte. The original does its clipping by adjusting a pointer and two counts before the loop, as the comment beside it already says, rather than keeping six named bounds. $0 MISSING -- one routine in the original opens ENTER 0, which is a $G+ frame with no locals at all. Cheap to find and cheap to fix once found."
+seen_in = "TPART1"
 state = "open"
 
 [plan.row."001 1012:0004"]
 label = "BuildLens quadrant walk"
 investigation = "pacing"
 note = "BuildLens (1012:0004, ENTER $1C) was the coverage walk's largest span in part 001 -- the whole 696-byte routine unaligned while routines.py had nothing to say, because nobody had declared it. The frame size read the source's var block and three corrections fell out of it, none visible in the statements: the original WALKS ONE QUADRANT AND MIRRORS, X and Y each 0..20 with four sign-paired stores per iteration and a separate set of four in each branch (the identity branch indexes from X and Y directly at 1012:0043, never through SX/SY); it holds no D2, recomputing X*X+Y*Y at 1012:0116; it names its Sqrt intermediate, so two Real locals; and the lens radius is a typed constant of type WORD read from DS:$0002, not an untyped const -- 1012:012e is MOV AX,[$0002] / MUL WORD PTR [$0002] where a fold would have emitted MOV AX,1600, and 1012:0135/015e widen it with XOR DX,DX, unsigned, which is what forces the two LongInt conversion slots the ENTER counts. The table is therefore 1641 words, not 1600: mirroring reaches index (20+20)*40+(20+20) = 1640, the unit init clears 3282 bytes at 1012:0008, and in the shipped binary Cell at DS:$4FD6 begins exactly $0CD2 after LensTab at DS:$4304. No overrun and no deviation -- the size was measured for. After the fix the routine aligns in full and part 001's coverage walk moved 66.6% -> 68.4%; routines.py unchanged at 74 locked, 0 failing. Generalised as the wiki observation `The frame is bigger than your locals account for`. Init-time only, so this is alignment rather than a per-frame pacing gain: 441 square roots where the reconstruction did 1600."
+
+[plan.row."001 1012:05bd"]
+label = "a String-taking loader we have not written at all"
+investigation = "part1-frame-residue"
+target = "R0"
+
+[plan.row."001 1082:0128"]
+label = "BlitClipped: 6 bytes of locals against our 19"
+investigation = "part1-frame-residue"
+target = "R0"
 
 [plan.row."001 1082:0137"]
 label = "seven spans on one length change; reads as hand assembler"
@@ -637,8 +654,8 @@ investigation = "part1-p1s4-frames"
 target = "R0"
 
 [plan.row."001 1107:07a2"]
-label = "BuildPoints does not pair; its frame should now be $202"
-investigation = "part1-p1s4-unlocated"
+label = "BuildPoints: one counter and two strings, so a body rewrite"
+investigation = "part1-frame-residue"
 target = "R0"
 
 [plan.row."001 1107:097b"]

@@ -186,6 +186,11 @@ var
   { DS:$AAD0 spin, DS:$AAD2 orbit. Local lives in Animate's own frame. }
   Angle      : Integer;                             { DS:$AAD0 }
   OrbitAngle : Integer;                             { DS:$AAD2 }
+  { DS:$AAD4 -- THE FILE RECORD IS A GLOBAL, not a local in Load. 12c5:0417
+    pushes DS:$AAD4 to Assign, a data-segment address, where a local would be
+    LEA'd off SS. It also closes this unit's block: 128 bytes from $AAD4 ends
+    at $AB54, which is exactly where dsmap's next shift boundary is. }
+  F : file;                                         { DS:$AAD4 }
 
 const
   { DS:$0280 = 320, so the horizontal centre is 160.
@@ -400,8 +405,12 @@ end;
 
 procedure ObjTransformAll(AObj : PObj; A1, A2, A3 : Integer);
 var
+  { ENTER $12 is 18 bytes. The counter, three LongInts and the for-loop's own
+    two-byte limit temp account for 16, so two bytes here are declared and
+    never read -- nothing below [BP-$10] is referenced at any width. }
   I          : Integer;
   TX, TY, TZ : LongInt;
+  Spare      : Integer;
 begin
   { 12c5:02f4 -- SinCos(angle, var C, var S). The FIRST var parameter takes
     the COSINE. }
@@ -841,12 +850,29 @@ end;
   -------------------------------------------------------------------------- }
 procedure Load;
 var
-  F   : file;
-  I   : Integer;
-  { The palette is a LOCAL in the original -- Load's frame is ENTER $482 and
-    the second BlockRead lands at [BP-$481], which then goes straight to
-    VGA.SetPalette768 (12c5:0473 -> 1491:01c2). Nothing keeps a copy. }
-  Pal : array[0..767] of Byte;
+  { ENTER $482 IS 1,154 BYTES AND EVERY PART OF IT IS PINNED, because Pal's
+    base is the one local address the routine names. Only two slots are
+    referenced in the whole routine: [BP-1], which 12c5:0495 sets to $64 and
+    12c5:049b INCs -- a BYTE, and the counter of `for I := 100 to 255` -- and
+    [BP-$481], which 12c5:045b and 12c5:046d LEA for the BlockRead and then for
+    SetPalette768.
+
+    First declared is nearest BP, so I is first at [BP-1]. Working forward:
+    1 + 256 + 128 + 768 = 1,153, which puts Pal's base at exactly [BP-$481].
+    That is the check -- no other arrangement of those sizes lands there, and
+    ENTER rounds 1,153 up to the even 1,154.
+
+    So there are 384 bytes here that nothing reads. Their SIZES are forced by
+    Pal's address; their TYPES are a guess, and two strings are chosen because
+    P1S4's loader has an unreferenced String[127] in the same position and a
+    filename buffer is the obvious thing for a loader to declare and then take
+    from a constant instead. }
+  I      : Byte;                        { [BP-1] }
+  Spare1 : String;                      { [BP-$101], 256, never read }
+  Spare2 : String[127];                 { [BP-$181], 128, never read }
+  { The palette IS a local -- 12c5:046d LEAs [BP-$481] straight into
+    SetPalette768 (1491:01c2) and nothing keeps a copy. }
+  Pal    : array[0..767] of Byte;       { [BP-$481] }
 begin
   Assign(F, 'neurosis.dat');
   Reset(F, 1);
@@ -874,6 +900,11 @@ end;
   first frame blitted whatever the heap held.
   -------------------------------------------------------------------------- }
 procedure AllocWork;
+var
+  { 12c5:0a60 opens ENTER 2 and the routine references no local at all in its
+    forty bytes, so this is two bytes declared and never read. It has to be
+    here or the frame is absent where the original has one. }
+  Spare : Integer;
 begin
   GetMem(Work, 64000);                 { 12c5:0a64 }
   WorkSeg := Seg(Work^);               { 12c5:0a73 }

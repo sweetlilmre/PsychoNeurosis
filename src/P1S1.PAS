@@ -319,7 +319,20 @@ end;
   backwards. }
 procedure BuildCell(N : Integer);
 var
-  I : Integer;
+  { ENTER 8 is eight bytes and the referenced slots are [BP-2], [BP-4], [BP-6]
+    and [BP-7]. The odd one names the split: three Integers first, then two
+    Bytes, of which [BP-8] is never read. 6 + 1 + 1 = 8.
+
+    OUR BODY ONLY USES THE FIRST of them, where the original reads all four --
+    so this routine still has a body defect and the declarations are only the
+    frame half of it. They are transcribed because the frame is a prerequisite:
+    while the ENTER operand is wrong the routine cannot align at all, and its
+    four prologue bytes differ before any statement is reached. }
+  I       : Integer;                    { [BP-2] }
+  Spare1  : Integer;                    { [BP-4], read by the original }
+  Spare2  : Integer;                    { [BP-6], read by the original }
+  Spare3  : Byte;                       { [BP-7], read by the original }
+  Spare4  : Byte;                       { [BP-8], never read }
 begin
   for I := BounceH * BounceW - 1 downto 0 do
     Cell[I] := Under^[N, LensTab[I]];

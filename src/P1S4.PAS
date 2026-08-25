@@ -267,8 +267,22 @@ procedure Project(var X, Y, Z : LongInt);               external; { 1107:1A04 }
   -------------------------------------------------------------------------- }
 procedure Transform(A1, A2, A3 : Integer);
 var
-  I       : Integer;
-  X, Y, Z : LongInt;
+  { ENTER $14 IS 20 BYTES AND THE ODD OFFSETS DECODE IT. Every referenced slot
+    below the first is odd -- [BP-3], [BP-5], [BP-7], [BP-9], [BP-$0B],
+    [BP-$0D], [BP-$0F], [BP-$11], [BP-$13] -- which only happens if a ONE-BYTE
+    local was declared first and pushed everything after it off even alignment.
+
+    Reading forward from that: a Byte, then three LongInts at [BP-5], [BP-9]
+    and [BP-$0D] (each read twice, at its low and high word, which is exactly
+    the pairs above), then three Integers at [BP-$0F], [BP-$11] and [BP-$13].
+    1 + 12 + 6 = 19, and ENTER rounds it to the even 20.
+
+    The three Integers are the projected results: the routine stores X, Y and
+    the depth before writing them into the seven-byte output record, the same
+    way scene 5's per-point transform does. }
+  I          : Byte;                    { [BP-1] }
+  X, Y, Z    : LongInt;                 { [BP-5], [BP-9], [BP-$0D] }
+  Sx, Sy, Sd : Integer;                 { [BP-$0F], [BP-$11], [BP-$13] }
 begin
   SinCos(A1, MCos1, MSin1);                 { -> DS:$5B52, $5B56 }
   SinCos(A2, MCos2, MSin2);                 { -> DS:$5B5A, $5B5E }

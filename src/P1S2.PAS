@@ -52,6 +52,11 @@ var
   BackdropSeg : Word;
   CometBank   : ^TCometBank;    { DS:$56C0 -- 10 frames of 65 x 48 }
   FontBuf     : ^TFontBuf;      { DS:$56CA -- 59 glyphs of 16 x 16 }
+  { DS:$59D2 -- THE FILE RECORD IS A GLOBAL. 1082:003a pushes a DS address to
+    Assign where a local would be LEA'd off SS, and Load's frame confirms it:
+    ENTER $182 is 386 bytes and references only [BP-2], with no room for a
+    128-byte file record among the 384 that follow. }
+  F           : file;           { DS:$59D2 }
 
 { --------------------------------------------------------------------------
   Title_Load (1082:0000)
@@ -81,8 +86,17 @@ var
   -------------------------------------------------------------------------- }
 procedure Load;
 var
-  F : file;
-  I : Integer;
+  { ENTER $182 IS 386 BYTES AND ONLY [BP-2] IS EVER REFERENCED, in the whole
+    routine. So one 2-byte local is declared first and 384 bytes after it are
+    never read -- and the file record is NOT among them, because Assign takes a
+    DS address at 1082:003a where a local would be LEA'd off SS.
+
+    2 + 256 + 128 = 386. The sizes are forced; the types are a guess, and two
+    strings are chosen because P1S4's and P1S5's loaders have unreferenced
+    string locals in exactly this position. }
+  I      : Integer;                     { [BP-2] }
+  Spare1 : String;                      { 256, never read }
+  Spare2 : String[127];                 { 128, never read }
 begin
   GetMem(WorkBuf,   SizeOf(TWorkBuf));        { 1082:0000 }
   GetMem(Backdrop,  64000);
