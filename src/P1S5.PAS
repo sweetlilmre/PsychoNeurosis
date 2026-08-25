@@ -177,12 +177,23 @@ var
   Work    : Pointer;
   WorkSeg : Word;                                   { DS:$AAC6 }
   PtCount : Integer;                                { DS:$AAC8 }
-  { DS:$AACA -- SIX BYTES DECLARED AND NEVER REFERENCED. They are needed for
-    Angle to land at $AAD0 and nothing in the binary reads them, so the type
-    is a guess: six bytes is exactly a Turbo Pascal Real, and this unit does
-    real arithmetic in Vector_Animate's trig, which is the only reason Real is
-    chosen over three Words or a six-byte array. }
-  Spare   : Real;                                   { DS:$AACA }
+  { DS:$AACA, $AACC, $AACE -- THREE INTEGERS, and they ARE referenced. This
+    said `six bytes declared and never read, so the type is a guess: Real`.
+    The guess was wrong and the premise was too. The x87 traps had made the
+    region unreadable to a plain disassembler -- INT $3A..$3E carry their
+    operands inline, so the decoder resynchronised in the middle of them and
+    printed nonsense. Decoding it with the kit's x87 disassembler shows all
+    three being written:
+
+      12c5:07db  MOV [$AACA],AX   after Round(Cos(Local * Pi / 180) * 5)
+      12c5:0802  MOV [$AACC],AX   after Round(Sin(Orbit * Pi / 180) * 20)
+      12c5:0828  MOV [$AACE],AX   after Round(Sin(Local * Pi / 180) * 500)
+
+    and 12c5:0842..084a pushing all three to ObjTranslate. A trap-carrying
+    region needs the x87 decoder before anything in it is called unreferenced. }
+  Dx      : Integer;                                { DS:$AACA }
+  Dy      : Integer;                                { DS:$AACC }
+  Dz      : Integer;                                { DS:$AACE }
   { DS:$AAD0 spin, DS:$AAD2 orbit. Local lives in Animate's own frame. }
   Angle      : Integer;                             { DS:$AAD0 }
   OrbitAngle : Integer;                             { DS:$AAD2 }
@@ -663,13 +674,21 @@ begin
     Inc(Angle, VectorStep);
     if Angle > VectorWrap then Angle := 0;
 
-    ObjTranslate(@Obj,
-                 Round(Cos(Local      * Pi / 180.0) *   5.0),
-                 Round(Sin(OrbitAngle * Pi / 180.0) *  20.0),
-                 Round(Sin(Local      * Pi / 180.0) * 500.0));
+    { THE THREE ARE COMPUTED INTO VARIABLES, THEN THE ANGLES ADVANCE, THEN
+      THE CALL. Passing the Round expressions as arguments is the same
+      arithmetic in the wrong order: the original has both increments between
+      the last Round and the call, so Local is already advanced by the time
+      ObjTranslate runs but the values it passes were computed before. }
+    Dx := Round(Cos(Local      * Pi / 180.0) *   5.0);   { 12c5:07b9 }
+    Dy := Round(Sin(OrbitAngle * Pi / 180.0) *  20.0);   { 12c5:07df }
+    Dz := Round(Sin(Local      * Pi / 180.0) * 500.0);   { 12c5:0806 }
 
-    Inc(Local, LocalStep);
-    Inc(OrbitAngle, OrbitStep);
+    { 12c5:082b and 12c5:0834 are MOV AX / ADD AX,imm / MOV back -- the
+      assignment form, not Inc's ADD [mem],reg. Six bytes each. }
+    Local      := Local + LocalStep;                     { 12c5:082b }
+    OrbitAngle := OrbitAngle + OrbitStep;                { 12c5:0834 }
+
+    ObjTranslate(@Obj, Dx, Dy, Dz);                      { 12c5:084e }
 
     if KeyPressed then Exit;            { 12c5:0851 }
   end;

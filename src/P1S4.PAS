@@ -118,6 +118,13 @@ type
     Flag    : Byte;
   end;
 
+  { The output array is passed by pointer too, and ONE-based: 1107:03fd is
+    IMUL AX,[BP-2],7 / LES DI,[BP+4] / ADD DI,AX / CMP BYTE PTR ES:[DI-1] --
+    the minus one is the low bound folded into the displacement, so P^[I]
+    lands at P + (I-1)*7 and the caller passes @Outp[1]. }
+  TOutArr = array[1..LastEntry] of TOut;
+  POutArr = ^TOutArr;
+
   { 51 bytes in the original ($33): a two-byte (W, H) header the blitter reads
     out of the sprite itself, then 49 pixels. }
   TBlob = record
@@ -318,9 +325,14 @@ begin
   begin
     Move(P^[I], T, SizeOf(TTrail));         { 1107:049f, thirteen bytes }
     RotatePoint(T.X, T.Y, T.Z);             { 1107:04b3 }
-    T.X := T.X + Trail[0].X;
-    T.Y := T.Y + Trail[0].Y;
-    T.Z := T.Z + Trail[0].Z;
+    { THE TRANSLATION IS READ THROUGH THE POINTER, not from Trail absolutely.
+      1107:04bc is LES DI,[BP+0A] -- the parameter again -- and the three adds
+      take es:[di], es:[di+4] and es:[di+8], which is element ZERO of whatever
+      was passed. Reading Trail[0] by name is the same value and an absolute
+      displacement instead of a register indirection. }
+    T.X := T.X + P^[0].X;                   { 1107:04bf }
+    T.Y := T.Y + P^[0].Y;
+    T.Z := T.Z + P^[0].Z;
     Outp[I].D := FixedToInt(T.Z);           { 1107:052e }
     Project(T.X, T.Y, T.Z);
     { both come back zero-extended, so the low word carries the sign }
@@ -341,28 +353,40 @@ end;
   in index order and the depth cueing was wrong wherever the field folded over
   itself. The records are swapped whole -- three 7-byte Moves via a temporary.
   -------------------------------------------------------------------------- }
-procedure DepthSort(Lo, Hi : Integer);
-var
-  I, J : Integer;
-  P    : Integer;
-  T    : TOut;
-begin
-  I := Lo;  J := Hi;
-  P := Outp[(Lo + Hi) div 2].D;
-  repeat
-    while Outp[I].D > P do Inc(I);
-    while Outp[J].D < P do Dec(J);
-    if I <= J then
-    begin
-      if Outp[I].D <> Outp[J].D then
+procedure SortOutp(Arr : POutArr);
+{ 1107:03d7 -- A WRAPPER, and DepthSort is NESTED INSIDE IT. Four bytes of
+  parameters and no locals: PUSH 1 / PUSH $90 / PUSH BP / CALL 0x287, and that
+  PUSH BP is the STATIC LINK. So the sort reaches the array through this
+  routine's pointer parameter rather than naming Outp, and the bounds 1 and 144
+  are constants in the wrapper, not in the sort.
+
+  This is the same shape scene 5's SortAll turned out to be, in the same
+  binary, and that one was worth 619 bytes. }
+  procedure DepthSort(Lo, Hi : Integer);
+  var
+    I, J : Integer;
+    P    : Integer;
+    T    : TOut;
+  begin
+    I := Lo;  J := Hi;
+    P := Arr^[(Lo + Hi) div 2].D;
+    repeat
+      while Arr^[I].D > P do Inc(I);
+      while Arr^[J].D < P do Dec(J);
+      if I <= J then
       begin
-        T := Outp[I];  Outp[I] := Outp[J];  Outp[J] := T;
+        if Arr^[I].D <> Arr^[J].D then
+        begin
+          T := Arr^[I];  Arr^[I] := Arr^[J];  Arr^[J] := T;
+        end;
+        Inc(I);  Dec(J);
       end;
-      Inc(I);  Dec(J);
-    end;
-  until I > J;
-  if Lo < J then DepthSort(Lo, J);
-  if I < Hi then DepthSort(I, Hi);
+    until I > J;
+    if Lo < J then DepthSort(Lo, J);
+    if I < Hi then DepthSort(I, Hi);
+  end;
+begin
+  DepthSort(1, TrailCount);                 { 1107:03da, PUSH 1 / PUSH $90 }
 end;
 
 { --------------------------------------------------------------------------
@@ -377,13 +401,14 @@ end;
   49 bytes each, into the 51-byte blob at DS:$80C4 + I*$33 -- past the (W, H)
   header, which Banner_Load already set to 7, 7.
   -------------------------------------------------------------------------- }
-procedure BuildBlobs;
+procedure BuildBlobs(Arr : POutArr);
 var
+  { ENTER 2, so one Integer -- 1107:03f3 is MOV WORD PTR [BP-2],1. }
   I : Integer;
 begin
-  DepthSort(1, TrailCount);                 { 1107:03d7 -> 1107:0287 }
+  SortOutp(Arr);                            { 1107:03f0, the SAME pointer }
   for I := 1 to LastEntry do
-    if Outp[I].Flag <> 0 then
+    if Arr^[I].Flag <> 0 then               { 1107:0406 }
       Move(ProfileB, Blob[I].Pix, BlobPixels)
     else
       Move(ProfileA, Blob[I].Pix, BlobPixels);
@@ -405,18 +430,27 @@ end;
   -------------------------------------------------------------------------- }
 procedure StarInit(C0, Ca, Cb, Speed : Byte);
 var
-  I : Integer;
+  { ENTER 6, and it is a Byte plus a four-byte pointer: 12b2:0009 is
+    MOV BYTE PTR [BP-1],1 and 12b2:000f INCs the same byte, so the counter is
+    a Byte; 12b2:0020 stores DI and ES into [BP-6] and every field write then
+    goes through LES DI,[BP-6]. 1 + 4 = 5, and ENTER rounds it to 6.
+
+    The pointer is the same idiom scene 5's point loops use -- the record's
+    address taken once per iteration rather than three subscript computations. }
+  I : Byte;                             { [BP-1] }
+  P : ^TStar;                           { [BP-6] }
 begin
-  Randomize;
+  Randomize;                            { 12b2:0004 }
   for I := 1 to StarCount do
   begin
-    Star[I].X     := Random(319);
-    Star[I].Y     := Random(199);
-    Star[I].Spare := 0;
+    P := @Star[I];                      { 12b2:0017, IMUL DI,AX,9 + $9DD2 }
+    P^.X     := Random(319);            { 12b2:0026, PUSH $13F }
+    P^.Y     := Random(199);            { 12b2:0034, PUSH $C7 }
+    P^.Spare := 0;                      { 12b2:0067, XOR AX,AX then store }
     case Random(3) of
-      0 : begin Star[I].Colour := C0;  Star[I].DX := Speed;     end;
-      1 : begin Star[I].Colour := Ca;  Star[I].DX := Speed * 2; end;
-      2 : begin Star[I].Colour := Cb;  Star[I].DX := Speed * 3; end;
+      0 : begin P^.Colour := C0;  P^.DX := Speed;     end;
+      1 : begin P^.Colour := Ca;  P^.DX := Speed * 2; end;
+      2 : begin P^.Colour := Cb;  P^.DX := Speed * 3; end;
     end;
   end;
 end;
@@ -472,7 +506,7 @@ end;
 procedure FrameStep(A1, A2, A3 : Integer);
 begin
   Transform(@Trail, A1, A2, A3);    { 1107:0446 }
-  BuildBlobs;                       { 1107:03e7 }
+  BuildBlobs(@Outp[1]);             { 1107:0576, DS:$6336 = Outp + 7 }
   StarStep;                         { 12b2:00c0 }
   StarDraw(VirtScrSeg);             { 12b2:00f1 }
   DrawBlobs;                        { 1107:0245 }

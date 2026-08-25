@@ -103,10 +103,9 @@ begin
   BackdropSeg := Seg(Backdrop^);
   GetMem(CometBank, SizeOf(TCometBank));
 
-  Assign(F, 'neurosis.dat');
-  Reset(F, 1);
-  Seek(F, $00FD00);
-
+  { THE FILE IS OPENED BY THE CALLER, not here. 1082:0572..0597 is Assign,
+    Reset and Seek in Scene2's own body, and 1082:059c is the near call to this
+    routine afterwards -- so Load is entered with the file already positioned. }
   BlockRead(F, Palette, 768);
   BlockRead(F, CometBank^, SizeOf(TCometBank));
   ClearScreen($A000, 0);
@@ -453,7 +452,11 @@ end;
 
 procedure Scene2;
 begin
-  Load;                                   { 1082:0000 }
+  { Opened HERE, before Load, which is where the original has it. }
+  Assign(F, 'neurosis.dat');              { 1082:057c }
+  Reset(F, 1);                            { 1082:0588 }
+  Seek(F, $00FD00);                       { 1082:0597 }
+  Load;                                   { 1082:059c, a near call to offset 0 }
   ShowWord('ASPHYXIA');                   { 1082:0592 }
   ShowWord('PRESENTS');                   { 1082:059D }
   PaletteFadeOut(FadePause);              { 1082:05BB -- 1491:0330 }
