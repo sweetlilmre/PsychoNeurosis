@@ -1330,9 +1330,21 @@ end;
   -------------------------------------------------------------------------- }
 procedure LoadAssets;
 var
-  F   : file;
-  Pal : TPal768;
-  I   : Integer;
+  { ENTER $686 -- 1,670 bytes -- and this routine declared 898. The arithmetic
+    picks the missing item out on its own: 128 for the file record plus 768 for
+    a palette is 896, and the original's two scalar slots are at [BP-$681] and
+    [BP-$683], so everything above $681 is buffers. 128 + 768 + 768 is 1,664,
+    which fills BP-1 down to BP-$680 exactly -- there is a SECOND 768-byte
+    palette. Nothing in the routine reads it, and a local is allocated whether
+    or not it is read. }
+  F    : file;                    { [BP-$080] }
+  Pal  : TPal768;                 { [BP-$380] }
+  Pal2 : TPal768;                 { [BP-$680], never read }
+  Spare : Byte;                   { [BP-$681] }
+  I    : Integer;                 { [BP-$683] }
+  Spare2 : Integer;               { [BP-$685], nor this one -- the buffers
+                                    end at $680 and the frame is $686, so
+                                    six bytes of scalars sit below them }
 begin
   Assign(F, 'neurosis.dat');
   Reset(F, 1);
