@@ -14,7 +14,7 @@ program TPART3;
   -- the two variants are byte-identical apart from exactly those pairs --
   so the faithful build keeps the $E+ default. See dosbuild.py. }
 
-uses Crt, VGA, DemoVT, P3Main;
+uses DemoVT, Crt, VGA, P3Main;
 
 var
   PrevExit : Pointer;
