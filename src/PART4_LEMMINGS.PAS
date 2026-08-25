@@ -940,15 +940,26 @@ end;
   -------------------------------------------------------------------------- }
 procedure Digger(N : Integer);
 var
-  Col, ColTo : Integer;
-  Hit        : Boolean;
+  { FIVE LOCALS IN EIGHT BYTES, which is what 1005:0df5's ENTER $8 and its slots
+    say: Words at [BP-$02] and [BP-$04], Bytes at [BP-$05] and [BP-$06], and a
+    Word at [BP-$08] -- 2+2+1+1+2. This routine declared three.
+
+    The pixel is READ INTO A BYTE before it is tested; writing the GetPixel
+    inside the `in` test keeps it in a register and loses the slot. }
+  Col, ColTo : Integer;           { [BP-$02], [BP-$04] }
+  Hit        : Boolean;           { [BP-$05] }
+  Pix        : Byte;              { [BP-$06] }
+  Lim        : Integer;           { [BP-$08], 18 references in the original }
 begin
   Hit := False;
   if Lem[N].Dir < 1 then
   begin
     ColTo := Lem[N].X + 3;
     for Col := Lem[N].X - 3 to ColTo do
-      if GetPixel(Col, Lem[N].Y + 1, VirtScrSeg) in Wall then Hit := True;
+    begin
+      Pix := GetPixel(Col, Lem[N].Y + 1, VirtScrSeg);
+      if Pix in Wall then Hit := True;
+    end;
     DrawLine(Lem[N].X - 2, Lem[N].Y - 11, Lem[N].X - 2, Lem[N].Y + 1,
              0, VirtScrSeg);
     DrawLine(Lem[N].X - 1, Lem[N].Y - 11, Lem[N].X - 1, Lem[N].Y + 1,
@@ -960,7 +971,10 @@ begin
   begin
     ColTo := Lem[N].X + 4;
     for Col := Lem[N].X - 3 to ColTo do
-      if GetPixel(Col, Lem[N].Y + 1, VirtScrSeg) in Wall then Hit := True;
+    begin
+      Pix := GetPixel(Col, Lem[N].Y + 1, VirtScrSeg);
+      if Pix in Wall then Hit := True;
+    end;
     VLine(Lem[N].X + 4, Lem[N].Y - 10, Lem[N].Y,     0, VirtScrSeg);
     VLine(Lem[N].X + 5, Lem[N].Y - 9,  Lem[N].Y,     0, VirtScrSeg);
     VLine(Lem[N].X + 6, Lem[N].Y - 8,  Lem[N].Y - 1, 0, VirtScrSeg);
