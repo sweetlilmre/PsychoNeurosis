@@ -57,7 +57,7 @@ procedure Scene1;
 
 implementation
 
-uses VGA, Crt, DemoVT;
+uses VGA, Crt, DemoVT, ModeX;   { ModeX for LogicalWidth -- see SetDisplayStart }
 
 const
   { Mode-X logical screen. CRTC Offset register is programmed to 80, i.e.
@@ -413,20 +413,75 @@ end;
   pixels share a byte address across the planes) and fine pan via Attribute
   Controller register $13. Together they give single-pixel smooth scrolling.
   -------------------------------------------------------------------------- }
+{ HAND ASSEMBLER, transcribed verbatim. The tell is the CRTC pair: the
+  original loads Addr into BX ONCE and writes both halves as 16-bit OUT
+  DX,AX -- index in AL, data in AH -- reusing BH then BL. Turbo Pascal has
+  no way to say that: PortW with `$0C or (Hi(Addr) shl 8)` does emit the
+  16-bit OUT, and then builds the word as MOV AL / XOR AH,AH / SHL AX,8 /
+  OR AX,$000C -- eleven bytes where the original spends four. Measured.
+  The attribute-controller tail is the same story: AND BL,3 / SHL BL,1 /
+  MOV AL,BL rather than working in AL throughout.
+
+  The frame is ENTER 4 for three bytes of declarations, so [BP-4] is the
+  compiler's padding. Dummy is never stored -- the $3DA read at 1015:06e1
+  discards AL -- but it is declared, because it is what puts Addr at [BP-2].
+
+  FOR REFERENCE ONLY, the equivalent Pascal -- not what the binary does:
+    Addr := LogicalWidth * Y * 2 + (X shr 2);
+    Port[$3D4] := $0C; Port[$3D5] := Hi(Addr);
+    Port[$3D4] := $0D; Port[$3D5] := Lo(Addr);
+    Dummy := Port[$3DA];  Port[$3C0] := $13;
+    Port[$3C0] := (X and 3) shl 1;  Port[$3C0] := $20;
+}
 procedure SetDisplayStart(X, Y : Integer);
 var
-  Addr  : Word;
-  Dummy : Byte;
+  Addr  : Word;    { [BP-2] }
+  Dummy : Byte;    { [BP-3] -- declared, never stored }
 begin
-  Addr := (CrtcOffset * Y * 2) + (X shr 2);   { = Y*BytesPerRow + X div 4 }
+  { COMPILED, not assembler, and two bytes proved it. The arithmetic below
+    is byte-identical to the original only when Pascal emits it: the
+    compiler writes MOV CX,AX as 8B C8 and ADD AX,CX as 03 C1, while BASM
+    writes the SAME MNEMONICS as 89 C1 and 01 C8 -- the other direction
+    bit. Transcribing this half as asm left exactly those two bytes wrong.
+    So a register-to-register op is a DISCRIMINATOR between compiled code
+    and an asm block inside the same binary, built by the same tool. }
+  Addr := LogicalWidth * Y * 2 + (X shr 2);   { 1015:06b4..06c8 }
 
-  Port[$3D4] := $0C; Port[$3D5] := Hi(Addr);
-  Port[$3D4] := $0D; Port[$3D5] := Lo(Addr);
+  { 1015:06cb -- HAND ASSEMBLER from here, and the CRTC pair is the tell:
+    Addr is loaded into BX ONCE and both halves are written as 16-bit OUT
+    DX,AX, index in AL and data in AH. PortW with `$0C or (Hi(Addr) shl 8)`
+    does emit the 16-bit OUT and then builds the word as MOV AL / XOR AH,AH
+    / SHL AX,8 / OR AX,$000C -- eleven bytes where the original spends
+    four. Measured, 25 Aug 2026.
 
-  Dummy := Port[$3DA];                        { reset attribute flip-flop }
-  Port[$3C0] := $13;                          { horizontal pixel panning }
-  Port[$3C0] := (X and 3) shl 1;
-  Port[$3C0] := $20;                          { re-enable video output }
+    FOR REFERENCE ONLY, the equivalent Pascal -- not what the binary does:
+      Port[$3D4] := $0C; Port[$3D5] := Hi(Addr);
+      Port[$3D4] := $0D; Port[$3D5] := Lo(Addr);
+      Dummy := Port[$3DA];  Port[$3C0] := $13;
+      Port[$3C0] := (X and 3) shl 1;  Port[$3C0] := $20; }
+  asm
+    MOV  BX, Addr       { 1015:06cb  both halves are used                }
+    MOV  AH, BH         { 1015:06ce                                      }
+    MOV  AL, $0C        { 1015:06d0  CRTC start address HIGH             }
+    MOV  DX, $03D4      { 1015:06d2                                      }
+    OUT  DX, AX         { 1015:06d5  ONE 16-bit write: index AND data    }
+    MOV  AH, BL         { 1015:06d6                                      }
+    MOV  AL, $0D        { 1015:06d8  CRTC start address LOW              }
+    MOV  DX, $03D4      { 1015:06da                                      }
+    OUT  DX, AX         { 1015:06dd                                      }
+    MOV  DX, $03DA      { 1015:06de                                      }
+    IN   AL, DX         { 1015:06e1  reset the attribute flip-flop       }
+    MOV  DX, $03C0      { 1015:06e2                                      }
+    MOV  AL, $13        { 1015:06e5  horizontal pixel panning            }
+    OUT  DX, AL         { 1015:06e7                                      }
+    MOV  BX, X          { 1015:06e8                                      }
+    AND  BL, 3          { 1015:06eb                                      }
+    SHL  BL, 1          { 1015:06ee                                      }
+    MOV  AL, BL         { 1015:06f0                                      }
+    OUT  DX, AL         { 1015:06f2                                      }
+    MOV  AL, $20        { 1015:06f3  re-enable video output              }
+    OUT  DX, AL         { 1015:06f5                                      }
+  end;
 end;
 
 { --------------------------------------------------------------------------
