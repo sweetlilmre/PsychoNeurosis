@@ -290,10 +290,11 @@ tier = "part"
 outcome = "differs"
 achieved = "R2"
 observer = "maintainer"
-date = "2026-08-21"
-confirmed_at = "fbe0608dba1c"
-fingerprint = "d6ceeaa45f4d5a1b"
-against = "ORIG6.EXE"
+date = "2026-08-25"
+confirmed_at = "80178de2c021"
+fingerprint = "e1bf5aff3bd5b982"
+against = "NEUROSIS_006.exe"
+note = "Watched beside ORIG6 on 25 Aug 2026, after this session's three P6S3 fixes (SetDAC as hand assembler, Setup's var block reordered and 256 bytes added, Pal as 256 three-byte records) and P6S1's Abs fix. THREE VERDICTS, ONE OF THEM A DEFECT. Scene 1, the whooshtext: a bit JERKY. Scene 3, the fire: it DOES NOT CLIMB AS HIGH up the screen as the original -- definitely different. The final scene looks the same and the timing is very similar. So part 006 is NOT confirmable at R3 and part6-confirm-r3 stays open; the fire height is a new defect with a watched run behind it, which is the strongest evidence this project gets."
 
 [observation."TPART7"]
 harness = "TPART7"
@@ -439,6 +440,19 @@ resolution = "IT IS TWO SEPARATE THINGS, AND ONE OF THEM IS THE MEASURING APPARA
 [[plan.investigation]]
 name = "part3-driver-volume-vars"
 finding = "part 003's variables sit 2 bytes below the original's after the harness's own 2 bytes are accounted for, and the original has FOUR bytes of variables between its typed constants at $9F1A and Tunnel's YOffset at $9F1E that we do not declare. IDENTIFIED AND MEASURED, DELIBERATELY NOT COMMITTED -- see below."
+seen_in = "TPART3"
+state = "open"
+
+[[plan.investigation]]
+name = "part6-fire-height"
+finding = "part 006 scene 3: the fire DOES NOT CLIMB AS HIGH up the screen as the original's, and scene 1 is a bit jerky. Reported from a watched run beside ORIG6 on 25 Aug 2026; the final scene matched and the timing was very similar."
+seen_in = "TPART6"
+state = "resolved"
+resolution = "THE FIRE'S RESEED HAD TWO DEFECTS AND THEY COMPOUND. 95.6 to 96.2 percent, and the reseed block's opcodes are now identical. Found from the bytes AFTER the run said where to look, which is the order that worked. ONE: the test is `<`, not `>`. Over the same FCOMPP the original emits JBE at 1118:0922 where ours emitted JAE -- opposite senses. TWO, AND THIS IS THE ONE THAT LOWERS THE FIRE: THE STORE IS UNCONDITIONAL. 1118:0932 is the conditional jump's OWN TARGET, and it reads the value back out of [BP-$04] and writes it to Grid[99,I] on EVERY column. Only the VALUE is conditional, so the seed is STICKY: the bottom row is written all the way across every frame, carrying the last drawn value into the columns the test skips. Ours wrote only where the test fired and left the rest at whatever the diffusion had cooled them to -- a cooler bottom row, and a shorter fire. The slot was already declared as Tmp and sitting unused, with a note saying [BP-$04] is touched twice. It is never initialised before the loop, so the first columns of the first frame carry whatever the frame held; that is the original's behaviour and it is transcribed rather than corrected. The residual differences in the block are all addresses -- the RTL's Random target, the 0.4 constant's CS offset, Grid's DS displacement (2 bytes, part of the var-layout thread) and the FPU status slot one byte low, which means this routine's frame is still one byte too big before the compiler's temporary. SCENE 1'S JERKINESS IS NOT ADDRESSED and no cause is proposed -- it needs its own look. AND THIS FIX WANTS ANOTHER WATCHED RUN: the fire should now climb as high as the original's, and nobody may record that but a person who sees it."
+
+[[plan.investigation]]
+name = "part3-var-bundle"
+finding = "part 003's variable layout needs four separate changes and every one of them measures WORSE on its own, because each fixes one unit's addresses while leaving the next unit's wrong."
 seen_in = "TPART3"
 state = "open"
 
@@ -618,8 +632,8 @@ investigation = "part3-driver-volume-vars"
 target = "R0"
 
 [plan.row."003 1015:0000"]
-label = "UploadPalette is hand assembler: LOOP, ADC BH,0, pointers in locals"
-investigation = "part3-init-and-palette"
+label = "the four part-003 var changes must land together, not singly"
+investigation = "part3-var-bundle"
 target = "R0"
 
 [plan.row."003 1015:018d"]
@@ -655,6 +669,11 @@ target = "R0"
 [plan.row."003 1015:0a26"]
 label = "every unit wants an EMPTY initialisation section"
 investigation = "part3-init-and-palette"
+target = "R0"
+
+[plan.row."003 10b8:0592"]
+label = "Demo_Scene2's file record is a LOCAL: ENTER $80 says so"
+investigation = "part3-var-bundle"
 target = "R0"
 
 [plan.row."003 120f:0017"]
@@ -705,4 +724,9 @@ target = "R0"
 [plan.row."006 1118:00c6"]
 label = "Pal is 256 three-byte records; the fold is in the displacement"
 investigation = "part6-p6s3-setup"
+target = "R0"
+
+[plan.row."006 1118:0907"]
+label = "the reseed test is `<` and the store to Grid[99,I] is UNCONDITIONAL"
+investigation = "part6-fire-height"
 target = "R0"

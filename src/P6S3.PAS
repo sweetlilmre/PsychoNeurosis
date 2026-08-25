@@ -437,11 +437,35 @@ begin
   repeat
     { 1118:0907 -- reseed the bottom row. Random is the REAL one here, and
       the threshold is the extended 0.4 at CS:$08c9. }
+    { TWO DEFECTS HERE AND TOGETHER THEY ARE WHY THE FIRE DID NOT CLIMB AS
+      HIGH as the original's -- reported from a watched run beside ORIG6 on
+      25 Aug 2026, and found from the bytes afterwards.
+
+      THE TEST IS `<`, NOT `>`. The original emits JBE at 1118:0922 where
+      ours emitted JAE over the same FCOMPP, so the branch senses are
+      opposite.
+
+      AND THE STORE IS UNCONDITIONAL. 1118:0932 is the jump's OWN TARGET,
+      and it reads the value back out of [BP-$04] and writes it to
+      Grid[99,I] on EVERY column -- only the VALUE is conditional. So the
+      seed is STICKY: the bottom row is written all the way across every
+      frame, carrying the last drawn value into the columns the test skips,
+      instead of leaving 60% of them at whatever the diffusion cooled them
+      to. That is a much hotter bottom row, and a taller fire.
+
+      Tmp is [BP-$04] and was already declared for this and unused. It is
+      never initialised before the loop, so the first columns of the first
+      frame carry whatever the frame held -- that is the original's
+      behaviour and it is transcribed, not corrected.
+
+      1118:0938 writes [$92A9+I], and $740A + 98*80 + I - 1 is $92A9 + I,
+      which is row 99. }
     for I := 1 to GridW do
-      if Random > 0.4 then                       { 1118:0916 }
-        Grid[99, I] := Random(2) * 255;          { 1118:0938 writes [$92A9+I],
-                                                   and $740A + 98*80 + I - 1 is
-                                                   $92A9 + I -- row 99 }
+    begin
+      if Random < 0.4 then                       { 1118:0922, JBE }
+        Tmp := Random(2) * 255;                  { 1118:0926 -> [BP-$04] }
+      Grid[99, I] := Tmp;                        { 1118:0932, EVERY column }
+    end;
 
     { ------------------------------------------------------------------
       EQUIVALENT PASCAL, for reference -- the assembler is what runs:
