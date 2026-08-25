@@ -566,6 +566,13 @@ resolution = "IMPLEMENTED AS ONE BUNDLE, and part 001 went 81.0% -> 81.5%. Trans
 name = "part1-dgroup-placement"
 finding = "part 001: this unit's DGROUP block is about 26KB from where the original's is. dsmap pairs the original's $AAC6 with ours at a shift of -26018 and its $AAD0 at -26036, and a third of all paired references carry -22896 at $ACEB. The within-unit order is now right -- Obj at $A106, ObjMeta at $A5C2, Scr at $A5F6, WorkSeg at $AAC6, PtCount at $AAC8 all fall out of MaxPoints being 100 -- so what is left is WHERE THE UNIT'S BLOCK STARTS, which is a function of the other units' sizes and of the order the uses clause puts them in. The wiki's observation on DGROUP running backwards down the uses clause is the thing to read first; P1INTRO's clause was already deliberately reversed once, so the ordering is understood and the SIZES are the more likely culprit. This is the lever on every remaining 12c5 span: the code around the displacements is already exact, so each span is one wrong absolute address away from aligning."
 seen_in = "TPART1"
+state = "resolved"
+resolution = "HALF RESOLVED, AND THE DIAGNOSIS WAS WRONG IN A USEFUL WAY. The finding said this was a unit-PLACEMENT problem and not a within-unit ordering one. That was the wrong way round: the unequal shifts were the evidence AGAINST a block move, not for one. dsmap paired the original's $AAC6 at -26018 and its $AAD0 at -26036 -- ten bytes apart in the original and twenty-eight in ours -- and a block that has merely moved carries ONE shift everywhere. Unequal shifts over a few bytes are always an ORDER defect. That reading is worth keeping as a rule. WHAT THE ORDER TURNED OUT TO BE, and it is fully determined once MaxPoints is 100: $A106 Obj (1212), $A5C2 ObjMeta (52), $A5F6 Scr (1200), $AAA6 MCos1..MSin3 (24), $AABE MScale (4), $AAC2 Work (4), $AAC6 WorkSeg (2), $AAC8 PtCount (2), $AACA six bytes never referenced, $AAD0 Angle, $AAD2 OrbitAngle. IT CLOSES WITHOUT A GAP -- each address plus its size is the next address, from $A106 to $AAD4 -- and that is the check on the whole sequence. The piece that settles the shape is Scr: 1200 bytes at $A5F6 end at $AAA6, which is exactly where MCos1 sits, so THE MATHS MODULE'S VARIABLES ARE DECLARED BETWEEN Scr AND Work. They were in a block of their own at the end of the unit, and Angle, OrbitAngle, Work, WorkSeg and PtCount were all in front of the model, so all eleven addresses were wrong. The six bytes at $AACA are transcribed as a Real with the type flagged as a guess -- six bytes is exactly a Turbo Pascal Real and this unit does real arithmetic, which is the only argument for it over three Words. MEASURED: $AAC6, $AAC8 and $AAD0 now carry ONE shift of -23530 where they carried three different ones, and the coverage walk moved 3 bytes to 81.5%. THREE BYTES, for a correction that is certainly right -- because the addresses are still all wrong, just now wrong by the same amount. Data image unchanged, traps identical, TransformPoint still 305 bytes with 24 differing and all 24 displacements. WHAT IS LEFT is a clean chain and it is the next investigation, part1-unit-sizes: -23530 for this unit's whole block, then +272 at $AB54 and +368 at $ACEB. Since DGROUP runs backwards down the uses clause, this unit's block starting 23530 bytes too low says the units BELOW it there -- the other four scene units -- are collectively that much too small. 23530 bytes is a buffer, not a variable."
+
+[[plan.investigation]]
+name = "part1-unit-sizes"
+finding = "part 001: the scene units' data blocks are collectively about 23.5KB too small, and the residual is now a clean three-step chain rather than noise. After P1S5's own order was fixed, dsmap gives exactly three shifts above $AAC6: -23530 across $AAC6..$AAD0 (this unit's tail), -23258 across $AB54..$AB58, and -22890 across $ACEB..$ACFB with 38 sites. The steps between them are +272 and +368, and a step of +N means our version has N MORE bytes in that gap than the original -- so the region after P1S5 is 272 bytes too big and the one after that a further 368. THE BIG ONE IS THE BASE SHIFT, -23530. DGROUP runs backwards down the uses clause, so P1S5's block beginning 23530 bytes too low means everything declared below it there is that much too small in total. 23530 is the size of a BUFFER, not of a variable or two, so look for a screen-sized array that is missing or declared smaller than the original's -- P1S5's own MaxPoints was exactly this class of defect and was worth 864 bytes. METHOD FOR THE NEXT SESSION, because guessing which unit is expensive: dsmap only pairs references it can anchor, and 196 are unpaired. Take the original's LOWEST paired data offset below $A106, find which unit's code references it, and that unit is where the shortfall begins. Then walk up. Do NOT reorder anything before the sizes are right: the two defects are independent and part 003's episode says a layout change measured against a wrong size measures wrong."
+seen_in = "TPART1"
 state = "open"
 
 [plan.row."001 1012:0004"]
@@ -663,9 +670,19 @@ label = "this unit's data block sits 26KB from the original's"
 investigation = "part1-dgroup-placement"
 target = "R0"
 
+[plan.row."001 dgroup $AB54"]
+label = "a +272 step: the region after P1S5 is 272 bytes too big"
+investigation = "part1-unit-sizes"
+target = "R0"
+
 [plan.row."001 dgroup $ACEB"]
-label = "38 references carry one shift of -22896, so it is a block move"
-investigation = "part1-dgroup-placement"
+label = "a further +368 step, 38 sites"
+investigation = "part1-unit-sizes"
+target = "R0"
+
+[plan.row."001 dgroup base"]
+label = "P1S5's block starts 23530 bytes too low; the units below it are too small"
+investigation = "part1-unit-sizes"
 target = "R0"
 
 [plan.row."002 1008:0362"]

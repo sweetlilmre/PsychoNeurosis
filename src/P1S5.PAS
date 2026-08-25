@@ -111,25 +111,38 @@ type
   TScrArr = array[1..MaxPoints * 2] of TScreenPt;
   PScrArr = ^TScrArr;
 
-var
-  { DS:$AAD0 spin, DS:$AAD2 orbit. Local lives in Animate's own frame. }
-  Angle      : Integer;
-  OrbitAngle : Integer;
-  { DS:$AAC6 -- the render target. Animate copies the clean gradient out of
-    the virtual screen into it, draws, and blits it to video. }
-  Work    : Pointer;
-  WorkSeg : Word;
+{ ==========================================================================
+  THE DECLARATION ORDER BELOW IS MEASURED, and it runs across three var blocks
+  and the maths module's comment. Turbo Pascal lays a unit's DGROUP down in
+  declaration order, so these addresses ARE the order:
 
-  PtCount : Integer;                                { DS:$AAC8 }
-  { Model coordinates, 16.16 fixed point -- which is why the records are
-    TWELVE bytes and not six. An earlier version held these as plain Integers
-    because a Turbo Pascal LongInt multiply overflows before it can take the
-    middle 32 bits of a 32x32 product; the rotation now goes through the
-    shared 386 maths object, which does that properly, so the coordinates are
-    the original's again. }
-  { DS:$A106, and ObjMeta follows it at $A5C2 rather than Scr, because
-    $A106 + $4BC is $A5C2 exactly. Scr was declared here, between the model
-    and the sprite, which put it 1212 bytes too early. }
+      $A106  Obj        1212   the model: 100 points then the translation
+      $A5C2  ObjMeta      52   the point sprite
+      $A5F6  Scr        1200   200 six-byte screen records
+      $AAA6  MCos1..MSin3 24   the maths module's sin/cos pairs
+      $AABE  MScale        4
+      $AAC2  Work          4
+      $AAC6  WorkSeg       2
+      $AAC8  PtCount       2
+      $AACA  (six bytes)   6   declared, never referenced
+      $AAD0  Angle         2
+      $AAD2  OrbitAngle    2
+
+  IT CLOSES WITHOUT A GAP, and that is the check on it: each address plus its
+  size is the next address, from $A106 to $AAD4. The one that settles the
+  shape is Scr -- 1200 bytes at $A5F6 ends at $AAA6, which is exactly where
+  MCos1 is, so the maths declarations sit BETWEEN Scr and Work and not after
+  everything. They were in a block of their own at the end here, and Angle,
+  OrbitAngle, Work, WorkSeg and PtCount were all in front of the model, which
+  put every one of these eleven addresses wrong.
+
+  Reordering was not optional and not cosmetic: dsmap paired the original's
+  $AAC6 with ours at a shift of -26018 and its $AAD0 at -26036, ten bytes
+  apart in the original and twenty-eight in ours. Unequal shifts over a few
+  bytes are an ORDER defect, not a block-placement one -- a block that had
+  simply moved would carry one shift everywhere.
+  ========================================================================== }
+var
   Obj     : TObj;                                  { DS:$A106 }
   { DS:$A5C2 -- the 52-byte point sprite: a 2-byte (W, H) header and 50 px. }
   ObjMeta : array[0..51] of Byte;
@@ -151,10 +164,28 @@ var
   BEFORE the $L directive and spelled exactly this way.
   -------------------------------------------------------------------------- }
 var
-  { DS:$AAA6..$AABD -- cos then sin, per axis, as SinCos leaves them. }
+  { DS:$AAA6..$AABD -- cos then sin, per axis, as SinCos leaves them. Scr's
+    1200 bytes end at $AAA6, so this block follows it immediately. }
   MCos1, MSin1, MCos2, MSin2, MCos3, MSin3 : LongInt;
   { DS:$AABE -- the projection scale, 16.16. }
   MScale : LongInt;
+
+  { And the rest of the unit's variables follow the maths block, which is why
+    they are declared here rather than at the top. }
+  { DS:$AAC2 -- the render target. Animate copies the clean gradient out of
+    the virtual screen into it, draws, and blits it to video. }
+  Work    : Pointer;
+  WorkSeg : Word;                                   { DS:$AAC6 }
+  PtCount : Integer;                                { DS:$AAC8 }
+  { DS:$AACA -- SIX BYTES DECLARED AND NEVER REFERENCED. They are needed for
+    Angle to land at $AAD0 and nothing in the binary reads them, so the type
+    is a guess: six bytes is exactly a Turbo Pascal Real, and this unit does
+    real arithmetic in Vector_Animate's trig, which is the only reason Real is
+    chosen over three Words or a six-byte array. }
+  Spare   : Real;                                   { DS:$AACA }
+  { DS:$AAD0 spin, DS:$AAD2 orbit. Local lives in Animate's own frame. }
+  Angle      : Integer;                             { DS:$AAD0 }
+  OrbitAngle : Integer;                             { DS:$AAD2 }
 
 const
   { DS:$0280 = 320, so the horizontal centre is 160.
