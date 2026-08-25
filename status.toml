@@ -701,6 +701,13 @@ resolution = "TWO OF FIVE FRAMES FIXED and the reason the first one resisted is 
 name = "part7-string-table"
 finding = "part 007's largest span is 100f:07a8..07dd, 53 bytes, and it is a BODY difference in a routine that appends a string to a table. Decoded: MOV BYTE PTR [BP-$107],1 sets a byte local; CMP WORD PTR [$3406],$64 / JGE / INC WORD PTR [$3406] is `if Count < 100 then Inc(Count)` against a counter at DS:$3406; then LEA DI,[BP-$100] pushes a local buffer, MOV DI,[$3406] / SHL DI,7 / ADD DI,$186 indexes a table of 128-byte entries whose FOLDED base is $186, and PUSH $7F with a call to the string-assign RTL copies at most 127 characters. So the table is `array[..] of String[127]` at DS:$186 + Count*128, and the routine is `Table[Count] := S` guarded by a 100-entry cap. 127 and 128 together say String[127] rather than String, which is the kind of detail that costs a byte per entry if guessed. Note the folded base: $186 is not the table's address, it is the address minus one stride, so the array is ONE-based."
 seen_in = "TPART7"
+state = "resolved"
+resolution = "PART 007 IS AT 99.3% AND MEETS THE TARGET -- 95.9% at the start of the batch, and no unaligned span of 16 bytes or more is left. Five findings, and the last two were worth 3.4 points between them. AddFlic at 100f:0771, ENTER $308: only three slots are read and they decompose exactly -- S at [BP-$100] (256), a SEVEN-byte slot at [BP-$107] whose base is its length byte (100f:07a8 sets it to 1, so String[6]), another String at [BP-$207] never referenced, and Turbo Pascal's own 256-byte temporary at [BP-$307] for the UpCaseStr result. 256 + 7 + 256 = 519 declared plus 256 of temporary is 775, rounded to 776. Ours declared S alone and came out $200. Adding the two, plus the one statement that sets Ext's length, took the part 96.0% to 97.5% and removed a 53-byte span entirely. WaitTicks at 100f:03c9, three things and the third was the big one. Its Target is ONE statement, not an assignment plus two Inc's: 100f:03e7 and 03ef are ADD/ADC with the result still in DX:AX and the only store is at 03f7. It is FAR -- 100f:040e is RETF 2 and the parameter is at [BP+6], where a near routine's first is at [BP+4]. AND SO IS ReadTimer, which 100f:031c returns with RETF and whose caller at 100f:03fd is PUSH CS / CALL near, the same-segment far-call form; declared near, ours emitted a bare CALL. Finally the wait is a REPEAT, not a WHILE: the original's test is at the bottom with the conditional jumps going back and the fall-through leaving, where `while c do ;` on an empty body costs one jump more. Those last two together took 97.4% to 99.3%. A NOTE ON THE PATH: making WaitTicks far LOST ten bytes at first, and the correct reading was to keep it -- RETF 2 and a parameter at [BP+6] are unambiguous -- and find what else was wrong. Reverting on the walk's verdict would have hidden ReadTimer's far-ness and the repeat/while difference behind it. A right change can measure worse while a second defect is still in place."
+
+[[plan.investigation]]
+name = "target-99-remaining"
+finding = "FOUR OF TEN PARTS NOW MEET THE 99% TARGET -- 000, 009 and psycho at 100%, 002 at 99.9% -- and 007 joins them at 99.3%. Remaining: 006 at 98.0%, 005 at 97.3%, 004 at 96.5%, 003 at 95.6%, 001 at 90.9%. WHAT PART 007's RUN SUGGESTS FOR THE REST, because none of it needed new tooling: the wins came from FAR-ness (RETF against RET, and a parameter at [BP+6] rather than [BP+4]), from LOOP SHAPE (a test at the bottom with jumps back is repeat-until; while-with-empty-body costs an extra jump), from STATEMENT COUNT (one expression storing once, versus an assignment plus Inc's storing three times), and from FRAME DECOMPOSITION including the compiler's own temporaries. All four are cheap to check and none of them shows up in a data-layout instrument. SO FOR 003, 004 AND 001 -- the three furthest away -- run prologue.py per segment first and then look at the RETF/RET of every routine whose frame will not pair. Part 007 had TWO routines declared near that are far, and each one broke its own body AND its callers."
+seen_in = "TPART7"
 state = "open"
 
 [plan.row."001 1012:0004"]
@@ -1194,8 +1201,8 @@ investigation = "part6-and-part3"
 target = "R0"
 
 [plan.row."003 to 99"]
-label = "95.6%, never had the layout treatment"
-investigation = "target-99-percent"
+label = "95.6% -- check RETF/RET on every unpaired frame"
+investigation = "target-99-remaining"
 target = "R0"
 
 [plan.row."004 dgroup $06D2"]
@@ -1214,8 +1221,8 @@ investigation = "part4-sixteen-bytes"
 target = "R0"
 
 [plan.row."004 to 99"]
-label = "96.5%, never had the layout treatment"
-investigation = "target-99-percent"
+label = "96.5% -- same, plus the 2,646 unreferenced bytes"
+investigation = "target-99-remaining"
 target = "R0"
 
 [plan.row."005 1096:0000"]
@@ -1314,8 +1321,8 @@ investigation = "part7-string-table"
 target = "R0"
 
 [plan.row."007 to 99"]
-label = "95.9%, never had the layout treatment"
-investigation = "target-99-percent"
+label = "MET at 99.3%; five findings, far-ness and loop shape the biggest"
+investigation = "target-99-remaining"
 target = "R0"
 
 [plan.row."125e:0741"]

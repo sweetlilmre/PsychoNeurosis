@@ -538,8 +538,12 @@ end;
   The answer is a LongInt whose high word is the BIOS tick and whose low word
   is the PIT counter, i.e. 65536 units per tick and 1,193,182 units a second.
   -------------------------------------------------------------------------- }
-function ReadTimer : LongInt;
-{ NO LOCALS AT ALL, and that is what ENTER $04 means. Turbo Pascal allocates
+function ReadTimer : LongInt; far;
+{ FAR: 100f:031c is RETF, and its caller at 100f:03fd is PUSH CS / CALL near --
+  the same-segment far call. Declared near, the caller emitted a bare CALL and
+  the two differed by the pushed CS.
+
+  NO LOCALS AT ALL, and that is what ENTER $04 means. Turbo Pascal allocates
   four bytes of frame for a LongInt function's RESULT, so a routine with one
   LongInt local would open ENTER $08 -- which is what this did, under three
   different spellings before the frame was read properly:
@@ -666,14 +670,27 @@ end;
   therefore free until it exceeds the frame delay, and the animation runs at
   its authored speed rather than at decode speed plus the delay.
   -------------------------------------------------------------------------- }
-procedure WaitTicks(MS : Word);
+procedure WaitTicks(MS : Word); far;
+{ FAR, and the parameter's offset says so: 100f:03cd reads MS from [BP+6], and
+  a near routine's first parameter is at [BP+4] -- the extra two bytes are the
+  pushed CS. 100f:040e confirms it with RETF 2. Declared near, every reference
+  to MS in this routine was two bytes off. }
 var
   Target : LongInt;                 { [BP-4] }
 begin
-  Target := LongInt(MS) * PITHz div 1000;         { 100f:03cd .. 100f:03e2 }
-  Inc(Target, Overhead);                          { 100f:03e7 }
-  Inc(Target, Stamp);                             { 100f:03ef }
-  while ReadTimer < Target do ;                   { 100f:03fd .. 100f:040b }
+  { ONE STATEMENT, not three. 100f:03e7 and 100f:03ef are ADD AX / ADC DX
+    against Overhead and Stamp with the result still in the register pair, and
+    the ONLY store is 100f:03f7's MOV [BP-4],AX / MOV [BP-2],DX. Written as an
+    assignment plus two Inc's, each one stores Target and loads it again -- the
+    same arithmetic and three times the traffic. }
+  Target := LongInt(MS) * PITHz div 1000
+            + Overhead + Stamp;                   { 100f:03cd .. 100f:03fa }
+  { REPEAT, not WHILE. The original's test is at the BOTTOM with the
+    conditional jumps going back and the fall-through leaving -- 100f:0404 is
+    JG to the exit, 100f:0406 JL back, 100f:040b JB back, and then LEAVE. A
+    `while c do ;` with an empty body compiles to test, jump-out, JMP back,
+    which is one jump more. }
+  repeat until ReadTimer >= Target;               { 100f:03fd .. 100f:040b }
 end;
 
 { ==========================================================================
@@ -833,7 +850,29 @@ end;
   -------------------------------------------------------------------------- }
 procedure AddFlic;
 var
-  S : String;                       { [BP-$100] }
+  { ENTER $308 IS 776 BYTES AND IT DECOMPOSES EXACTLY. Only three slots are
+    referenced -- [BP-$100], [BP-$107] and [BP-$307] -- and first-declared is
+    nearest BP, so working down from S:
+
+        [BP-$100]  S      256   the String below
+        [BP-$107]  a SEVEN-byte slot, whose base is its length byte:
+                          100f:07a8 is MOV BYTE PTR [BP-$107],1, which sets a
+                          length of 1. Seven bytes is String[6].
+        [BP-$207]  256   another String, never referenced
+        [BP-$307]  256   Turbo Pascal's temporary for the UpCaseStr result --
+                         100f:078b LEAs it before the call, so it is the
+                         compiler's, not a declaration
+
+    256 + 7 + 256 = 519 declared, plus the 256-byte result temporary, is 775,
+    and ENTER rounds it to 776. Declared with S alone this frame came out $200.
+
+    THE TWO NEW ONES ARE SIZED, NOT UNDERSTOOD. The seven-byte slot gets a
+    length of 1 and nothing writes a character into it, and the 256-byte one is
+    never touched at all. String[6] and String are what fit; what they were for
+    is not readable from this routine. }
+  S    : String;                    { [BP-$100] }
+  Ext  : String[6];                 { [BP-$107] -- length set to 1, no data }
+  Unused : String;                  { [BP-$207] -- never referenced }
 begin
   Count   := 0;                                   { 100f:0777 }
   PlayIdx := 1;                                   { 100f:077a }
@@ -841,6 +880,13 @@ begin
   LoopCnt := 1;                                   { 100f:0785 }
 
   S := UpCaseStr('lemend.flc');                   { 100f:078b .. 100f:07a3 }
+  { 100f:07a8 -- MOV BYTE PTR [BP-$107],1, ONE store and nothing else. That is
+    the length byte of Ext being set directly: `Ext := ' '` would store the
+    length AND a character, which is two. So the source writes the length and
+    leaves the content, which makes Ext a one-character string of whatever the
+    frame held. It reads as an abandoned line rather than a deliberate one, and
+    it is transcribed because the store is there. }
+  Ext[0] := #1;                                   { 100f:07a8 }
   if Count < MaxFlics then Inc(Count);            { 100f:07ad }
   Names[Count] := S;                              { 100f:07b8 .. 100f:07cd }
 end;
