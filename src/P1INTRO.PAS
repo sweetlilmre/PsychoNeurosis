@@ -22,7 +22,18 @@ procedure RunIntro;
 
 implementation
 
-uses VGA, Crt, DemoVT, P1S1, P1S2, P1S3, P1S4, P1S5;
+{ THE SCENES ARE NAMED BACKWARDS AND THAT IS THE MEASUREMENT. Do not tidy
+  this into scene order -- the clause fixes the segment layout, and 25 Aug
+  2026 segpair.py measured it both ways: in scene order SIX of the nine
+  paired segments came out transposed, our order running P1S5, P1S4,
+  FixMath, P1S3, P1S2, P1S1; as written below all nine match the original.
+  The initialised data improved with it, 420 differing bytes to 393, and
+  the first divergence moved from $0002 to $0018.
+
+  spans.py CANNOT TELL THESE APART -- 16161 against 16159 aligned, two
+  bytes of noise -- because it locates each segment by content. Read
+  segpair.py and dgimage.py for this, never the walk. }
+uses VGA, Crt, DemoVT, P1S5, P1S4, P1S3, P1S2, P1S1;
 
 procedure RunIntro;
 var

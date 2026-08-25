@@ -388,6 +388,20 @@ seen_in = "TPART6"
 state = "resolved"
 resolution = "THREE DEFECTS IN ONE ROUTINE AND ITS NEIGHBOUR, 90.8 to 95.6 percent -- part 006 is over the 95 target. ONE: SetDAC at 1118:0000 is HAND ASSEMBLER, not four Port[] writes. The original loads DX once as $03C8, does OUT, then INC DX and reuses it for all three components; Turbo Pascal emits MOV DX,imm for every constant port index and never emits INC DX, and it evaluates the value before the port where the original does the port first. 27 bytes against our 35, and the transcription is byte-identical including the 'neurosis.dat' literal that follows it. handasm.py reported `no evidence`, which is its honest answer for a 27-byte routine and not a refutation. TWO: Setup's frame is ENTER $484 and ours was $384. The original's touched slots are [BP-$02], [BP-$04], [BP-$404] and [BP-$484], and locals are allocated FIRST-DECLARED NEAREST BP -- proved on our own build, whose file record sat at [BP-$80] because it was declared first -- so the two counters come first and the file record LAST. Our block was in exactly the reverse order. The missing 256 bytes sit between J and Pal, and WHAT THEY ARE IS NOT DECIDABLE FROM THE BINARY: nothing reads the slot, so a 256-byte local and a 1024-byte Pal read 768 bytes at a time give the same frame, the same base addresses and the same push $0300. Written as a never-read local so that SizeOf(Pal) stays equal to the 768 the original pushes; the source says so. THREE: Pal is 256 THREE-BYTE RECORDS, not 768 bytes. The original addresses green and blue as [BX+DI-$403] and [BX+DI-$402] -- the component offset FOLDED INTO THE DISPLACEMENT, which is a record field. A flat Pal[I*3+1] cannot do that: TP emits INC AX and leaves the displacement at -$404. It also builds the index straight into DI where the flat form computes in AX and copies. Same 768 bytes. This is the same class as row 002 108b:1113, where part 002's palette was found to be 256 three-byte elements and part 002 scene 1's was not. NOT RE-OBSERVED. SetDAC is called 281 times per Setup and Overlay runs every frame, so this part has changed behaviourally-relevant code and the run owed under part6-confirm-r3 now covers it."
 
+[[plan.investigation]]
+name = "spans-config-missing-segments"
+finding = "spans.toml's segment list for parts 001 and 003 disagrees with what the original files' own relocations say: each is missing one segment."
+seen_in = "TPART3"
+state = "resolved"
+resolution = "BOTH OMISSIONS ARE TURBO PASCAL'S Crt, 1,568 bytes, FOLDED INTO A NEIGHBOURING USER SEGMENT. Part 003 was missing 1309, so 12f8 was measured as 1,840 bytes instead of 272; part 001 was missing 14d0, so 1491 was measured as 2,576 instead of 1,008. Read straight off each file's relocation targets, which name every segment the image refers to. Both rows added, and every part now agrees with its file. WHAT IT COST IS NOT THE HEADLINE NUMBER, and saying so matters more than the fix: part 003 moved 12127 to 12118 aligned and part 001 did not move at all, because spans.py locates a segment by content and had been aligning the Crt bytes inside the combined block anyway. The damage was to per-segment LENGTHS -- which is how it was found, segpair.py pairing the original's '073-paragraph VGA' against our 062-paragraph Crt. This is the drifted second copy the distrust list describes: it does not go quiet, it manufactures findings. Nothing in the reconstruction improved here."
+
+[[plan.investigation]]
+name = "part1-unit-order"
+finding = "part 001 is the worst part at 76.0 percent, its initialised data is 112 bytes short with 420 of 640 differing, and the note said its units were laid down in a different order without saying which."
+seen_in = "TPART1"
+state = "resolved"
+resolution = "SIX OF ITS NINE PAIRED SEGMENTS WERE OUT OF ORDER, and segpair.py named them: our located order ran P1S5, P1S4, FixMath, P1S3, P1S2, P1S1 where the original runs P1S1, P1S2, P1S3, P1S4, then a 304-byte segment we do not have yet, then P1S5, then FixMath. That is the scene list REVERSED against P1Intro's clause, the same shape as part 005's -- so naming the five scenes backwards puts them in the original's order, and it does: all nine paired segments now match. The DATA improved with it, 420 differing bytes to 393, and the first divergence moved from $0002 to $0018. THE COVERAGE WALK DID NOT MOVE -- 16161 to 16159, two bytes of noise -- which is the third part in one day where a unit-order fix was invisible to it. WHAT IS LEFT AND WHERE TO START: the original carries four zero bytes at $0018, between the 320/200 pair at $0014 and the 50 at $001c, that we do not declare, and the region is still 112 bytes short overall. The 304-byte segment at 12b2 is NOT FOUND by segpair, so it is a unit not yet written rather than one in the wrong place, and it is worth identifying before more declaration work: an absent unit displaces everything after it in DGROUP."
+
 [plan.row."001 1012:0004"]
 label = "BuildLens quadrant walk"
 investigation = "pacing"
@@ -397,6 +411,11 @@ note = "BuildLens (1012:0004, ENTER $1C) was the coverage walk's largest span in
 label = "Mosaic block sampling BASM"
 investigation = "pacing"
 note = "Scene 3's crawl: the mosaic block sampling (10e3:0148..01cb) is one hand BASM block loading ES/DS once per level and walking blocks register-only, five instructions a pixel; it had been re-expressed as Pascal Mem[] loops that reload a segment register on every one of 128,000 accesses per level. Back in verbatim, fragment @asm 001 10e3:0148 +132 locked at 132. Also recorded as a deviation: the _fpu originals' raw x87 came from a post-build patch a byte-scanner cannot reproduce safely (validated against all six variant pairs and refused), so our $N+ scenes keep TP7's emulator-interrupt encoding -- a bounded per-op cost."
+
+[plan.row."001 12b2:0000"]
+label = "a 304-byte segment segpair cannot find: a unit not yet written"
+investigation = "part1-unit-order"
+target = "R0"
 
 [plan.row."001 12c5:075e"]
 label = "Vector_Animate frame"
