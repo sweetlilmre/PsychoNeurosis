@@ -671,6 +671,12 @@ finding = "THE TARGET IS NOW 99%, RAISED FROM 95%, so six parts are short and no
 seen_in = "TPART1"
 state = "open"
 
+[[plan.investigation]]
+name = "bss-sweep-all-parts"
+finding = "THE BSS SWEEP ACROSS ALL NINE PARTS, in one struct read each and no disassembler, and it is the worklist for the 99% target. The MZ header's minalloc field is the loader's uninitialised-data request in paragraphs; the difference from the original's is the exact shortfall. Ours against theirs: 004 is 2,768 bytes SHORT -- the largest. 002 is 2,096 short. 005 is 384 bytes OVER, the only surplus. 003 is 128 short. 006 is 48 short. And 000, 001, 007 and 009 are EXACT. PART 001'S IS NOW EXACT, which is the headline: it was 16,704 bytes short at the start of the day and matches to the paragraph. AND PART 002 IS THE INSTRUCTIVE ONE: it is 2,096 bytes short of data and its coverage walk reads 99.9%. So a data shortfall does NOT necessarily show up in the code walk -- that part's code evidently makes few absolute data references, or the ones it makes fall inside the walk's short-difference tolerance. The two instruments measure different things and neither implies the other. Do not read a high walk percentage as evidence the data is right, and do not expect fixing the data to move the walk by itself; on part 001 a 16.7KB correction moved it three bytes. WHERE 004's 2,768 BYTES ARE, localised but not yet identified. dsgaps over PART4_LEMMINGS.PAS shows EVERY sprite bank tiling exactly against its declaration -- WalkBank 432, SplatBank 480, DigBank 1,326, TunnelBk 420, DeathBBk 800, DeathABk 648, BuildBank 720 -- with ONE exception: TumbleBk is declared array[1..4] of array[0..99], which is 400 bytes, and the gap from $06D2 to SplatBank at $12B8 is 3,046. So 2,646 bytes are unaccounted between them, which is most of the shortfall. There IS something in that gap: segment 1005 references $1240, which is 120 bytes below SplatBank, and nothing else in the range. So the region reads as TumbleBk, then a large undeclared block, then a 120-byte block at $1240, then SplatBank. Read what 1005 does with $1240 first -- and note 3,046 does not divide by 4, so TumbleBk simply being bigger does not explain it."
+seen_in = "TPART4"
+state = "open"
+
 [plan.row."001 1012:0004"]
 label = "BuildLens quadrant walk"
 investigation = "pacing"
@@ -1031,6 +1037,11 @@ label = "The VGA unit now matches the originals layout routine for routine"
 investigation = "pacing"
 note = "Part 002 97.2 to 97.6 percent. PaletteFadeOut belongs between PaletteDim and WaitRetrace, which is where 1436:00d6 puts it: PaletteDim ends at 00D6, the fade runs to 011A, WaitRetraces fourteen bytes follow and CopyScreen is at 0128. Declared near the end of the unit instead, CopyScreen landed at 00E4 and every far call to it from another segment differed in four bytes. EVERY ROUTINE IN THE UNIT NOW SITS AT THE ORIGINALS EXACT OFFSET - 0048, 0063, 0083, 008b, 009b, 00b3, 00d6, 0128, 0144, 015a all match. AND AN INSTRUMENT NOTE: prologue.py reports ONE routine of 82 bytes at 00D6 and there are TWO. WaitRetrace has no standard prologue so the scan cannot see it and folds it into its neighbours extent. The tell is the call 011A inside that extent - a routine does not call into its own middle - and it is what turned a wrong 82 into the right 68 and 14. Part 001 gave up 7 bytes for this; net strongly positive."
 
+[plan.row."002 bss 2096"]
+label = "2,096 bytes short of data at 99.9% walk -- the instruments differ"
+investigation = "bss-sweep-all-parts"
+target = "R0"
+
 [plan.row."002 gen/P6TEXT"]
 label = "REGRESSION: the generator and the sources had drifted, and the build was failing unread"
 investigation = "pacing"
@@ -1156,6 +1167,11 @@ label = "95.6%, never had the layout treatment"
 investigation = "target-99-percent"
 target = "R0"
 
+[plan.row."004 dgroup $06D2"]
+label = "2,646 bytes unaccounted between TumbleBk and SplatBank"
+investigation = "bss-sweep-all-parts"
+target = "R0"
+
 [plan.row."004 gen/harness"]
 label = "part 004 is one paragraph of typed constants short; the harness was hiding it"
 investigation = "part4-sixteen-bytes"
@@ -1185,6 +1201,11 @@ note = "PARKED at the observer's call on 24 Aug 2026, with part 005 at 88.1% and
 label = "Scene2 motion-table build"
 investigation = "part5-386-trio"
 note = "The investigation's premise was stale: the 386 trio (SinCos/RotatePoint/Project) HAS been transcribed since the 19 Aug part-005 re-read (P5S3, verified fragments). The cost was the motion-table build in Demo_Scene2 -- loop body 1096:051a..0591, entered by the JMP at 1096:0514 -- which is 80x87 code in the original: FILD the index, FDIV by a SINGLE 180.0 at CS:$03c9, FLD the ten-byte EXTENDED Pi at CS:$03cd, then the RTL's Sin (CS:$32ad), Cos (CS:$32b2) and Round. P5S2 compiled under the $N- default, sending those calls through the software six-byte-Real RTL instead. Fixed by {$N+} on P5S2, and the reason is fidelity rather than speed: $N- emits no 80x87 instructions and therefore no emulator traps at all, so the traps in the 1994 file are positive evidence of $N+. TWO FIGURES CORRECTED HERE, both measured against bin/NEUROSIS.005 on 24 Aug 2026. The loop body carries TWELVE traps, not fourteen -- fourteen is the count for the whole of Demo_Scene2 at 1096:03d7..06b7, so the number was right with the wrong extent attached to it. And the loop makes 4,002 trig calls, not 3,424: the counter at DS:$63ca is seeded at 1096:050f and tested against $7D0 at 1096:0592, so it turns 2001 times at two calls a turn. 3,424 is not reproducible from this loop and is dropped. There is no raw 80x87 opcode anywhere in the shipped binary and there is none in ours either; both ship $E+ traps and both are executed by the emulator, since the demo never had a coprocessor. Settled independently of anyone reading a trap by building the unit both ways: $N+ aligns part 005 at 80.4%, $N- at 79.2%, so $N- moves the rebuild 137 bytes further from the 1994 file."
+
+[plan.row."005 bss +384"]
+label = "the only SURPLUS; a surplus is easier to place than a shortfall"
+investigation = "bss-sweep-all-parts"
+target = "R0"
 
 [plan.row."006 1095:0114"]
 label = "Sign has no local: the frame leaves no room for one"
