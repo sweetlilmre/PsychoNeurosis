@@ -141,32 +141,48 @@ type
   TPal768 = array[0..767] of Byte;
 
 var
+  { THE ORDER IS THE ORIGINAL'S AND THE ADDRESSES CHAIN EXACTLY. ColOfs is at
+    DS:$0172 and 402 bytes long, so it ends at $0303; SavedVol is the byte at
+    $0304; WorkScr and ScrollBuf are the two pointers at $0305 and $0309;
+    WorkSeg is the word at $030D; SideTick and HillTick are the bytes at $030F
+    and $0310; and Lem begins at $0311, 25 records of 21 bytes, ending exactly
+    where LiveCount sits at $051E. Not one byte of slack anywhere in that run.
+
+    Declared with Lem first, as this block was, ColOfs came out at $0414 instead
+    of $0172 -- 674 bytes late, which is Lem's 525 plus what follows it -- and
+    every absolute reference in the part carried the difference.
+
+    WHAT IS STILL MISSING IS THE EIGHTY BYTES BELOW ColOfs. The typed constants
+    end at $0121 and ColOfs starts at $0172, so something occupies $0122..$0171
+    and this unit does not declare it. }
+
+  { DS:$0172 -- ColumnSlideIn's per-column start offset, 201 entries. }
+  ColOfs     : array[0..200] of Integer;
+
+  { DS:$0304 -- the tracker volume as we found it. }
+  SavedVol   : Byte;
+
+  { The two screens. VirtScrSeg (VGA, DS:$CF8C here) holds the hillside and is
+    what GetPixel reads; this one is composed into each frame. DS:$0305 and
+    DS:$030D. }
+  WorkScr    : Pointer;
+
+  { DS:$0309 -- 18 rows of 341, the scroller's own bitmap. }
+  ScrollBuf  : Pointer;
+
+  WorkSeg    : Word;
+
+  { DS:$030F and DS:$0310 -- the two background animations' counters. }
+  SideTick   : Byte;
+  HillTick   : Byte;
+
   { DS:$0311 }
   Lem        : array[1..MaxLem] of TLem;
   { DS:$051E and DS:$0520 }
   LiveCount  : Integer;
   Spawned    : Integer;
 
-  { The two screens. VirtScrSeg (VGA, DS:$CF8C here) holds the hillside and is
-    what GetPixel reads; this one is composed into each frame. DS:$0305 and
-    DS:$030D. }
-  WorkScr    : Pointer;
-  WorkSeg    : Word;
 
-  { DS:$0309 -- 18 rows of 341, the scroller's own bitmap. }
-  ScrollBuf  : Pointer;
-
-
-  { DS:$030F and DS:$0310 -- the two background animations' counters. }
-  SideTick   : Byte;
-  HillTick   : Byte;
-
-  { DS:$0304 -- the tracker volume as we found it. }
-  SavedVol   : Byte;
-
-
-  { DS:$0172 -- ColumnSlideIn's per-column start offset, 201 entries. }
-  ColOfs     : array[0..200] of Integer;
 
   { DS:$CC07 -- the scene palette, which Explode fades entries $E0..$E9 up
     towards. }
