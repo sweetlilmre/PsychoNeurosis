@@ -142,11 +142,17 @@ var
   AngX, AngY, AngZ    : Integer;   { DS:$BE9C, $BE9E, $BEA0 }
   StepX, StepY, StepZ : Integer;   { DS:$BEA2, $BEA4, $BEA6 }
 
-  { The three shape offsets, and $BEA8..$BEAD is where they go -- the only six
-    bytes the recorded addresses leave unaccounted for between StepZ and
-    XCentre. BindShapes fills them with Ofs(); the original writes the same
-    values as immediates because it knew where its own tables landed. }
-  OfsSphere, OfsCube, OfsGrid : Word;   { DS:$BEA8, $BEAA, $BEAC }
+  { SIX BYTES OF SCRATCH, and the name they used to carry was wrong. The
+    original uses $BEA8 and $BEAA as DX SPILLS -- 1139:0111 and 015b are
+    `MOV [$BEA8],DX`, 1139:0132 and 017c read it back, and 00c7/00e8 do the
+    same with $BEAA -- so they are working storage for a routine between
+    SetAngles and DrawShape, not the shape offsets this once called them.
+    $BEAC is never referenced at all.
+
+    They are still declared, because the original really has six bytes here and
+    removing them moves every variable above. What they are FOR is now read
+    correctly; what the routine that spills into them is doing is not yet. }
+  Scratch1, Scratch2, Scratch3 : Word;   { DS:$BEA8, $BEAA, $BEAC }
 
   { [transcribed] The projection centre. Morph_InitScene zeroes both before the
     first shape and they stay put for this scene. }
@@ -168,23 +174,12 @@ var
   Frames              : Integer;   { DS:$BEC2 }
   Count               : Word;      { DS:$BEC4 -- the point counter }
 
-{ --------------------------------------------------------------------------
-  SHAPE ADDRESSING
-
-  The original identifies a shape by its DGROUP offset -- $0636, $5136,
-  $63F6 -- and DrawShape/DrawMorph walk it with SI six bytes at a time.
-  Typed constants live in DGROUP here too, so Ofs() gives exactly the same
-  kind of value and the assembler below stays literal. The three compiled-in
-  offsets cannot be reused verbatim because the compiler decides where it
-  puts these arrays, but nothing else about the addressing changes.
-  -------------------------------------------------------------------------- }
-
-procedure BindShapes;
-begin
-  OfsSphere := Ofs(ShapeSphere);      { $0636 in the original }
-  OfsCube   := Ofs(ShapeCube);        { $5136 }
-  OfsGrid   := Ofs(ShapeGrid);        { $63F6 }
-end;
+{ BindShapes IS GONE. It filled three Words with Ofs() of the shape tables and
+  the original has no such routine -- the addresses it was reading are DX spills
+  (see the var block), and the original's own Scene3 gets the offsets as OFFSET
+  inside an asm block, which is both the right immediate and the reference that
+  keeps the tables in DGROUP. Removing the call took 32 bytes out and left the
+  initialised image identical. }
 
 { --------------------------------------------------------------------------
   1139:034d -- GetPalette768(var P)
@@ -909,7 +904,8 @@ end;
   wrote the store and BASM assembled it.
 
   AND IT DOES NOT CALL BindShapes. The original's first instruction is the
-  LogicalWidth store; there is no call ahead of it.
+  LogicalWidth store; there is no call ahead of it, and there is no BindShapes
+  in this unit any more either.
 
   FOR REFERENCE ONLY, the equivalent Pascal -- not what the binary does:
     LogicalWidth := 80;  SetModeX;  Set400Lines;  ModeX.BuildRowTable;
@@ -917,10 +913,6 @@ end;
     ProjScale := 256;  ViewDist := 2500; }
 procedure InitScene; assembler;
 asm
-  CALL BindShapes                { NOT in the original -- it has no call ahead
-                                   of the LogicalWidth store. Kept because
-                                   dropping it smart-links the shape tables
-                                   out and costs 8,738 bytes of DGROUP. }
   MOV  LogicalWidth, 80          { 1139:02fe  640 logical pixels per row }
   CALL SetModeX                  { 1139:0303  1192:002a, mode 13h -> Mode-X }
   CALL Set400Lines               { 1139:0308  near, and now 320x400 }
@@ -952,10 +944,13 @@ begin
     original knew where its own tables landed. Ofs() is not a compile-time
     constant, so a variable read at run time is the only alternative and it
     never matches -- same instruction LENGTH, never the same bytes.
-    BindShapes still runs and still fills OfsSphere, OfsCube and OfsGrid,
-    because removing them takes six bytes out of DGROUP that the original
-    has at $BEA8..$BEAD -- tried, and it cost 106 bytes. What those six
-    bytes really are is therefore still open; they are NOT these three. }
+    RESOLVED, AND THIS NOTE'S OWN GUESS WAS WRONG. The offsets come from
+    OFFSET inside the asm block below, which emits the same immediate AND
+    references the tables -- a literal number references nothing, and the
+    linker then drops 8,738 bytes of shape data. BindShapes is gone with its
+    three Ofs() calls; the six bytes it wrote at $BEA8..$BEAD are DX spills
+    belonging to a routine between SetAngles and DrawShape, and they are
+    declared as scratch now. See the var block. }
   { EIGHT INLINE BLOCKS, no helpers. 1139:03b4 repeats the same six
     calls eight times over; a Frame/Hold/MorphTo_ trio reads better and
     is 476 bytes of different code. Every keypress test in the original
@@ -963,9 +958,15 @@ begin
     scene -- which is why these are Exit and not a broken-out loop. }
   InitScene;
   PageOfs := PageOfsB;
-  CurShape  := $0636;
-  MorphFrom := $0636;
-  MorphTo   := $5136;
+  { OFFSET IN AN ASM BLOCK, not a literal, and it does two jobs at once. It
+    emits the same immediate the original has -- 1139:03bd..03cf -- AND it is a
+    reference to the table, which is what keeps 8,738 bytes of shape data from
+    being smart-linked out of DGROUP. A literal number references nothing. }
+  asm
+    MOV  WORD PTR CurShape,  OFFSET ShapeSphere   { 1139:03bd  $0636 }
+    MOV  WORD PTR MorphFrom, OFFSET ShapeSphere   { 1139:03c3  $0636 }
+    MOV  WORD PTR MorphTo,   OFFSET ShapeCube     { 1139:03c9  $5136 }
+  end;
   StepX := SpinX;  StepY := SpinY;  StepZ := SpinZ;
   AngX  := 0;      AngY  := 0;      AngZ  := 0;
 
