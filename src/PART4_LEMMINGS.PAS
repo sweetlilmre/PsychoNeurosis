@@ -108,7 +108,16 @@ type
                                        Turbo Pascal does when a Word meets a
                                        signed Integer. Two Integers would have
                                        stayed 16-bit. }
-    Y          : Integer;     { +2  }
+    Y          : Word;        { +2  -- UNSIGNED TOO, and UpdateAll is where it
+                                       shows: 1005:1A9D reads Y and follows it
+                                       with XOR DX,DX while 1005:1AAB reads
+                                       TrigY and follows it with CWD, so the
+                                       comparison Y = TrigY is a Word against an
+                                       Integer widened to LongInt. An earlier
+                                       pass left Y signed on the grounds that
+                                       nothing promoted around it; nothing did
+                                       in Walker, and this routine is where it
+                                       does. }
     Bounces    : Integer;     { +4  -- a second hard landing splats }
     Frame      : Integer;     { +6  -- one-based, indexes the sprite banks }
     Tick       : Integer;     { +8  -- sub-frame counter }
@@ -285,7 +294,7 @@ const
     ((7, 7, 7), (7, 7, 7), (7, 7, 7), (7, 7, 7),
      (30, 30, 30), (30, 30, 30), (30, 30, 30), (30, 30, 30));
 
-procedure SetState(S : Byte; N : Integer); forward;
+procedure SetState(N : Integer; S : Byte); forward;
 procedure Remove(N : Integer); forward;
 
 { ==========================================================================
@@ -619,7 +628,12 @@ begin
 end;
 
 { 1005:0b22 -- change state, and restart the animation. }
-procedure SetState(S : Byte; N : Integer);
+{ THE LEMMING COMES FIRST. 1005:0b22 reads the state byte from [BP+$04] and the
+  index from [BP+$06], and parameters are pushed left to right, so the one
+  nearest BP is the LAST declared -- which makes N the first parameter and the
+  state the second. Every call site had them the other way round, and that is
+  two differing instructions per call across nine routines. }
+procedure SetState(N : Integer; S : Byte);
 begin
   Lem[N].State := S;
   Lem[N].Frame := 1;
@@ -683,51 +697,55 @@ end;
   small negative offsets are. States 1 and 2 add FOUR to the frame index when
   facing left, so their banks hold the same animation twice, mirrored.
   -------------------------------------------------------------------------- }
-procedure DrawSprite(N : Integer);
-var
-  F : Integer;
+{ IT TAKES THE LEMMING, NOT ITS INDEX, and it has no locals at all. 1005:03b9
+  opens PUSH BP / MOV BP,SP with no ENTER, and every field access is
+  `LES DI, [BP+$04]` followed by `ES:[DI+n]` -- so the parameter is a four-byte
+  reference to the record and the routine reads through it. There is no F
+  either: 1005:03C7 is `IMUL DI, ES:[DI+$06], $78`, the frame read straight out
+  of the record at the point of use. A local F and an Integer index between them
+  accounted for twelve of this part's unaligned spans. }
+procedure DrawSprite(var L : TLem);
 begin
-  F := Lem[N].Frame;
-  case Lem[N].State of
+  case L.State of
     StSplat:
-      Blit(@SplatBank[F], Lem[N].X - 4, Lem[N].Y - 8, 12, 10, WorkSeg);
+      Blit(@SplatBank[L.Frame], L.X - 4, L.Y - 8, 12, 10, WorkSeg);
     StBuilder:
-      Blit(@BuildBank[F], Lem[N].X - 4, Lem[N].Y - 8, 12, 10, WorkSeg);
+      Blit(@BuildBank[L.Frame], L.X - 4, L.Y - 8, 12, 10, WorkSeg);
     StFaller:
-      if Lem[N].FallDist < 4 then
+      if L.FallDist < 4 then
       begin
-        if Lem[N].Dir < 1 then
-          Blit(@WalkBank[F + 4], Lem[N].X - 3, Lem[N].Y - 8, 6, 9, WorkSeg)
+        if L.Dir < 1 then
+          Blit(@WalkBank[L.Frame + 4], L.X - 3, L.Y - 8, 6, 9, WorkSeg)
         else
         begin
-          Blit(@WalkBank[F], Lem[N].X - 3, Lem[N].Y - 8, 6, 9, WorkSeg);
+          Blit(@WalkBank[L.Frame], L.X - 3, L.Y - 8, 6, 9, WorkSeg);
           { 1005:0467 -- the only place DrawSprite changes state, and it
             steps TWICE: MOV AX,Frame / INC AX / DIV 4 / INC AX. }
-          Lem[N].Frame := ((F + 1) mod 4) + 1;
+          L.Frame := ((L.Frame + 1) mod 4) + 1;
         end;
       end
       else
-        Blit(@TumbleBk[F], Lem[N].X - 3, Lem[N].Y - 10, 10, 10, WorkSeg);
+        Blit(@TumbleBk[L.Frame], L.X - 3, L.Y - 10, 10, 10, WorkSeg);
     StWalker:
-      if Lem[N].Dir < 1 then
-        Blit(@WalkBank[F + 4], Lem[N].X - 3, Lem[N].Y - 8, 6, 9, WorkSeg)
+      if L.Dir < 1 then
+        Blit(@WalkBank[L.Frame + 4], L.X - 3, L.Y - 8, 6, 9, WorkSeg)
       else
-        Blit(@WalkBank[F], Lem[N].X - 3, Lem[N].Y - 8, 6, 9, WorkSeg);
+        Blit(@WalkBank[L.Frame], L.X - 3, L.Y - 8, 6, 9, WorkSeg);
     StTunneller:
-      Blit(@TunnelBk[F], Lem[N].X - 8, Lem[N].Y - 9, 14, 10, WorkSeg);
+      Blit(@TunnelBk[L.Frame], L.X - 8, L.Y - 9, 14, 10, WorkSeg);
     StDeathB:
-      Blit(@DeathBBk[F], Lem[N].X - 5, Lem[N].Y - 8, 16, 10, WorkSeg);
+      Blit(@DeathBBk[L.Frame], L.X - 5, L.Y - 8, 16, 10, WorkSeg);
     StDigger:
-      Blit(@DigBank[F], Lem[N].X - 8, Lem[N].Y - 12, 17, 13, WorkSeg);
+      Blit(@DigBank[L.Frame], L.X - 8, L.Y - 12, 17, 13, WorkSeg);
     StFuse:
-      Blit(@FuseBank[F], Lem[N].X - 4, Lem[N].Y - 9, 15, 10, WorkSeg);
+      Blit(@FuseBank[L.Frame], L.X - 4, L.Y - 9, 15, 10, WorkSeg);
     StExplode:
       { 1005:05d1 -- frames 1..9 all show the first picture; only from 10
         does it start stepping the bank. }
-      if F < 10 then
-        Blit(@Explosion[1], Lem[N].X - $1F, Lem[N].Y - $30, 63, 55, WorkSeg)
+      if L.Frame < 10 then
+        Blit(@Explosion[1], L.X - $1F, L.Y - $30, 63, 55, WorkSeg)
       else
-        Blit(@Explosion[F - 8], Lem[N].X - $1F, Lem[N].Y - $30,
+        Blit(@Explosion[L.Frame - 8], L.X - $1F, L.Y - $30,
              63, 55, WorkSeg);
     StDeathA:
       begin
@@ -737,9 +755,9 @@ begin
           BackdropAnim animates at (113, 50), which is the point of it. The
           four immediates are PUSH $5F, $32, $3C, $35 in that order, and Blit
           takes them as X, Y, W, H. }
-        if F = 1 then
+        if L.Frame = 1 then
           Blit(@DeathAPic, $5F, $32, 60, 53, WorkSeg);
-        Blit(@DeathABk[F], Lem[N].X - 4, Lem[N].Y - $B, 9, 12, WorkSeg);
+        Blit(@DeathABk[L.Frame], L.X - 4, L.Y - $B, 9, 12, WorkSeg);
       end;
   end;
 end;
@@ -798,9 +816,9 @@ begin
     if (Pix = DeathAColour) or (Pix = StuckColour)
        or ((Pix > $1F) and (Pix < $2A)) then
     begin
-      if (Pix > $1F) and (Pix < $2A) then SetState(StDeathB, N);
-      if Pix = DeathAColour then SetState(StDeathA, N);
-      if Pix = StuckColour  then SetState(StStuck,  N);
+      if (Pix > $1F) and (Pix < $2A) then SetState(N, StDeathB);
+      if Pix = DeathAColour then SetState(N, StDeathA);
+      if Pix = StuckColour  then SetState(N, StStuck);
       Exit;
     end;
     if Pix in Ground then goto Stand;            { 1005:156E }
@@ -809,7 +827,7 @@ begin
   { 1005:1579 -- the loop ran out, so there is nothing under it anywhere. This
     is the code AFTER the for loop, which is why the loop's own bottom test at
     1005:1570 branches straight into it. }
-  SetState(StFaller, N);
+  SetState(N, StFaller);
   Exit;
 
 Stand:
@@ -899,7 +917,7 @@ begin
       begin
         if Lem[N].FallDist < 11 then
         begin
-          SetState(StWalker, N);
+          SetState(N, StWalker);
           { + DY_ - 1, which is nothing while DY_ is 1 -- transcribed because
             1005:0bd5 adds it. }
           Inc(Lem[N].Y, DY_ - 1);
@@ -909,10 +927,10 @@ begin
         begin
           Inc(Lem[N].Bounces);
           if Lem[N].Bounces = 2 then
-            SetState(StSplat, N)
+            SetState(N, StSplat)
           else
           begin
-            SetState(StWalker, N);
+            SetState(N, StWalker);
             Inc(Lem[N].Y, DY_ - 1);
             Lem[N].FallDist := 0;
           end;
@@ -922,7 +940,7 @@ begin
       end;
       if (Pix > $1F) and (Pix < $2A) then
       begin
-        SetState(StDeathB, N);
+        SetState(N, StDeathB);
         Exit;
       end;
     end;
@@ -1030,7 +1048,7 @@ begin
     end;
   end;
 
-  if not Hit then SetState(StWalker, N);
+  if not Hit then SetState(N, StWalker);
 end;
 
 procedure Tunneller(N : Integer);
@@ -1068,7 +1086,7 @@ begin
   if Lem[N].Frame mod 3 = 0 then
     Inc(Lem[N].X, Lem[N].Dir);
 
-  if not Hit then SetState(StWalker, N);
+  if not Hit then SetState(N, StWalker);
 end;
 
 { --------------------------------------------------------------------------
@@ -1099,7 +1117,7 @@ begin
   end;
   if Lem[N].Tick = 500 then
   begin
-    SetState(StWalker, N);
+    SetState(N, StWalker);
     Lem[N].Timer := $14;
   end;
 end;
@@ -1145,7 +1163,7 @@ begin
   if Lem[N].Tick mod 3 = 0 then
   begin
     Inc(Lem[N].Frame);
-    if Lem[N].Frame > 5 then SetState(StExplode, N);
+    if Lem[N].Frame > 5 then SetState(N, StExplode);
   end;
 end;
 
@@ -1204,21 +1222,29 @@ begin
     if Lem[N].Y > 199 then Remove(N);            { off the bottom }
     if Lem[N].Active <> 0 then
     begin
-      { 1005:1a70 -- the scripted trigger }
-      if (Lem[N].TrigX >= 0) and (Lem[N].TrigX = Lem[N].X)
-         and (Lem[N].TrigY >= 0) and (Lem[N].TrigY = Lem[N].Y) then
+      { 1005:1a7a -- the scripted trigger, and it is TWO comparisons, not four.
+        There is no test against zero anywhere in the original; the `>= 0`
+        guards this used to carry were four comparisons it does not make.
+
+        THE TRIG FIELD IS ON THE LEFT even though the binary reads Lem[N].X
+        first. For a comparison widened to LongInt Turbo Pascal evaluates the
+        RIGHT operand first: written the other way round our build emitted
+        TrigX at 1005:1A7E and X at 1005:1A8C, the reverse of the original.
+        Each side is widened because X and Y are Words and the Trig fields
+        Integers. }
+      if (Lem[N].TrigX = Lem[N].X) and (Lem[N].TrigY = Lem[N].Y) then
       begin
-        SetState(Lem[N].TrigState, N);
+        SetState(N, Lem[N].TrigState);
         Lem[N].TrigX := 0;
         Lem[N].TrigY := 0;
       end;
 
       if Lem[N].Timer > 0 then Dec(Lem[N].Timer);
-      if Lem[N].Timer = 1 then SetState(StFuse, N);
+      if Lem[N].Timer = 1 then SetState(N, StFuse);
       if Lem[N].Timer < 0 then Inc(Lem[N].Timer);
       if Lem[N].Timer = -1 then Remove(N);
 
-      DrawSprite(N);                             { 1005:1ae3 }
+      DrawSprite(Lem[N]);                        { 1005:1ae3 }
 
       case Lem[N].State of                       { 1005:1aec }
         StWalker    : Walker(N);
