@@ -41,6 +41,8 @@
 {$N+}   { six-byte Reals through the x87 }
 
 unit P6S2;
+{$I-}   { no I/O check: the original goes straight on after each file
+          call, with no near CALL to the RTL's check routine. }
 
 interface
 
@@ -240,17 +242,19 @@ end;
   -------------------------------------------------------------------------- }
 procedure Run;
 var
-  I, J     : Integer;             { [BP-2], [BP-4] }
-  ScrollY  : Integer;             { [BP-$507] }
-  Frame    : Integer;             { [BP-$509] }
-  Tile     : array[1..2] of TTile;{ [BP-$4fb] }
-  AnimSeg  : Word;                { [BP-$4fd] }
-  DGroup   : Word;                { [BP-$4ff] }
-  CelsOfs  : Word;                { [BP-$501] }
-  TileSeg  : Word;                { [BP-$503] }
-  TileOfs  : Word;                { [BP-$505] }
-  Src, Dst : Word;               { [BP-$13], [BP-$15] }
-  Pix      : Word;               { [BP-$11] }
+  I              : Integer;   { [BP-$2] }
+  J              : Integer;   { [BP-$4] }
+  Pix            : Word;   { [BP-$11] }
+  Src            : Word;   { [BP-$13] }
+  Dst            : Word;   { [BP-$15] }
+  Tile           : array[1..2] of TTile;   { [BP-$4FB] }
+  AnimSeg        : Word;   { [BP-$4FD] }
+  DGroup         : Word;   { [BP-$4FF] }
+  CelsOfs        : Word;   { [BP-$501] }
+  TileSeg        : Word;   { [BP-$503] }
+  TileOfs        : Word;   { [BP-$505] }
+  ScrollY        : Integer;   { [BP-$507] }
+  Frame          : Integer;   { [BP-$509] }
 begin
   for I := 1 to 2 do
   begin

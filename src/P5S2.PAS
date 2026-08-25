@@ -42,6 +42,8 @@
           instruction that proves it. }
 
 unit P5S2;
+{$I-}   { no I/O check: the original goes straight on after each file
+          call, with no near CALL to the RTL's check routine. }
 
 {$N+}   { FIRST, SO NOBODY HAS TO REDISCOVER IT: THERE IS NOT ONE RAW 80x87
           OPCODE IN THE SHIPPED 1994 BINARY, AND THAT IS NOT AN ARGUMENT
@@ -217,20 +219,23 @@ end;
   -------------------------------------------------------------------------- }
 procedure Shatter;
 var
-  Work    : Pointer;              { [BP-$21] -- a second 64,000-byte screen }
-  WorkSeg : Word;                 { [BP-$23] }
-  Dots    : ^TDots;               { [BP-$0e] }
-  Count   : Integer;              { [BP-2]  }
-  X, Y    : Integer;              { [BP-4], [BP-6] }
-  I       : Integer;              { [BP-8]  }
-  Step    : Integer;              { [BP-$0a] }
-  X0, X1  : Integer;              { [BP-$10], [BP-$12] }
-  Y0, Y1  : Integer;              { [BP-$14], [BP-$16] }
-  Col     : Byte;                 { [BP-$17] }
-  Denom   : Integer;              { [BP-$19] }
-  T       : Integer;              { [BP-$1b] }
-  Pass    : Integer;              { [BP-$1d] }
-  Limit   : Integer;              { [BP-$25] }
+  Count          : Integer;   { [BP-$2] }
+  X              : Integer;   { [BP-$4] }
+  Y              : Integer;   { [BP-$6] }
+  I              : Integer;   { [BP-$8] }
+  Step           : Integer;   { [BP-$A] }
+  Dots           : ^TDots;   { [BP-$E] }
+  X0             : Integer;   { [BP-$10] }
+  X1             : Integer;   { [BP-$12] }
+  Y0             : Integer;   { [BP-$14] }
+  Y1             : Integer;   { [BP-$16] }
+  Col            : Byte;   { [BP-$17] }
+  Denom          : Integer;   { [BP-$19] }
+  T              : Integer;   { [BP-$1B] }
+  Pass           : Integer;   { [BP-$1D] }
+  Work           : Pointer;   { [BP-$21] }
+  WorkSeg        : Word;   { [BP-$23] }
+  Limit          : Integer;   { [BP-$25] }
 begin
   GetMem(Work, 64000);                           { 1096:0046 }
   WorkSeg := Seg(Work^);                         { 1096:0054 }

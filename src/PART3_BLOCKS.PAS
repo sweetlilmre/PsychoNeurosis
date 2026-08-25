@@ -20,6 +20,8 @@
           never lands on an exact half), but the original's arithmetic. }
 
 unit Part3Blocks;
+{$I-}   { no I/O check: the original goes straight on after each file
+          call, with no near CALL to the RTL's check routine. }
 
 interface
 

@@ -7,6 +7,8 @@
   =========================================================================== }
 
 unit P1S3;
+{$I-}   { no I/O check: the original goes straight on after each file
+          call, with no near CALL to the RTL's check routine. }
 
 {$G+}   { 286: Mosaic_Run 10e3:00bb opens ENTER $18. }
 {$N+}   { Mosaic_Load's arithmetic is x87 -- 10e3:0075 FILD. }

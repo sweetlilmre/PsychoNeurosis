@@ -9,6 +9,8 @@
   =========================================================================== }
 
 unit P1S5;
+{$I-}   { no I/O check: the original goes straight on after each file
+          call, with no near CALL to the RTL's check routine. }
 {$A-}   { data alignment off -- measured, see the note in P2S2.PAS }
 
 {$G+}   { 286: the binary's Scene5 pushes immediates (68 00 A0 at 12c5:0a9c)

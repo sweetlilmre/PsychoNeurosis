@@ -33,6 +33,8 @@
   =========================================================================== }
 
 unit Part3Stars;
+{$I-}   { no I/O check: the original goes straight on after each file
+          call, with no near CALL to the RTL's check routine. }
 
 {$G+}   { 286: Stars_ProjectAndPlot 10b8:0000 opens ENTER 4; every framed
           routine in 10b8 does. }

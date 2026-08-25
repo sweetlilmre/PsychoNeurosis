@@ -38,6 +38,8 @@
 {$N+}   { six-byte Reals through the x87, which is what the binary uses }
 
 unit P6S1;
+{$I-}   { no I/O check: the original goes straight on after each file
+          call, with no near CALL to the RTL's check routine. }
 
 {$G+}   { 286: Whoosh_Run 100f:0590 opens ENTER $50a; every framed routine
           in the segment does. }
@@ -206,12 +208,14 @@ end;
   -------------------------------------------------------------------------- }
 procedure Whoosh(S : String);
 var
-  PathSeg, PathOfs : Word;        { [BP-$10a], [BP-$10c] }
-  DotSeg,  DotOfs  : Word;        { [BP-$10e], [BP-$110] }
-  Len              : Integer;     { [BP-$112] }
-  CharIdx          : Integer;     { [BP-$106] }
-  Pass             : Integer;     { [BP-$108] }
-  Lane             : Integer;     { [BP-$102] }
+  Lane           : Integer;   { [BP-$102] }
+  CharIdx        : Integer;   { [BP-$106] }
+  Pass           : Integer;   { [BP-$108] }
+  PathSeg        : Word;   { [BP-$10A] }
+  PathOfs        : Word;   { [BP-$10C] }
+  DotSeg         : Word;   { [BP-$10E] }
+  DotOfs         : Word;   { [BP-$110] }
+  Len            : Integer;   { [BP-$112] }
   Idx              : Word;        { SI in the original }
 begin
   PathSeg := Seg(Path^);   PathOfs := Ofs(Path^);    { 1095:0698 }

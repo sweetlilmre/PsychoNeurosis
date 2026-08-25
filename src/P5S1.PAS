@@ -39,6 +39,8 @@
           which pushes every routine here seven bytes out of step. }
 
 unit P5S1;
+{$I-}   { no I/O check: the original goes straight on after each file
+          call, with no near CALL to the RTL's check routine. }
 
 interface
 

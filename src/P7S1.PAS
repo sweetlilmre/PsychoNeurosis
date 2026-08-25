@@ -579,11 +579,11 @@ end;
   -------------------------------------------------------------------------- }
 procedure Calibrate;
 var
-  Acc  : LongInt;                   { [BP-6] }
-  I    : Integer;                   { [BP-2] }
-  T0   : LongInt;                   { [BP-$0e] }
-  T1   : LongInt;                   { [BP-$12] }
-  Junk : LongInt;                   { [BP-$0a] -- computed, never read }
+  I              : Integer;   { [BP-$2] }
+  Acc            : LongInt;   { [BP-$6] }
+  Junk           : LongInt;   { [BP-$A] }
+  T0             : LongInt;   { [BP-$E] }
+  T1             : LongInt;   { [BP-$12] }
 begin
   asm
     MOV  AL, 34h           { 100f:0321  counter 0, both bytes, mode 2, binary}
@@ -817,11 +817,11 @@ end;
   -------------------------------------------------------------------------- }
 procedure PlayAll;
 var
-  Done  : Boolean;                  { [BP-3] }
-  Outer : Boolean;                  { [BP-2] -- cleared, never set }
-  Abort : Boolean;                  { [BP-1] }
-  Left  : Integer;                  { [BP-5] }
-  Res   : Integer;                  { [BP-7] }
+  Abort          : Boolean;   { [BP-$1] }
+  Outer          : Boolean;   { [BP-$2] }
+  Done           : Boolean;   { [BP-$3] }
+  Left           : Integer;   { [BP-$5] }
+  Res            : Integer;   { [BP-$7] }
 begin
   Outer := False;                                 { 100f:07d8 }
   repeat

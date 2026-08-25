@@ -37,6 +37,8 @@
 {$N+}   { the spark and the palette ramp go through the x87 }
 
 unit P6S3;
+{$I-}   { no I/O check: the original goes straight on after each file
+          call, with no near CALL to the RTL's check routine. }
 
 interface
 
@@ -182,19 +184,35 @@ end;
   there is black. The fast one moves half a pixel a frame on both axes; the
   slow one 0.1 across and 0.2 down.
   -------------------------------------------------------------------------- }
-procedure SparkStep(DX_, DY_ : Real);
-var X, Y : Integer;
+procedure SparkHalf;
 begin
-  X := Round(SparkX);  Y := Round(SparkY);       { 1118:021d }
-  if GetPixel(X, Y, VGASeg) = SparkCol then      { 1118:023c }
-    PutPixel(X, Y, 0, VGASeg);                   { 1118:0276 }
-  SparkX := SparkX - DX_;                        { 1118:028c }
-  SparkY := SparkY + DY_;                        { 1118:02b2 }
-  X := Round(SparkX);  Y := Round(SparkY);
-  if GetPixel(X, Y, VGASeg) = 0 then             { 1118:02f6 }
-    PutPixel(X, Y, SparkCol, VGASeg);            { 1118:0330 }
+  { NO PARAMETERS AND NO LOCALS. 1118:020a takes nothing and rounds SparkX
+    and SparkY twice over -- once for the GetPixel and again for the PutPixel
+    inside the same `if`. Caching them in two Integers, and sharing one routine
+    between the two speeds with the velocity as a parameter, is the obvious way
+    to write this and is not what the binary does. }
+  if GetPixel(Round(SparkX), Round(SparkY), VGASeg) = SparkCol then
+    PutPixel(Round(SparkX), Round(SparkY), 0, VGASeg);
+  SparkX := SparkX - 0.5;
+  SparkY := SparkY + 0.5;
+  if GetPixel(Round(SparkX), Round(SparkY), VGASeg) = 0 then
+    PutPixel(Round(SparkX), Round(SparkY), SparkCol, VGASeg);
 end;
 
+procedure SparkSlow;
+begin
+  { NO PARAMETERS AND NO LOCALS. 1118:034b takes nothing and rounds SparkX
+    and SparkY twice over -- once for the GetPixel and again for the PutPixel
+    inside the same `if`. Caching them in two Integers, and sharing one routine
+    between the two speeds with the velocity as a parameter, is the obvious way
+    to write this and is not what the binary does. }
+  if GetPixel(Round(SparkX), Round(SparkY), VGASeg) = SparkCol then
+    PutPixel(Round(SparkX), Round(SparkY), 0, VGASeg);
+  SparkX := SparkX - 0.1;
+  SparkY := SparkY + 0.2;
+  if GetPixel(Round(SparkX), Round(SparkY), VGASeg) = 0 then
+    PutPixel(Round(SparkX), Round(SparkY), SparkCol, VGASeg);
+end;
 { --------------------------------------------------------------------------
   1118:0486 -- the title sequence.
 
@@ -247,7 +265,7 @@ begin
     V := (Round(X / 20.0) div 2) * $3C;
     SetRGB(Track, V, 0, 0);
     Delay(10);
-    SparkStep(0.5, 0.5);                         { 1118:0670 }
+    SparkHalf;                         { 1118:0670 }
   end;
 
   for X := $A9 downto $A0 do                     { 1118:067d }
@@ -259,7 +277,7 @@ begin
     V := (Round(X / 40.0) div 2) * $3C;          { 1118:071a }
     SetRGB(Track, V, 0, 0);
     Delay(5);                                    { 1118:0754 }
-    SparkStep(0.1, 0.2);                         { 1118:0759 }
+    SparkSlow;                         { 1118:0759 }
   end;
 
   for X := $9F downto -$1E do                    { 1118:0766 }
@@ -270,12 +288,12 @@ begin
     SetRGB(Flick3, 0, 0, Random($40));
     V := (Round(X / 40.0) div 2) * $3C;
     SetRGB(Track, V, 0, 0);
-    SparkStep(0.1, 0.2);                         { 1118:083b }
+    SparkSlow;                         { 1118:083b }
   end;
 
   for I := 1 to $1F4 do                          { 1118:0847 }
   begin
-    SparkStep(0.1, 0.2);                         { 1118:0851 }
+    SparkSlow;                         { 1118:0851 }
     Delay(2);                                    { 1118:0856 }
   end;
 

@@ -43,6 +43,8 @@
           rotate-and-sample below will not assemble without this. }
 
 unit Part3Sprites;
+{$I-}   { no I/O check: the original goes straight on after each file
+          call, with no near CALL to the RTL's check routine. }
 
 interface
 
@@ -562,9 +564,9 @@ end;
   -------------------------------------------------------------------------- }
 procedure Run;
 var
+  X              : Integer;   { [BP-$4] }
+  Sweep          : Integer;   { [BP-$6] }
   Angle : array[1..NumSprites] of Integer;   { [BP-$10] .. [BP-8] }
-  X     : Integer;                           { [BP-4] }
-  Sweep : Integer;                           { [BP-6] }
 begin
   X := BaseX;                                    { 125e:0782 }
   { [BP-6] is also set to 100 here (125e:0787) and never read -- the sweep
