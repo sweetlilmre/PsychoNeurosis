@@ -127,7 +127,24 @@ type
   TFont = array[0..FontChars - 1, 1..8, 1..8] of Byte;
 
 var
-  F : file;                       { DS:$5AD2 -- unit-level, see Load }
+  { DS:$5AD2 -- unit-level, see Load. THIS ADDRESS IS THE MEASUREMENT THAT SAYS
+    part 001 is data-blocked, and it is worth writing down because every span in
+    segment 1107 turns on it. The routine's CODE now matches -- same calls, same
+    order, no I/O check -- and the two operands differ: the original pushes
+    DS:$5AD2 for the file and DS:$5B6A for the buffer, this build $0952 and
+    $354C. The two gaps are 20,864 and 9,758, and their being DIFFERENT rules
+    out a uniform shift: it is the sizes of what comes before, not a single
+    missing block.
+
+    Where it comes from is partly mapped. This part's DGROUP order is right --
+    reverse of P1Intro's uses clause puts P1S5 first, and P1S5's constants are
+    at $001C and $01A8 exactly as recorded. But P1S5's VARIABLES are at
+    $A5B6..$AB58 in the original, and nothing declared in that unit accounts for
+    the distance. The load image is 1,536 bytes BIGGER here than the original's
+    while the BSS is 23,520 bytes SMALLER, so there is initialised data here
+    that belongs in BSS and a large block of variables that is missing
+    altogether. }
+  F : file;
   { DS:$5BCC -- entry 0 is the translation, 1..144 are the grid. }
   Trail : array[0..LastEntry] of TTrail;
   { DS:$632F, stride 7 }
