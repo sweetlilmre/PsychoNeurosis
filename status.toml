@@ -429,6 +429,13 @@ seen_in = "TPART3"
 state = "resolved"
 resolution = "THE COLOUR TABLES ARE ONE-BASED, and the subscript fold is what says so. 88.1 to 89.0 percent. 1015:018d computes Band*BandSize + 1 into DI and folds +1 into the displacement, which is base $0002 minus a low bound of 1. A 0-based table gives DI = Band*BandSize and a displacement of 2, which is what ours emitted. TColourTable and RotTmp are array[1..N], every subscript shifted by one -- 99 of them -- and band b is then b*15+1..b*15+15, which is also how the fifteen unrolled moves read naturally. Worth 87 bytes. RotateBandsFine is now byte-identical for its whole first band except one displacement. A SECOND FINDING FROM THE SAME ROUTINE: the store went through [DI+$A7EF] where ours used [DI+$A7DB], and chasing that 20-byte gap gave this unit's variable ORDER, read straight off the addresses. 1015:088d pushes [$A7DE] then [$A7E0] as SetDisplayStart's two parameters, so PanX and PanY come FIRST; Angle's three words are $A7E2, $A7E4, $A7E6; Radius is $A7E8..$A7ED; and RotTmp[1] is at $A7F0. Ours had Angle and Radius first and RotTmp before them. Reordering was worth another 33 bytes and took the shift from +9 to -2. UNRESOLVED, AND THE RESIDUAL IS EXACTLY TWO BYTES. Our PanX lands at $A7DC where the original's is $A7DE, so this unit wants two more bytes BEFORE PanX, and it cannot simply be given them. Measured both placements: a Word below PanX fixed every address in the unit and pushed PART3_STARS' variables up by 2 -- its base was already right -- costing 569 bytes of the walk; a Word between Radius and RotTmp left the -2 untouched and cost the same 569. So the two bytes are a REDISTRIBUTION inside this unit rather than an addition: something declared here is two bytes larger than the original's. YOffset at 800 entries and PlaneOf at LogWidth are the candidates and NEITHER HAS BEEN CHECKED against the binary. That is the next step, and it comes before adding any declaration. The source carries this note at the var block. Not re-observed. The rotation runs every frame of scene 1, so this is live code, but the behaviour is unchanged -- the same fifteen bytes move the same way."
 
+[[plan.investigation]]
+name = "part3-var-base"
+finding = "part 003's variables sit two bytes below the original's, and Tunnel's own declarations do not explain it -- a Word added anywhere in the unit cost 569 bytes of the coverage walk."
+seen_in = "TPART3"
+state = "resolved"
+resolution = "IT IS TWO SEPARATE THINGS, AND ONE OF THEM IS THE MEASURING APPARATUS. 89.0 to 89.1 percent. InitTables settled the sizes that were in doubt: 1015:0662 loops while [BP-2] != $31F, so YOffset really is 800 entries, and 1015:06a7 tests $27F, so PlaneOf really is 640. Both were already right. PlaneOf's base is $A55E and 640 bytes later is $A7DE, which IS PanX -- so there is NO missing gap before PanX, and that half of the puzzle is closed by refutation. The same routine did yield a defect: the plane counter is a BYTE at [BP-3], not a Word. 1015:0685 reads it MOV AL / XOR AH,AH / MOV DX,AX before the shift count reaches CX, and 1015:069a..06a3 increments, compares and resets it with INC BYTE PTR / CMP BYTE PTR / MOV BYTE PTR. A Word loads straight into CX and costs three instructions less, which is what ours did. Worth 26 bytes. THE REMAINING -2 IS THE HARNESS. Our YOffset base is $9F1C against the original's $9F1E. Typed constants end at $9F19 in both; ours then carries 0D 0A at $9F1A where the original has 00 00, because the original writes no text. The uninitialised region begins where the initialised one ENDS, not where its paragraph padding ends, so those two bytes move every variable in the part. Part 006 proves it independently: +2 is the ONLY shift dsmap reports there and the same two bytes are its only image difference. NOT FIXABLE BY WRITING DIFFERENTLY -- replacing every WriteLn(s) with Write(s, #13, #10) leaves the same two bytes at the same address, measured. Recorded in docs/23-deviations.md and corrected in dgimage.py's docstring, which had claimed for weeks that these bytes displace nothing. WHAT IS STILL OWED HERE: the original has FOUR bytes of variables between the end of its typed constants at $9F1A and YOffset at $9F1E, and we have none. Whose they are is unknown. Net of the harness's +2 that is the -2 still reported. Find the owner before declaring anything: an addition in the wrong unit cost 569 bytes twice."
+
 [plan.row."001 1012:0004"]
 label = "BuildLens quadrant walk"
 investigation = "pacing"
@@ -612,6 +619,16 @@ target = "R0"
 [plan.row."003 1015:0191"]
 label = "Tunnel's var ORDER: PanX, PanY, Angle, Radius, then RotTmp"
 investigation = "part3-onebased-tables"
+target = "R0"
+
+[plan.row."003 1015:0654"]
+label = "InitTables: the plane counter is a Byte; the array sizes were right"
+investigation = "part3-var-base"
+target = "R0"
+
+[plan.row."003 1015:0662"]
+label = "the -2 var base is the harness's two bytes plus four missing elsewhere"
+investigation = "part3-var-base"
 target = "R0"
 
 [plan.row."003 1015:06b0"]

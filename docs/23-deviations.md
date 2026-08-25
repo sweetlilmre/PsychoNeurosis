@@ -149,6 +149,7 @@ than in the scene:
 - **`TP3S6`** shows the wrong colours run on its own. `PART3_WAVES` sets no
   palette and neither does the binary: the scene inherits the blue ramp scene 5
   leaves behind. It looks right under `TPART3`.
+- **A harness that writes text costs two bytes of DGROUP, and they move every variable in the part by two.** Ours have `0D 0A` at the end of the initialised region where the originals, which write nothing, have `00 00` — visible on parts 003, 005 and 006 as `dgimage.py`'s "2 byte(s) differ". The uninitialised region begins where the initialised one ENDS rather than where its paragraph padding ends, so the whole variable block sits two bytes high. Part 006 shows it cleanly: `+2` is the only shift `dsmap.py` reports there, across every variable. **It is not `WriteLn` and it cannot be written around** — replacing every `WriteLn(s)` with `Write(s, #13, #10)` leaves the same two bytes at the same address, measured 25 Aug 2026. So this is accepted rather than fixed: subtract two before reading a variable shift on those parts. It is worth naming because on part 003 it netted against four bytes of genuinely missing variables and produced a `-2` that reads like a declaration defect and is half apparatus.
 - **Every harness installs an `ExitProc`** that puts the adapter back into
   80x25 text (BIOS mode 3). The scenes and the part drivers are left exactly as
   the binaries have them — several of them do not restore text mode, and each

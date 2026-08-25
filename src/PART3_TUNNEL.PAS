@@ -222,7 +222,13 @@ end;
   -------------------------------------------------------------------------- }
 procedure InitTables;
 var
-  I, P : Word;
+  I : Word;      { [BP-2] }
+  P : Byte;      { [BP-3] -- a BYTE, and the widening is the proof: 1015:0685
+                   reads it with MOV AL / XOR AH,AH / MOV DX,AX before the
+                   shift count reaches CX, and 1015:069a..06a3 increments and
+                   compares it with the byte forms INC BYTE PTR / CMP BYTE PTR
+                   / MOV BYTE PTR. A Word here loads straight into CX and
+                   costs three instructions less, which is what ours did. }
 begin
   for I := 0 to 799 do
     YOffset[I] := I * BytesPerRow;
