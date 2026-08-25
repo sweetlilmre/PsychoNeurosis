@@ -136,7 +136,14 @@ const
     transcription would no longer match. The values are the ones read out of
     part 002's copy of this same unit. }
   PosField  : Word = $0125;      { the song position, a LongInt }
-  SyncField : Word = $0203;      { flag, then two values }
+  SyncField : Word = $0203;      { the sync FLAG }
+  { The two values the note above means by "flag, then two values". They were
+    missing, and the offsets recorded above are what say so: $0292 to $0298 is
+    six bytes, three words, and only two were declared -- which left VolField
+    at $0294 and every field after this unit's data two bytes low. Part 003's
+    image carries all five in a row: 25 01 03 02 04 02 05 02 06 02. }
+  SyncValue1 : Word = $0204;
+  SyncValue2 : Word = $0205;
   VolField  : Word = $0206;      { the volume byte }
 
 var

@@ -40,13 +40,21 @@ interface
 const
   RowCount = 800;                       { $320 -- the table 107c:0000 fills }
 
+const
+  { DS:$0002 here, DS:$76B6 in part 003 -- the CRTC Offset value and the
+    multiplier BuildRowTable uses. A TYPED constant, so the compiled-in $50 is
+    in the file image and the code can still write over it: Demo_Scene1 stores
+    $A0 (1008:0727) to make that scene's canvas 1280 wide, and part 003's
+    InitScene writes $50 back.
+
+    Declared `var` it was in BSS and stored NOTHING, which left a two-byte hole
+    between the morph unit's shape tables and the sprite unit's captions and
+    put every variable behind it two bytes low. `var` against `const X : T = v`
+    is not variable against constant -- it is uninitialised against
+    initialised, and both are writable. }
+  LogicalWidth : Byte = $50;
+
 var
-  { DS:$0002 -- the CRTC Offset value, and the multiplier BuildRowTable uses.
-    It is INITIALISED DATA: the compiled-in value is $50, which is a 640-pixel
-    canvas. Demo_Scene1 stores $A0 over it (1008:0727) before calling in, which
-    is what makes the canvas 1280 wide for that scene. It has to be a variable,
-    not a constant, because the compiled-in default is the other value. }
-  LogicalWidth : Byte;
   { DS:$4B08 -- RowOfs[I] = LogicalWidth * I * 2. }
   RowOfs : array[0..RowCount - 1] of Word;
 

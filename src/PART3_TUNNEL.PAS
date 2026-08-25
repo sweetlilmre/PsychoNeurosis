@@ -31,6 +31,12 @@
   =========================================================================== }
 
 unit Part3Tunnel;
+{$A-}   { DATA ALIGNMENT OFF, and the palette's own recorded addresses say so:
+          the three 225-byte tables sit at DS:$0002, $00E3 and $01C4 in the
+          original -- ODD offsets, one after another with no gap. Under TP7's
+          $A+ default each odd-sized typed constant gets a pad byte, which put
+          Blue at $01C6 and everything after it two bytes out for the whole
+          part: CollapseFrames, the sine table, all six shape slots. }
 
 {$G+}   { 286: Demo_Scene1 1015:098d opens ENTER 2; every framed routine
           in 1015 does. }
