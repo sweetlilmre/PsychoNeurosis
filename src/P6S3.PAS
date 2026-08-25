@@ -357,10 +357,23 @@ end;
   -------------------------------------------------------------------------- }
 procedure Run(Segment : Word);
 var
-  Frame : Integer;                { [BP-7] }
-  I     : Integer;                { [BP-2] }
+  { FOUR DECLARATIONS AND AN x87 TEMPORARY, in ten bytes. 1118:08d3 touches
+    [BP-$02] four times, [BP-$04] twice, [BP-$05] once, [BP-$07] five times and
+    [BP-$08] once -- and the last of those is `MOV AH,[BP-$08] / SAHF` at
+    1118:091E, which is the high half of an FPU status word the compiler stored
+    at [BP-$09]. So the declarations run $02, $04, $05, $07 and the two bytes
+    below them are the code generator's.
+
+    [BP-$05] is written once, with a zero, at 1118:08DC and never read again --
+    so the source assigns it and the value goes nowhere. Frame is initialised
+    first and it second, which is the order below. }
+  I     : Integer;                { [BP-$02] }
+  Tmp   : Integer;                { [BP-$04] }
+  Unread : Byte;                  { [BP-$05], assigned 0 and never read }
+  Frame : Integer;                { [BP-$07] }
 begin
-  Frame := 0;
+  Frame  := 0;
+  Unread := 0;                                   { 1118:08DC }
   Overlay(Segment);                              { 1118:08e3 }
   CopyScreen(Segment, VGASeg);                   { 1118:08ec }
   Title;                                         { 1118:08f1 }
