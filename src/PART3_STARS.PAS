@@ -103,9 +103,18 @@ var
   { DS:$B250. 500 six-byte records read straight off the DAT. The walk is
     Waypoints[50] down to Waypoints[1], and it reads Waypoints[0] once on the
     way out -- see RunScene -- so the array starts at zero. }
+  { [0..500] and NOT [1..500], which was tried and measured WORSE. The offsets
+    argue for 500 records: the table is at DS:$B250 and PanY at $BE08, which is
+    3,000 bytes, and DataSize says 3000 three lines above. Making it so moved
+    the morph unit's variables from 4 bytes low to 10, so a zeroth entry is
+    there and SOMETHING ELSE in this unit is six bytes short. The argument is
+    good and the measurement disagrees with it; the measurement wins until the
+    other six bytes are found. }
   Waypoints    : array[0..NumWaypoints] of TWaypoint;
 
-  PanX, PanY   : Integer;                               { DS:$BE0A, DS:$BE08 }
+  { PanY FIRST: the recorded addresses put it at $BE08 and PanX at $BE0A, so
+    the lower of the two was declared second. }
+  PanY, PanX   : Integer;                               { DS:$BE08, DS:$BE0A }
   DisplayCount : Integer;                               { DS:$BE0C }
   WaypointIdx  : Integer;                               { DS:$BE0E }
 
