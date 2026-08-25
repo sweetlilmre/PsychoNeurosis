@@ -94,7 +94,9 @@ const
   GlyphCols   = 21;
   FirstChar   = 32;           { the font starts at space }
   GlyphCount  = 62;           { 23436 / 378 -- space to ']' }
-  TextLen     = $ED;          { 237 -- ScrollStep's own bound }
+  TextLen     = $EC;          { 236 -- and 1005:08C7 compares ScrollIdx against
+                                exactly this, so the message is 236 characters
+                                indexed from ONE, not 237 indexed from zero }
 
   DataOfs     = $001228CE;    { NEUROSIS.DAT -- 1,189,070 }
 
@@ -162,10 +164,6 @@ var
   { DS:$0304 -- the tracker volume as we found it. }
   SavedVol   : Byte;
 
-  { DS:$0002 -- a 32-bit count of frames drawn, bumped by MainLoop with
-    ADD [0002],1 / ADC [0004],0. NOTHING IN PART 004 EVER READS IT, and it is
-    kept because the original keeps it. }
-  FrameCount : LongInt;
 
   { DS:$0172 -- ColumnSlideIn's per-column start offset, 201 entries. }
   ColOfs     : array[0..200] of Integer;
@@ -285,11 +283,21 @@ const
   black into $80..$87 and the belt simply is not there.
   -------------------------------------------------------------------------- }
 
-{ DS:$0005 -- the message, compiled into DGROUP. Element 0 is a zero byte and
-  ScrollStep indexes from 1; the $ED bound it tests is exactly this length. }
+{ DS:$0006 -- the message, compiled into DGROUP, and ONE-BASED with no leading
+  zero. The two images' DGROUPs settle it byte for byte: the original opens
+  `00 00 00 00 00 00 20` and ours opened `00 00 00 20`. Six zeros then the
+  leading space means two bytes, then FrameCount's four, then the text at
+  $0006 -- so FrameCount is a TYPED CONSTANT in the initialised region and not
+  a `var` in BSS, and the message has 236 characters rather than 237 with a #0
+  in front. }
 const
-  Message : array[0..TextLen - 1] of Char = (
-    #0,
+  { DS:$0002 -- a 32-bit count of frames drawn, bumped by MainLoop with
+    ADD [0002],1 / ADC [0004],0. NOTHING IN PART 004 EVER READS IT, and it is
+    kept because the original keeps it -- as initialised data, which is the
+    only way it reaches $0002 at all. }
+  FrameCount : LongInt = 0;                      { DS:$0002 }
+
+  Message : array[1..TextLen] of Char = (
     ' ','F','O','R',' ','T','H','O','S','E',' ','O','F',' ','Y','O','U',' ',
     'T','H','A','T',' ','R','E','A','L','L','Y',' ','H','A','T','E',' ','L',
     'O','N','G',',',' ','B','O','R','I','N','G',' ','S','C','R','O','L','L',
@@ -308,9 +316,16 @@ const
 const
   ScrollCol  : Integer = 0;                      { DS:$00F2 }
   ScrollIdx  : Byte    = 1;                      { DS:$00F4 }
-  ScrollPal  : array[0..7, 0..2] of Byte =       { DS:$00F5 }
-    ((7, 7, 7), (7, 7, 7), (7, 7, 7), (7, 7, 7),
-     (30, 30, 30), (30, 30, 30), (30, 30, 30), (30, 30, 30));
+  { FLAT AND ONE-BASED, not eight triples. Every reference computes the index
+    at run time from a single byte counter -- 1005:098D is MOV SI,AX / SHL AX,1
+    / ADD AX,SI / INC AX, which is `Last * 3 + 1` -- against a base displacement
+    of $00F4, and $00F4 with a low bound of 1 is this array's own $00F5. A
+    two-dimensional array folds the second subscript into the displacement
+    instead, and MainLoop's fade then needs three statements where the original
+    has one loop over all twenty-four bytes. }
+  ScrollPal  : array[1..24] of Byte =            { DS:$00F5 }
+    (7, 7, 7,  7, 7, 7,  7, 7, 7,  7, 7, 7,
+     30, 30, 30,  30, 30, 30,  30, 30, 30,  30, 30, 30);
 
 procedure SetState(N : Integer; S : Byte); forward;
 procedure Remove(N : Integer); forward;
@@ -610,7 +625,7 @@ begin
   { THE SPACE ARM COMES FIRST. 1005:08CC is CMP/JBE, which jumps to the message
     arm and falls through to the space, so the test is `ScrollIdx > TextLen - 1`
     with the space as the THEN. }
-  if ScrollIdx > TextLen - 1 then                { 1005:08C7 }
+  if ScrollIdx > TextLen then                   { 1005:08C7 -- CMP AL,$EC }
     ScrollChar(Ord(' '), ScrollCol)
   else
     ScrollChar(Ord(Message[ScrollIdx]), ScrollCol);
@@ -625,20 +640,20 @@ begin
 
   { 1005:093f -- rotate the eight-entry cycle and show it. The original does
     the whole thing TWICE per frame, so the colours run at double speed. }
-  Last := ScrollPal[7, 2];                       { 1005:094D }
-  Move(ScrollPal[0, 0], ScrollPal[1, 0], 21);    { 1005:0953 }
-  FillChar(ScrollPal[0, 0], 3, Last);            { 1005:0964 }
+  Last := ScrollPal[24];                       { 1005:094D }
+  Move(ScrollPal[1], ScrollPal[4], 21);    { 1005:0953 }
+  FillChar(ScrollPal[1], 3, Last);            { 1005:0964 }
   for Last := 0 to 7 do                          { 1005:0974 -- the same byte }
-    SetRGB($80 + Last, ScrollPal[Last, 0], ScrollPal[Last, 1],
-           ScrollPal[Last, 2]);
+    SetRGB($80 + Last, ScrollPal[Last * 3 + 1],
+           ScrollPal[Last * 3 + 1 + 1], ScrollPal[Last * 3 + 1 + 1 + 1]);
 
   { and again, written out rather than looped }
-  Last := ScrollPal[7, 2];
-  Move(ScrollPal[0, 0], ScrollPal[1, 0], 21);
-  FillChar(ScrollPal[0, 0], 3, Last);
+  Last := ScrollPal[24];
+  Move(ScrollPal[1], ScrollPal[4], 21);
+  FillChar(ScrollPal[1], 3, Last);
   for Last := 0 to 7 do
-    SetRGB($80 + Last, ScrollPal[Last, 0], ScrollPal[Last, 1],
-           ScrollPal[Last, 2]);
+    SetRGB($80 + Last, ScrollPal[Last * 3 + 1],
+           ScrollPal[Last * 3 + 1 + 1], ScrollPal[Last * 3 + 1 + 1 + 1]);
 end;
 
 { ==========================================================================
@@ -1275,7 +1290,12 @@ begin
   Lem[N].Tick := (Lem[N].Tick mod 5) + 1;
   if Lem[N].Tick mod 3 = 0 then
   begin
-    Inc(Lem[N].Frame);
+    { WRITTEN OUT, NOT Inc(). 1005:1988 computes the address, LOADS the frame,
+      INCs the register and computes the address a second time to store it --
+      five instructions where `Inc` gives one `INC WORD PTR [DI+n]`. Faller's
+      Inc(Lem[N].Bounces) really is the short form at 1005:0BE2, so the two
+      spellings are both in the original and this is the long one. }
+    Lem[N].Frame := Lem[N].Frame + 1;            { 1005:1988 }
     if Lem[N].Frame < 10 then
       for Pass := 1 to 5 do
         for C := $E0 to $E9 do
@@ -1614,13 +1634,14 @@ begin
     if KeyPressed or (LiveCount = 0) then        { 1005:1C46 }
     begin
       FadeStep;
-      { 1005:1C5B -- fade the scroller's colour cycle out with it }
-      for I := 0 to 7 do
-      begin
-        if ScrollPal[I, 0] <> 0 then Dec(ScrollPal[I, 0]);
-        if ScrollPal[I, 1] <> 0 then Dec(ScrollPal[I, 1]);
-        if ScrollPal[I, 2] <> 0 then Dec(ScrollPal[I, 2]);
-      end;
+      { 1005:1C2E -- fade the scroller's colour cycle out with it, and it is
+        ONE loop over all twenty-four bytes rather than eight passes of three:
+        1005:1C38 indexes [DI+$F4] with DI the counter itself, no multiply, and
+        1005:1C49 compares it against $18. }
+      for I := 1 to 24 do
+        { `> 0`, not `<> 0`: 1005:1C40 is JBE, which is what an unsigned
+          greater-than gives; a not-equal gives JE. }
+        if ScrollPal[I] > 0 then Dec(ScrollPal[I]);
 
       V := GetVolume;
       if V = 0 then Done := True else SetVolume(V - 1);
