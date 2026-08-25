@@ -436,6 +436,12 @@ seen_in = "TPART3"
 state = "resolved"
 resolution = "IT IS TWO SEPARATE THINGS, AND ONE OF THEM IS THE MEASURING APPARATUS. 89.0 to 89.1 percent. InitTables settled the sizes that were in doubt: 1015:0662 loops while [BP-2] != $31F, so YOffset really is 800 entries, and 1015:06a7 tests $27F, so PlaneOf really is 640. Both were already right. PlaneOf's base is $A55E and 640 bytes later is $A7DE, which IS PanX -- so there is NO missing gap before PanX, and that half of the puzzle is closed by refutation. The same routine did yield a defect: the plane counter is a BYTE at [BP-3], not a Word. 1015:0685 reads it MOV AL / XOR AH,AH / MOV DX,AX before the shift count reaches CX, and 1015:069a..06a3 increments, compares and resets it with INC BYTE PTR / CMP BYTE PTR / MOV BYTE PTR. A Word loads straight into CX and costs three instructions less, which is what ours did. Worth 26 bytes. THE REMAINING -2 IS THE HARNESS. Our YOffset base is $9F1C against the original's $9F1E. Typed constants end at $9F19 in both; ours then carries 0D 0A at $9F1A where the original has 00 00, because the original writes no text. The uninitialised region begins where the initialised one ENDS, not where its paragraph padding ends, so those two bytes move every variable in the part. Part 006 proves it independently: +2 is the ONLY shift dsmap reports there and the same two bytes are its only image difference. NOT FIXABLE BY WRITING DIFFERENTLY -- replacing every WriteLn(s) with Write(s, #13, #10) leaves the same two bytes at the same address, measured. Recorded in docs/23-deviations.md and corrected in dgimage.py's docstring, which had claimed for weeks that these bytes displace nothing. WHAT IS STILL OWED HERE: the original has FOUR bytes of variables between the end of its typed constants at $9F1A and YOffset at $9F1E, and we have none. Whose they are is unknown. Net of the harness's +2 that is the -2 still reported. Find the owner before declaring anything: an addition in the wrong unit cost 569 bytes twice."
 
+[[plan.investigation]]
+name = "part3-driver-volume-vars"
+finding = "part 003's variables sit 2 bytes below the original's after the harness's own 2 bytes are accounted for, and the original has FOUR bytes of variables between its typed constants at $9F1A and Tunnel's YOffset at $9F1E that we do not declare. IDENTIFIED AND MEASURED, DELIBERATELY NOT COMMITTED -- see below."
+seen_in = "TPART3"
+state = "open"
+
 [plan.row."001 1012:0004"]
 label = "BuildLens quadrant walk"
 investigation = "pacing"
@@ -606,6 +612,11 @@ label = "REGRESSION: the generator and the sources had drifted, and the build wa
 investigation = "pacing"
 note = "Running tools/emit_pascal_data2.py to regenerate P2OBJ.INC also rewrote P6TEXT.INC, renaming CreditText to Credits and shortening it from 113 entries to 99. P6S4 stopped compiling and the failure cascaded to P6MAIN, TP6S4 and TPART6 - so run/TPART6.EXE was STALE from that commit onward, and so were several other EXEs. I did not notice for four commits because I only ever read the last line of the build output, which is the green check you have not read the output of, verbatim. Every part re-measured from a clean build afterwards: 001 68.7 to 68.6, 003 65.8 to 67.4, 004 56.2 to 56.6, 005 88.4 to 88.7, 006 73.0 to 73.4, 007 86.9 to 87.0 - the rises are the VGA layout work reaching parts whose EXEs had been stale, and the 001 fall is a stale number correcting itself. Fixed at the generator, which is where the drift belonged: it emits CreditText and a FIXED 113 entries now, with the two shape facts named as constants beside the reader rather than derived from however much text the image happens to hold. Verified idempotent and the 99 real strings identical to the pre-break file. One slot differs and the NEW output is the correct one: slot 100 has a length byte of ZERO and the old generator ignored the length byte and captured three bytes of padding as text. Also repaired: two string literals in the generator that a heredoc broke by halving a backslash, which is WORKING.md section 9 first entry, and it hid itself - the generator crashed, the include was left as restored, and a diff of two copies of that untouched file reported idempotent."
 
+[plan.row."003 1000:00f0"]
+label = "the driver's two volume Words, and the fade is a repeat"
+investigation = "part3-driver-volume-vars"
+target = "R0"
+
 [plan.row."003 1015:0000"]
 label = "UploadPalette is hand assembler: LOOP, ADC BH,0, pointers in locals"
 investigation = "part3-init-and-palette"
@@ -617,8 +628,8 @@ investigation = "part3-onebased-tables"
 target = "R0"
 
 [plan.row."003 1015:0191"]
-label = "Tunnel's var ORDER: PanX, PanY, Angle, Radius, then RotTmp"
-investigation = "part3-onebased-tables"
+label = "Tunnel's block is 2 bytes wrong in SIZE, not in its start"
+investigation = "part3-driver-volume-vars"
 target = "R0"
 
 [plan.row."003 1015:0654"]
