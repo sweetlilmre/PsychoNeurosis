@@ -425,23 +425,45 @@ end;
   Rotates the whole 225-entry table right by one complete band: the last 15
   entries are saved, everything shifts up by 15, the saved block goes to front.
   -------------------------------------------------------------------------- }
+{ UNROLLED PER TABLE, and no nested procedure and no Move. The original is
+  three groups of three loops -- save the last band, shift everything up by one
+  band, put the saved band at the front -- written out once for each table.
+  1015:004d opens ENTER 2, so the ONLY local is the loop counter: a nested
+  RotateWholeTable(var T) would need a frame for the parameter and a Tmp array,
+  and Move would appear as far calls that are not there.
+
+  The loop bounds are read off the compares. 1015:006e tests $0f, so the save
+  runs 1 to 15. 1015:0074 seeds $d2 = 210 and 1015:0079 jumps PAST the DEC, so
+  the shift body runs with I = 210 first and 1015:0091 stops it at 1 -- 210
+  iterations, downto. Same shape as RotateBandsFine, which cost 1,145 bytes of
+  the walk for the same reason before it was unrolled. }
 procedure RotateBandsCoarse;
-
-  procedure RotateWholeTable(var T : TColourTable);
-  var
-    I   : Integer;
-    Tmp : array[0..BandSize - 1] of Byte;
-  begin
-    Move(T[NumColours - BandSize + 1], Tmp, BandSize);
-    for I := NumColours downto BandSize + 1 do
-      T[I] := T[I - BandSize];
-    Move(Tmp, T[1], BandSize);
-  end;
-
+var
+  I : Integer;                    { [BP-2] -- the only local }
 begin
-  RotateWholeTable(Red);
-  RotateWholeTable(Green);
-  RotateWholeTable(Blue);
+  { Red -- DS:$0002 }
+  for I := 1 to BandSize do
+    RotTmp[I] := Red[I + (NumColours - BandSize)];    { 1015:005b }
+  for I := NumColours - BandSize downto 1 do
+    Red[I + BandSize] := Red[I];                      { 1015:007e }
+  for I := 1 to BandSize do
+    Red[I] := RotTmp[I];                              { 1015:0097 }
+
+  { Green -- DS:$00E3 }
+  for I := 1 to BandSize do
+    RotTmp[I] := Green[I + (NumColours - BandSize)];
+  for I := NumColours - BandSize downto 1 do
+    Green[I + BandSize] := Green[I];
+  for I := 1 to BandSize do
+    Green[I] := RotTmp[I];
+
+  { Blue -- DS:$01C4 }
+  for I := 1 to BandSize do
+    RotTmp[I] := Blue[I + (NumColours - BandSize)];
+  for I := NumColours - BandSize downto 1 do
+    Blue[I + BandSize] := Blue[I];
+  for I := 1 to BandSize do
+    Blue[I] := RotTmp[I];
 end;
 
 { --------------------------------------------------------------------------

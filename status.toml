@@ -471,6 +471,19 @@ seen_in = "TPART4"
 state = "resolved"
 resolution = "RESOLVED, AND THE 16 BYTES WERE REALLY TWO. The 384-against-368 reading was paragraph rounding: part 004's variables were only 2 bytes low, and the missing constant is the text RTL's `0D 0A`, which the ORIGINAL carries at $0170. MEASURED ACROSS ALL NINE SHIPPED PARTS, which is what turned a guess into a rule: only 000, 004 and 007 carry that constant at all. The other six do not, so a harness that writes text puts a byte in THEIR data segment the original has not got -- and one that does not write puts these three 2 bytes short. It is a per-part fact, not a preference, and tools/mktests.py now holds it as TEXT_RTL with the measurement written beside it. Scene harnesses inherit their part's answer. Part 004 is back to 96.5 percent and its data is identical again. PART 004 IS A STAND-IN AND IS LABELLED ONE. Its original writes text from somewhere our sources do not reproduce: only the RTL references the constant, so the call site is not in any user segment read so far, and `Runtime error ` is present in our build too -- so the error handler is NOT the source of it. Until the real call site is found the harness supplies two bytes the original really has. The generator says to remove the part from TEXT_RTL in the same commit that adds the real one."
 
+[[plan.investigation]]
+name = "part3-coarse-unrolled"
+finding = "part 003 is at 90.6 percent and its two largest Tunnel spans, 49 and 52 bytes, both sit inside Tunnel_RotateBandsCoarse at 1015:004d."
+seen_in = "TPART3"
+state = "resolved"
+resolution = "UNROLLED PER TABLE, and the whole 306-byte routine is now BYTE-IDENTICAL. 90.6 to 91.9 percent, +182 bytes. The original is three groups of three loops -- save the last band into RotTmp, shift everything up by one band, put the saved band at the front -- written out once for each of the three colour tables. Ours had a nested RotateWholeTable(var T) called three times, with Move at each end. 1015:004d opens ENTER 2, so the ONLY local is the loop counter: a nested procedure would need a frame for the parameter and a Tmp array, and Move would appear as far calls that are not there. The bounds come off the compares -- 1015:006e tests $0f so the save runs 1 to 15; 1015:0074 seeds $d2 = 210 and 1015:0079 jumps PAST the DEC, so the shift runs I = 210 downto 1. Same shape and same cause as RotateBandsFine, which had cost 1,145 bytes for the same reason."
+
+[[plan.investigation]]
+name = "part3-morph-zero-stores"
+finding = "part 003's Morph spans start at 1139:03e1, where the original writes three zeros as MOV WORD PTR [addr],0 and ours writes XOR AX,AX / MOV [addr],AX -- three bytes shorter each, which then drifts the rest of the routine."
+seen_in = "TPART3"
+state = "open"
+
 [plan.row."001 1012:0004"]
 label = "BuildLens quadrant walk"
 investigation = "pacing"
@@ -651,6 +664,11 @@ label = "the four part-003 var changes must land together, not singly"
 investigation = "part3-var-bundle"
 target = "R0"
 
+[plan.row."003 1015:004d"]
+label = "RotateBandsCoarse is unrolled per table: ENTER 2 leaves room for one counter"
+investigation = "part3-coarse-unrolled"
+target = "R0"
+
 [plan.row."003 1015:018d"]
 label = "the colour tables are 1-based; the fold names the low bound"
 investigation = "part3-onebased-tables"
@@ -689,6 +707,11 @@ target = "R0"
 [plan.row."003 10b8:0592"]
 label = "Demo_Scene2's file record is a LOCAL: ENTER $80 says so"
 investigation = "part3-var-bundle"
+target = "R0"
+
+[plan.row."003 1139:03e1"]
+label = "three zero stores use the immediate form; and ours makes one extra near call"
+investigation = "part3-morph-zero-stores"
 target = "R0"
 
 [plan.row."003 120f:0017"]
