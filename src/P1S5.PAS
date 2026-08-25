@@ -31,7 +31,18 @@ uses VGA, Crt, DemoVT, FixMath;
 {$I gen/P1VECT.INC}      { const VecLogoA, VecGlobe : array[.., 1..3] of Integer }
 
 const
-  MaxPoints    = 64;
+  { 100, and it is MEASURED, not chosen. 12c5:031a reaches the object's
+    translation with ADD DI,$4B0 and the point array starts at the object's
+    own address (12c5:0366 is IMUL AX,[BP-2],0C / ADD DI,AX / ADD DI,$FFF4).
+    $4B0 is 1200 bytes, which is exactly one hundred twelve-byte points.
+
+    It was 64, and that put every DGROUP address after the array wrong by 432
+    bytes. With 100 the four addresses this file already recorded separately
+    all fall out of one layout: Obj at $A106, ObjMeta at $A106+$4BC = $A5C2,
+    Scr at $A5C2+52 = $A5F6 -- which is the pointer 12c5:0621 hands SortAll --
+    and Scr's own 1200 bytes end at $AAC6, where WorkSeg is, with PtCount at
+    $AAC8 right behind it. }
+  MaxPoints    = 100;
   GlobePoints  = 36;       { $24 -- 12c5:0874 }
   LogoPoints   = 48;       { $30 -- 12c5:0973 }
   VectorFrames = 240;      { $F0 -- 12c5:085c }
@@ -71,6 +82,23 @@ type
   TPoint3 = record
     X, Y, Z : LongInt;
   end;
+  PPoint3 = ^TPoint3;
+
+  { THE MODEL IS ONE RECORD, PASSED BY POINTER. Both 12c5:02e3 and 12c5:03a2
+    open LES DI,[BP+0A] and RET $A -- a far pointer parameter and three
+    Integers -- and 12c5:0785 calls the first of them as
+    MOV DI,$A106 / PUSH DS / PUSH DI, so the record is a unit-level variable
+    and the caller passes its address. The points sit at offset 0 and the
+    translation at $4B0, which is what fixes MaxPoints at 100.
+
+    This was three separate unit-level things here: a Pt array and three loose
+    PosX/PosY/PosZ LongInts, with every routine reading them directly and
+    taking no parameter at all. }
+  TObj = record
+    Pt  : array[1..MaxPoints] of TPoint3;   { offset 0, 1200 bytes }
+    Pos : TPoint3;                          { offset $4B0 }
+  end;
+  PObj = ^TObj;
 
   TScreenPt = record
     X, Y, D : Integer;      { six bytes, matching the $A5F0 stride }
@@ -99,12 +127,17 @@ var
     middle 32 bits of a 32x32 product; the rotation now goes through the
     shared 386 maths object, which does that properly, so the coordinates are
     the original's again. }
-  Pt      : array[1..MaxPoints] of TPoint3;        { DS:$A106, 12 bytes each }
-  Scr     : TScrArr;   { DS:$A5F0 }
-  { DS:$A5B6/$A5BA/$A5BE -- object + $4B0, the translation. }
-  PosX, PosY, PosZ : LongInt;
+  { DS:$A106, and ObjMeta follows it at $A5C2 rather than Scr, because
+    $A106 + $4BC is $A5C2 exactly. Scr was declared here, between the model
+    and the sprite, which put it 1212 bytes too early. }
+  Obj     : TObj;                                  { DS:$A106 }
   { DS:$A5C2 -- the 52-byte point sprite: a 2-byte (W, H) header and 50 px. }
   ObjMeta : array[0..51] of Byte;
+  { DS:$A5F6, NOT $A5F0. The stores are `I * 6 - $5A10` and $A5F0 is the
+    DISPLACEMENT a one-based array of six-byte records gets; the first element
+    is six bytes further on. 12c5:0621 pushes $A5F6 to SortAll, which is the
+    same number read the other way. }
+  Scr     : TScrArr;                               { DS:$A5F6 }
 { --------------------------------------------------------------------------
   THE SHARED 386 MATHS MODULE.
 
@@ -172,9 +205,9 @@ begin
   PtCount := Count;
   for I := 1 to Count do
   begin
-    Pt[I].X := IntToFixed(Src^[I, 1]);
-    Pt[I].Y := IntToFixed(Src^[I, 2]);
-    Pt[I].Z := IntToFixed(Src^[I, 3]);
+    Obj.Pt[I].X := IntToFixed(Src^[I, 1]);
+    Obj.Pt[I].Y := IntToFixed(Src^[I, 2]);
+    Obj.Pt[I].Z := IntToFixed(Src^[I, 3]);
   end;
 end;
 
@@ -184,11 +217,25 @@ end;
   Reads straight off the three blocks: D1 goes to object+$4B0 (X), D2 to +$4B4
   (Y), D3 to +$4B8 (Z), each ADDED, each via IntToFixed. It accumulates.
   -------------------------------------------------------------------------- }
-procedure ObjTranslate(DX_, DY_, DZ_ : Integer);
+procedure ObjTranslate(AObj : PObj; DX_, DY_, DZ_ : Integer);
+var
+  P : PPoint3;                            { [BP-5] -- and the ODD offset is
+                                            this unit's data-alignment switch
+                                            being off: a four-byte pointer
+                                            would sit at [BP-6] with
+                                            alignment on. }
 begin
-  Inc(PosX, IntToFixed(DX_));
-  Inc(PosY, IntToFixed(DY_));
-  Inc(PosZ, IntToFixed(DZ_));
+  { 12c5:03a6..03b0 -- the translation's ADDRESS is taken ONCE into a local
+    pointer and all three components go through it. Reaching AObj^.Pos three
+    times is the same arithmetic and reloads the far pointer each time. }
+  P := @AObj^.Pos;
+  { The same assignment form, and here the ORDER of the operands is visible
+    too: 12c5:03b6 calls IntToFixed and then does ADD AX,ES:[DI], so the call
+    is the LEFT operand and the field is added to its result. Written the other
+    way round the compiler loads the field first and the two disagree. }
+  P^.X := IntToFixed(DX_) + P^.X;
+  P^.Y := IntToFixed(DY_) + P^.Y;
+  P^.Z := IntToFixed(DZ_) + P^.Z;
 end;
 
 { --------------------------------------------------------------------------
@@ -252,7 +299,29 @@ procedure TransformPoint(P          : TPoint3;
                          TX, TY, TZ : LongInt;
                          I          : Integer);
 var
-  Sx, Sy : Integer;
+  { BOTH ARE LONGINT, and that is measured twice over. 12c5:0222 is
+    MOV AX,[BP-0C] / CWD / MOV [BP-10],AX / MOV [BP-0E],DX -- a sign-extend
+    into a FOUR-byte slot, which an Integer local would not need -- and every
+    expression built on them is done in 32 bits: 12c5:024d is SUB AX,[BP-14]
+    / SBB DX,[BP-12] and 12c5:029a is ADD AX,$85 / ADC DX,0. Declared as
+    Integer, the whole routine is 24 bytes short and the arithmetic is 16-bit.
+
+    Sx is [BP-10] and Sy is [BP-14], so Sx is the first local declared. }
+  Sx, Sy : LongInt;
+
+  { TWENTY BYTES DECLARED AND NEVER REFERENCED. ENTER $28 is 40 bytes; the
+    twelve-byte value copy of P plus these two LongInts account for 20, and
+    the routine touches no offset below [BP-14] at any width. So the 1994
+    source declared 20 bytes more here and used none of it.
+
+    They are transcribed for the same reason the three dead angle parameters
+    are: a declaration that is not there moves every offset after it, and this
+    routine's offsets are the whole reason its 300 bytes now align. The TYPE
+    is a guess -- 20 bytes is five LongInts, or a twelve-byte point and two
+    more, or ten Integers, and nothing in the binary distinguishes them
+    because nothing reads them. LongInt is chosen only because every other
+    local here is one. }
+  Dead1, Dead2, Dead3, Dead4, Dead5 : LongInt;
 begin
   { P IS the twelve-byte copy at [BP-0C], so there are no coordinate locals to
     load it into -- the copy the compiler makes for a value parameter is what
@@ -260,9 +329,16 @@ begin
     straight out of the frame. }
   RotatePoint(P.X, P.Y, P.Z);                     { 12c5:01d7 }
 
-  Inc(P.X, TX);                                   { 12c5:01da }
-  Inc(P.Y, TY);
-  Inc(P.Z, TZ);
+  { NOT Inc(). 12c5:01da is MOV AX,[BP-0C] / MOV DX,[BP-0A] / ADD AX,[BP+0E]
+    / ADC DX,[BP+10] / MOV [BP-0C],AX / MOV [BP-0A],DX -- eighteen bytes that
+    load the target into a register pair, add, and store back. Inc(P.X, TX)
+    compiles to the read-modify-write form instead, MOV AX,[BP+0E] / MOV
+    DX,[BP+10] / ADD [BP-0C],AX / ADC [BP-0A],DX, which is twelve. Six bytes
+    per site, three sites, and every span after it in this segment was
+    displaced by the difference. }
+  P.X := P.X + TX;                                { 12c5:01da }
+  P.Y := P.Y + TY;
+  P.Z := P.Z + TZ;
 
   Project(P.X, P.Y, P.Z);                         { 12c5:021f }
 
@@ -275,16 +351,23 @@ begin
     the reflection, the same X and the same D. This was two separate stores
     in a single loop here, which is the same arithmetic but not the same
     routine boundary. }
-  Scr[I].X := Sx;                     { the object }
-  Scr[I].Y := Horizon - Sy;
+  { The casts are where the 32-bit values meet the six-byte screen record's
+    Integer fields, and each one is the low word of a register pair the
+    original has already computed in full. }
+  Scr[I].X := Integer(Sx);                     { the object }
+  Scr[I].Y := Integer(Horizon - Sy);
   Scr[I].D := FixedToIntTrunc(P.Z);   { 12c5:0268 -> 1483:0071 }
 
-  Scr[I + PtCount].X := Sx;           { and its reflection }
-  Scr[I + PtCount].Y := Sy + Horizon + 1;
+  Scr[I + PtCount].X := Integer(Sx);           { and its reflection }
+  { 12c5:029a -- TWO adds, ADD AX,$85 then ADD AX,1, not one ADD AX,$86.
+    Borland Pascal emits one instruction per operator and does not fold
+    adjacent constants, so this is `+ Horizon + 1` in the source and writing
+    it as `+ 134` would be six bytes shorter than the original. }
+  Scr[I + PtCount].Y := Integer(Sy + Horizon + 1);
   Scr[I + PtCount].D := FixedToIntTrunc(P.Z);
 end;
 
-procedure ObjTransformAll(A1, A2, A3 : Integer);
+procedure ObjTransformAll(AObj : PObj; A1, A2, A3 : Integer);
 var
   I          : Integer;
   TX, TY, TZ : LongInt;
@@ -298,12 +381,12 @@ begin
   { 12c5:0317..0344 -- the translation is read ONCE, before the loop, into
     three locals, and those are what get passed per point. Reading PosX, PosY
     and PosZ inside the loop is the same answer and not the same code. }
-  TX := PosX;
-  TY := PosY;
-  TZ := PosZ;
+  TX := AObj^.Pos.X;
+  TY := AObj^.Pos.Y;
+  TZ := AObj^.Pos.Z;
 
   for I := 1 to PtCount do
-    TransformPoint(Pt[I], A1, A2, A3, TX, TY, TZ, I);   { 12c5:0393 }
+    TransformPoint(AObj^.Pt[I], A1, A2, A3, TX, TY, TZ, I);   { 12c5:0393 }
 end;
 
 { --------------------------------------------------------------------------
@@ -533,14 +616,15 @@ begin
   for Frame := 1 to VectorFrames do
   begin
     CopyScreen(VirtScrSeg, WorkSeg);    { 12c5:0782 -- the clean gradient }
-    ObjTransformAll(Angle, Angle, Angle);
+    ObjTransformAll(@Obj, Angle, Angle, Angle);   { 12c5:0796 }
     RenderObject;                       { 12c5:0799 }
     CopyScreen(WorkSeg, $A000);         { 12c5:07a3 }
 
     Inc(Angle, VectorStep);
     if Angle > VectorWrap then Angle := 0;
 
-    ObjTranslate(Round(Cos(Local      * Pi / 180.0) *   5.0),
+    ObjTranslate(@Obj,
+                 Round(Cos(Local      * Pi / 180.0) *   5.0),
                  Round(Sin(OrbitAngle * Pi / 180.0) *  20.0),
                  Round(Sin(Local      * Pi / 180.0) * 500.0));
 
@@ -621,15 +705,15 @@ begin
   PtCount := GlobePoints;
   for I := 1 to PtCount do
   begin
-    Pt[I].X := IntToFixed(Src^[I, 1]);
-    Pt[I].Y := IntToFixed(Src^[I, 2]);
-    Pt[I].Z := IntToFixed(Src^[I, 3]);
+    Obj.Pt[I].X := IntToFixed(Src^[I, 1]);
+    Obj.Pt[I].Y := IntToFixed(Src^[I, 2]);
+    Obj.Pt[I].Z := IntToFixed(Src^[I, 3]);
   end;
 
 
-  PosX := IntToFixed(0);                       { 12c5:0918 }
-  PosY := IntToFixed(-70);                     { 12c5:091e }
-  PosZ := IntToFixed(1600);                    { 12c5:092c }
+  Obj.Pos.X := IntToFixed(0);                  { 12c5:0918 }
+  Obj.Pos.Y := IntToFixed(-70);                { 12c5:091e }
+  Obj.Pos.Z := IntToFixed(1600);               { 12c5:092c }
 
   { 12c5:093b -- Scale := (ScreenWidth / 2.0) * 10.0, as 16.16.
     CS:$0868 = 2.0, CS:$086C = 10.0. }
@@ -648,9 +732,9 @@ begin
   PtCount := LogoPoints;
   for I := 1 to PtCount do
   begin
-    Pt[I].X := IntToFixed(Src^[I, 1]);
-    Pt[I].Y := IntToFixed(Src^[I, 2]);
-    Pt[I].Z := IntToFixed(Src^[I, 3]);
+    Obj.Pt[I].X := IntToFixed(Src^[I, 1]);
+    Obj.Pt[I].Y := IntToFixed(Src^[I, 2]);
+    Obj.Pt[I].Z := IntToFixed(Src^[I, 3]);
   end;
   OrbitAngle := 17;                            { 12c5:0a15 }
   Animate;
