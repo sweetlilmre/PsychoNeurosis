@@ -539,20 +539,19 @@ end;
   is the PIT counter, i.e. 65536 units per tick and 1,193,182 units a second.
   -------------------------------------------------------------------------- }
 function ReadTimer : LongInt;
-var
-  { THE RESULT IS THE TWO WORDS SEEN AS ONE LONGINT, not an expression over
-    them: 100f:0315 is MOV AX,[BP-4] / MOV DX,[BP-2] and nothing else. Written
-    as `(LongInt(Hi) shl 16) or Lo`, as it is below, the compiler needs a
-    four-byte temporary for the shift and this frame comes out ENTER $08 where
-    the original is $04.
+{ NO LOCALS AT ALL, and that is what ENTER $04 means. Turbo Pascal allocates
+  four bytes of frame for a LongInt function's RESULT, so a routine with one
+  LongInt local would open ENTER $08 -- which is what this did, under three
+  different spellings before the frame was read properly:
 
-    A `LongInt absolute Lo` alias with `ReadTimer := T` was TRIED and did not
-    fix it -- the frame stayed $08 and the walk lost 11 bytes -- so the extra
-    four bytes are not the shift temporary after all, or `absolute` on a local
-    does not do what it appears to. Left as it was; the frame is still four
-    bytes too big and the cause is not yet found. }
-  Lo : Word;                        { [BP-4] }
-  Hi : Word;                        { [BP-2] }
+    two Words + `(LongInt(Hi) shl 16) or Lo`      ENTER $08
+    two Words + a `LongInt absolute` alias        ENTER $08
+    one LongInt local + `ReadTimer := T`          ENTER $08
+
+  The referenced slots [BP-4] and [BP-2] ARE the result, not locals. The
+  assembler writes both halves of it directly and the compiler's own epilogue
+  loads them into DX:AX -- which is why 100f:0315 is MOV AX,[BP-4] /
+  MOV DX,[BP-2] with no shift and no `or`. `@Result` is how BASM names it. }
 begin
   asm
     CLI                    { 100f:02d3                                       }
@@ -585,10 +584,9 @@ begin
     JA   @@Store           { 100f:030c  -> 100f:030f                          }
     INC  DX                { 100f:030e  so 0040:6C is one behind. Fix it.    }
   @@Store:
-    MOV  Lo, BX            { 100f:030f                                       }
-    MOV  Hi, DX            { 100f:0312                                       }
+    MOV  WORD PTR @Result, BX     { 100f:030f  the low half              }
+    MOV  WORD PTR @Result+2, DX   { 100f:0312  and the high                 }
   end;
-  ReadTimer := (LongInt(Hi) shl 16) or Lo;        { 100f:0315 }
 end;
 
 { ==========================================================================
@@ -609,6 +607,11 @@ var
   Junk           : LongInt;   { [BP-$A] }
   T0             : LongInt;   { [BP-$E] }
   T1             : LongInt;   { [BP-$12] }
+  { FOUR BYTES DECLARED AND NEVER READ. ENTER $16 is 22 bytes and the routine
+    references nine word slots from [BP-2] down to [BP-$12], which is 18 -- so
+    four more are declared below T1 and nothing touches them. LongInt because
+    every other local here is one; the type is a guess and the size is not. }
+  Spare          : LongInt;   { [BP-$16] }
 begin
   asm
     MOV  AL, 34h           { 100f:0321  counter 0, both bytes, mode 2, binary}

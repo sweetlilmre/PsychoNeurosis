@@ -694,6 +694,13 @@ state = "open"
 name = "part7-frames"
 finding = "NO COVERAGE GAIN THIS BATCH, and the recon is the deliverable. Part 007 is the cheapest part to finish -- 3,945 of 4,112 aligned, so 99% needs only about 126 bytes, and its unaligned spans total 130. ITS BSS ALREADY MATCHES EXACTLY, so the whole gap is CODE, which makes it the one part where the frame instruments are the right first move. FIVE FRAME DIFFERENCES, all in segment 100f, all named, with the referenced slots read out of the original. Two are shortfalls and three surpluses: 100f:00de FliColor256, ENTER $18 (24) against our $12 (18), SIX SHORT. Referenced: -2, -4, -6, -8, -0A as words, then -0E and -10, and a BYTE at -15 -- an odd offset, so a one-byte local or an odd-sized record sits above it. -0C is never touched. 100f:031d Calibrate, ENTER $16 (22) against our $12 (18), FOUR SHORT. Nine word slots from -2 to -12 are all referenced, which is 18, so the remaining four are declared and unread. 100f:02cf ReadTimer, ENTER $04 against our $08, FOUR TOO BIG. Only -2 and -4 are read. 100f:0453 Play, ENTER $238 against our $23A, two too big. 100f:06f7 UpCaseStr, ENTER $104 against our $106, two too big -- and its shape is readable: a 256-byte String value-parameter copy at [BP-$100] plus two 2-byte slots at -$102 and -$104 is 260 exactly, so we have one 2-byte local the original does not. AND A NEGATIVE RESULT ON ReadTimer worth not repeating. Its four extra bytes look like the temporary for `(LongInt(Hi) shl 16) or Lo`, because the original's tail is just MOV AX,[BP-4] / MOV DX,[BP-2] -- the LongInt result IS those four bytes, with no shift and no or. Declaring `T : LongInt absolute Lo` and returning T should have removed the temporary. IT DID NOT: the frame stayed $08 and the walk lost 11 bytes, so either the extra four are not that temporary or `absolute` on a local does not do what it appears to. Reverted. The next attempt should settle what the four bytes ARE before changing the expression again -- a probe on how TP7 frames a LongInt function would do it."
 seen_in = "TPART7"
+state = "resolved"
+resolution = "TWO OF FIVE FRAMES FIXED and the reason the first one resisted is the finding: TURBO PASCAL ALLOCATES FRAME FOR A FUNCTION'S RESULT. A `function : LongInt` gets four bytes, so ENTER $04 on such a function with only [BP-4] and [BP-2] touched means NO LOCALS -- those four bytes ARE the result, the assembler writes both halves directly, and the epilogue loads them into DX:AX. `@Result` is how BASM names it. THREE WRONG SPELLINGS CAME FIRST, all measured at ENTER $08 against the original's $04: two Words with `(LongInt(Hi) shl 16) or Lo`, which looked like a shift temporary; two Words with a `LongInt absolute` alias, where the alias took four bytes of its own rather than overlaying; and one LongInt local assigned to the function name. The fourth -- no locals, MOV WORD PTR @Result and @Result+2 -- matched. The lesson is not about `absolute`: A SLOT THE ROUTINE READS IS NOT NECESSARILY A SLOT IT DECLARES, and the wiki's frame observation now says so, along with a correction to its blind spot, which claimed a routine with no locals gets no ENTER at all. True of a procedure, false of a function. Calibrate at 100f:031d was the second: nine word slots from [BP-2] to [BP-$12] are all referenced, which is 18 against ENTER $16's 22, so four bytes are declared and unread. Added as a LongInt, type guessed and size measured. PART 007 IS 95.9% -> 96.0%. Three frames remain: 100f:00de FliColor256 six short with a BYTE at [BP-$15], 100f:0453 Play two too big, 100f:06f7 UpCaseStr two too big. AND UpCaseStr's TWO BYTES ARE A PUZZLE WORTH THE NOTE. Its original frame is 260 = a 256-byte String parameter copy at [BP-$100] plus I at [BP-$102] and L at [BP-$104], and ours declares exactly that and comes out 262. The loop is NOT the difference: 100f:071f compares against L directly, so `for I := 1 to L` over a simple local needs no limit temporary, and our declaration order already matches. Something else in our body spends one word. Read it before changing anything."
+
+[[plan.investigation]]
+name = "part7-string-table"
+finding = "part 007's largest span is 100f:07a8..07dd, 53 bytes, and it is a BODY difference in a routine that appends a string to a table. Decoded: MOV BYTE PTR [BP-$107],1 sets a byte local; CMP WORD PTR [$3406],$64 / JGE / INC WORD PTR [$3406] is `if Count < 100 then Inc(Count)` against a counter at DS:$3406; then LEA DI,[BP-$100] pushes a local buffer, MOV DI,[$3406] / SHL DI,7 / ADD DI,$186 indexes a table of 128-byte entries whose FOLDED base is $186, and PUSH $7F with a call to the string-assign RTL copies at most 127 characters. So the table is `array[..] of String[127]` at DS:$186 + Count*128, and the routine is `Table[Count] := S` guarded by a 100-entry cap. 127 and 128 together say String[127] rather than String, which is the kind of detail that costs a byte per entry if guessed. Note the folded base: $186 is not the table's address, it is the address minus one stride, so the array is ONE-based."
+seen_in = "TPART7"
 state = "open"
 
 [plan.row."001 1012:0004"]
@@ -1297,8 +1304,13 @@ investigation = "part7-frames"
 target = "R0"
 
 [plan.row."007 100f:06f7"]
-label = "UpCaseStr is two too big; 256 + 2 + 2 is the original's 260"
-investigation = "part7-frames"
+label = "UpCaseStr is two bytes too big and the loop is not the cause"
+investigation = "part7-string-table"
+target = "R0"
+
+[plan.row."007 100f:07a8"]
+label = "Table[Count] := S over String[127] entries at DS:$186 folded"
+investigation = "part7-string-table"
 target = "R0"
 
 [plan.row."007 to 99"]
