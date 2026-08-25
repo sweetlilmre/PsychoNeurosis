@@ -105,6 +105,7 @@ var
 type
   { The DAC in the order the hardware wants it: R, G, B per entry, 0..63. }
   TPalette = array[0..255, 0..2] of Byte;
+  PPalette = ^TPalette;
 
 var
   { The virtual screen every part draws into before blitting to $A000.
@@ -694,6 +695,14 @@ asm
   POP  DS               { restore our data segment                          }
 end;
 
+{ AND IT SITS BETWEEN FadeStep AND WaitRetrace, which part 004's copy fixes
+  exactly: 11e3:0260 is FadeStep, 02b9 this routine, 03d4 WaitRetrace's
+  fourteen bytes and 03e2 ClearScreen -- 02b9 to 03d4 is $11B, which is this
+  routine's length. Declared near the end of the unit instead, ClearScreen came
+  out 283 bytes early in parts 001 and 004 and every far call to it differed.
+  Part 001's copy agrees from the other side: PaletteDim at 1491:01F2 is 35
+  bytes and this routine follows at 0215. }
+
 { --------------------------------------------------------------------------
   11e3:0260 -- one step of a fade to black, on the LIVE DAC. Compiled Pascal.
   Only part 004 links it.
@@ -764,6 +773,69 @@ begin
   end;
   WaitRetrace;                             { 11e3:02A9 }
   SetPalette768(@Buf);                     { 11e3:02AD }
+end;
+
+{ --------------------------------------------------------------------------
+  1491:0215 -- PaletteFadeUp(P, Pause). Compiled Pascal in the binary
+  (ENTER $602: two 768-byte buffers and two counters).
+
+  Copies the target palette into a local, blanks a second one, and then walks
+  every component of the second UP toward the first by one a step, showing it
+  after each. 64 steps with Delay(Pause) between them.
+
+  Because it steps by one and stops when it matches, a component that starts
+  at 63 takes all 64 steps and one at 10 arrives after 10 -- so dark colours
+  land early and the bright ones keep climbing. That is what gives the fade
+  its shape rather than a flat linear ramp.
+  -------------------------------------------------------------------------- }
+procedure PaletteFadeUp(P : Pointer; Pause : Word);
+var
+  { THE TWO BYTES BELOW THE BUFFERS ARE I THEN Step, and 11e3's copy says which
+    is which: the OUTER loop counts in [BP-$602] -- 02E2 stores zero and 02E7
+    jumps to its increment -- so Step is the further of the two from BP and
+    therefore the SECOND declared. }
+  Target : TPalette;              { [BP-$300] }
+  Cur    : TPalette;              { [BP-$600] }
+  I      : Byte;                  { [BP-$601] }
+  Step   : Byte;                  { [BP-$602] }
+begin
+  { AN ASSIGNMENT, NOT Move. 11e3:02BD copies the palette INLINE -- MOV BX,SS /
+    MOV ES,BX / MOV BX,DS / CLD / LEA DI / LDS SI,[BP+8] / MOV CX,$300 /
+    REP MOVSB / MOV DS,BX, nineteen bytes -- where a Move call is twenty-one.
+    Those two bytes are why ClearScreen came out two bytes early in parts 001
+    and 004 after the ordering was fixed. }
+  { THE COPY IS HAND ASSEMBLER, and three Pascal forms were tried before that
+    was the answer: `Move(P^, Target, SizeOf(Target))`, `Target := TPalette(P^)`
+    and `Target := PPalette(P)^` all compile to the runtime helper, and so does
+    a `var` parameter. Turbo Pascal uses the helper for a 768-byte structured
+    assignment whatever the source looks like, so the inline REP MOVSB at
+    11e3:02BD cannot come from Pascal at all. Transcribed verbatim, it is two
+    bytes shorter than the call -- which is exactly what ClearScreen's offset
+    was out by in parts 001 and 004. }
+  asm
+    MOV  BX, SS            { 11e3:02BD  the destination is on the stack       }
+    MOV  ES, BX            { 11e3:02BF                                        }
+    MOV  BX, DS            { 11e3:02C1  save DGROUP -- LDS is about to take it }
+    CLD                    { 11e3:02C3  upwards                               }
+    LEA  DI, Target        { 11e3:02C4                                        }
+    LDS  SI, P             { 11e3:02C8  the caller's palette, a far pointer    }
+    MOV  CX, $300          { 11e3:02CB  768 bytes                             }
+    REP  MOVSB             { 11e3:02CE                                        }
+    MOV  DS, BX            { 11e3:02D0  DGROUP back                           }
+  end;
+  FillChar(Cur, SizeOf(Cur), 0);              { 1491:0232 -- start from black }
+  for Step := 0 to $3F do
+  begin
+    for I := 0 to 255 do
+    begin
+      if Cur[I, 0] < Target[I, 0] then Inc(Cur[I, 0]);
+      if Cur[I, 1] < Target[I, 1] then Inc(Cur[I, 1]);
+      if Cur[I, 2] < Target[I, 2] then Inc(Cur[I, 2]);
+    end;
+    WaitRetrace;                              { 1491:0300 }
+    SetPalette768(@Cur);                      { 1491:0306 }
+    Delay(Pause);                             { 1491:0311 }
+  end;
 end;
 
 { ORDER: this sits between PaletteDim and WaitRetrace because that is
@@ -941,41 +1013,6 @@ begin
   GetPalette768(@Palette);
 end;
 
-{ --------------------------------------------------------------------------
-  1491:0215 -- PaletteFadeUp(P, Pause). Compiled Pascal in the binary
-  (ENTER $602: two 768-byte buffers and two counters).
-
-  Copies the target palette into a local, blanks a second one, and then walks
-  every component of the second UP toward the first by one a step, showing it
-  after each. 64 steps with Delay(Pause) between them.
-
-  Because it steps by one and stops when it matches, a component that starts
-  at 63 takes all 64 steps and one at 10 arrives after 10 -- so dark colours
-  land early and the bright ones keep climbing. That is what gives the fade
-  its shape rather than a flat linear ramp.
-  -------------------------------------------------------------------------- }
-procedure PaletteFadeUp(P : Pointer; Pause : Word);
-var
-  Target : TPalette;              { [BP-$302] }
-  Cur    : TPalette;              { [BP-$602] }
-  Step   : Byte;                  { [BP-$604] }
-  I      : Byte;                  { [BP-$603] }
-begin
-  Move(P^, Target, SizeOf(Target));          { 1491:0219 }
-  FillChar(Cur, SizeOf(Cur), 0);              { 1491:0232 -- start from black }
-  for Step := 0 to $3F do
-  begin
-    for I := 0 to 255 do
-    begin
-      if Cur[I, 0] < Target[I, 0] then Inc(Cur[I, 0]);
-      if Cur[I, 1] < Target[I, 1] then Inc(Cur[I, 1]);
-      if Cur[I, 2] < Target[I, 2] then Inc(Cur[I, 2]);
-    end;
-    WaitRetrace;                              { 1491:0300 }
-    SetPalette768(@Cur);                      { 1491:0306 }
-    Delay(Pause);                             { 1491:0311 }
-  end;
-end;
 
 { --------------------------------------------------------------------------
   1491:0330 -- PaletteFadeOut(Pause). Compiled Pascal (ENTER $302).
