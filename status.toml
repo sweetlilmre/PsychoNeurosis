@@ -520,6 +520,13 @@ seen_in = "TPART3"
 state = "resolved"
 resolution = "BOTH COUNTERS ARE UNIT-LEVEL VARIABLES, NOT LOCALS. 93.2 to 94.9 percent, +226 bytes from two declarations, and the initialised data stayed identical. Stars_Generate: 10b8:069d is `MOV WORD PTR [$A88A],2` and 10b8:06a5 is `INC WORD PTR [$A88A]`, so the loop runs on the unit-level Idx -- which was ALREADY declared at that address, with a note in the var block saying it is unit-level in the original. The routine simply declared its own `I` as well. Removing the local removed the frame and every offset in the routine came back into line: 211 bytes for a two-line change. Demo_Scene1: 1015:09a0 zeroes [$A7EE], 09a5 increments it, 09a9 reads it back as the colour index. That is the same two bytes between Radius and RotTmp that the layout needed and that a note here called NEVER REFERENCED -- it is the palette counter, and finding its use is what settles what those bytes are. The scene also sets ModeX's LogicalWidth first, at 1015:0991, which ours did not. The palette loop is now byte-identical. AND A STRUCTURAL FINDING NOT ACTED ON, because it is a rewrite rather than a declaration: Tunnel_LoadTexture takes NO PARAMETER -- 1015:09c0 calls it with nothing pushed -- and opens ENTER $200, so it reads the texture through a 512-BYTE FRAME BUFFER rather than a 64,000-byte GetMem block. Scene1 has no GetMem at all. It uses the unit-level file at $A7FF, which ours already has in the right place. That is where the next work on this part is, and it is worth the 52-byte span at 10b8:07dc plus whatever Scene1's head is still adrift by. 19 bytes short of 95 percent."
 
+[[plan.investigation]]
+name = "part3-loadtexture"
+finding = "part 003 is 19 bytes short of 95 percent, and Tunnel_LoadTexture is the last structural difference: 1015:09c0 calls it with nothing pushed, it opens ENTER $200, and Scene1 has no GetMem at all."
+seen_in = "TPART3"
+state = "resolved"
+resolution = "PART 003 IS OVER 95 PERCENT: 94.9 to 95.6, and NINE OF THE TEN PARTS are now at or above the target. Four findings, all in Tunnel, and the data stayed identical. THE BUFFER WAS VGA'S VIRTUAL SCREEN ALL ALONG. LoadTexture reads into the far pointer at DS:$E76C and copies from the word at DS:$E770, which are VGA's VirtScr and VirtScrSeg, allocated by VirtScrAlloc in the part's main body long before scene 1 runs. So the routine takes no parameter, and Scene1 neither allocates nor frees: the GetMem and the FreeMem it carried were both inventions, and the note beside the GetMem that explained why it had to be there is deleted with it. UNROLLED FOUR TIMES, not a loop -- 1015:08d5 and 08ff push 0 and 1 as separate immediates and the whole read-and-copy is written out per plane; there is no local to hold a counter. And the copy is CopyScreen at 12f8:00ad, a far call into VGA, not a Move. TWO SWITCHES AND A DUPLICATE. The unit was missing {$I-}: with I/O checking left on TP inserts a far call to the runtime check after every file operation, and LoadTexture makes six of them. And the unit declared its OWN SelectPlane, making a near call where 1015:08d7 makes a FAR call to ModeX's at 1192:0087 -- three bytes shorter and never a match. Removing the local lets the calls resolve to ModeX, which is already in the uses clause. Those two together were worth 91 bytes. paslint earned its keep on the way: the {$I-} comment quoted the opposite directive and the brace ended the comment early, which it reported at the line rather than dozens of lines later."
+
 [plan.row."001 1012:0004"]
 label = "BuildLens quadrant walk"
 investigation = "pacing"
@@ -736,8 +743,18 @@ investigation = "surplus-fpu-sites"
 target = "R0"
 
 [plan.row."003 1015:08a7"]
-label = "LoadTexture is parameterless with a 512-byte frame buffer"
-investigation = "part3-unit-level-counters"
+label = "LoadTexture is parameterless and reads into VGA's VirtScr"
+investigation = "part3-loadtexture"
+target = "R0"
+
+[plan.row."003 1015:08d0"]
+label = "the unit wants {$I-}: six file operations, six inserted checks"
+investigation = "part3-loadtexture"
+target = "R0"
+
+[plan.row."003 1015:08d7"]
+label = "SelectPlane is ModeX's, called FAR; the local copy was a near call"
+investigation = "part3-loadtexture"
 target = "R0"
 
 [plan.row."003 1015:09a0"]

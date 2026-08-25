@@ -38,6 +38,15 @@ unit Part3Tunnel;
           Blue at $01C6 and everything after it two bytes out for the whole
           part: CollapseFrames, the sine table, all six shape slots. }
 
+{$I-}   { NO I/O CHECKING. The original goes straight from Seek to the next
+          statement -- 1015:08d0 is the Seek and 1015:08d5 is already pushing
+          SelectPlane's argument -- where the switch left ON inserts a far
+          call to the runtime's check after every file operation. LoadTexture
+          makes six of them, so this was six extra calls.
+
+          A directive cannot be quoted inside a comment: TP7 does not nest
+          them, so the brace would end this one early. paslint says so. }
+
 {$G+}   { 286: Demo_Scene1 1015:098d opens ENTER 2; every framed routine
           in 1015 does. }
 
@@ -221,13 +230,10 @@ begin
   Port[$3D4] := $13; Port[$3D5] := CrtcOffset;         { CRTC 13: 640 wide }
 end;
 
-{ --------------------------------------------------------------------------
-  VGA_SelectPlane (1192:0087) -- Sequencer Map Mask.
-  -------------------------------------------------------------------------- }
-procedure SelectPlane(Plane : Byte);
-begin
-  PortW[$3C4] := (Word(1 shl Plane) shl 8) or 2;
-end;
+{ SelectPlane IS NOT DECLARED HERE. 1015:08d7 is a FAR call to 1192:0087 --
+  ModeX's SelectPlane -- and a local copy made it a near call, which is three
+  bytes shorter and never matches. ModeX is in the uses clause, so the calls
+  below resolve to it. }
 
 { --------------------------------------------------------------------------
   Tunnel_InitTables (1015:0654)
@@ -271,20 +277,44 @@ end;
           centre -- that is a stride artefact, not the artwork.
           See docs/06-part3-scene1-tunnel.md.
   -------------------------------------------------------------------------- }
-procedure LoadTexture(Buffer : Pointer);
-var
-  Plane : Byte;
+{ NO PARAMETER, NO LOOP, AND THE BUFFER IS VGA'S VIRTUAL SCREEN.
+
+  1015:09c0 calls this with nothing pushed, so it takes no argument. The buffer
+  it reads into is the far pointer at DS:$E76C and the segment it copies from is
+  the word at DS:$E770 -- which are VGA's VirtScr and VirtScrSeg, allocated by
+  VirtScrAlloc in the part's main body long before scene 1 runs. So Scene1 needs
+  no GetMem of its own, and it has none: 1015:098d goes straight from ENTER to
+  the LogicalWidth store.
+
+  UNROLLED FOUR TIMES, not a loop. 1015:08d5 pushes 0 and 1015:08ff pushes 1 as
+  separate immediates, with the whole read-and-copy written out for each plane;
+  a `for Plane := 0 to 3` needs a counter and there is no local to hold one.
+
+  And the copy is CopyScreen (12f8:00ad), not a Move: 1015:08fa is a far call
+  into the VGA unit with VirtScrSeg and $A000 pushed. }
+procedure LoadTexture;
 begin
-  Assign(F, 'neurosis.dat');
-  Reset(F, 1);
-  Seek(F, TextureOfs);
-  for Plane := 0 to 3 do
-  begin
-    SelectPlane(Plane);
-    BlockRead(F, Buffer^, PlaneSize);
-    Move(Buffer^, Mem[$A000:0], PlaneSize);   { VGA_CopyToPlane, 12f8:00ad }
-  end;
-  Close(F);
+  Assign(F, 'neurosis.dat');                  { 1015:08b5 }
+  Reset(F, 1);                                { 1015:08c1 }
+  Seek(F, TextureOfs);                        { 1015:08d0 }
+
+  SelectPlane(0);                             { 1015:08d7 }
+  BlockRead(F, VirtScr^, PlaneSize);          { 1015:08ee }
+  CopyScreen(VirtScrSeg, $A000);              { 1015:08fa }
+
+  SelectPlane(1);                             { 1015:0901 }
+  BlockRead(F, VirtScr^, PlaneSize);
+  CopyScreen(VirtScrSeg, $A000);
+
+  SelectPlane(2);
+  BlockRead(F, VirtScr^, PlaneSize);
+  CopyScreen(VirtScrSeg, $A000);
+
+  SelectPlane(3);
+  BlockRead(F, VirtScr^, PlaneSize);
+  CopyScreen(VirtScrSeg, $A000);              { 1015:0978 }
+
+  Close(F);                                   { 1015:0982 }
 end;
 
 { --------------------------------------------------------------------------
@@ -590,17 +620,10 @@ end;
   Demo_Scene1 (1015:098d)
   -------------------------------------------------------------------------- }
 procedure Scene1;
-var
-  Buffer : Pointer;
 begin
   { 1015:0991 -- FIRST, before anything else. ModeX's LogicalWidth is set here
     and not inside InitTables. }
   LogicalWidth := 80;
-  { Buffer was passed to LoadTexture without ever being allocated -- a wild
-    pointer that BlockRead then wrote 64,000 bytes through, four times over.
-    That is what hung the scene. }
-  GetMem(Buffer, PlaneSize);
-
   InitTables;
   SetModeX;
 
@@ -608,7 +631,7 @@ begin
   for PalIdx := 0 to 255 do                   { blank the palette first }
     SetRGB(PalIdx, 0, 0, 0);
 
-  LoadTexture(Buffer);
+  LoadTexture;
 
   Angle  := StartAngle;
   Radius := StartRadius;
@@ -624,7 +647,9 @@ begin
     UpdateMotion;
   until Radius < 1.0;   { FCOMP against CS:[0989] = 1.0 -- exactly 990 frames }
 
-  FreeMem(Buffer, PlaneSize);
+  { NO FreeMem. The buffer was VGA's virtual screen all along and the part's
+    main body frees it with VirtScrFree; scene 1 neither allocates nor releases
+    it. }
 end;
 
 { The original gives every unit an EMPTY initialisation section, and the
