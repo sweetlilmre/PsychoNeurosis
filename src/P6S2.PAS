@@ -263,8 +263,19 @@ end;
   -------------------------------------------------------------------------- }
 procedure Run;
 var
-  I              : Integer;   { [BP-$2] }
-  J              : Integer;   { [BP-$4] }
+  I              : Integer;   { [BP-$02] }
+  J              : Integer;   { [BP-$04] }
+  { ELEVEN BYTES BETWEEN J AND Pix, and the arithmetic is what finds them.
+    100f:0590 opens ENTER $50a = 1,290 and the routine names only three slots:
+    [BP-$02], [BP-$04] and [BP-$286], the last being Tile[2].Pix at
+    100f:0609. The array is indexed IMUL DI,[BP-$02],$273 against a
+    displacement of $76E, so an element is 627 bytes and element 1 sits at
+    [BP-$4FB] -- which puts element 2's last byte at [BP-$016]. Below BP the
+    declarations therefore have to fill $01..$15 exactly, and Pix at [BP-$11],
+    Src at [BP-$13] and Dst at [BP-$15] leave $05..$0F -- eleven bytes -- with
+    nothing to put in them. Pix at an ODD offset is the tell: a word does not
+    land there unless an odd number of bytes was declared before it. }
+  Unread         : array[1..11] of Byte;   { [BP-$05]..[BP-$0F], never read }
   Pix            : Word;   { [BP-$11] }
   Src            : Word;   { [BP-$13] }
   Dst            : Word;   { [BP-$15] }
