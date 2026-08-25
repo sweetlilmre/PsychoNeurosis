@@ -615,6 +615,13 @@ resolution = "SEVEN FIXES IN ONE BATCH: part 001 86.7% -> 88.6%, +399 bytes, and
 name = "part1-stardraw-asm"
 finding = "part 001: StarDraw at 12b2:00f1 is HAND-WRITTEN ASSEMBLER and ours is Pascal, and it needs a row-offset table we do not have. The tells are all present: PUSH BP / MOV BP,SP with no ENTER, MOV BX,0 where the compiler emits XOR, MOV CX,$5A with a DEC CX / JNE loop rather than a compiled counter, and a bare STOSB. It is FAR (RETF 2) with one Word parameter, the segment. WHAT IT READS: Star[].Colour at $9DE3, .X at $9DDB and .Y at $9DDD -- offsets 8, 0 and 2 of the nine-byte record, with BX advancing by 9 per star -- and then ADD DI,[BX-$54A6] after SHL BX,1, which is a WORD TABLE AT DS:$AB5A indexed by Y. Ours computes Y * ScrWidth + X arithmetically instead. THE TABLE IS THE BLOCKER and it is worth doing in its own right: $AB5A is referenced from EVERY segment of this part, so it is shared data, and its neighbours are now known -- a four-byte Pointer at $AB54 and a Word at $AB58 that 1107:0583 and 1107:058f use as the virtual-screen segment. So the three together read as a screen pointer, its segment, and a row table, in one shared unit. MODEX.PAS already has this exact shape for another part (RowOfs : array[0..RowCount-1] of Word at DS:$4B08 with a BuildRowTable) -- read that before inventing anything. Transcribe the asm verbatim per the standing rule, with the equivalent Pascal above it in a comment, once the table exists to index."
 seen_in = "TPART1"
+state = "resolved"
+resolution = "RESOLVED, AND THE BLOCKER I RECORDED DID NOT EXIST. This said the row table at $AB5A was missing and had to be built before the assembler could be written. VGA.PAS already declares it -- `YOfs : array[0..ScrHeight - 1] of Word` -- along with BuildRowTable to fill it, and PutPixel already uses the exact idiom the star blitter needs, MOV DI,[BX + OFFSET YOfs] after SHL BX,1. I had grepped for the name `RowOfs`, which is what MODEX.PAS calls its equivalent, and concluded from its absence that the thing was absent. GREP FOR THE SHAPE, NOT THE NAME: two units in this repository hold the same table under different names, and one of them was the one I searched. STARDRAW IS NOW BYTE-FOR-BYTE IDENTICAL TO THE ORIGINAL. Written as `far; assembler;` and transcribed verbatim: PUSH BP / MOV BP,SP with no ENTER, MOV BX,0 rather than the XOR the code generator emits, MOV CX,$5A with DEC CX / JNE, a bare STOSB, and DX holding BX across the row lookup because BX is needed as the table index. All 45 bytes match except four absolute DGROUP displacements -- $9DE3, $9DDB, $9DDD and $AB5A against ours -- which is the allowed-difference class. SHIFTTRAILS at 1107:059f, +132 and the biggest single item of the batch. ENTER 2 is TWO BYTES and no third local: both counters are Bytes (1107:05a3 and 05ac are MOV BYTE PTR) and the row index is recomputed inline rather than kept, which is why there is no room for it. It also takes the trail BY POINTER, and the pointer is @Trail[1] rather than @Trail -- 1107:06aa is MOV DI,$5BD9, one record in -- so the parameter needs a ONE-based view of the same records. 1107:05ce reads ES:[DI-1] after DI += K*13, and that minus one is the low bound and the Flag field's offset 12 folded together. SCENE2's Close, no measured change but correct: 1082:05a4 closes the file AFTER the call to Load returns, where ours closed it inside Load. AND TWO THINGS CHECKED AND FOUND ALREADY RIGHT, which is worth recording so nobody re-checks them. P1S3's grey ramp constant: the original holds an 80-bit Extended at CS:$000D and decoding it gives 0.2470000000, exactly what we have. And the ramp really does recompute the expression three times per entry -- nine x87 sites where one subexpression would cost three -- which our source already does and comments."
+
+[[plan.investigation]]
+name = "part1-mosaic-run"
+finding = "part 001 at 89.4%. Mosaic_Run at 10e3:00bb is the next span worth reading and it needs a full body pass rather than a declaration fix: prologue.py will not pair it, so its body differs substantially. ENTER $18 is 24 bytes and only four slots are touched -- [BP-6] a Word set to $FFFF, [BP-8] a Word set to 4, [BP-$0B] a BYTE set to 1 then INC'd and compared against 5 (the loop counter), and [BP-$0D] a BYTE set to 4 -- with [BP-2], [BP-4] and everything from [BP-$0E] down to [BP-$18] unreferenced. That is eleven bytes of declared-and-dead below the last live slot, which is a lot even for this author, so read it before transcribing: an odd-offset run has already fooled me once by being a 13-byte record rather than a leading Byte. THE OTHER SPANS, largest first: 1082:036a (110), 1107:04f3 (109), 1107:08fc (111), 1107:00be (83), 1012:0366 (81). None is now worth more than about 130, so the cheap structural wins are done and what is left is per-routine reading. THREE FRAME SIZES STILL MISSING and one is a whole routine: $482 is 1012:05bd, which takes a String by value and reads a 768-byte palette into a local at [BP-$400] and 64,000 bytes through VGA's VirtScr pointer -- P1S1 has no String-taking routine at all. $6 is 1082:0128 BlitClipped, six bytes of locals against our nineteen. $A and $0 are unidentified."
+seen_in = "TPART1"
 state = "open"
 
 [plan.row."001 1012:0004"]
@@ -637,6 +644,11 @@ label = "seven spans on one length change; reads as hand assembler"
 investigation = "part1-depthsort-nested"
 target = "R0"
 
+[plan.row."001 1082:036a"]
+label = "110 bytes, unread"
+investigation = "part1-mosaic-run"
+target = "R0"
+
 [plan.row."001 1082:0572"]
 label = "158 bytes, unread"
 investigation = "part1-mass-targets"
@@ -645,6 +657,11 @@ target = "R0"
 [plan.row."001 10e3:0075"]
 label = "the palette ramp recomputes Round(I*K) once per channel"
 investigation = "part1-trap-deficit"
+target = "R0"
+
+[plan.row."001 10e3:00bb"]
+label = "Mosaic_Run: 24-byte frame, four live slots, eleven dead bytes"
+investigation = "part1-mosaic-run"
 target = "R0"
 
 [plan.row."001 10e3:0148"]

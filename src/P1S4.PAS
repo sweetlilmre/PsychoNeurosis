@@ -112,6 +112,13 @@ type
   TTrailArr = array[0..LastEntry] of TTrail;
   PTrailArr = ^TTrailArr;
 
+  { ShiftTrails is handed @Trail[1] rather than @Trail, so it needs a ONE-based
+    view of the same records: 1107:06aa is MOV DI,$5BD9, which is Trail plus one
+    record, and 1107:05ce reads ES:[DI-1] after DI += K*13 -- the low bound and
+    the Flag field's offset 12 folded together into the minus one. }
+  TTrail1   = array[1..LastEntry] of TTrail;
+  PTrail1   = ^TTrail1;
+
   { 7 bytes in the original: X, Y, D as words and the flag as a byte. }
   TOut = record
     X, Y, D : Integer;
@@ -469,14 +476,50 @@ begin
   end;
 end;
 
-{ [transcribed] 12b2:00f1 -- StarDraw(Segment). One byte per star through the
-  row-offset table at DS:$AB5A. No clipping: the ranges above guarantee it. }
-procedure StarDraw(Segment : Word);
-var
-  I : Integer;
-begin
-  for I := 1 to StarCount do
-    Mem[Segment : Star[I].Y * ScrWidth + Star[I].X] := Star[I].Colour;
+{ --------------------------------------------------------------------------
+  12b2:00f1 -- StarDraw(Segment). HAND ASSEMBLER, verbatim.
+
+  Every tell is present. There is no ENTER, only PUSH BP / MOV BP,SP, in a
+  segment whose other Pascal routine opens ENTER 6 -- so this one was not
+  compiled from Pascal. `MOV BX,0` is two bytes longer than the XOR the code
+  generator emits for a zeroed register. The loop is `DEC CX / JNE` against a
+  count loaded once with `MOV CX,$5A`, where a Pascal `for` would compare
+  against a limit. And the write is a bare STOSB with ES:DI walked by hand.
+
+  It is FAR: 12b2:011d is RETF 2, one Word of parameter.
+
+  BX carries the byte offset into the star array and advances by 9 -- the
+  record size -- so the three loads are one displacement apart from the array
+  base rather than three subscript computations. DX holds BX across the row
+  lookup, because BX is needed as the table index and there is no spare
+  register.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      for I := 1 to StarCount do
+        Mem[Segment : YOfs[Star[I].Y] + Star[I].X] := Star[I].Colour;
+
+  Note the row TABLE, not a multiply: our previous transcription computed
+  Y * ScrWidth, which is the same address by different code.
+  -------------------------------------------------------------------------- }
+procedure StarDraw(Segment : Word); far; assembler;
+asm
+  MOV  AX, Segment              { which screen -- $A000 or the virtual one   }
+  MOV  ES, AX                   { ES:DI addresses the pixel                 }
+  MOV  BX, 0                    { byte offset into Star; NOT xor, verbatim   }
+  MOV  CX, StarCount            { $5A -- 90 stars, counted down             }
+@Star:
+  MOV  DX, BX                   { keep the offset; BX is about to be reused  }
+  MOV  AL, [BX + OFFSET Star + 8]  { .Colour, offset 8 of the nine bytes     }
+  MOV  DI, [BX + OFFSET Star]      { .X, offset 0                            }
+  MOV  BX, [BX + OFFSET Star + 2]  { .Y, offset 2 -- BX now the row          }
+  SHL  BX, 1                    { * 2, a word index into the row table       }
+  ADD  DI, [BX + OFFSET YOfs]   { + YOfs[Y] = Y * 320 -- DS:$AB5A           }
+  STOSB                         { one byte, and DI advances (unused)         }
+  MOV  BX, DX                   { the offset back                            }
+  ADD  BX, 9                    { next star, one record on                   }
+  DEC  CX                       { 12b2:0119                                  }
+  JNE  @Star                    { 12b2:011a                                  }
 end;
 
 { --------------------------------------------------------------------------
@@ -525,16 +568,18 @@ end;
   The grid is fixed in space; what travels along it is the lit state. That is
   why the message flows through the balls instead of the balls flying.
   -------------------------------------------------------------------------- }
-procedure ShiftTrails;
+procedure ShiftTrails(Arr : PTrail1);
 var
-  Row, J, K : Integer;
+  { ENTER 2, so TWO BYTES and no third local. 1107:05a3 is
+    MOV BYTE PTR [BP-1],0 and 1107:05ac MOV BYTE PTR [BP-2],2 -- both counters
+    are Bytes, and the row index K is recomputed inline each time rather than
+    kept, which is why there is no room for it. }
+  Row : Byte;                           { [BP-1], 0 .. 7 }
+  J   : Byte;                           { [BP-2], 2 .. 18 }
 begin
   for Row := 0 to TrailRows - 1 do
     for J := 2 to TrailLen do
-    begin
-      K := Row * TrailLen + J;
-      Trail[K - 1].Flag := Trail[K].Flag;
-    end;
+      Arr^[Row * TrailLen + J - 1].Flag := Arr^[Row * TrailLen + J].Flag;
 end;
 
 { --------------------------------------------------------------------------
@@ -593,7 +638,7 @@ begin
         else
           Trail[Row * TrailLen].Flag := 0;
 
-      ShiftTrails;                          { 1107:06af }
+      ShiftTrails(@Trail[1]);               { 1107:06aa, DS:$5BD9 }
       FrameStep(0, Angle, Angle);           { 1107:06bc -- note the ZERO }
       ClearScreen(VirtScrSeg, 0);           { 1107:06c5 }
 

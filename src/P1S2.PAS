@@ -126,7 +126,7 @@ begin
 
   GetMem(FontBuf, SizeOf(TFontBuf));              { 1082:03A0 -- late }
   BlockRead(F, FontBuf^, SizeOf(TFontBuf));
-  Close(F);
+  { Close is the CALLER's, at 1082:05a4, after this routine returns. }
 end;
 
 procedure Unload;
@@ -457,6 +457,7 @@ begin
   Reset(F, 1);                            { 1082:0588 }
   Seek(F, $00FD00);                       { 1082:0597 }
   Load;                                   { 1082:059c, a near call to offset 0 }
+  Close(F);                               { 1082:05a4, AFTER Load returns }
   ShowWord('ASPHYXIA');                   { 1082:0592 }
   ShowWord('PRESENTS');                   { 1082:059D }
   PaletteFadeOut(FadePause);              { 1082:05BB -- 1491:0330 }
