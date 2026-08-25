@@ -30,6 +30,23 @@ begin
   end;
 end;
 
+{ F IS A LOCAL, NOT A GLOBAL, and the reason is a measurement rather than
+  tidiness. A program's own variables land at the FRONT of DGROUP's
+  uninitialised region, ahead of every unit's, so a 128-byte file record here
+  pushed the part's first variable 128 bytes late and carried every absolute
+  reference in the whole part with it: ColOfs sat at $01F6 where the original
+  has $0172.
+
+  THE REMAINING FOUR BYTES ARE NOT PrevExit, which is what the first version of
+  this note said. ColOfs is at $0176 now, and it stays at $0176 with PrevExit
+  removed altogether and the exit hook with it -- tried, measured, reverted. So
+  128 of the 132 were this record and the last four are somebody else's.
+
+  A HARNESS DISPLACES THE PART IT MEASURES, and that is worth knowing wherever
+  these are generated: any global the harness declares moves every variable in
+  the part under test, so the coverage number is partly a measurement of the
+  measuring apparatus. }
+procedure CheckData;
 var
   F : file;
 begin
@@ -42,7 +59,10 @@ begin
     Halt(1);
   end;
   Close(F);
+end;
 
+begin
+  CheckData;
   WriteLn('part 004 -- the lemmings; single-scene, the harness stands in for the driver');
   WriteLn('Press a key to start.');
   ReadKey;
