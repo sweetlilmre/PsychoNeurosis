@@ -662,6 +662,13 @@ resolution = "THE INITIALISED IMAGE NOW MATCHES IN SIZE EXACTLY -- 752 bytes aga
 name = "part1-last-two"
 finding = "part 001: TWO SMALL DEFECTS LEFT IN THE LAYOUT and both are localised to the byte. FIRST, a two-byte typed constant at DS:$0284 holding $A640. The initialised image matches exactly up to $0283 and diverges there: the original has $A640 and ours goes straight to the next constant, after which everything is shifted by two -- which dsmap confirms as a shift of exactly -2 across ten sites at $0286..$02E2. It sits immediately after P1S5's MViewW and MViewH at $0280 and $0282, so it is most likely a third typed constant in that unit's block. $A640 is 42,560, and read as a DGROUP address it falls inside P1S5's own data ($A106..$AAD4), so a typed constant initialised to the address of one of that unit's variables is the shape to look for -- but that is a hypothesis, not a measurement. Find what reads $0284. SECOND, 112 bytes of UNINITIALISED data, which the MZ header still reports: minalloc is 3,777 paragraphs against the original's 3,784, and it did NOT move when 112 bytes of initialised data were added, so it is a separate shortfall in a separate region. The remaining shifts point at it: -124 across sixteen sites at $AAC2..$AB58 and -104 across thirty-nine at $ACEB..$ACFB, twenty apart. So roughly 104 bytes are missing below both and another twenty between them. USE THE FEEDBACK LOOP rather than inference: add a declaration, rebuild, read minalloc. It moves by exactly what was added, so a candidate can be priced in one build. And run `dsgaps.py` per unit to find the declaration whose gap does not match its size -- that method has now produced four sizes in a row that tiled exactly."
 seen_in = "TPART1"
+state = "resolved"
+resolution = "PART 001 90.0% -> 90.9%, +186 bytes, AND THE DATA SHIFTS COLLAPSED TO A SINGLE +4 ACROSS FIFTY-SEVEN SITES. Two changes did it, one of them an undo. P1S3's FILE RECORD IS A GLOBAL, worth 128 bytes and it was the whole BSS shortfall. dsgaps showed the gap: sorted, this part's recorded addresses run $59D2 for scene 2's file record, 128 bytes on to $5A52, then 128 MORE to $5AD2 where scene 4's begins -- and nothing was declared in that second 128. 10e3:0017 opens ENTER $02, two bytes, which is the counter alone and cannot hold a 128-byte record. Every other scene in the part already had its file record as a global; this was the last local one. minalloc went from 112 bytes short to 16 OVER. AND I REMOVED THE NINETEEN-BYTE VGA STATE BLOCK I ADDED LAST BATCH. It was declared on the strength of sixteen byte addresses measured in $ACEA..$ACFC, it regressed nothing, and it gained nothing -- and that last part was the tell I did not read. With it gone the shift at $ACEB stopped being twenty bytes worse than the shift everywhere else, and all fifty-seven paired references collapsed onto ONE value. The addresses are real; attributing them to VGA was not. Segment 1491 is VGA's CODE and may reference a LATER unit's data, and that is what it does here. A DECLARATION THAT MEASURES AS NEUTRAL IS NOT CONFIRMED, it is unmeasured -- and on this target neutral has now twice meant wrong. WHAT IS LEFT IS TWO NUMBERS: a shift of +4 across 57 sites, so four bytes too many somewhere before them, and a shift of -2 across 10 sites at $0286..$02E2, which is the missing two-byte constant at $0284. minalloc is 16 bytes over. All parts rebuilt, none regressed, three byte-exact artefacts holding, traps identical opcode for opcode."
+
+[[plan.investigation]]
+name = "target-99-percent"
+finding = "THE TARGET IS NOW 99%, RAISED FROM 95%, so six parts are short and not one. Standings: 001 at 90.9%, 003 at 95.6%, 007 at 95.9%, 004 at 96.5%, 005 at 96.7%, 006 at 97.9%. Parts 000, 009 and psycho are at 100% and 002 at 99.9%, so those four are done. PART 001 IS STILL THE BIGGEST GAP but it is no longer the best-understood work: its layout is down to two numbers (a +4 shift across 57 sites and a -2 across 10, plus minalloc 16 bytes over) and every remaining span is small. The other five have never had the treatment part 001 just got, and the methods that paid there are all untried on them: compare the MZ minalloc field for a BSS shortfall, run dsgaps.py per unit to price each global against the gap the comments record, run prologue.py per segment for frame mismatches, and run framehist.py for the frames prologue.py will not pair. START WITH THE CHEAPEST SWEEP ON EACH: minalloc is one struct read and tells you immediately whether a part has a data shortfall at all. Part 001's was 16,704 bytes and closed to 16 in four batches, and none of it needed a disassembler. Do that for 003, 004, 005, 006 and 007 before reading any code."
+seen_in = "TPART1"
 state = "open"
 
 [plan.row."001 1012:0004"]
@@ -1144,9 +1151,19 @@ label = "Waves_Step erase/draw BASM"
 investigation = "part3-s6-left-dark"
 note = "Erase/draw is hand BASM with ES/CX set only in the erase branch; a skipped erase makes the draw store the colour byte into the curve table at 356+NewX (back half of curve 0). Original's left-half brightness is that corruption plus unerased litter; our Pascal-isation had fixed the bug. Block now transcribed verbatim, fragment target @asm 003 120f:01b1 +59 StepEraseDraw."
 
+[plan.row."003 to 99"]
+label = "95.6%, never had the layout treatment"
+investigation = "target-99-percent"
+target = "R0"
+
 [plan.row."004 gen/harness"]
 label = "part 004 is one paragraph of typed constants short; the harness was hiding it"
 investigation = "part4-sixteen-bytes"
+target = "R0"
+
+[plan.row."004 to 99"]
+label = "96.5%, never had the layout treatment"
+investigation = "target-99-percent"
 target = "R0"
 
 [plan.row."005 1096:0000"]
@@ -1202,6 +1219,11 @@ target = "R0"
 [plan.row."006 1118:0907"]
 label = "the reseed test is `<` and the store to Grid[99,I] is UNCONDITIONAL"
 investigation = "part6-fire-height"
+target = "R0"
+
+[plan.row."007 to 99"]
+label = "95.9%, never had the layout treatment"
+investigation = "target-99-percent"
 target = "R0"
 
 [plan.row."125e:0741"]

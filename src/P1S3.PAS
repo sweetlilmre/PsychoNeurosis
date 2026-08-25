@@ -60,6 +60,21 @@ const
   ASSETS  NEUROSIS.DAT $02AEE0, 64,000 bytes:
             assets/part001/intro_screen.png
   -------------------------------------------------------------------------- }
+{ --------------------------------------------------------------------------
+  THIS UNIT'S ONLY GLOBAL, and it was a local in Load.
+
+  DS:$5A52 -- the file record. 10e3:0017 opens ENTER $02, two bytes, which is
+  the counter alone and leaves no room for a 128-byte file record; and the
+  addresses recorded across this part leave exactly 128 bytes unaccounted here.
+  Sorted, they run $59D2 for scene 2's file record, 128 bytes on to $5A52, and
+  then 128 MORE to $5AD2 where scene 4's begins. Nothing was declared in that
+  second 128, this unit has no other unit-level data, and every other scene in
+  the part keeps its file record as a global -- so it is this.
+  -------------------------------------------------------------------------- }
+var
+  F : file;                             { DS:$5A52 }
+
+
 procedure MosaicRun;
 var
   { CntX and CntY first, so they land at [BP-2] and [BP-4] as the binary
@@ -223,7 +238,9 @@ end;
   -------------------------------------------------------------------------- }
 procedure Load;
 var
-  F : file;
+  { ENTER $02 at 10e3:0017 is TWO BYTES -- just the counter. The file record is
+    a GLOBAL, declared with the unit's other data above, which is what every
+    other scene in this part turned out to do as well. }
   I : Integer;
 begin
   Assign(F, 'neurosis.dat');

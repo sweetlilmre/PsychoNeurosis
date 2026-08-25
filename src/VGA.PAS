@@ -119,26 +119,6 @@ var
     indexes this rather than multiplying, which is why it needs no MUL. }
   YOfs       : array[0..ScrHeight - 1] of Word;
 
-  { NINETEEN BYTES OF UNIT STATE THAT WERE NOT DECLARED AT ALL, and their
-    absence put Palette 768 bytes early -- which is what a data-reference map
-    showed as a +768 step in the shift between $AB58 and $ACEB.
-
-    Segment 1491 writes sixteen distinct addresses in $ACEA..$ACFC, and the
-    three it never touches -- $ACEF, $ACF1 and $ACF7 -- are the high halves of
-    Words at $ACEE, $ACF0 and $ACF6. That gives the sizes below and they sum to
-    nineteen exactly, from $ACEA to $ACFC inclusive.
-
-    THE PURPOSES ARE NOT KNOWN. 1491:044c..045e sets several of them from one
-    value masked with $7F, zeroes three and sets another to one, which reads
-    like the fade machinery's state, but nothing here is measured beyond the
-    addresses and the widths. Named for what they are: the block that has to be
-    here for Palette to land in the right place. }
-  State1, State2, State3, State4 : Byte;    { $ACEA .. $ACED }
-  StateW1                       : Word;    { $ACEE }
-  StateW2                       : Word;    { $ACF0 }
-  State5, State6, State7, State8 : Byte;   { $ACF2 .. $ACF5 }
-  StateW3                       : Word;    { $ACF6 }
-  State9, StateA, StateB, StateC, StateD : Byte;  { $ACF8 .. $ACFC }
 
   { Palette WAS DECLARED HERE and the original's VGA has no such global. Every
     palette routine in segment 1491 takes a POINTER: 1491:01c6 and 1491:01f6
