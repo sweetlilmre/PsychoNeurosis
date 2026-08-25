@@ -690,6 +690,12 @@ finding = "PART 006's DATA LAYOUT IS COMPLETE -- minalloc matches EXACTLY and ds
 seen_in = "TPART6"
 state = "open"
 
+[[plan.investigation]]
+name = "part7-frames"
+finding = "NO COVERAGE GAIN THIS BATCH, and the recon is the deliverable. Part 007 is the cheapest part to finish -- 3,945 of 4,112 aligned, so 99% needs only about 126 bytes, and its unaligned spans total 130. ITS BSS ALREADY MATCHES EXACTLY, so the whole gap is CODE, which makes it the one part where the frame instruments are the right first move. FIVE FRAME DIFFERENCES, all in segment 100f, all named, with the referenced slots read out of the original. Two are shortfalls and three surpluses: 100f:00de FliColor256, ENTER $18 (24) against our $12 (18), SIX SHORT. Referenced: -2, -4, -6, -8, -0A as words, then -0E and -10, and a BYTE at -15 -- an odd offset, so a one-byte local or an odd-sized record sits above it. -0C is never touched. 100f:031d Calibrate, ENTER $16 (22) against our $12 (18), FOUR SHORT. Nine word slots from -2 to -12 are all referenced, which is 18, so the remaining four are declared and unread. 100f:02cf ReadTimer, ENTER $04 against our $08, FOUR TOO BIG. Only -2 and -4 are read. 100f:0453 Play, ENTER $238 against our $23A, two too big. 100f:06f7 UpCaseStr, ENTER $104 against our $106, two too big -- and its shape is readable: a 256-byte String value-parameter copy at [BP-$100] plus two 2-byte slots at -$102 and -$104 is 260 exactly, so we have one 2-byte local the original does not. AND A NEGATIVE RESULT ON ReadTimer worth not repeating. Its four extra bytes look like the temporary for `(LongInt(Hi) shl 16) or Lo`, because the original's tail is just MOV AX,[BP-4] / MOV DX,[BP-2] -- the LongInt result IS those four bytes, with no shift and no or. Declaring `T : LongInt absolute Lo` and returning T should have removed the temporary. IT DID NOT: the frame stayed $08 and the walk lost 11 bytes, so either the extra four are not that temporary or `absolute` on a local does not do what it appears to. Reverted. The next attempt should settle what the four bytes ARE before changing the expression again -- a probe on how TP7 frames a LongInt function would do it."
+seen_in = "TPART7"
+state = "open"
+
 [plan.row."001 1012:0004"]
 label = "BuildLens quadrant walk"
 investigation = "pacing"
@@ -1278,6 +1284,21 @@ target = "R0"
 [plan.row."006 dgroup $94E0"]
 label = "Stretch runs to 199, not BotRow -- the whole 38-byte shortfall"
 investigation = "part6-and-part3"
+target = "R0"
+
+[plan.row."007 100f:00de"]
+label = "FliColor256 is six bytes short; a byte local at [BP-15]"
+investigation = "part7-frames"
+target = "R0"
+
+[plan.row."007 100f:031d"]
+label = "Calibrate is four short; nine word slots all read"
+investigation = "part7-frames"
+target = "R0"
+
+[plan.row."007 100f:06f7"]
+label = "UpCaseStr is two too big; 256 + 2 + 2 is the original's 260"
+investigation = "part7-frames"
 target = "R0"
 
 [plan.row."007 to 99"]

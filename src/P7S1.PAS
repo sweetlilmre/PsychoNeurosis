@@ -540,6 +540,17 @@ end;
   -------------------------------------------------------------------------- }
 function ReadTimer : LongInt;
 var
+  { THE RESULT IS THE TWO WORDS SEEN AS ONE LONGINT, not an expression over
+    them: 100f:0315 is MOV AX,[BP-4] / MOV DX,[BP-2] and nothing else. Written
+    as `(LongInt(Hi) shl 16) or Lo`, as it is below, the compiler needs a
+    four-byte temporary for the shift and this frame comes out ENTER $08 where
+    the original is $04.
+
+    A `LongInt absolute Lo` alias with `ReadTimer := T` was TRIED and did not
+    fix it -- the frame stayed $08 and the walk lost 11 bytes -- so the extra
+    four bytes are not the shift temporary after all, or `absolute` on a local
+    does not do what it appears to. Left as it was; the frame is still four
+    bytes too big and the cause is not yet found. }
   Lo : Word;                        { [BP-4] }
   Hi : Word;                        { [BP-2] }
 begin
