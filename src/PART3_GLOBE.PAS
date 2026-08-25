@@ -71,8 +71,17 @@ var
   -------------------------------------------------------------------------- }
 procedure FadeOut;
 var
-  I       : Word;
-  R, G, B : Byte;
+  { EIGHT BYTES, NOT SIX. 119d:0000's slots are [BP-$02] never touched,
+    [BP-$04] five times, [BP-$06] four times and [BP-$08] never touched, with
+    the lowest touched byte at [BP-$07] -- so the three colour bytes are at
+    $05, $06 and $07, the counter is the word at $04, and there is an unread
+    word declared BEFORE it and an unread byte declared AFTER the colours. An
+    unreferenced local is still allocated, so the operand counts both and
+    nothing in the instruction stream points at either. }
+  Unread  : Word;                 { [BP-$02], never read }
+  I       : Word;                 { [BP-$04] }
+  R, G, B : Byte;                 { [BP-$05], [BP-$06], [BP-$07] }
+  Spare   : Byte;                 { [BP-$08], never read }
 begin
   WaitRetrace;
   for I := 0 to 255 do
@@ -112,8 +121,14 @@ var
     -------------------------------------------------------------------------- }
   procedure FadeIn;
   var
-    I          : Word;
-    R, G, B    : Byte;
+    { THE SAME EIGHT-BYTE SHAPE AS FadeOut, and the same slots: 119d:0064 has
+      [BP-$02] and [BP-$08] never touched around a word at $04 and the three
+      colour bytes at $05..$07. Two routines written from one template, and
+      both declared two of their locals and never read them. }
+    Unread     : Word;              { [BP-$02], never read }
+    I          : Word;              { [BP-$04] }
+    R, G, B    : Byte;              { [BP-$05], [BP-$06], [BP-$07] }
+    Spare      : Byte;              { [BP-$08], never read }
   begin
     if KeyPressed then Exit;
     WaitRetrace;
@@ -143,6 +158,15 @@ var
           See docs/10-part3-scene4-globe.md.
   -------------------------------------------------------------------------- }
   procedure LoadTables;
+  var
+    { ONE HUNDRED AND TWENTY-EIGHT BYTES THIS ROUTINE NEVER READS. 119d:010f
+      opens ENTER $80 and there is not one BP-relative reference in the whole
+      routine -- everything it touches is either the static link at [BP+$04] or
+      DGROUP. 128 is the size of an untyped `file` variable, so the likeliest
+      reading is a second file record declared here and abandoned when the
+      author moved it to the unit's own storage. Whatever it was, the space is
+      reserved and the operand says so. }
+    Unread : array[0..127] of Byte;
   begin
     GetMem(SrcOfs, TableSize);                 { 119d:0113 -> SS:[link-$0A] }
     GetMem(DstOfs, TableSize);                 { 119d:0126 -> SS:[link-$06] }
@@ -206,7 +230,10 @@ var
     { 119d:01a3 and 119d:01af -- RenderFrame's OWN two words: the segments of
       the parent's two tables, copied down here once so the loop can reload DS
       from a register three times a pixel. }
-    SrcSeg, DstSeg : Word;
+    SrcSeg, DstSeg : Word;          { [BP-$02], [BP-$04] }
+    Unread         : Word;          { [BP-$06], never read -- 119d:018b's
+                                      ENTER is $06 and the lowest slot the
+                                      routine touches is [BP-$04] }
   begin
     { 119d:018f -- the frame is abandoned the moment a key is down. }
     if KeyPressed then Exit;

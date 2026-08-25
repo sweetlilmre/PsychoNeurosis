@@ -102,7 +102,14 @@ var
   -------------------------------------------------------------------------- }
 procedure LoadCurves;
 var
-  I : Integer;
+  { THE FIRST HUNDRED AND TWENTY-EIGHT BYTES ARE NEVER READ. 120f:0017 opens
+    ENTER $86 and its slots run [BP-$02] down to [BP-$80] with not one
+    reference between them, then [BP-$82], [BP-$84] and [BP-$86] carrying all
+    the traffic. First declared is nearest BP, so the dead block is declared
+    FIRST and the words after it -- 128 is the size of an untyped `file`, and
+    Globe_LoadTables in this same part has exactly the same dead 128 bytes. }
+  Unread : array[0..127] of Byte;   { [BP-$01]..[BP-$80], never read }
+  I      : Integer;
 begin
   Assign(F, 'neurosis.dat');
   Reset(F, 1);
@@ -238,7 +245,19 @@ procedure Run;
 
   procedure Pass(SeedCurve, SeedRow : Integer);
   var
-    I, J, N : Integer;
+    { SIX BYTES AND ONLY FOUR OF THEM DECLARED. 120f:01f8 opens ENTER $06 with
+      [BP-$02] 43 times, [BP-$04] 24 and [BP-$06] 12; the third is the
+      compiler's, because 120f:0478 stores the mod result into [BP-$06] and the
+      loop below compares against it every iteration. So there is no N -- the
+      phase count is written as the `for` limit and Turbo Pascal makes the
+      temporary itself. Declaring it produced BOTH, and the frame came out $08.
+
+      WHICH VARIABLE IS WHICH IS ALSO FIXED. The seeding loop and the inner
+      phase-step loop share [BP-$02]; the outer loop of the phase spread has
+      [BP-$04] to itself. First declared is nearest BP, so I is the one that
+      does two jobs and J counts particles in the second loop -- the reverse of
+      how it reads. }
+    I, J : Integer;                 { [BP-$02], [BP-$04] }
   begin
     for I := 1 to Particles do
     begin
@@ -255,11 +274,10 @@ procedure Run;
       end;
     end;
 
-    for I := 1 to Particles do
+    for J := 1 to Particles do
     begin
-      N := (I * 15) mod 360;
-      for J := 1 to N do
-        P[I].Phase := P[I].Phase mod PhaseWrap + 1;
+      for I := 1 to (J * 15) mod 360 do          { 120f:0470 }
+        P[J].Phase := P[J].Phase mod PhaseWrap + 1;
     end;
 
     SweepX := SweepFrom;

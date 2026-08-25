@@ -335,8 +335,17 @@ end;
   -------------------------------------------------------------------------- }
 procedure FadeStep;
 var
-  I       : Integer;
-  R, G, B : Byte;
+  { EIGHT BYTES, NOT SIX, and the same shape as part 003's two other fade
+    steps: 125e:047a's slots are [BP-$02] never touched, [BP-$04] eight times,
+    [BP-$06] four times and [BP-$08] never touched, with the lowest touched
+    byte at [BP-$07]. So an unread word is declared first, the counter is the
+    word at $04, the three colour bytes are $05..$07, and an unread byte
+    follows them. Three routines in this part share the template and all three
+    declare the same two locals without reading either. }
+  Unread  : Word;                 { [BP-$02], never read }
+  I       : Integer;              { [BP-$04] }
+  R, G, B : Byte;                 { [BP-$05], [BP-$06], [BP-$07] }
+  Spare   : Byte;                 { [BP-$08], never read }
 begin
   WaitRetrace;                                   { 125e:047e }
   for I := 0 to 255 do
@@ -409,7 +418,14 @@ procedure Load;
 var
   F   : file;                                    { DS:$E6EC }
   I   : Integer;                                 { [BP-$82] }
-  Tmp : array[0..AngleWrap - 1] of               { [BP-$626] }
+  { ONE ENTRY MORE THAN THE ANGLE RANGE. 125e:012e opens ENTER $626 and the
+    lowest slot the routine names is [BP-$82], so the buffer below it is
+    $626 - $82 = 1,444 bytes; at four bytes a record that is 361 entries, not
+    360. Declared 0..AngleWrap - 1 the frame came out $622, four short. The
+    extra entry is index 360, which the wobble table's `mod AngleWrap` can
+    never reach -- so it is allocated and never written, like the 128 dead
+    bytes above it. }
+  Tmp : array[0..AngleWrap] of                   { [BP-$626] }
           record X, Y : Integer end;
 
   { 125e:00d3. The original declares this twice -- once nested in Load and
