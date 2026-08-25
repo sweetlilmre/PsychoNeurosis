@@ -742,6 +742,13 @@ resolution = "THE PROBE SETTLED IT: A `for` LOOP COSTS TWO BYTES OF FRAME FOR IT
 name = "apply-for-temp"
 finding = "APPLY THE for-LOOP TEMPORARY FINDING to the two routines it has not been tried on. A `for` costs two bytes of frame for its limit, measured in probe/TWOBYTE.PAS, so a routine whose frame exceeds its declarations by exactly two usually has a `for` -- and one whose frame MATCHES its declarations while ours is two over has declared a limit variable the original left to the temporary. P6S1's Whoosh at 1095:067d, ENTER $112 against our $114: our nine declared words plus the 256-byte String copy come to 274, which IS $112, so on the new reading one of those nine is the loop's temporary rather than a declaration. Len at [BP-$112] is the candidate -- it is the deepest slot and it is what a limit temporary would be -- but the original DOES reference [BP-$112], so check whether that reference is the loop's own compare before removing the declaration. P5S2's Shatter at 1096:0042, ENTER $26 against our $28: seventeen locals sum to 38 = $26 exactly, so again one of them is a temporary. Limit at [BP-$25] is the candidate and the original does NOT reference it, which is the stronger case of the two. Do Shatter first: an unreferenced deepest slot that we declare and the original spends on a loop temporary is exactly the shape the probe describes."
 seen_in = "TPART5"
+state = "resolved"
+resolution = "THE for-TEMPORARY FINDING PAID ON BOTH ROUTINES AND A THIRD BESIDES. PART 006 NOW HAS ZERO FRAME DIFFERENCES IN EVERY SEGMENT, and part 005 has one. Part 005 97.3% -> 97.4%. P5S2's Shatter: `Limit := Count; for I := 1 to Limit` paid for the variable AND the loop's temporary, giving $28 against the original's $26. The original never reads a slot at [BP-$25]. Written `for I := 1 to Count` the sixteen remaining locals sum to 36 and the temporary makes 38. +13 bytes on the walk. P6S1's Whoosh: [BP-$112] IS the loop's temporary and not a declared Len -- 1095:06c6 stores the length there and 1095:06cd compares against the same slot, which is store-then-compare, what a `for` does with its limit. Dropping Len and looping over Length(S) matched the frame. That is the distinction the previous session could not make: the original DOES reference [BP-$112], so the reference alone did not settle whether it was a declaration -- the store-then-compare PAIR is what settles it. P5S1's HeightFromMap, which was not on the list: ENTER $04 with only [BP+4] and [BP-2] read, so two bytes are declared and never touched. AND IT IS NOT A LOOP TEMPORARY -- 100e:05c8 compares [BP-2] against the constant $3FF directly, and a constant limit needs no temporary, which is the other half of what the probe measured. So the same instrument that adds a slot in one routine rules one out in another."
+
+[[plan.investigation]]
+name = "part5-last-frame"
+finding = "PART 006's FRAMES ARE COMPLETE -- framehist reports zero differing frame sizes across all seven segments -- so everything left in it is bodies, and it needs about 42 bytes for 99%. Its three remaining spans: 100f:0543 (29), which is a REGISTER-ALLOCATION difference and was deliberately left (the original builds the palette index in DI directly, ours in AX then transfers; the displacements and the folded base already match and Pascal does not name the register); 11bb:0096 (18), which is SetPalette768 followed by Close and differs only in the far-call target and the file record's DS address; and 1095:063c (16), unread. So part 006 may not reach 99% without addressing displacement noise, and that is a different kind of work from everything in this batch. PART 005 HAS ONE FRAME LEFT, $102 MISSING, and prologue.py does not report it in any of the seven segments -- so it belongs to a routine the tool lists as `unproven, nothing calls this` or one outside the segment bounds. 258 is a String parameter's 256-byte copy plus two, so look for a routine taking a String that we have as taking something else, or one we have not written. framehist found it; prologue cannot name it. That pair of tools disagreeing IS the signal -- it means the routine exists in the original and has no counterpart of ours confident enough to pair."
+seen_in = "TPART5"
 state = "open"
 
 [plan.row."001 1012:0004"]
@@ -1294,6 +1301,11 @@ label = "~210 bytes still missing before scene 3's block"
 investigation = "part5-layout"
 target = "R0"
 
+[plan.row."005 frame $102"]
+label = "a String-taking routine framehist sees and prologue cannot name"
+investigation = "part5-last-frame"
+target = "R0"
+
 [plan.row."006 100f:00ac"]
 label = "LoadCel is NESTED -- the pushed BP is a static link, RET 8"
 investigation = "part6-to-99"
@@ -1305,8 +1317,8 @@ investigation = "part6-to-99"
 target = "R0"
 
 [plan.row."006 100f:0543"]
-label = "Setup's palette loop -- locate by ENTER $386, not the fetch"
-investigation = "part6-last-42"
+label = "register allocation, deliberately left"
+investigation = "part5-last-frame"
 target = "R0"
 
 [plan.row."006 1095:0114"]
@@ -1362,6 +1374,11 @@ target = "R0"
 [plan.row."006 dgroup $94E0"]
 label = "Stretch runs to 199, not BotRow -- the whole 38-byte shortfall"
 investigation = "part6-and-part3"
+target = "R0"
+
+[plan.row."006 frames"]
+label = "COMPLETE -- zero differing frame sizes in all seven segments"
+investigation = "part5-last-frame"
 target = "R0"
 
 [plan.row."007 100f:00de"]

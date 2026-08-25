@@ -249,7 +249,12 @@ var
   Pass           : Integer;   { [BP-$1D] }
   Work           : Pointer;   { [BP-$21] }
   WorkSeg        : Word;   { [BP-$23] }
-  Limit          : Integer;   { [BP-$25] }
+  { Limit WAS DECLARED HERE and the original does not declare it. A `for` loop
+    costs two bytes of frame for its limit whatever the limit is -- measured in
+    probe/TWOBYTE.PAS -- so `Limit := Count; for I := 1 to Limit` pays for the
+    variable AND the temporary, which is why this frame came out $28 against
+    the original's $26. The remaining sixteen locals sum to 36 and the loop's
+    temporary makes 38 = $26. The original never reads a slot at [BP-$25]. }
 begin
   GetMem(Work, 64000);                           { 1096:0046 }
   WorkSeg := Seg(Work^);                         { 1096:0054 }
@@ -317,8 +322,7 @@ begin
     begin
       { 1096:01d1 -- erase: put back whatever the background has at the
         position the dot occupied on the PREVIOUS step. }
-      Limit := Count;
-      for I := 1 to Limit do
+      for I := 1 to Count do
       begin
         T  := Dots^[I].Age - 1;                  { 1096:01f9 }
         X1 := Dots^[I].ToX;                      { 1096:0206 }
@@ -333,8 +337,7 @@ begin
 
       { 1096:0297 -- draw: the dot's own colour at the NEW position, and only
         then is Age stepped. }
-      Limit := Count;
-      for I := 1 to Limit do
+      for I := 1 to Count do
       begin
         T  := Dots^[I].Age;                      { 1096:02b9 -- no -1 here }
         X1 := Dots^[I].ToX;                      { 1096:02cb }

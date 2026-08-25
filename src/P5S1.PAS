@@ -786,7 +786,13 @@ end;
   animation.
   -------------------------------------------------------------------------- }
 procedure HeightFromMap(Threshold : Byte);
-var I : Integer;
+var
+  { ENTER $04 is four bytes and only [BP-2] is read, so the two below it are
+    declared and never touched. NOT a for-loop temporary: 100e:05c8 compares
+    [BP-2] against the constant $3FF directly, and a constant limit needs no
+    temporary -- which is the other half of what probe/TWOBYTE.PAS measured. }
+  I     : Integer;                { [BP-2] }
+  Spare : Integer;                { [BP-4], never referenced }
 begin
   for I := 0 to GridVerts - 1 do
     if HeightMap[I] > Threshold then                  { 100e:058b, JBE }

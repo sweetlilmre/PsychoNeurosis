@@ -235,7 +235,12 @@ var
   PathOfs        : Word;   { [BP-$10C] }
   DotSeg         : Word;   { [BP-$10E] }
   DotOfs         : Word;   { [BP-$110] }
-  Len            : Integer;   { [BP-$112] }
+  { Len WAS DECLARED HERE and [BP-$112] is the FOR LOOP's OWN TEMPORARY, not a
+    variable. 1095:06c6 stores the length there and 1095:06cd compares against
+    the same slot -- store-then-compare is what a `for` does with its limit.
+    A `for` costs two bytes of frame whatever the limit is, measured in
+    probe/TWOBYTE.PAS, so declaring Len as well paid twice and made this frame
+    $114 against the original's $112. }
   { AND NOTHING BELOW $112. The running index is SI and it is ONLY ever SI:
     1095:06F8 is `XOR SI,SI` where a declared variable would be a store to the
     frame, and the register is then carried across the `Move` at 1095:0768 --
@@ -246,9 +251,9 @@ var
 begin
   PathSeg := Seg(Path^);   PathOfs := Ofs(Path^);    { 1095:0698 }
   DotSeg  := Seg(Dots^);   DotOfs  := Ofs(Dots^);    { 1095:06ac }
-  Len     := Length(S);                              { 1095:06c0 }
 
-  for CharIdx := 1 to Len do
+
+  for CharIdx := 1 to Length(S) do                   { 1095:06c0 }
   begin
     LoadGlyph(Ord(S[CharIdx]));                  { 1095:06e9 }
     for Pass := 1 to Lanes do
