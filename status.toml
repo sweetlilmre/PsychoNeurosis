@@ -291,10 +291,10 @@ outcome = "differs"
 achieved = "R2"
 observer = "maintainer"
 date = "2026-08-25"
-confirmed_at = "80178de2c021"
-fingerprint = "e1bf5aff3bd5b982"
+confirmed_at = "d1b7e9a59d5e"
+fingerprint = "64bde46a96c2b509"
 against = "NEUROSIS_006.exe"
-note = "Watched beside ORIG6 on 25 Aug 2026, after this session's three P6S3 fixes (SetDAC as hand assembler, Setup's var block reordered and 256 bytes added, Pal as 256 three-byte records) and P6S1's Abs fix. THREE VERDICTS, ONE OF THEM A DEFECT. Scene 1, the whooshtext: a bit JERKY. Scene 3, the fire: it DOES NOT CLIMB AS HIGH up the screen as the original -- definitely different. The final scene looks the same and the timing is very similar. So part 006 is NOT confirmable at R3 and part6-confirm-r3 stays open; the fire height is a new defect with a watched run behind it, which is the strongest evidence this project gets."
+note = "THE FIRE IS CONFIRMED CORRECT. Watched beside ORIG6 on 25 Aug 2026, after the reseed fix -- the test changed from `>` to `<` and the store to Grid[99,I] made UNCONDITIONAL, so the seed is sticky across columns. The maintainer reports scene 3's fire now correct, which closes part6-fire-height against a run rather than against a byte count. OUTCOME STILL `differs` DELIBERATELY: this report is about the fire and says nothing about scene 1, which the 25 Aug run called JERKY and for which no cause has been found. Nothing here retracts that, so part6-confirm-r3 stays open and the part is not confirmable at R3 yet. Recording `matches` on the strength of a sentence about one scene would be putting words in the observer's mouth."
 
 [observation."TPART7"]
 harness = "TPART7"
