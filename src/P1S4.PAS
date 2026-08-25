@@ -26,6 +26,8 @@
           original targets 386 and above. }
 
 unit P1S4;
+{$I-}   { no I/O check: the original goes straight on after each file
+          call, with no near CALL to the RTL's check routine. }
 
 interface
 
@@ -125,6 +127,7 @@ type
   TFont = array[0..FontChars - 1, 1..8, 1..8] of Byte;
 
 var
+  F : file;                       { DS:$5AD2 -- unit-level, see Load }
   { DS:$5BCC -- entry 0 is the translation, 1..144 are the grid. }
   Trail : array[0..LastEntry] of TTrail;
   { DS:$632F, stride 7 }
@@ -549,7 +552,9 @@ end;
   -------------------------------------------------------------------------- }
 procedure Load;
 var
-  F : file;
+  { THE FILE RECORD IS A GLOBAL, not a local. 1107:007f pushes DS:$5AD2 as the
+    file for the second BlockRead -- a data-segment address, where a local
+    would be LEA'd off SS. It is declared beside the unit's other data below. }
   I : Integer;
 begin
   Assign(F, 'neurosis.dat');

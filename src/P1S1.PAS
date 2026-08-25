@@ -7,6 +7,8 @@
   =========================================================================== }
 
 unit P1S1;
+{$I-}   { no I/O check: the original goes straight on after each file
+          call, with no near CALL to the RTL's check routine. }
 
 {$G+}   { 286: every framed routine in 1012 opens ENTER, e.g. Bounce_Run
           1012:03e3 ENTER $54. }
