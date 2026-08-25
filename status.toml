@@ -422,6 +422,13 @@ seen_in = "TPART3"
 state = "resolved"
 resolution = "THREE DEFECTS IN ONE 72-BYTE ROUTINE, now BYTE-IDENTICAL, and part 003 is at 88.1 percent. Each was found by a bracket rather than an argument, and one of the brackets was a REGRESSION that located the truth. ONE: 1015:06bc reads a BYTE FROM MEMORY where a plain const would have folded into the instruction -- MOV AL,[$76B6] / XOR AH,AH / MUL [BP+4]. That address is ModeX's LogicalWidth, a Byte TYPED constant, and the XOR is its unsigned widening. Ours used CrtcOffset, a plain const, which folded to the literal 80. Both images already held 50 at $76B6 because the data layout was already right, so the fix was to reference the existing constant, not to declare a new one -- declaring one would have displaced everything after it. TWO: THE TERM ORDER, and the disassembly reads the wrong way round. The original computes X shr 2 FIRST, into CX, and multiplies second, so the obvious conclusion is that the shift is the LEFT operand. It is not: TP evaluates the SECOND operand of this addition first. Measured all three ways -- 12227 aligned before, 12224 with the shift written on the left, 12243 with it on the right. The three-byte REGRESSION is what proved the direction. THREE: the CRTC pair is HAND ASSEMBLER and the arithmetic is NOT, and two bytes drew the line. The original loads Addr into BX once and writes both halves as 16-bit OUT DX,AX, index in AL and data in AH; PortW with `$0C or (Hi(Addr) shl 8)` does emit the 16-bit OUT and then builds the word as MOV AL / XOR AH,AH / SHL AX,8 / OR AX,$000C, eleven bytes where the original spends four. But transcribing the WHOLE routine as assembler left exactly two bytes wrong -- 8B C8 against 89 C1 for MOV CX,AX, and 03 C1 against 01 C8 for ADD AX,CX -- both in the opening arithmetic and none in the tail. Opposite direction bits, same mnemonics: the compiler and BASM disagree, so those two bytes named the block boundary to the byte. A Pascal statement followed by an asm block at exactly that point is identical in all 72. Written up in the wiki as a new section of direction-bit-names-basm, because the page's ratio refuses to speak below eight qualifying operations and this decided it on two. NOT RE-OBSERVED. SetDisplayStart runs once per frame of scene 1, so this is behaviourally live code, but nothing about it should look different."
 
+[[plan.investigation]]
+name = "part3-onebased-tables"
+finding = "part 003's next cause is 1015:018d, five spans, inside RotateBandsFine -- the unrolled band rotation that shifts fifteen entries in each of three colour tables."
+seen_in = "TPART3"
+state = "resolved"
+resolution = "THE COLOUR TABLES ARE ONE-BASED, and the subscript fold is what says so. 88.1 to 89.0 percent. 1015:018d computes Band*BandSize + 1 into DI and folds +1 into the displacement, which is base $0002 minus a low bound of 1. A 0-based table gives DI = Band*BandSize and a displacement of 2, which is what ours emitted. TColourTable and RotTmp are array[1..N], every subscript shifted by one -- 99 of them -- and band b is then b*15+1..b*15+15, which is also how the fifteen unrolled moves read naturally. Worth 87 bytes. RotateBandsFine is now byte-identical for its whole first band except one displacement. A SECOND FINDING FROM THE SAME ROUTINE: the store went through [DI+$A7EF] where ours used [DI+$A7DB], and chasing that 20-byte gap gave this unit's variable ORDER, read straight off the addresses. 1015:088d pushes [$A7DE] then [$A7E0] as SetDisplayStart's two parameters, so PanX and PanY come FIRST; Angle's three words are $A7E2, $A7E4, $A7E6; Radius is $A7E8..$A7ED; and RotTmp[1] is at $A7F0. Ours had Angle and Radius first and RotTmp before them. Reordering was worth another 33 bytes and took the shift from +9 to -2. UNRESOLVED, AND THE RESIDUAL IS EXACTLY TWO BYTES. Our PanX lands at $A7DC where the original's is $A7DE, so this unit wants two more bytes BEFORE PanX, and it cannot simply be given them. Measured both placements: a Word below PanX fixed every address in the unit and pushed PART3_STARS' variables up by 2 -- its base was already right -- costing 569 bytes of the walk; a Word between Radius and RotTmp left the -2 untouched and cost the same 569. So the two bytes are a REDISTRIBUTION inside this unit rather than an addition: something declared here is two bytes larger than the original's. YOffset at 800 entries and PlaneOf at LogWidth are the candidates and NEITHER HAS BEEN CHECKED against the binary. That is the next step, and it comes before adding any declaration. The source carries this note at the var block. Not re-observed. The rotation runs every frame of scene 1, so this is live code, but the behaviour is unchanged -- the same fifteen bytes move the same way."
+
 [plan.row."001 1012:0004"]
 label = "BuildLens quadrant walk"
 investigation = "pacing"
@@ -595,6 +602,16 @@ note = "Running tools/emit_pascal_data2.py to regenerate P2OBJ.INC also rewrote 
 [plan.row."003 1015:0000"]
 label = "UploadPalette is hand assembler: LOOP, ADC BH,0, pointers in locals"
 investigation = "part3-init-and-palette"
+target = "R0"
+
+[plan.row."003 1015:018d"]
+label = "the colour tables are 1-based; the fold names the low bound"
+investigation = "part3-onebased-tables"
+target = "R0"
+
+[plan.row."003 1015:0191"]
+label = "Tunnel's var ORDER: PanX, PanY, Angle, Radius, then RotTmp"
+investigation = "part3-onebased-tables"
 target = "R0"
 
 [plan.row."003 1015:06b0"]

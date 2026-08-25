@@ -106,7 +106,12 @@ const
   AngleWrap   = 360.0;
 
 type
-  TColourTable = array[0..NumColours - 1] of Byte;
+  { ONE-BASED, and the subscript fold says so. 1015:018d computes
+    Band*BandSize + 1 into DI and folds +1 into the displacement -- base
+    $0002 minus a low bound of 1. A 0-based table gives DI = Band*BandSize
+    and a displacement of 2, which is what this emitted before. It also
+    makes the unrolled moves read naturally: band b is b*15+1 .. b*15+15. }
+  TColourTable = array[1..NumColours] of Byte;
 
 { Three separate R/G/B channel tables, not interleaved triples. These are
   TYPED CONSTANTS, not vars: they sit in the executable's initialised data at
@@ -134,13 +139,30 @@ var
   { 1 shl (x mod 4) -- the Map Mask value for each column. }
   PlaneOf  : array[0..LogWidth - 1] of Byte;
 
+  { THE ORDER OF THE NEXT FIVE IS READ STRAIGHT OFF THE ADDRESSES, and it is
+    not the order a person would write them in. 1015:088d pushes [$A7DE] then
+    [$A7E0] as SetDisplayStart's two parameters, so PanX and PanY come FIRST;
+    Angle's three words are $A7E2, $A7E4, $A7E6 and Radius's are $A7E8..$A7ED;
+    and 1015:0191 stores through [DI+$A7EF], putting RotTmp[1] at $A7F0.
+
+    UNRESOLVED, AND MEASURED THREE WAYS. Our PanX lands at $A7DC where the
+    original's is $A7DE, so this unit wants two more bytes BEFORE PanX -- and
+    it cannot simply have them. Adding a Word here fixed every address in this
+    unit and pushed PART3_STARS' variables up by 2 (its base was already
+    right), costing 569 bytes of the coverage walk. Putting the Word between
+    Radius and RotTmp instead left the -2 shift untouched and cost the same
+    569. So the two bytes are a REDISTRIBUTION inside this unit, not an
+    addition: something declared here is two bytes larger than the original's.
+    YOffset at 800 entries and PlaneOf at LogWidth are the candidates, and
+    neither has been checked against the binary. Do that before adding
+    anything. }
+  PanX, PanY    : Integer;      { $A7DE, $A7E0 }
+  Angle, Radius : Real;         { $A7E2, $A7E8 }
+
   { The byte RotateBandsFine lifts out of each band before shifting it. Every
     reference in 1015:0191 is indexed BY THE BAND, so the original kept fifteen
     of them rather than one scalar. }
-  RotTmp   : array[0..BandCount - 1] of Byte;
-
-  Angle, Radius : Real;
-  PanX, PanY    : Integer;
+  RotTmp   : array[1..BandCount] of Byte;   { $A7F0, 1-based: DI = Band+1 }
 
   { UNIT-LEVEL, and the chain of addresses is what says so. This unit's vars run
     from Crt's at DS:$9F0E: YOffset 1,600 bytes, PlaneOf 640, RotTmp 15, then
@@ -268,8 +290,8 @@ end;
   FOR REFERENCE ONLY, the equivalent Pascal -- not what the binary does:
     Port[$3C8] := 1;
     for I := 0 to NumColours - 1 do begin
-      Port[$3C9] := Red[I];  Port[$3C9] := Green[I];
-      Port[$3C9] := Blue[I];
+      Port[$3C9] := Red[I + 1];  Port[$3C9] := Green[I + 1];
+      Port[$3C9] := Blue[I + 1];
     end;
 }
 procedure UploadPalette; assembler;
@@ -328,8 +350,7 @@ begin
   for Band := 0 to BandCount - 1 do
   begin
     { Red -- DS:$0002 }
-    RotTmp[Band] := Red[Band * BandSize];
-    Red[Band * BandSize] := Red[Band * BandSize + 1];
+    RotTmp[Band + 1] := Red[Band * BandSize + 1];
     Red[Band * BandSize + 1] := Red[Band * BandSize + 2];
     Red[Band * BandSize + 2] := Red[Band * BandSize + 3];
     Red[Band * BandSize + 3] := Red[Band * BandSize + 4];
@@ -343,11 +364,11 @@ begin
     Red[Band * BandSize + 11] := Red[Band * BandSize + 12];
     Red[Band * BandSize + 12] := Red[Band * BandSize + 13];
     Red[Band * BandSize + 13] := Red[Band * BandSize + 14];
-    Red[Band * BandSize + 14] := RotTmp[Band];
+    Red[Band * BandSize + 14] := Red[Band * BandSize + 15];
+    Red[Band * BandSize + 15] := RotTmp[Band + 1];
 
     { Green -- DS:$00E3 }
-    RotTmp[Band] := Green[Band * BandSize];
-    Green[Band * BandSize] := Green[Band * BandSize + 1];
+    RotTmp[Band + 1] := Green[Band * BandSize + 1];
     Green[Band * BandSize + 1] := Green[Band * BandSize + 2];
     Green[Band * BandSize + 2] := Green[Band * BandSize + 3];
     Green[Band * BandSize + 3] := Green[Band * BandSize + 4];
@@ -361,11 +382,11 @@ begin
     Green[Band * BandSize + 11] := Green[Band * BandSize + 12];
     Green[Band * BandSize + 12] := Green[Band * BandSize + 13];
     Green[Band * BandSize + 13] := Green[Band * BandSize + 14];
-    Green[Band * BandSize + 14] := RotTmp[Band];
+    Green[Band * BandSize + 14] := Green[Band * BandSize + 15];
+    Green[Band * BandSize + 15] := RotTmp[Band + 1];
 
     { Blue -- DS:$01C4 }
-    RotTmp[Band] := Blue[Band * BandSize];
-    Blue[Band * BandSize] := Blue[Band * BandSize + 1];
+    RotTmp[Band + 1] := Blue[Band * BandSize + 1];
     Blue[Band * BandSize + 1] := Blue[Band * BandSize + 2];
     Blue[Band * BandSize + 2] := Blue[Band * BandSize + 3];
     Blue[Band * BandSize + 3] := Blue[Band * BandSize + 4];
@@ -379,7 +400,8 @@ begin
     Blue[Band * BandSize + 11] := Blue[Band * BandSize + 12];
     Blue[Band * BandSize + 12] := Blue[Band * BandSize + 13];
     Blue[Band * BandSize + 13] := Blue[Band * BandSize + 14];
-    Blue[Band * BandSize + 14] := RotTmp[Band];
+    Blue[Band * BandSize + 14] := Blue[Band * BandSize + 15];
+    Blue[Band * BandSize + 15] := RotTmp[Band + 1];
   end;
 end;
 
@@ -395,10 +417,10 @@ procedure RotateBandsCoarse;
     I   : Integer;
     Tmp : array[0..BandSize - 1] of Byte;
   begin
-    Move(T[NumColours - BandSize], Tmp, BandSize);
-    for I := NumColours - 1 downto BandSize do
+    Move(T[NumColours - BandSize + 1], Tmp, BandSize);
+    for I := NumColours downto BandSize + 1 do
       T[I] := T[I - BandSize];
-    Move(Tmp, T[0], BandSize);
+    Move(Tmp, T[1], BandSize);
   end;
 
 begin
