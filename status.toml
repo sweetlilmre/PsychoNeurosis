@@ -804,6 +804,13 @@ finding = "PART 005's LAST 136 BYTES ARE TWO CODE-GENERATION PUZZLES AND NOTHING
 seen_in = "TPART5"
 state = "open"
 
+[[plan.investigation]]
+name = "part6-close"
+finding = "PART 006 98.6 -> 99.3%, AND THE SPAN THAT HAD BEEN WRITTEN OFF AS UNFIXABLE WAS A DECLARATION ALL ALONG. 100f:0543 was recorded as `a REGISTER-ALLOCATION difference, deliberately left -- the original builds the palette index in DI, ours in AX then transfers; Pascal does not name the register`. That was wrong. It is the palette's TYPE: array[0..255, 0..2] of Byte rather than array[0..767], which puts the channel in a constant second subscript the compiler folds into the displacement instead of adding at run time -- and once the index is built the way a two-dimensional subscript builds it, the register follows. 29 bytes, and it closed to zero. THE LESSON IS THE MISATTRIBUTION: a difference blamed on the code generator's freedom was a difference in the source's types, and calling it unfixable stopped anyone looking for a year of sessions. THAT IS THE THIRD PALETTE IN ONE DAY -- part 004's ScenePal, part 005's P5S2 and this one -- all flat array[0..767] in ours and all two-dimensional in the original. It is this target's default shape for a 768-byte DAC buffer and should be assumed, not discovered a fourth time. AND P6S1's FONT IS THREE-DIMENSIONAL for the same reason, one dimension deeper. 1095:0649 reaches a glyph byte as ES:[DI-$2011] with DI built from Ch shifted left 8, Row shifted left 4 and Col added, and $2011 is 8,209 = 32*256 + 1*16 + 1 -- the three low bounds folded into one displacement. A flat index made the compiler subtract all three at run time. P6S4 HAD NO {$I-} EITHER, exactly as part 004's Lemmings unit did not: seven five-byte calls to the runtime's I/O check the original has none of. The part's other three scene units all carry the directive. Worth a sweep for units with no I directive at all. TWO SMALLER ONES. P6S2's Setup declares I, J, A and not I, A, J -- the first cell loop puts its inner counter at [BP-$84] and the shape loop multiplies [BP-$86] by eight, so both offsets are readable and neither is a guess. And a subscript needs PARENTHESES: 100f:04d9 computes A*8 into AX, moves it to DX, computes J + $1E in AX and only then adds DX back, which is what `left + right` gives when the RIGHT operand is compound and needs the accumulator itself. Written A * 8 + J + 30 it parses as ((A*8) + J) + 30 and stays in AX. MEASURED: 99.3%, twelve bytes left and they are a call target and trailing padding; frames at ZERO differences across all seven segments; initialised image identical; 55 traps identical opcode for opcode; three byte-exact artefacts holding; paslint clean."
+seen_in = "TPART6"
+state = "resolved"
+resolution = "RESOLVED: part 006 meets the bar at 99.3%. Twelve bytes remain, in one span that is a near call's target plus the zero padding after a unit's last routine -- neither closes by editing. FIVE PARTS NOW MEET 99% and three more are at 100%; only 005 (98.8%) and 001 (90.9%) are below, and 001 is the whole of the remaining job."
+
 [plan.row."001 1012:0004"]
 label = "BuildLens quadrant walk"
 investigation = "pacing"
@@ -1480,8 +1487,8 @@ investigation = "part6-to-99"
 target = "R0"
 
 [plan.row."006 100f:0543"]
-label = "register allocation, deliberately left"
-investigation = "part5-last-frame"
+label = "NOT register allocation -- the palette is two-dimensional"
+investigation = "part6-close"
 target = "R0"
 
 [plan.row."006 1095:0114"]
@@ -1497,6 +1504,11 @@ target = "R0"
 [plan.row."006 1095:02ac"]
 label = "BuildPath tests Major and Minor, not two fresh Abs calls"
 investigation = "surplus-fpu-sites"
+target = "R0"
+
+[plan.row."006 1095:0649"]
+label = "and the font is three-dimensional, fold $2011 = 32*256+16+1"
+investigation = "part6-close"
 target = "R0"
 
 [plan.row."006 1095:067d"]
@@ -1532,6 +1544,11 @@ target = "R0"
 [plan.row."006 11bb:0096"]
 label = "SetPalette768 + Close: call target and DS address only"
 investigation = "part6-last-42"
+target = "R0"
+
+[plan.row."006 P6S4 $I-"]
+label = "seven IOCheck calls, the same miss as part 004's unit"
+investigation = "part6-close"
 target = "R0"
 
 [plan.row."006 dgroup $94E0"]

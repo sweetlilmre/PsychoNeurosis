@@ -110,7 +110,11 @@ type
   TCoord  = array[0..Angles - 1, 1..GridRows, 1..GridCols] of Integer;
   TAnim   = array[0..Angles - 1, 0..TilePix - 1] of Byte;
   TTile   = record W, H : Byte; Pix : array[0..TilePix - 1] of Byte end;
-  TPal768 = array[0..767] of Byte;
+  { TWO-DIMENSIONAL, entry by channel. 100f:0543 builds the index once and
+    reads the three channels off consecutive displacements; a flat
+    Pal[I * 3 + 1] adds the 1 at run time. Part 004's scene palette and part
+    005's both turned out to be this shape, which makes three. Same 768 bytes. }
+  TPal768 = array[0..255, 0..2] of Byte;
   TPoint  = record X, Y : Integer end;
 
 var
@@ -241,10 +245,14 @@ var
     A file record is what fits, and P6S1's Load has the same thing in the same
     position, also unreferenced. }
   Unread  : file;                 { [BP-$80]..[BP-1], never referenced }
-  { I FIRST: the palette loop at 100f:0544 indexes Pal with the counter held at
-    [BP-$82], and that is the first-declared slot. With A there instead, every
-    reference in that loop was two bytes out. }
-  I, A, J : Integer;              { [BP-$82], [BP-$84], [BP-$86] }
+  { I, THEN J, THEN A -- and all three offsets are readable, so none of this is
+    a guess. The palette loop at 100f:0544 indexes Pal with the counter at
+    [BP-$82], so I is first. The first cell loop at 100f:0447 puts its inner
+    counter at [BP-$84] and that counter is J. And the shape loop's destination
+    at 100f:04d9 multiplies [BP-$86] by eight, which is A. Ours had A and J the
+    other way round, which is two bytes of displacement on every reference in
+    the three-deep shape loop -- the part's largest remaining span. }
+  I, J, A : Integer;              { [BP-$82], [BP-$84], [BP-$86] }
   Pal     : TPal768;              { [BP-$386] }
 begin
   GetMem(Cells, CellSize);                       { 100f:03ff }
@@ -267,11 +275,17 @@ begin
     for I := 1 to GridCols do
       for J := 1 to 8 do
         if CellShape[A, I, J] <> 0 then
-          Cells^[A * 8 + J + 30, I] := CellShape[A, I, J];
+          { THE PARENTHESES ARE NOT COSMETIC. 100f:04d9 computes A*8 into AX,
+            moves it to DX, computes J + $1E in AX and only then adds DX back --
+            which is what `left + right` compiles to when the RIGHT operand is a
+            compound expression and needs the accumulator itself. Written
+            A * 8 + J + 30 it parses as ((A*8) + J) + 30, every right operand is
+            a simple one, and the whole sum stays in AX. }
+          Cells^[A * 8 + (J + 30), I] := CellShape[A, I, J];
 
   BlockRead(F, Pal, SizeOf(Pal));                { 100f:0524 }
   for I := 0 to 255 do                           { 100f:0529 }
-    SetRGB(I, Pal[I * 3], Pal[I * 3 + 1], Pal[I * 3 + 2]);
+    SetRGB(I, Pal[I, 0], Pal[I, 1], Pal[I, 2]);   { 100f:0543 }
 
   BuildTables;                                   { 100f:0574 }
   BlockRead(F, Anim^, AnimSize);                 { 100f:0589 }

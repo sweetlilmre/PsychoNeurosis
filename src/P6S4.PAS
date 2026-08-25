@@ -31,6 +31,15 @@
 {$S-}   { 11bb:0015 opens ENTER $386,0 with no stack check. }
 {$G+}   { 186 shifts with immediates }
 {$N+}   { the stretch table is worked out on the x87 }
+{$I-}   { NO I/O CHECK, and this unit had no I directive at all so it took the
+          command line's $I+ default. The original's Setup goes straight from
+          each file call to the next -- 11bb:0034 is MOV DI,$9654 for the Reset
+          with nothing between it and the Assign that precedes it -- where ours
+          put a five-byte near call to the runtime's check routine after every
+          Assign, Reset, Seek, BlockRead and Close. Seven sites, 35 bytes, and
+          every instruction after the first of them out of step. The part's
+          other three scene units all carry the directive; this one was missed,
+          exactly as part 004's Lemmings unit was. }
 
 unit P6S4;
 

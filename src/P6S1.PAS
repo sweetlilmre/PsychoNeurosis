@@ -75,7 +75,19 @@ type
     Flat and 0-based, `Dots^[(Lane - 1) * LaneLen]` makes the compiler work
     the -1 out at run time instead. Same 3,200 bytes either way. }
   TDots = array[1..Lanes, 1..LaneLen] of Byte;
-  TFont = array[0..FontSize - 1] of Byte;
+  { THREE-DIMENSIONAL, AND THE FOLD IS THE PROOF -- the same reading as TDots
+    above, one dimension deeper. 1095:0649 reaches a glyph byte as
+    ES:[DI-$2011] with DI built from Ch shifted left 8, Row shifted left 4 and
+    Col added, and $2011 is 8,209 = 32*256 + 1*16 + 1: the three low bounds,
+    folded into the displacement. A flat array indexed
+    Font^[(Ch - FirstCh) * 256 + (Row - 1) * 16 + (Col - 1)] makes the compiler
+    subtract all three at RUN TIME instead. Same 15,104 bytes.
+
+    59 glyphs from space, which is what FontSize divided by 256 gives, and the
+    upper bound follows from it rather than being chosen. }
+  TFont = array[FirstCh..FirstCh + FontSize div 256 - 1,
+                1..16, 1..16] of Byte;
+  { Entry by channel, for the same reason -- see P6S2 and part 004. }
   TPal768 = array[0..767] of Byte;
 
 var
@@ -208,8 +220,7 @@ var Row, Col : Integer;
 begin
   for Row := 2 to 16 do                          { 1095:0618 }
     for Col := 1 to 16 do                        { 1095:0622 }
-      Dots^[17 - Row, 17 - Col] :=
-        Font^[(Ch - FirstCh) * 256 + (Row - 1) * 16 + (Col - 1)];
+      Dots^[17 - Row, 17 - Col] := Font^[Ch, Row, Col];   { 1095:0649 }
 end;
 
 { --------------------------------------------------------------------------
