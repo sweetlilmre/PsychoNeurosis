@@ -232,22 +232,18 @@ procedure Title;
 var
   X, I, J, V : Integer;
 
-  procedure Draw;
-  var A, B : Integer;
-  begin
-    for A := 1 to TitleW do                      { 1118:04bf }
-      for B := 1 to TitleH do                    { 1118:04c9 }
-        if (X + A < 320) and (X + A > 0) then    { 1118:04d2, 1118:04dd }
-          PutPixel(X + A, B + $28, TitleB[B, A], VGASeg);   { 1118:0500 }
-  end;
-
 begin
   SparkX := 205.0;                               { 1118:048a }
   SparkY := 48.0;                                { 1118:049c }
 
   for X := $140 downto $BE do                    { 1118:04ae }
   begin
-    Draw;
+    { 1118:04bf -- INLINE, and it appears once per loop. I and J are the
+      original's own [BP-4] and [BP-6]. }
+    for I := 1 to TitleW do
+      for J := 1 to TitleH do
+        if (X + I < 320) and (X + I > 0) then
+          PutPixel(X + I, J + $28, TitleB[J, I], VGASeg);
     SetRGB(Flick1, Random($40), 0, 0);           { 1118:051f }
     SetRGB(Flick2, Random($40), 0, 0);           { 1118:0532 }
     SetRGB(Flick3, Random($40), 0, 0);           { 1118:0545 }
@@ -258,7 +254,12 @@ begin
 
   for X := $BD downto $AA do                     { 1118:0594 }
   begin
-    Draw;
+    { 1118:04bf -- INLINE, and it appears once per loop. I and J are the
+      original's own [BP-4] and [BP-6]. }
+    for I := 1 to TitleW do
+      for J := 1 to TitleH do
+        if (X + I < 320) and (X + I > 0) then
+          PutPixel(X + I, J + $28, TitleB[J, I], VGASeg);
     SetRGB(Flick1, Random($40), 0, 0);
     SetRGB(Flick2, Random($40), 0, 0);
     SetRGB(Flick3, Random($40), 0, 0);
@@ -270,7 +271,12 @@ begin
 
   for X := $A9 downto $A0 do                     { 1118:067d }
   begin
-    Draw;
+    { 1118:04bf -- INLINE, and it appears once per loop. I and J are the
+      original's own [BP-4] and [BP-6]. }
+    for I := 1 to TitleW do
+      for J := 1 to TitleH do
+        if (X + I < 320) and (X + I > 0) then
+          PutPixel(X + I, J + $28, TitleB[J, I], VGASeg);
     SetRGB(Flick1, 0, 0, Random($40));           { 1118:06ee }
     SetRGB(Flick2, 0, 0, Random($40));
     SetRGB(Flick3, 0, 0, Random($40));
@@ -282,7 +288,12 @@ begin
 
   for X := $9F downto -$1E do                    { 1118:0766 }
   begin
-    Draw;
+    { 1118:04bf -- INLINE, and it appears once per loop. I and J are the
+      original's own [BP-4] and [BP-6]. }
+    for I := 1 to TitleW do
+      for J := 1 to TitleH do
+        if (X + I < 320) and (X + I > 0) then
+          PutPixel(X + I, J + $28, TitleB[J, I], VGASeg);
     SetRGB(Flick1, 0, 0, Random($40));
     SetRGB(Flick2, 0, 0, Random($40));
     SetRGB(Flick3, 0, 0, Random($40));

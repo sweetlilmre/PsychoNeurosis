@@ -311,9 +311,23 @@ end;
   -------------------------------------------------------------------------- }
 procedure Setup;
 var
-  Pal   : TPal768;                { [BP-$386] }
-  Dummy : LongInt;                { [BP-$86] }
-  I     : Integer;
+  { IN THE ORDER THE FRAME GIVES, and it closes to the byte: 128 + 2 + 4 + 768
+    is 902, which is the ENTER $386 this routine opens with. Declared the other
+    way round -- Pal first -- it put the palette nearest BP and everything else
+    behind it, and the routine's frame references are 128 bytes of an unread
+    local away from the original's.
+
+    THE 128 BYTES NEAREST BP ARE NEVER REFERENCED. Every frame reference in
+    1095:000d..1095:01a0 is to [BP-$82], [BP-$84], [BP-$86] or [BP-$386] --
+    nothing touches [BP-$80] upward. A file record is exactly 128 bytes and
+    this routine does open a file, but it opens the UNIT's F at DS:$738A, which
+    1095:00c3 pushes by address. So the original very likely had a local file
+    record here once and kept the declaration after moving to the global. That
+    it is 128 bytes and unread is measured; what it was for is not. }
+  Unread : file;                  { [BP-$80]..[BP-1], never referenced }
+  I      : Integer;               { [BP-$82] }
+  Dummy  : LongInt;               { [BP-$86] }
+  Pal    : TPal768;               { [BP-$386] }
 begin
   Assign(F, 'neurosis.dat');                     { 1095:001b }
   Reset(F, 1);
