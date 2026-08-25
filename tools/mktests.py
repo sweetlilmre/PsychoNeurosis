@@ -154,21 +154,31 @@ SCENES = [
 # scene order, the mode changes between them and the music handling are the
 # original's rather than this file's idea of them. Every driver ends in
 # Halt(0), exactly as the main body does, so nothing after the call runs.
+# THE ORDER OF A PART HARNESS'S `uses` CLAUSE IS A MEASUREMENT, not a style.
+# Turbo Pascal's link order is a reverse DFS post-order over the `uses` graph and
+# THE WALK STARTS AT THE PROGRAM, so this clause -- not the part unit's -- decides
+# where the shared units land. `Crt, VGA, DemoVT` visits Crt first, so Crt
+# finishes first and ends up LAST in code; the original finishes DemoVT first,
+# which needs `DemoVT, Crt, VGA`. Checked by pairing each part's inter-unit call
+# targets: with the clause this way round every part's segment order matches the
+# 1994 file, and with Crt first parts 001, 003, 005 and 006 all had one unit
+# displaced. Changing the part unit's own clause does nothing, which is the
+# evidence for the walk starting here.
 PARTS = [
     ("TPART1", "P1Intro", "RunIntro",
-     "Crt, VGA, DemoVT",
+     "DemoVT, Crt, VGA",
      "part 001 -- all five scenes, through the driver at 1000:003c"),
     ("TPART2", "P2Main", "RunPart2",
      "Crt, VGA, ModeX, P2View, FixMath, DemoVT",
      "part 002 -- both scenes, through the driver at 1000:0032"),
     ("TPART3", "P3Main", "RunPart3",
-     "Crt, VGA, DemoVT",
+     "DemoVT, Crt, VGA",
      "part 003 -- all seven scenes, through the driver at 1000:0041"),
     ("TPART5", "P5Main", "RunPart5",
-     "Crt, VGA, DemoVT",
+     "DemoVT, Crt, VGA",
      "part 005 -- all three scenes, through the main body at 1000:002d"),
     ("TPART6", "P6Main", "RunPart6",
-     "Crt, VGA, DemoVT",
+     "DemoVT, Crt, VGA",
      "part 006 -- all four scenes, through the main body at 1000:002d"),
     ("TPART7", "P7Main", "RunPart7",
      "Crt, VGA, DemoVT",
@@ -187,14 +197,24 @@ PARTS = [
 # on the way out of Halt, out of a run-time error, and out of a normal end.
 # So it goes in every harness, and the scenes and drivers keep their faithful
 # behaviour untouched.
-EXIT_PROC = """var
-  PrevExit : Pointer;
-
-{ Runs on the way out of Halt, of a run-time error, or of a normal end --
-  see the note in mktests.py. }
+# AND IT DECLARES NOTHING, which is not tidiness. A PROGRAM's globals land at
+# the FRONT of DGROUP's uninitialised region, ahead of every unit's, so anything
+# a harness declares moves the part's first variable and every absolute
+# reference in the part with it. Measured on part 004: `PrevExit : Pointer` and
+# `F : file` between them put ColOfs at $01F6 where the original has $0172, and
+# removing both took the coverage walk from 94.6% to 96.5%. A harness that
+# declares one file record is measuring itself.
+#
+# So F is a local of the check below, and the handler ENDS the exit chain
+# instead of restoring it -- which needs no saved pointer. The cost is that any
+# handler installed before this one is skipped, which here means Crt's; this one
+# does the substantive half of its job by putting the BIOS back in mode 3.
+EXIT_PROC = """{ Runs on the way out of Halt, of a run-time error, or of a normal end --
+  see the note in mktests.py, including why this ends the chain rather than
+  restoring it. }
 procedure RestoreTextMode; far;
 begin
-  ExitProc := PrevExit;
+  ExitProc := nil;
   asm
     MOV  AX, $0003      { BIOS mode 3: 80x25 colour text                    }
     INT  $10            { which also undoes Mode-X's CRTC and sequencer     }
@@ -221,9 +241,12 @@ program %(prog)s;
 
 uses %(uses)s, %(unit)s;
 
-%(exit)svar
+%(exit)s{ F IS A LOCAL. See the note on EXIT_PROC in mktests.py: a program-level file
+  record displaces every variable in the part under test. }
+procedure CheckData;
+var
   F : file;
-%(vars)sbegin
+begin
   Assign(F, 'neurosis.dat');
   {$I-} Reset(F, 1); {$I+}
   if IOResult <> 0 then
@@ -233,6 +256,10 @@ uses %(uses)s, %(unit)s;
     Halt(1);
   end;
   Close(F);
+end;
+
+%(vars)sbegin
+  CheckData;
 
   WriteLn('%(what)s');
   WriteLn('Press a key to start.');
@@ -247,7 +274,6 @@ end.
 
 
 HOOK = """
-  PrevExit := ExitProc;
   ExitProc := @RestoreTextMode;
 """
 

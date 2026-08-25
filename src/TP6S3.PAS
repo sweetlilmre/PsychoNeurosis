@@ -16,20 +16,21 @@ program TP6S3;
 
 uses Crt, VGA, DemoVT, P6S3;
 
-var
-  PrevExit : Pointer;
-
 { Runs on the way out of Halt, of a run-time error, or of a normal end --
-  see the note in mktests.py. }
+  see the note in mktests.py, including why this ends the chain rather than
+  restoring it. }
 procedure RestoreTextMode; far;
 begin
-  ExitProc := PrevExit;
+  ExitProc := nil;
   asm
     MOV  AX, $0003      { BIOS mode 3: 80x25 colour text                    }
     INT  $10            { which also undoes Mode-X's CRTC and sequencer     }
   end;
 end;
 
+{ F IS A LOCAL. See the note on EXIT_PROC in mktests.py: a program-level file
+  record displaces every variable in the part under test. }
+procedure CheckData;
 var
   F : file;
 begin
@@ -42,12 +43,15 @@ begin
     Halt(1);
   end;
   Close(F);
+end;
+
+begin
+  CheckData;
 
   WriteLn('part 006 scene 3 -- the fire');
   WriteLn('Press a key to start.');
   ReadKey;
 
-  PrevExit := ExitProc;
   ExitProc := @RestoreTextMode;
 
   SetMode13h;         { 1000:0030 }

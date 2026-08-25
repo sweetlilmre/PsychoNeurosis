@@ -14,22 +14,23 @@ program TPART2;
   -- the two variants are byte-identical apart from exactly those pairs --
   so the faithful build keeps the $E+ default. See dosbuild.py. }
 
-uses Crt, VGA, ModeX, FixMath, P2View, DemoVT, P2Main;
-
-var
-  PrevExit : Pointer;
+uses Crt, VGA, ModeX, P2View, FixMath, DemoVT, P2Main;
 
 { Runs on the way out of Halt, of a run-time error, or of a normal end --
-  see the note in mktests.py. }
+  see the note in mktests.py, including why this ends the chain rather than
+  restoring it. }
 procedure RestoreTextMode; far;
 begin
-  ExitProc := PrevExit;
+  ExitProc := nil;
   asm
     MOV  AX, $0003      { BIOS mode 3: 80x25 colour text                    }
     INT  $10            { which also undoes Mode-X's CRTC and sequencer     }
   end;
 end;
 
+{ F IS A LOCAL. See the note on EXIT_PROC in mktests.py: a program-level file
+  record displaces every variable in the part under test. }
+procedure CheckData;
 var
   F : file;
 begin
@@ -42,12 +43,15 @@ begin
     Halt(1);
   end;
   Close(F);
+end;
+
+begin
+  CheckData;
 
   WriteLn('part 002 -- both scenes, through the driver at 1000:0032');
   WriteLn('Press a key to start.');
   ReadKey;
 
-  PrevExit := ExitProc;
   ExitProc := @RestoreTextMode;
 
   RunPart2;
