@@ -49,6 +49,10 @@
 {$G+}   { 286 instructions: SHL BX,1 with an immediate in the blits. }
 
 unit Part4Lemmings;
+{$A-}   { DATA ALIGNMENT OFF. The scroller's constants run contiguously in the
+          original -- Message $0005 for 237 bytes, ScrollCol $00F2, ScrollIdx
+          $00F4, ScrollPal $00F5 -- and 237 is odd. Under TP7's $A+ default the
+          message is padded to 238 and everything after it is one byte out. }
 
 interface
 
@@ -246,12 +250,6 @@ const
   to turn. Leaving them at zero, which is what a plain `var` gives you, writes
   black into $80..$87 and the belt simply is not there.
   -------------------------------------------------------------------------- }
-const
-  ScrollCol  : Integer = 0;                      { DS:$00F2 }
-  ScrollIdx  : Byte    = 1;                      { DS:$00F4 }
-  ScrollPal  : array[0..7, 0..2] of Byte =       { DS:$00F5 }
-    ((7, 7, 7), (7, 7, 7), (7, 7, 7), (7, 7, 7),
-     (30, 30, 30), (30, 30, 30), (30, 30, 30), (30, 30, 30));
 
 { DS:$0005 -- the message, compiled into DGROUP. Element 0 is a zero byte and
   ScrollStep indexes from 1; the $ED bound it tests is exactly this length. }
@@ -272,6 +270,13 @@ const
     ' ','T','H','E',' ','S','I','D','E',' ','M','A','R','K','E','D',' ','-',
     'P','O','W','E','R','-',' ',' ',' ',' ',' ',' ','*','*','*',' ',' ',' ',
     ' ',' ');
+
+const
+  ScrollCol  : Integer = 0;                      { DS:$00F2 }
+  ScrollIdx  : Byte    = 1;                      { DS:$00F4 }
+  ScrollPal  : array[0..7, 0..2] of Byte =       { DS:$00F5 }
+    ((7, 7, 7), (7, 7, 7), (7, 7, 7), (7, 7, 7),
+     (30, 30, 30), (30, 30, 30), (30, 30, 30), (30, 30, 30));
 
 procedure SetState(S : Byte; N : Integer); forward;
 procedure Remove(N : Integer); forward;
