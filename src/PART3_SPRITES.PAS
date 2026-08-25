@@ -154,6 +154,7 @@ var
     part. }
   TargetPal : array[0..255, 0..2] of Byte;
 
+
 { --------------------------------------------------------------------------
   Sprite_DrawRotated (125e:0388) -- HAND ASSEMBLER, transcribed verbatim.
 
@@ -426,7 +427,13 @@ end;
   -------------------------------------------------------------------------- }
 procedure Load;
 var
-  F   : file;                                    { DS:$E6EC }
+  { F IS A LOCAL, and the frame proves it against the DS: address that used to
+    be written beside it. 125e:012e opens ENTER $626 -- 1,574 bytes -- which is
+    128 for this record plus 2 for I plus the 1,444-byte buffer below, and I
+    sits at [BP-$82] = 130 precisely BECAUSE the 128 bytes of file record are
+    nearer BP. Moved to unit level it cost 338 bytes of alignment and the DS:
+    note was simply wrong. }
+  F   : file;                                    { [BP-$80] }
   I   : Integer;                                 { [BP-$82] }
   { ONE ENTRY MORE THAN THE ANGLE RANGE. 125e:012e opens ENTER $626 and the
     lowest slot the routine names is [BP-$82], so the buffer below it is

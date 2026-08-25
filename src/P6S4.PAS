@@ -76,7 +76,21 @@ type
 
 var
   Margin  : array[TopRow..199] of Byte;      { DS:$942c }
-  Stretch : array[TopRow..BotRow] of Integer;{ DS:$94b8 }
+  { RUNS TO 199, NOT TO BotRow, and that is 38 bytes -- the whole of this
+    part's data shortfall. 11bb:0123 is SHL DI,1 / MOV [DI-$6B48],AX, so the
+    FOLDED base is $94B8 and the array itself begins at $94B8 + 20*2 = $94E0.
+    Buf is at $9648, so the extent is 360 bytes: 180 Integers, indices 20..199.
+    Declared array[TopRow..BotRow] it was 161 entries and 322 bytes.
+
+    Margin above it IS right, and the same reading proves it: 11bb:00e5 is
+    MOV AL,[DI-$6BE8], a folded base of $9418, so Margin[20] sits at $942C --
+    its recorded address -- and its extent to $94E0 is 180 bytes, which is what
+    array[TopRow..199] of Byte gives. The comment in the header calling it
+    "180 bytes off the file" was right all along.
+
+    The loop at 11bb:00e1..0129 only walks 20..180; the arrays are declared to
+    199 regardless. }
+  Stretch : array[TopRow..199] of Integer;   { DS:$94E0, folded base $94B8 }
   Buf     : Pointer;              { DS:$9648 }
   Font    : ^TFont;               { DS:$964c }
   Line    : Integer;              { DS:$9650 }

@@ -684,6 +684,12 @@ seen_in = "TPART5"
 state = "resolved"
 resolution = "PART 005 IS AT 97.3% AND ITS DATA LAYOUT IS ESSENTIALLY DONE: minalloc matches the original EXACTLY, and dsmap's shift is +0 across ONE HUNDRED AND FORTY-FOUR sites spanning $0000..$ABAC. Four references remain off -- +32 over three sites at $63CA..$63D0 and +2 at $A5DC -- and those four are suspect as mispairings, because a real 32-byte surplus before $63CA would also show at $A67A, which reads +0. 96.7% -> 97.3%, +70 bytes on the walk. TWO UNREFERENCED BLOCKS, and the second needed a METHOD I had not used before. The first is 112 bytes at $5F6E between RowOfs and EdgeBuf: RowOfs's 200 words end there and EdgeBuf's recorded address is 112 further on, so the gap is read directly. THE SECOND COULD NOT BE READ THAT WAY. 98 bytes at $A55A, in a span that the addresses say is 128 wide, and NOTHING in part 005's seven segments references any address in it -- so there is no displacement to measure and no stride to factorise. What settled it was BISECTION ON THE SHIFT: declare a size, rebuild, read dsmap. 128 gave +30, 98 gave 0. That is a usable technique whenever a gap is unreferenced -- the shift is a continuous function of the size and one build prices each guess -- and it is cheaper than any amount of reading. AND THE 30 BYTES ARE NOT ACCOUNTED FOR, which is written into the source beside the declaration rather than smoothed over. The span is 128 and 98 balances the totals, so either Pal is longer than 768, or something 30 bytes wide sits between, or one address is a folded base. dsmap cannot pair Speed so its position is not checkable. The 98 is a total that balances, NOT a declaration that has been read, and the comment says so."
 
+[[plan.investigation]]
+name = "part6-and-part3"
+finding = "PART 006's DATA LAYOUT IS COMPLETE -- minalloc matches EXACTLY and dsmap's shift is +0 across ALL 160 paired sites in ONE group with no boundary anywhere. 97.9% -> 98.0%. It was ONE ARRAY BOUND, and the folded base is what read it. P6S4's Stretch was array[TopRow..BotRow] of Integer -- 161 entries, 322 bytes -- and it runs to 199, 180 entries, 360 bytes. 11bb:0123 is SHL DI,1 / MOV [DI-$6B48],AX, so $94B8 is the FOLDED base and the array itself begins at $94B8 + 20*2 = $94E0; Buf is at $9648, which makes the extent 360. The difference is exactly the 38-byte shift dsmap reported. And the SAME reading proved Margin above it CORRECT: 11bb:00e5 is MOV AL,[DI-$6BE8], a folded base of $9418, so Margin[20] is at $942C and its extent to $94E0 is 180 bytes -- which array[TopRow..199] of Byte gives, and which the header comment had said all along. Reading a folded base as an address would have made Margin look 40 bytes too big and Stretch 78 too small; reading it as a fold gives both right. AND A REVERTED CHANGE ON PART 003, worth recording because the reasoning was good and the answer was wrong. PART3_SPRITES' Load declares `F : file` as a LOCAL with `DS:$E6EC` written beside it -- a data-segment address on a local, which is the contradiction that has found four globals on this target already. Moving it to unit level made dsmap's two anomalies merge into one uniform +4, which looked like confirmation. IT COST 338 BYTES OF ALIGNMENT: the walk went 95.6% to 93.2%. THE FRAME SETTLED IT AGAINST THE COMMENT. 125e:012e opens ENTER $626, which is 1,574 bytes, and that is 128 for the file record plus 2 for I plus the 1,444-byte buffer below -- and I sits at [BP-$82] = 130 PRECISELY BECAUSE 128 bytes of file record are nearer BP. So F is genuinely a local and the DS: note was simply wrong. Reverted, and the source now carries the frame arithmetic instead of the bad address. TWO LESSONS. A dsmap anomaly MERGING is not proof the change was right -- it says the sizes now agree, not that the declaration moved to the right place. And the comment-versus-code pass cuts both ways: a stale comment can invent a defect as easily as a good one can find it, so check the frame before trusting an address."
+seen_in = "TPART6"
+state = "open"
+
 [plan.row."001 1012:0004"]
 label = "BuildLens quadrant walk"
 investigation = "pacing"
@@ -1169,6 +1175,11 @@ label = "Waves_Step erase/draw BASM"
 investigation = "part3-s6-left-dark"
 note = "Erase/draw is hand BASM with ES/CX set only in the erase branch; a skipped erase makes the draw store the colour byte into the curve table at 356+NewX (back half of curve 0). Original's left-half brightness is that corruption plus unerased litter; our Pascal-isation had fixed the bug. Block now transcribed verbatim, fragment target @asm 003 120f:01b1 +59 StepEraseDraw."
 
+[plan.row."003 125e:012e"]
+label = "SPRITES' F is a LOCAL; ENTER $626 proves it against the DS: note"
+investigation = "part6-and-part3"
+target = "R0"
+
 [plan.row."003 to 99"]
 label = "95.6%, never had the layout treatment"
 investigation = "target-99-percent"
@@ -1262,6 +1273,11 @@ target = "R0"
 [plan.row."006 1118:0907"]
 label = "the reseed test is `<` and the store to Grid[99,I] is UNCONDITIONAL"
 investigation = "part6-fire-height"
+target = "R0"
+
+[plan.row."006 dgroup $94E0"]
+label = "Stretch runs to 199, not BotRow -- the whole 38-byte shortfall"
+investigation = "part6-and-part3"
 target = "R0"
 
 [plan.row."007 to 99"]
