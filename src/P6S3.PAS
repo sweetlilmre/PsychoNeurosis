@@ -67,7 +67,15 @@ const
   SparkCol = $FE;                 { 1118:0472 pushes -2 }
 
 type
-  TPal768 = array[0..767] of Byte;
+  { 256 THREE-BYTE ELEMENTS, not 768 bytes, and the displacements say so.
+    The original addresses the green and blue components as [BX+DI-$403]
+    and [BX+DI-$402] -- the component offset FOLDED INTO THE DISPLACEMENT,
+    which is a record field. A flat Pal[I*3+1] cannot produce that: Turbo
+    Pascal emits INC AX for the +1 and leaves the displacement at -$404.
+    It also builds the index straight into DI here, where the flat form
+    computes in AX and then copies. Same 768 bytes either way. }
+  TRGB   = record R, G, B : Byte end;
+  TPal256 = array[0..255] of TRGB;
 
 var
   { DS:$740A, and TWO-DIMENSIONAL. 1118:01c5 writes [$73B9 + I*80 + J], and a
@@ -111,17 +119,64 @@ var
   each pass loops over survives.
   -------------------------------------------------------------------------- }
 procedure Setup;
+{ THE DECLARATION ORDER IS THE MEASUREMENT and it is the reverse of the
+  obvious one. Locals are allocated FIRST-DECLARED NEAREST BP, and the
+  original's slots are [BP-$02], [BP-$04], [BP-$404] and [BP-$484], so the
+  two counters come first and the file record LAST. Declared the other way
+  round the frame is still legal, still compiles, and puts every offset in
+  the routine somewhere else.
+
+  AND THE FRAME IS $484 -- 1156 bytes -- where 2 + 2 + 768 + 128 reaches
+  only $384. The missing 256 sit between J and Pal: Pal's base is [BP-$404]
+  and 768 bytes below [BP-$04] would put it at [BP-$304].
+
+  WHAT THOSE 256 BYTES ARE IS NOT DECIDABLE FROM THE BINARY, and saying so
+  is the honest answer. Nothing reads the slot, so a 256-byte local here
+  and a 1024-byte Pal read 768 bytes at a time produce THE SAME BYTES
+  everywhere -- same frame, same base addresses, same `push $0300`. This
+  form is chosen because it keeps SizeOf(Pal) equal to the 768 the original
+  actually pushes, so no literal has to be written where a SizeOf belongs.
+  If a later reading of the file layout settles it the other way, the
+  measurement will not change. }
 var
+  I, J : Integer;                 { [BP-$02], [BP-$04] }
+  Spare : String;                 { [BP-$104] -- 256 bytes, NEVER READ }
+  Pal : TPal256;                  { [BP-$404] }
   F   : file;                     { [BP-$484] }
-  Pal : TPal768;                  { [BP-$404] }
-  I, J : Integer;
 
   { 1118:0000 -- the scene has its own copy of SetRGB rather than using the
-    VGA unit's, and it is nested inside Setup. }
+    VGA unit's, and it is nested inside Setup: RET $0A pops eight bytes of
+    parameter plus the two-byte static link.
+
+    HAND ASSEMBLER, transcribed verbatim. Four Port[] writes are what this
+    was, and they cannot produce these bytes: Turbo Pascal emits MOV DX,imm
+    for every constant port index, so `Port[$3C9] := R` reloads DX each
+    time and never emits INC DX. It also evaluates the VALUE before the
+    port, giving MOV AL then MOV DX, where the original does DX then AL.
+    Two tells, opposite ways round. 27 bytes against our 35.
+
+    handasm.py says `no evidence` here, which is the honest answer for a
+    27-byte routine and not a refutation -- its signals need volume.
+
+    FOR REFERENCE ONLY, the equivalent Pascal -- not what the binary does:
+      Port[$3C8] := Col;  Port[$3C9] := R;
+      Port[$3C9] := G;    Port[$3C9] := B;
+  }
   procedure SetDAC(Col, R, G, B : Byte);
   begin
-    Port[$3C8] := Col;  Port[$3C9] := R;
-    Port[$3C9] := G;    Port[$3C9] := B;
+    asm
+      MOV  DX, $03C8    { the DAC write-index port                        }
+      MOV  AL, Col      { [BP+$0C] -- first parameter, so highest offset  }
+      OUT  DX, AL       { select the colour                               }
+      INC  DX           { $03C9, the data port -- DX is kept live for all
+                          three components, which is the whole saving     }
+      MOV  AL, R        { [BP+$0A]                                        }
+      OUT  DX, AL
+      MOV  AL, G        { [BP+$08]                                        }
+      OUT  DX, AL
+      MOV  AL, B        { [BP+$06]                                        }
+      OUT  DX, AL
+    end;
   end;
 
 begin
@@ -134,13 +189,13 @@ begin
 
   BlockRead(F, Pal, SizeOf(Pal));                { 1118:00aa }
   for I := 0 to $FF do                           { 1118:00af }
-    SetDAC(I, Pal[I * 3], Pal[I * 3 + 1], Pal[I * 3 + 2]);
+    SetDAC(I, Pal[I].R, Pal[I].G, Pal[I].B);
   BlockRead(F, Pal, SizeOf(Pal));                { 1118:0105 }
   for I := $EE to $FF do                         { 1118:010a }
-    SetDAC(I, Pal[I * 3], Pal[I * 3 + 1], Pal[I * 3 + 2]);
+    SetDAC(I, Pal[I].R, Pal[I].G, Pal[I].B);
   BlockRead(F, Pal, SizeOf(Pal));                { 1118:0160 }
   for I := $E1 to $ED do                         { 1118:0165 }
-    SetDAC(I, Pal[I * 3], Pal[I * 3 + 1], Pal[I * 3 + 2]);
+    SetDAC(I, Pal[I].R, Pal[I].G, Pal[I].B);
 
   for I := 1 to GridH do                         { 1118:01a8 }
     for J := 1 to GridW do

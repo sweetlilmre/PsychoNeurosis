@@ -381,6 +381,13 @@ seen_in = "TPART5"
 state = "resolved"
 resolution = "IT WAS THE USES CLAUSE, and the +4 was the whole of it wearing a disguise. The four bytes are MViewH and MViewW, two typed Word constants that P5S3 owns; the rebuild put them at the FRONT of the initialised region and the original puts them at the very END, at $2d16 and $2d18, immediately after P5S1's four clip bounds. Everything between is P5S1's 11,532-byte generated mesh table, in the right place in both builds and differing in 5,182 places purely because it was displaced by four bytes. TWO CANDIDATES, AND A BUILD SETTLED THEM. That the constants belong to P5S1 is REFUTED and the refutation is worth keeping: DEMOMATH.OBJ is linked with {$L} from P5S3 and its EXTRN resolves by PASCAL SCOPE in the unit that links it, so declaring MViewW anywhere else gives `Undefined external (MViewW)`. Their owner is therefore not in question and the ORDER OF THE UNITS was the only thing left. Naming the three scene units backwards -- `uses Crt, VGA, DemoVT, P5S3, P5S2, P5S1` -- took the initialised data from 5,182 bytes differing to TWO, the harness's own line terminator and nothing else. Declaring MViewH before MViewW inside P5S3 closed the last four. THE SEGMENT SIZES AGREE WITHOUT BEING ASKED, which is the independent check: under the reversed clause P5S1 comes out at 0x88 paragraphs where the original has 0x88, and the four units after the scenes match the original's 0x08, 0x14, 0x62 and 0x11 exactly. Under scene order the three scene units were laid down back to front. AND THE COVERAGE WALK REPORTED 10980 of 11440 BOTH TIMES -- the same number to the byte, for a build whose units were in reverse order. spans.py locates a segment by CONTENT, so a unit at the wrong segment number still matches, and the two-byte displacement errors inside it fall under its short-difference tolerance. dsmap.py did move, 47 references at +0 to 60, and the three large negative shifts it had been reporting are gone. The clause now carries the measurement as a comment so nobody tidies it back into scene order; the general form went into the wiki's dgroup-order-reverses-uses as its second example, which is where the claim that the walk corroborates this is now qualified. NOT RE-OBSERVED: no behaviour is expected to change, and part 005's residual slowness in the rotozoom setup is still carried by row 005 1096:0042."
 
+[[plan.investigation]]
+name = "part6-p6s3-setup"
+finding = "part 006 sits at 90.8 percent and spanwhy traces 12 of its 18 spans back to three length changes inside P6S3, all of them in or downstream of Setup."
+seen_in = "TPART6"
+state = "resolved"
+resolution = "THREE DEFECTS IN ONE ROUTINE AND ITS NEIGHBOUR, 90.8 to 95.6 percent -- part 006 is over the 95 target. ONE: SetDAC at 1118:0000 is HAND ASSEMBLER, not four Port[] writes. The original loads DX once as $03C8, does OUT, then INC DX and reuses it for all three components; Turbo Pascal emits MOV DX,imm for every constant port index and never emits INC DX, and it evaluates the value before the port where the original does the port first. 27 bytes against our 35, and the transcription is byte-identical including the 'neurosis.dat' literal that follows it. handasm.py reported `no evidence`, which is its honest answer for a 27-byte routine and not a refutation. TWO: Setup's frame is ENTER $484 and ours was $384. The original's touched slots are [BP-$02], [BP-$04], [BP-$404] and [BP-$484], and locals are allocated FIRST-DECLARED NEAREST BP -- proved on our own build, whose file record sat at [BP-$80] because it was declared first -- so the two counters come first and the file record LAST. Our block was in exactly the reverse order. The missing 256 bytes sit between J and Pal, and WHAT THEY ARE IS NOT DECIDABLE FROM THE BINARY: nothing reads the slot, so a 256-byte local and a 1024-byte Pal read 768 bytes at a time give the same frame, the same base addresses and the same push $0300. Written as a never-read local so that SizeOf(Pal) stays equal to the 768 the original pushes; the source says so. THREE: Pal is 256 THREE-BYTE RECORDS, not 768 bytes. The original addresses green and blue as [BX+DI-$403] and [BX+DI-$402] -- the component offset FOLDED INTO THE DISPLACEMENT, which is a record field. A flat Pal[I*3+1] cannot do that: TP emits INC AX and leaves the displacement at -$404. It also builds the index straight into DI where the flat form computes in AX and copies. Same 768 bytes. This is the same class as row 002 108b:1113, where part 002's palette was found to be 256 three-byte elements and part 002 scene 1's was not. NOT RE-OBSERVED. SetDAC is called 281 times per Setup and Overlay runs every frame, so this part has changed behaviourally-relevant code and the run owed under part6-confirm-r3 now covers it."
+
 [plan.row."001 1012:0004"]
 label = "BuildLens quadrant walk"
 investigation = "pacing"
@@ -574,4 +581,19 @@ note = "The investigation's premise was stale: the 386 trio (SinCos/RotatePoint/
 [plan.row."006 1095:02ac"]
 label = "BuildPath tests Major and Minor, not two fresh Abs calls"
 investigation = "surplus-fpu-sites"
+target = "R0"
+
+[plan.row."006 1118:0000"]
+label = "SetDAC is hand assembler: DX loaded once, INC DX, no reload"
+investigation = "part6-p6s3-setup"
+target = "R0"
+
+[plan.row."006 1118:0028"]
+label = "Setup's var block is in reverse order and 256 bytes short"
+investigation = "part6-p6s3-setup"
+target = "R0"
+
+[plan.row."006 1118:00c6"]
+label = "Pal is 256 three-byte records; the fold is in the displacement"
+investigation = "part6-p6s3-setup"
 target = "R0"
