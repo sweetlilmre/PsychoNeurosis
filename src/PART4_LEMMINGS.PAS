@@ -101,7 +101,14 @@ const
 type
   { 21 bytes -- DS:$0311, indices 1..25, running to DS:$051D. }
   TLem = record
-    X, Y       : Integer;     { +0, +2  }
+    X          : Word;        { +0  -- UNSIGNED, and the arithmetic proves it:
+                                       1005:14EC computes Lem[N].X + DX_ in
+                                       THIRTY-TWO bits (CWD on the offset, XOR
+                                       DX,DX on X, then ADD/ADC), which is what
+                                       Turbo Pascal does when a Word meets a
+                                       signed Integer. Two Integers would have
+                                       stayed 16-bit. }
+    Y          : Integer;     { +2  }
     Bounces    : Integer;     { +4  -- a second hard landing splats }
     Frame      : Integer;     { +6  -- one-based, indexes the sprite banks }
     Tick       : Integer;     { +8  -- sub-frame counter }
@@ -761,12 +768,30 @@ end;
   state -- which is nothing. It is left in.
   -------------------------------------------------------------------------- }
 procedure Walker(N : Integer);
+label
+  Stand, Move;
 var
-  DX_, Row, Col, RowTo, ColTo : Integer;
-  Pix                         : Byte;
-  Standing, Climbed           : Boolean;
+  { TEN BYTES, AND ONLY SIX OF THEM ARE DECLARED. 1005:14d6 opens ENTER $A with
+    slots at [BP-$02] x16, [BP-$04] x16, [BP-$06] x6, [BP-$08] x6 and
+    [BP-$0A] x12, and the last two are not variables at all. A `for` whose
+    upper bound is an expression evaluates it ONCE into a compiler temporary,
+    and the loops here nest one deep, so two temporaries are live: [BP-$08]
+    holds the row bound and [BP-$0A] the column bound, in all three loops.
+
+    THAT IS ALSO WHY THERE IS NO Standing AND NO Climbed. The original leaves a
+    loop with a GOTO straight to the code that follows it -- 1005:156E jumps to
+    the wall check and 1005:171B jumps to the move. A Boolean flag set inside
+    the loop and tested after it is the re-expression, and it costs the flag,
+    the test and the branch around it. }
+  DX_   : Integer;                { [BP-$02] -- the ground offset first, then
+                                    the ROW of both later loops: one variable
+                                    doing three jobs }
+  Col   : Integer;                { [BP-$04] }
+  Spare : Byte;                   { [BP-$05], never read -- a byte declared
+                                    after a word lands here, and Pix is at
+                                    $06, so something occupies $05 }
+  Pix   : Byte;                   { [BP-$06] }
 begin
-  Standing := False;
   for DX_ := -3 to 3 do
   begin
     Pix := GetPixel(Lem[N].X + DX_, Lem[N].Y + 1, VirtScrSeg);
@@ -778,75 +803,64 @@ begin
       if Pix = StuckColour  then SetState(StStuck,  N);
       Exit;
     end;
-    if Pix in Ground then
-    begin
-      Standing := True;
-      Break;
-    end;
-    if DX_ = 3 then
-    begin
-      SetState(StFaller, N);
-      Exit;
-    end;
+    if Pix in Ground then goto Stand;            { 1005:156E }
   end;
 
-  if Standing then
-  begin
-    { 1005:1608 -- the wall ahead, head height }
-    for Row := Lem[N].Y - 9 to Lem[N].Y - 4 do
+  { 1005:1579 -- the loop ran out, so there is nothing under it anywhere. This
+    is the code AFTER the for loop, which is why the loop's own bottom test at
+    1005:1570 branches straight into it. }
+  SetState(StFaller, N);
+  Exit;
+
+Stand:
+  { 1005:1584 -- the wall ahead, head height. The bound is written as two
+    additions because that is what the original computes: ADD AX,3 then INC AX
+    twice, which is `+ 3 + 2` and not `+ 5` -- Turbo Pascal emits one operation
+    per operator rather than folding the constants first. }
+  for DX_ := Lem[N].Y - 9 to Lem[N].Y - 4 do
+    if Lem[N].Dir >= 1 then
     begin
-      if Lem[N].Dir < 1 then
-      begin
-        ColTo := Lem[N].X - 3;  Col := Lem[N].X - 5;
-      end
-      else
-      begin
-        ColTo := Lem[N].X + 5;  Col := Lem[N].X + 3;
-      end;
-      while Col <= ColTo do
-      begin
-        if GetPixel(Col, Row, VirtScrSeg) in Wall then
+      for Col := Lem[N].X + 3 to Lem[N].X + 3 + 2 do   { 1005:15B8 }
+        if GetPixel(Col, DX_, VirtScrSeg) in Wall then
         begin
           Lem[N].Dir := -Lem[N].Dir;
           Exit;
         end;
-        Inc(Col);
-      end;
-    end;
-
-    { 1005:16d0 -- a step it can climb rather than a wall.
-
-      The moment this finds one it writes the new Y and jumps OUT of both
-      loops to the move at 1005:1791 -- see the JMP at 1005:171b. Writing the
-      new Y and letting the row loop carry on is not the same thing: the new Y
-      is one LESS than the current row, so a row loop that kept going would
-      step back onto the row it just left and stay there. }
-    Climbed := False;
-    Row   := Lem[N].Y - 4;                       { 1005:16a8 }
-    RowTo := Lem[N].Y;                           { 1005:169d, read once }
-    while (Row <= RowTo) and not Climbed do
-    begin
-      if Lem[N].Dir < 1 then                     { 1005:16bf }
-      begin
-        ColTo := Lem[N].X - 3;  Col := Lem[N].X - 4;
-      end
-      else
-      begin
-        ColTo := Lem[N].X + 4;  Col := Lem[N].X + 3;
-      end;
-      while (Col <= ColTo) and not Climbed do
-      begin
-        if GetPixel(Col, Row, VirtScrSeg) in Wall then
+    end
+    else
+      for Col := Lem[N].X - 3 - 2 to Lem[N].X - 3 do   { 1005:1622 }
+        if GetPixel(Col, DX_, VirtScrSeg) in Wall then
         begin
-          Lem[N].Y := Row - 1;                   { 1005:170f }
-          Climbed  := True;                      { 1005:171b -- and out }
-        end
-        else Inc(Col);
-      end;
-      Inc(Row);
-    end;
-  end;
+          Lem[N].Dir := -Lem[N].Dir;
+          Exit;
+        end;
 
+  { 1005:1695 -- a step it can climb rather than a wall.
+
+    The moment this finds one it writes the new Y and jumps OUT of both loops
+    to the move -- the JMP at 1005:171B. Writing the new Y and letting the row
+    loop carry on is not the same thing: the new Y is one LESS than the current
+    row, so a row loop that kept going would step back onto the row it just
+    left and stay there. }
+  for DX_ := Lem[N].Y - 4 to Lem[N].Y do
+    if Lem[N].Dir >= 1 then
+    begin
+      for Col := Lem[N].X + 3 to Lem[N].X + 3 + 1 do   { 1005:16C6 }
+        if GetPixel(Col, DX_, VirtScrSeg) in Wall then
+        begin
+          Lem[N].Y := DX_ - 1;                         { 1005:170F }
+          goto Move;                                   { 1005:171B }
+        end;
+    end
+    else
+      for Col := Lem[N].X - 3 - 1 to Lem[N].X - 3 do   { 1005:1727 }
+        if GetPixel(Col, DX_, VirtScrSeg) in Wall then
+        begin
+          Lem[N].Y := DX_ - 1;
+          goto Move;
+        end;
+
+Move:
   Inc(Lem[N].X, Lem[N].Dir);                     { 1005:1791 }
   Lem[N].Tick := (Lem[N].Tick mod 2) + 1;
   if Lem[N].Tick mod 2 = 0 then
