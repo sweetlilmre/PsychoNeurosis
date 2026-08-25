@@ -105,6 +105,13 @@ type
     Flag    : Byte;
   end;
 
+  { Transform takes the whole trail BY POINTER, so the array needs a name.
+    1107:044a is LES DI,[BP+0A] -- a far pointer parameter -- and 1107:048d
+    indexes it as base + I * 13 with no adjustment, which is a ZERO-based
+    array. }
+  TTrailArr = array[0..LastEntry] of TTrail;
+  PTrailArr = ^TTrailArr;
+
   { 7 bytes in the original: X, Y, D as words and the flag as a byte. }
   TOut = record
     X, Y, D : Integer;
@@ -181,6 +188,17 @@ var
   ProfileA, ProfileB : array[1..BlobPixels] of Byte;
   { DS:$672D }
   Pal   : array[0..767] of Byte;
+  { DS:$6A2D, $6A2F, $6A31 -- BuildPoints' THREE COUNTERS ARE UNIT-LEVEL, and
+    that is what leaves the routine with no declared locals at all. The
+    original reads and writes them absolutely: 1107:0848 is
+    MOV DI,[$6A2D] for the row, 1107:087f pushes [$6A2F] for the column, and
+    1107:08d0 is IMUL DI,[$6A31],0D for the trail index.
+
+    They also tile: Pal at $672D is 768 bytes and ends exactly here, and these
+    six bytes end exactly at $6A33 where the row buffers begin. }
+  Row   : Integer;                                { DS:$6A2D }
+  Col   : Integer;                                { DS:$6A2F }
+  Idx   : Integer;                                { DS:$6A31 }
   { DS:$6A33, stride $100 -- THE EIGHT ROW BUFFERS, and they are UNIT-LEVEL.
     They were declared as locals inside BuildPoints, which is eight 256-byte
     strings on the stack and 2,048 bytes of DGROUP the original has and we did
@@ -265,42 +283,50 @@ procedure Project(var X, Y, Z : LongInt);               external; { 1107:1A04 }
   1107:04bf reads ES:[DI], ES:[DI+4], ES:[DI+8] with DI still pointing at the
   base of the array -- entry 0. It is the object position, not a point.
   -------------------------------------------------------------------------- }
-procedure Transform(A1, A2, A3 : Integer);
+procedure Transform(Base : Pointer; A1, A2, A3 : Integer);
 var
-  { ENTER $14 IS 20 BYTES AND THE ODD OFFSETS DECODE IT. Every referenced slot
-    below the first is odd -- [BP-3], [BP-5], [BP-7], [BP-9], [BP-$0B],
-    [BP-$0D], [BP-$0F], [BP-$11], [BP-$13] -- which only happens if a ONE-BYTE
-    local was declared first and pushed everything after it off even alignment.
+  { TWENTY BYTES, AND THE EARLIER READING OF THEM WAS WRONG. It said a Byte
+    then three LongInts then three Integers, because every referenced offset
+    below the first is odd and a one-byte local is the usual cause. The frame
+    was right and the parts were not: [BP-2] is written with MOV WORD PTR at
+    1107:0483, so the counter is an INTEGER, and the odd offsets come from a
+    THIRTEEN-byte record sitting after it.
 
-    Reading forward from that: a Byte, then three LongInts at [BP-5], [BP-9]
-    and [BP-$0D] (each read twice, at its low and high word, which is exactly
-    the pairs above), then three Integers at [BP-$0F], [BP-$11] and [BP-$13].
-    1 + 12 + 6 = 19, and ENTER rounds it to the even 20.
+    2 + 13 + 4 = 19, rounded to 20:
 
-    The three Integers are the projected results: the routine stores X, Y and
-    the depth before writing them into the seven-byte output record, the same
-    way scene 5's per-point transform does. }
-  I          : Byte;                    { [BP-1] }
-  X, Y, Z    : LongInt;                 { [BP-5], [BP-9], [BP-$0D] }
-  Sx, Sy, Sd : Integer;                 { [BP-$0F], [BP-$11], [BP-$13] }
+      [BP-2]     I, an Integer -- MOV WORD PTR [BP-2],1 and INC WORD PTR
+      [BP-$0F]   a TTrail, 13 bytes, copied in whole by Move at 1107:049f.
+                 Its three LongInt fields are at [BP-$0F], [BP-$0B] and
+                 [BP-7], which is exactly what 1107:04a4..04b3 pushes to
+                 RotatePoint, and the Flag byte is the odd [BP-3].
+      [BP-$13]   a four-byte pointer, loaded from the parameter at 1107:044a.
+
+    THE RECORD IS COPIED, NOT READ FIELD BY FIELD. 1107:049f is
+    Move(P^[I], T, 13) -- one call -- where this read three fields into three
+    LongInt locals. That is why there are no X, Y, Z locals to declare. }
+  I : Integer;                          { [BP-2] }
+  T : TTrail;                           { [BP-$0F], the working copy }
+  P : PTrailArr;                        { [BP-$13], from Base }
 begin
+  P := Base;                                { 1107:044a }
+
   SinCos(A1, MCos1, MSin1);                 { -> DS:$5B52, $5B56 }
   SinCos(A2, MCos2, MSin2);                 { -> DS:$5B5A, $5B5E }
   SinCos(A3, MCos3, MSin3);                 { -> DS:$5B62, $5B66 }
 
   for I := 1 to LastEntry do
   begin
-    X := Trail[I].X;  Y := Trail[I].Y;  Z := Trail[I].Z;
-    RotatePoint(X, Y, Z);
-    X := X + Trail[0].X;
-    Y := Y + Trail[0].Y;
-    Z := Z + Trail[0].Z;
-    Outp[I].D := FixedToInt(Z);             { 1107:052e }
-    Project(X, Y, Z);
+    Move(P^[I], T, SizeOf(TTrail));         { 1107:049f, thirteen bytes }
+    RotatePoint(T.X, T.Y, T.Z);             { 1107:04b3 }
+    T.X := T.X + Trail[0].X;
+    T.Y := T.Y + Trail[0].Y;
+    T.Z := T.Z + Trail[0].Z;
+    Outp[I].D := FixedToInt(T.Z);           { 1107:052e }
+    Project(T.X, T.Y, T.Z);
     { both come back zero-extended, so the low word carries the sign }
-    Outp[I].X    := Integer(X);
-    Outp[I].Y    := Integer(Y);
-    Outp[I].Flag := Trail[I].Flag;
+    Outp[I].X    := Integer(T.X);
+    Outp[I].Y    := Integer(T.Y);
+    Outp[I].Flag := T.Flag;
   end;
 end;
 
@@ -445,7 +471,7 @@ end;
   Transform with the array base DS:$5BCC, then the rest of the frame. }
 procedure FrameStep(A1, A2, A3 : Integer);
 begin
-  Transform(A1, A2, A3);            { 1107:0446 }
+  Transform(@Trail, A1, A2, A3);    { 1107:0446 }
   BuildBlobs;                       { 1107:03e7 }
   StarStep;                         { 12b2:00c0 }
   StarDraw(VirtScrSeg);             { 12b2:00f1 }
@@ -575,35 +601,55 @@ end;
       Trail[0] := (0, 0, 2000)                 1107:094e
   -------------------------------------------------------------------------- }
 procedure BuildPoints;
-var
-  Row   : Integer;
-  Col   : Integer;
-  Idx   : Integer;
-  C     : Char;
-  Done  : Boolean;
-begin
-  for Row := 1 to TrailRows do
-    Rows[Row] := GridPoint;
+{ NO DECLARED LOCALS, and the frame is how we know. ENTER $202 is 514 bytes and
+  every one of them is a compiler temporary: [BP-2] holds the inner for-loop's
+  length limit, and the two 256-byte blocks at [BP-$102] and [BP-$202] are the
+  results of TWO Copy() calls -- 1107:0885 and 1107:08af, each followed by a
+  comparison against a CS string constant. Row, Col and Idx are unit-level.
 
-  Idx  := 1;
-  Done := False;
-  for Row := 1 to TrailRows do
+  Three shapes here are the original's and not the obvious transcription:
+
+  THE EIGHT ASSIGNMENTS ARE UNROLLED. 1107:07a6..0800 is eight straight calls
+  to the string assign with eight LITERAL destinations -- $6A33, $6B33, $6C33
+  and so on -- not a loop with computed addressing. A `for Row := 1 to 8` loop
+  is the same result and not the same code.
+
+  THE TEST USES Copy(), TWICE. `Rows[Row][Col]` would fetch one byte; the
+  original builds a one-character STRING and compares it, twice, which is
+  where 512 of the 514 frame bytes go. That is also why there is no Char local.
+
+  AND IT BREAKS BY ASSIGNING THE LOOP VARIABLES. 1107:0933 is
+  MOV WORD PTR [$6A2D],8 -- Row is set to its limit, and Col to the row's
+  length just before it -- where this had a Boolean flag and two Breaks. That
+  is only legal because the counters are unit-level variables rather than the
+  for-statement's own, which is a second reason they live outside. }
+begin
+  Rows[1] := GridPoint;                           { 1107:07a6, and the seven }
+  Rows[2] := GridPoint;                           { below are separate calls }
+  Rows[3] := GridPoint;                           { in the original, not a }
+  Rows[4] := GridPoint;                           { loop }
+  Rows[5] := GridPoint;
+  Rows[6] := GridPoint;
+  Rows[7] := GridPoint;
+  Rows[8] := GridPoint;
+
+  Idx := 1;                                       { 1107:0836 }
+  for Row := 1 to TrailRows do                     { 1107:083c }
   begin
-    if Done then Break;
-    for Col := 1 to Length(Rows[Row]) do
+    for Col := 1 to Length(Rows[Row]) do          { limit into [BP-2] once }
     begin
-      C := Rows[Row][Col];
-      if (C = MarkerA) or (C = MarkerB) then
+      if (Copy(Rows[Row], Col, 1) = MarkerA)      { 1107:0885 }
+      or (Copy(Rows[Row], Col, 1) = MarkerB) then { 1107:08af }
       begin
         Trail[Idx].X    := IntToFixed((Col - 1) * 10 - 90);
         Trail[Idx].Y    := IntToFixed(32 - (Row - 1) * 8);
         Trail[Idx].Z    := IntToFixed(0);
         Trail[Idx].Flag := 0;
-        Inc(Idx);
-        if Idx > TrailCount then
+        Inc(Idx);                                 { 1107:0917 }
+        if Idx > TrailCount then                  { 1107:091b, CMP $91 }
         begin
-          Done := True;
-          Break;
+          Col := Length(Rows[Row]);               { 1107:0930 }
+          Row := TrailRows;                       { 1107:0933 }
         end;
       end;
     end;

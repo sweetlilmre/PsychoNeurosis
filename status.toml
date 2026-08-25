@@ -601,6 +601,13 @@ resolution = "RESOLVED FOR THE FRAMES, and worked as a BATCH rather than one fix
 name = "part1-frame-residue"
 finding = "part 001: four frame sizes are still missing and each names a different KIND of work. Run `framehist.py spans.toml 001`. $482 MISSING -- 1012:05bd, AND IT IS A ROUTINE WE HAVE NOT WRITTEN AT ALL, not a frame defect. It takes a String BY VALUE (copied to [BP-$100] at 1012:05c8 by the length-prefixed REP MOVSB) and reads into a 768-byte local at [BP-$400], with an Integer at [BP-$402] and 128 unreferenced bytes below that: 256 + 768 + 2 + 128 = 1,154. P1S1 has no String-taking routine at all, and 1012:05bd sits immediately after the bounce loop's constants at 1012:05b1, so it is whatever loads the next thing. Identify it before writing it. $202 MISSING -- 1107:07a2, BuildPoints, and this one is a BODY defect. The original has ONE 2-byte local plus two 256-byte strings ([BP-2], [BP-$102], [BP-$202] = 514); ours has five small locals. One counter where we have three means the original walks a single index rather than nesting Row and Col, so this is a rewrite and not a declaration change. Do not force the declarations to fit without the body. $6 MISSING -- 1082:0128, BlitClipped, ALSO a body defect and the largest of these: the original has SIX bytes of locals and ours has nineteen. Two Integers are read and two more bytes are dead; ours declares a pointer, six Integers, a Word and a Byte. The original does its clipping by adjusting a pointer and two counts before the loop, as the comment beside it already says, rather than keeping six named bounds. $0 MISSING -- one routine in the original opens ENTER 0, which is a $G+ frame with no locals at all. Cheap to find and cheap to fix once found."
 seen_in = "TPART1"
+state = "resolved"
+resolution = "THREE BODIES REWRITTEN IN ONE BATCH: part 001 83.7% -> 86.7%, +637 bytes, the largest run on this target. Data image unchanged, traps identical opcode for opcode, paslint and encaudit clean. Targeted BY MASS rather than by tool convenience -- summing the unaligned bytes per segment first put 1107 at 1,055 and named BuildPoints' 291-byte span as the single biggest item, which is not where the frame sweep would have sent us. 1107:07a2 BUILDPOINTS, +311 and the 291-byte span is gone entirely. Its ENTER $202 is 514 bytes and NONE of it is a declared local: [BP-2] is the inner for-loop's length limit and the two 256-byte blocks are compiler temps for TWO Copy() calls. Three shapes were wrong. The eight row assignments are UNROLLED -- 1107:07a6..0800 is eight calls with eight literal destinations $6A33, $6B33, $6C33 and so on, not a loop. The character test is `Copy(Rows[Row], Col, 1) = MarkerA` TWICE, which is where 512 of the 514 bytes go and why there is no Char local. And it breaks by ASSIGNING THE LOOP VARIABLES -- 1107:0933 is MOV WORD PTR [$6A2D],8 -- where this had a Boolean flag and two Breaks. AND THAT LAST ONE EXPLAINS WHY Row, Col AND Idx ARE UNIT-LEVEL, at $6A2D, $6A2F and $6A31: Turbo Pascal 7 REFUSES assignment to a for-loop control variable that is local to the routine, and accepts it when the variable is declared outside. Tested, not assumed -- the build was tried both ways. The three also tile: Pal at $672D is 768 bytes and ends exactly at $6A2D, and their six bytes end exactly at $6A33. 12c5:0870 VECTORRUN's two point loops, +275. The loops are ZERO-BASED with both subscripts carrying a +1 (1107... 12c5:0893 is MOV AX,[BP-2] / INC AX / IMUL DI,AX,0C while the table is scaled by six from the SAME counter without the increment), the point is reached through a DECLARED FOUR-BYTE POINTER whose value is set once per iteration and reloaded for each field write, and THERE IS NO Src POINTER FOR THE TABLE -- 12c5:08b3 is PUSH WORD PTR [DI+$1A8], an ABSOLUTE displacement, so the coordinate table is named directly. `Src := @VecGlobe` had been inferred to explain a slot that is the loop's limit temp. 1107:0446 TRANSFORM, +52, AND IT CORRECTS LAST RUN'S READING OF ITS OWN FRAME. That reading said a Byte then three LongInts then three Integers, on the strength of every referenced offset below the first being odd. The frame total was right and every part was wrong: [BP-2] is written with MOV WORD PTR so the counter is an Integer, and the odd offsets come from a THIRTEEN-BYTE RECORD after it. 2 + 13 + 4 = 19, rounded to 20. The record is copied whole by Move at 1107:049f rather than read field by field, and the routine takes the trail BY POINTER -- LES DI,[BP+0A] at 1107:044a -- which our signature did not have at all. An odd offset run is evidence of a one-byte local OR of an odd-sized record, and the two are not distinguishable from the offsets alone."
+
+[[plan.investigation]]
+name = "part1-mass-targets"
+finding = "part 001 at 86.7%, and the remaining spans are smaller and more scattered -- no single item is now worth more than about 210 bytes. Target BY MASS: sum the spans per segment first, because it has twice sent this work somewhere the frame sweep would not have. The list, largest first: 12c5:0780..084f (207, Vector_Animate's frame loop), 12b2:001f..00d9 (186, and 12b2 is the STAR-FIELD UNIT whose routines still sit inside P1S4 -- see part1-missing-star-unit), 1082:0572..0610 (158), 1107:0574..05fa (134), 10e3:0070..00e1 (113), 1107:08fc..096b (111). FOUR FRAME SIZES ARE STILL MISSING and two are known: $482 is 1012:05bd, a routine we have never written -- it takes a String by value, reads 768 bytes into a local palette at [BP-$400] and 64,000 through a POINTER GLOBAL AT DS:$AB54, then sets the DAC from the triples. $6 is 1082:0128 BlitClipped, where the original has six bytes of locals against our nineteen and clips by adjusting a pointer and two counts before the loop, as the comment beside it already says. $0 and $A are unidentified. THE TELLS THAT PAID THIS RUN, worth trying on each of the above before disassembling: an ABSOLUTE displacement for a table means the table is NAMED, not reached through a pointer variable; a four-byte slot written once per iteration and reloaded for each field write is the record's address taken once, so a declared pointer or a `with`; a single Move of a record's size replaces field-by-field reads and removes the locals they needed; and literal destination addresses in sequence mean the source is unrolled rather than looped."
+seen_in = "TPART1"
 state = "open"
 
 [plan.row."001 1012:0004"]
@@ -621,6 +628,11 @@ target = "R0"
 [plan.row."001 1082:0137"]
 label = "seven spans on one length change; reads as hand assembler"
 investigation = "part1-depthsort-nested"
+target = "R0"
+
+[plan.row."001 1082:0572"]
+label = "158 bytes, unread"
+investigation = "part1-mass-targets"
 target = "R0"
 
 [plan.row."001 10e3:0075"]
@@ -666,6 +678,11 @@ target = "R0"
 [plan.row."001 12b2:0000"]
 label = "StarInit belongs in its own unit, not in P1S4"
 investigation = "part1-missing-star-unit"
+target = "R0"
+
+[plan.row."001 12b2:001f"]
+label = "186 bytes in the star-field unit that has no unit of its own"
+investigation = "part1-mass-targets"
 target = "R0"
 
 [plan.row."001 12b2:00c0"]
@@ -717,6 +734,11 @@ target = "R0"
 label = "Vector_Animate frame"
 investigation = "pacing"
 note = "The part's second-largest span, and the frame technique found it the same way it found BuildLens. Vector_Animate opens ENTER $08 at 12c5:075e and the reconstruction declared two Integers, which is four bytes; worse, every local in the original sits on an ODD offset -- [BP-3] and [BP-7] -- which only happens if a ONE-BYTE local was declared FIRST and pushed everything after it out of alignment. Turbo Pascal does not align locals, so the offsets recover the declaration order directly: [BP-1] a byte written 0 at 12c5:076c and NEVER READ (one reference in the whole routine, and it is that store -- it reads like an exit flag the author abandoned, since Exit is reached straight from the KeyPressed test at 12c5:0851); [BP-3] Frame, seeded at 12c5:0770 and tested against $F0 at 12c5:085c; [BP-5] NEVER REFERENCED AT ALL at any width; [BP-7] Local, seeded at 12c5:0769, read at 12c5:07b9 and 12c5:0806, advanced by 3 at 12c5:082b. Seven bytes declared and ENTER $08 because the frame rounds to even. Both dead locals are transcribed anyway -- they are what the 1994 source declared, and omitting them is what put every other local in the routine at the wrong offset. Boolean, Byte and Char are indistinguishable from MOV BYTE PTR [BP-1],0, so the choice of Boolean is a guess and is flagged as one in the source. Measured: the span shrinks from 12c5:076e..0a13 (677) to 12c5:0780..0a13 (659), so the prologue and all three seeds now align, and part 001 moves 68.4% to 68.5%. THE 659 BYTES THAT REMAIN ARE THE LOOP BODY and are not yet read -- CopyScreen, ObjTransformAll, RenderObject, the three Round(Sin/Cos) translations at 12c5:07b8..0828 and ObjTranslate. That is where the rest of this span's work is."
+
+[plan.row."001 12c5:0780"]
+label = "Vector_Animate's frame loop, the biggest span left at 207"
+investigation = "part1-mass-targets"
+target = "R0"
 
 [plan.row."001 12c5:0947"]
 label = "P1S5's MViewW is a Word: the LongInt spill says so"

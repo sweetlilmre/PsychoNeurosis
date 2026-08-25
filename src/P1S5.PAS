@@ -728,26 +728,46 @@ end;
             assets/part001/vector_logo_a.bin   DS:$001C, 48 points
   -------------------------------------------------------------------------- }
 procedure VectorRun;
-type
-  TTriples = array[1..MaxPoints, 1..3] of Integer;
 var
-  { ENTER $A, and the slots are $02, $04, $06 and a four-byte pointer whose two
-    words are $0A and $08 -- three Integers and a Pointer, ten bytes exactly.
-    LoadObject is INLINED here, which is why its Src and I live in this frame. }
+  { ENTER $A is ten bytes and only TWO of them are declared. The frame reads as
+    three Integers and a Pointer -- which is what this said -- and the BODY
+    refutes that:
+
+      [BP-$06] is the for-loop's LIMIT temp. 12c5:087d is
+      MOV AX,[$AAC8] / DEC AX / MOV [BP-6],AX -- PtCount minus one, evaluated
+      once before the loop, which is what a `for` does with a non-constant
+      limit. It is not a declared Word.
+
+      [BP-$0A] is a DECLARED four-byte POINTER to the point being filled.
+      12c5:0897 computes IMUL DI,AX,0C / ADD DI,$A0FA, stores DI and ES into
+      it, and then every field write goes LES DI,[BP-$0A] / MOV ES:[DI],AX.
+      The record's address is taken ONCE, which three separate
+      `Obj.Pt[I].X :=` statements do not do.
+
+    AND THERE IS NO Src POINTER AT ALL. 12c5:08b3 is
+    PUSH WORD PTR [DI+$1A8] -- an ABSOLUTE displacement, so the coordinate
+    table is named directly. A table reached through a pointer variable would
+    load the pointer into a register first. `Src := @VecGlobe` was inferred to
+    explain a slot that turns out to be a compiler temp. }
   I      : Integer;                       { [BP-$02] }
-  Unread : Integer;                       { [BP-$04], nothing reads it }
-  W      : Word;                          { [BP-$06] }
-  Src    : ^TTriples;                     { [BP-$0A] }
+  W      : Word;                          { [BP-$04] -- the slide-out counter }
+  P      : PPoint3;                       { [BP-$0A], the point being filled }
 begin
   { INLINE, both times. 12c5:0874 sets PtCount from an immediate and then runs
-    the point loop in Vector_Run's own frame -- there is no call. }
-  Src := @VecGlobe;
-  PtCount := GlobePoints;
-  for I := 1 to PtCount do
+    the point loop in Vector_Run's own frame -- there is no call.
+
+    THE LOOP IS ZERO-BASED and both subscripts carry the +1. 12c5:0893 is
+    MOV AX,[BP-2] / INC AX / IMUL DI,AX,0C, so the counter is one less than the
+    point number, and 12c5:08a6 scales the SAME counter by six for the table
+    without the increment -- which is `VecGlobe[I + 1, n]` on a one-based table
+    folding to base + I*6. A `for I := 1 to PtCount` loop needs neither. }
+  PtCount := GlobePoints;                        { 12c5:0874 }
+  for I := 0 to PtCount - 1 do
   begin
-    Obj.Pt[I].X := IntToFixed(Src^[I, 1]);
-    Obj.Pt[I].Y := IntToFixed(Src^[I, 2]);
-    Obj.Pt[I].Z := IntToFixed(Src^[I, 3]);
+    P := @Obj.Pt[I + 1];                         { 12c5:08a0 }
+    P^.X := IntToFixed(VecGlobe[I + 1, 1]);      { 12c5:08b3 }
+    P^.Y := IntToFixed(VecGlobe[I + 1, 2]);
+    P^.Z := IntToFixed(VecGlobe[I + 1, 3]);
   end;
 
 
@@ -766,15 +786,14 @@ begin
   OrbitAngle := -2042;                         { 12c5:096a }
   Animate;
 
-  { INLINE, both times. 12c5:0874 sets PtCount from an immediate and then runs
-    the point loop in Vector_Run's own frame -- there is no call. }
-  Src := @VecLogoA;
+  { The same shape a second time, on the other table. }
   PtCount := LogoPoints;
-  for I := 1 to PtCount do
+  for I := 0 to PtCount - 1 do
   begin
-    Obj.Pt[I].X := IntToFixed(Src^[I, 1]);
-    Obj.Pt[I].Y := IntToFixed(Src^[I, 2]);
-    Obj.Pt[I].Z := IntToFixed(Src^[I, 3]);
+    P := @Obj.Pt[I + 1];
+    P^.X := IntToFixed(VecLogoA[I + 1, 1]);
+    P^.Y := IntToFixed(VecLogoA[I + 1, 2]);
+    P^.Z := IntToFixed(VecLogoA[I + 1, 3]);
   end;
   OrbitAngle := 17;                            { 12c5:0a15 }
   Animate;
