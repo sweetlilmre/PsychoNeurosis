@@ -811,6 +811,29 @@ seen_in = "TPART6"
 state = "resolved"
 resolution = "RESOLVED: part 006 meets the bar at 99.3%. Twelve bytes remain, in one span that is a near call's target plus the zero padding after a unit's last routine -- neither closes by editing. FIVE PARTS NOW MEET 99% and three more are at 100%; only 005 (98.8%) and 001 (90.9%) are below, and 001 is the whole of the remaining job."
 
+[[plan.investigation]]
+name = "part1-blitters"
+finding = "PART 001 90.9 -> 92.1%, AND TODAY'S FOUR SHAPES ALL APPEARED IN IT. The sweep was worth running before reading anything: P1S2 had no {$I-} at all -- the third unit today, after part 004's Lemmings and part 006's P6S4 -- and its font is THREE-DIMENSIONAL with the fold sitting in the file as a named constant. `FontBias = 8209 { = 32*256 + 17 }` had been written down, correctly, and then subtracted BY HAND in a flat subscript, which makes the compiler do at run time what the type does at compile time. 1082:022b is ES:[DI-$2011] and $2011 is 8,209. Part 006's scene 1 font is the identical shape. AND THREE ROUTINES ARE HAND ASSEMBLER THAT WERE COMPILED PASCAL HERE. P1S5's DrawPoint (12c5:052a) and DrawReflection (12c5:05a2) and P1S2's BlitClipped (1082:0128) are the same clipped transparent blitter three times over -- LODSB/STOSB, DEC CL / JNE inner loops, MUL CX to skip clipped rows, DS pointed at the sprite so the source needs no override. THE PROLOGUE IS THE CHEAP TELL: 12c5:052a is PUSH BP / MOV BP,SP and nothing else, so the routine has NO LOCALS, and a routine that clips a sprite and walks two nested loops cannot be written in Pascal with none. Ours declared seven. DrawPoint and DrawReflection differ in exactly two things and both are visible: the clip is the other side of the mirror line (0..133 against 133..199), and 12c5:0607 is ADD AL,$10 in front of the STOSB, which is what dims the reflection. BlitClipped is the same routine with the size COMPILED IN rather than read from the sprite -- 1082:0137 MOV DL,$30 and 1082:013b MOV CL,$41, immediates into register halves with XOR DH,DH and XOR CH,CH beside them, which is not a shape the code generator produces. AND A BEHAVIOURAL DIFFERENCE FALLS OUT OF THE TRANSCRIPTION: the original's DrawPoint has NO HORIZONTAL CLIP. The Pascal that was here tested X + C against 0 and 320 per pixel; the original tests neither, so a sprite whose X puts it off an edge WRAPS onto the neighbouring row. That is behaviour and the reconstruction has to keep it. MEASURED: 92.1%, no other part moved, three byte-exact artefacts hold, paslint clean, part 001's 53 traps identical opcode for opcode."
+seen_in = "TPART1"
+state = "resolved"
+resolution = "RESOLVED in the batch that found it: part 001 90.9 -> 92.1%. What is left in the part is 1,679 bytes, and the two things to do next are in part1-layout below."
+
+[[plan.investigation]]
+name = "part1-layout"
+finding = "PART 001's DATA SEGMENT HAS TWO ORDER DEFECTS AND THEY ARE BOTH LOCALISED. dsmap's change list, read past the single-site folds: +0 up to $0284, then -2 from $0286 to $56CA, then back to +0 by $878B, then +4 from $AAC2 to $ACFB across FIFTY-FIVE sites. THE -2 IS THE KNOWN MISSING TYPED CONSTANT AT DS:$0284, still open: dgimage says our initialised image is the right SIZE -- 752 bytes against 752 -- with 25 bytes differing and the first difference at $0284, and `no fixed shift resynchronises it`, so the content differs rather than the position. The original has $A640 there and ours goes straight to the next constant. It sits immediately after P1S5's MViewW and MViewH at $0280 and $0282. THE +4 IS NEW AND IS THE BIGGER ONE. Fifty-five paired references from $AAC2 up are four bytes high, which puts VGA's whole block there: the original's VirtScr is at $AB54, VirtScrSeg at $AB58 and YOfs at $AB5A -- the fold [BX-$54A6] is $AB5A -- and ours reads VirtScrSeg at $AB5C. So four bytes too many sit between $878B and $AAC2, which is P1S4's and P1S5's blocks. Fifty-five sites is the largest single lever left in the part. AND ONE READING FELL OUT OF THE +4 ON THE WAY: 1082:0076 is LES DI,[$AB54] where ours is MOV AX,[VirtScrSeg] -- so Title_Load reads the backdrop with BlockRead(F, VirtScr^, 64000) and not BlockRead(F, Mem[VirtScrSeg : 0], 64000). Worth changing whether or not the +4 moves, because it is a different instruction and not just a different displacement. framehist ALSO HAS SIX ROWS in this part -- $6 and $A and $18 missing, $2, $4 and $C surplus -- so there are declaration lists to fix as well, and $18 MISSING is a routine 24 bytes of locals short."
+seen_in = "TPART1"
+state = "open"
+
+[plan.row."001 $0284"]
+label = "the 2-byte typed constant holding $A640, still missing"
+investigation = "part1-layout"
+target = "R0"
+
+[plan.row."001 $AAC2 +4"]
+label = "55 sites four bytes high -- the largest lever left"
+investigation = "part1-layout"
+target = "R0"
+
 [plan.row."001 1012:0004"]
 label = "BuildLens quadrant walk"
 investigation = "pacing"
@@ -826,14 +849,24 @@ label = "a String-taking loader we have not written at all"
 investigation = "part1-frame-residue"
 target = "R0"
 
+[plan.row."001 1082:0076"]
+label = "Title_Load reads VirtScr^, not Mem[VirtScrSeg : 0]"
+investigation = "part1-layout"
+target = "R0"
+
 [plan.row."001 1082:0128"]
-label = "BlitClipped: 6 bytes of locals against our 19"
-investigation = "part1-frame-residue"
+label = "BlitClipped, the same routine with the size compiled in -- FIXED"
+investigation = "part1-blitters"
 target = "R0"
 
 [plan.row."001 1082:0137"]
 label = "seven spans on one length change; reads as hand assembler"
 investigation = "part1-depthsort-nested"
+target = "R0"
+
+[plan.row."001 1082:022b"]
+label = "the font is 3-D and FontBias was the fold -- FIXED"
+investigation = "part1-blitters"
 target = "R0"
 
 [plan.row."001 1082:036a"]
@@ -941,6 +974,16 @@ label = "the point array is at Obj^+0 and MaxPoints is 100, not 64"
 investigation = "part1-object-record"
 target = "R0"
 
+[plan.row."001 12c5:052a"]
+label = "DrawPoint is assembler, and has NO horizontal clip -- FIXED"
+investigation = "part1-blitters"
+target = "R0"
+
+[plan.row."001 12c5:05a2"]
+label = "DrawReflection, the same routine + ADD AL,$10 -- FIXED"
+investigation = "part1-blitters"
+target = "R0"
+
 [plan.row."001 12c5:061d"]
 label = "the drawing loops belong to the caller, which passes @Scr"
 investigation = "part1-sortall-restructure"
@@ -965,6 +1008,11 @@ target = "R0"
 label = "Demo_Scene5 preamble"
 investigation = "part1-s4s5-palette"
 note = "Scene5 in the binary flushes keys, does ClearScreen($A000,0), then AllocWork (12c5:0a60: GetMem+clear of the work buffer), THEN Load rewrites the DAC -- so the palette swap happens over black. Ours went straight into Load, recolouring scene 4's still-displayed frame for the whole file read and backdrop build. Scene5 rebuilt to the binary's structure (also: palette is a Load local passed to VGA.SetPalette768, FreeMem(Work) on exit, and P1S5 needs $G+). Opcode-identical modulo fixups after the fix."
+
+[plan.row."001 P1S2 $I-"]
+label = "no I directive at all -- the third unit today -- FIXED"
+investigation = "part1-blitters"
+target = "R0"
 
 [plan.row."001 dgimage $0018"]
 label = "112 bytes short of initialised data, first diff at $0018"
@@ -1019,6 +1067,11 @@ target = "R0"
 [plan.row."001 dgroup base"]
 label = "P1S5's block starts 23530 bytes too low; the units below it are too small"
 investigation = "part1-unit-sizes"
+target = "R0"
+
+[plan.row."001 frame $18"]
+label = "and a routine 24 bytes of locals short"
+investigation = "part1-layout"
 target = "R0"
 
 [plan.row."001 header 112"]

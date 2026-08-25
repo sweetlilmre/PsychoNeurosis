@@ -504,81 +504,214 @@ begin
   DepthSort(PtCount + 1, PtCount * 2);            { 12c5:01a1 }
 end;
 
-{ [transcribed] 12c5:052a -- transparent point sprite, W and H from its own
-  first two bytes, clipped to rows 0..133. }
-procedure DrawPoint(Src : Pointer; X, Y : Integer; Segment : Word);
-var
-  P          : ^Byte;
-  W, H, R, C : Integer;
-  D          : Word;
-  V          : Byte;
-begin
-  P := Src;
-  W := P^;  Inc(LongInt(P));
-  H := P^;  Inc(LongInt(P));
+{ --------------------------------------------------------------------------
+  12c5:052a -- the point sprite. HAND ASSEMBLER, transcribed verbatim.
 
-  if -Y > 0 then
-  begin
-    if -Y >= H then Exit;
-    Inc(LongInt(P), LongInt(-Y) * W);
-    Dec(H, -Y);
-    Y := 0;
-  end;
-  if Horizon - Y <= 0 then Exit;
-  if Horizon - Y < H then H := Horizon - Y + 1;
+  IT IS ASSEMBLER AND THE PROLOGUE IS HOW YOU KNOW, twice over. 12c5:052a is
+  PUSH BP / MOV BP,SP and NOTHING ELSE -- no ENTER, so no locals at all -- while
+  ours declared seven and opened ENTER $02 after Turbo Pascal had folded most of
+  them into registers. A routine that clips a sprite, walks two nested loops and
+  swaps DS cannot be written in Pascal with no locals; it can be written in
+  assembler with none, because the values live in registers.
 
-  for R := 0 to H - 1 do
-  begin
-    D := (Y + R) * ScrWidth + X;
-    for C := 0 to W - 1 do
-    begin
-      V := P^;
-      if (V <> 0) and (X + C >= 0) and (X + C < ScrWidth) then
-        Mem[Segment : D] := V;
-      Inc(LongInt(P));
-      Inc(D);
-    end;
-  end;
+  And the body is unmistakable once read: LODSB and STOSB for a byte at a time,
+  DEC CL / JNE for the inner loop, MUL CX to skip whole rows, and DS pointed at
+  the sprite so the source needs no segment override. Turbo Pascal emits none of
+  those for this shape.
+
+  THE REGISTERS, because the transcription is unreadable without them:
+
+      ES:DI   destination, and DS:SI the sprite -- swapped at 12c5:0573
+      CX      the sprite's width, from its own first byte
+      DX      the rows still to draw, from its second
+      BX      first the row, then the width again as the row-step correction
+      CH/CL   the inner counter, reloaded from CH at the top of every row
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      W := Src^[0];  H := Src^[1];  P := @Src^[2];
+      if -Y > 0 then                      -- clipped off the top
+      begin
+        if -Y >= H then Exit;
+        Inc(P, -Y * W);  Dec(H, -Y);  Y := 0;
+      end;
+      if Horizon - Y <= 0 then Exit;      -- wholly below the mirror line
+      if Horizon - Y < H then H := Horizon - Y + 1;
+      D := YOfs[Y] + X;
+      for R := 1 to H do
+      begin
+        for C := 1 to W do
+        begin
+          if P^ <> 0 then Mem[Segment : D] := P^;   -- 0 is transparent
+          Inc(P);  Inc(D);
+        end;
+        Inc(D, 320 - W);
+      end;
+
+  NO HORIZONTAL CLIP. The Pascal that was here tested `X + C >= 0` and
+  `X + C < 320` per pixel; the original tests neither, so a sprite whose X puts
+  it off either edge wraps onto the neighbouring row. That is behaviour, not an
+  omission, and the reconstruction has to keep it.
+  -------------------------------------------------------------------------- }
+{ @asm 001 12c5:052a +0 DrawPoint }
+procedure DrawPoint(Src : Pointer; X, Y : Integer; Segment : Word); assembler;
+asm
+        PUSH    DS                      { 12c5:052d                          }
+        LES     DI, Src                 { 052e  ES:DI := the sprite          }
+        XOR     DX, DX                  { 0531                               }
+        XOR     CX, CX                  { 0533                               }
+        MOV     DL, ES:[DI+1]           { 0535  DX := height                 }
+        XOR     CH, CH                  { 0539                               }
+        MOV     CL, ES:[DI]             { 053b  CX := width                  }
+        ADD     DI, 2                   { 053e  past the two size bytes      }
+        MOV     SI, DI                  { 0541  SI := the first pixel        }
+        MOV     BX, Y                   { 0543                               }
+        XOR     AX, AX                  { 0546                               }
+        SUB     AX, BX                  { 0548  AX := -Y                     }
+        JLE     @@NoTopClip             { 054a                               }
+        CMP     AX, DX                  { 054c  is the whole sprite above?   }
+        JGE     @@Done                  { 054e    yes -- nothing to draw     }
+        SUB     DX, AX                  { 0550  drop the clipped rows        }
+        ADD     BX, AX                  { 0552  Y := 0                       }
+        MOV     DI, DX                  { 0554  park the row count -- MUL is }
+        MUL     CX                      { 0556    about to write DX          }
+        MOV     DX, DI                  { 0558    and here it is back        }
+        ADD     SI, AX                  { 055a  skip that many sprite bytes  }
+@@NoTopClip:
+        MOV     AX, Horizon             { 055c  133, the mirror line         }
+        SUB     AX, BX                  { 055f                               }
+        JLE     @@Done                  { 0561  wholly below it              }
+        CMP     AX, DX                  { 0563                               }
+        JGE     @@NoBotClip             { 0565                               }
+        INC     AX                      { 0567  ONE MORE ROW than the gap,   }
+        MOV     DX, AX                  { 0568    which is what the original }
+@@NoBotClip:                            {         does; it is not an error   }
+        ADD     BX, BX                  { 056a  BX := Y * 2                  }
+        MOV     DI, [BX + OFFSET YOfs]  { 056c  DI := Y * 320                }
+        ADD     DI, X                   { 0570                               }
+        MOV     AX, ES                  { 0573  DS:SI is now the sprite      }
+        MOV     DS, AX                  { 0575                               }
+        MOV     AX, Segment             { 0577                               }
+        MOV     ES, AX                  { 057a  ES:DI is now the screen      }
+        MOV     BX, CX                  { 057c  keep the width for the step  }
+        MOV     CH, CL                  { 057e    and for the row reload     }
+@@Row:  MOV     CL, CH                  { 0580  <- once per row              }
+@@Pixel:
+        LODSB                           { 0582  one sprite byte              }
+        OR      AL, AL                  { 0583                               }
+        JNE     @@Opaque                { 0585                               }
+        INC     DI                      { 0587  transparent: step over it    }
+        DEC     CL                      { 0588                               }
+        JNE     @@Pixel                 { 058a                               }
+        JMP     @@NextRow               { 058c                               }
+@@Opaque:
+        STOSB                           { 058e                               }
+        DEC     CL                      { 058f                               }
+        JNE     @@Pixel                 { 0591                               }
+@@NextRow:
+        ADD     DI, 320                 { 0593  down one screen row...       }
+        SUB     DI, BX                  { 0597    and back by the width      }
+        DEC     DL                      { 0599                               }
+        JNE     @@Row                   { 059b                               }
+@@Done: POP     DS                      { 059d                               }
 end;
 
 { --------------------------------------------------------------------------
-  12c5:05a2 -- the REFLECTION blit. Same shape as DrawPoint, two differences:
-  it clips to rows 133..199 rather than 0..133, and every pixel is written as
-  `AL + $10` -- sixteen colours along the palette, which is what dims it.
+  12c5:05a2 -- the REFLECTION blit. HAND ASSEMBLER, transcribed verbatim.
+
+  The same routine as DrawPoint above, byte for byte, with exactly two changes
+  and both of them are visible in the listing:
+
+    * the clip is the OTHER SIDE of the mirror line. DrawPoint drops rows above
+      Y = 0 and stops at 133; this drops rows above 133 and stops at 199, so the
+      two together tile the screen at the horizon.
+    * 12c5:0607 is ADD AL,$10 in front of the STOSB -- every pixel written
+      sixteen entries further along the palette, which is what dims the
+      reflection. Nothing else about the pixel loop differs.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      W := Src^[0];  H := Src^[1];  P := @Src^[2];
+      if Horizon - Y > 0 then             -- clipped off above the horizon
+      begin
+        if Horizon - Y >= H then Exit;
+        Inc(P, (Horizon - Y) * W);  Dec(H, Horizon - Y);  Y := Horizon;
+      end;
+      if 199 - Y <= 0 then Exit;          -- wholly below the screen
+      if 199 - Y < H then H := 199 - Y + 1;
+      D := YOfs[Y] + X;
+      for R := 1 to H do
+      begin
+        for C := 1 to W do
+        begin
+          if P^ <> 0 then Mem[Segment : D] := P^ + $10;
+          Inc(P);  Inc(D);
+        end;
+        Inc(D, 320 - W);
+      end;
   -------------------------------------------------------------------------- }
-procedure DrawReflection(Src : Pointer; X, Y : Integer; Segment : Word);
-var
-  P          : ^Byte;
-  W, H, R, C : Integer;
-  D          : Word;
-  V          : Byte;
-begin
-  P := Src;
-  W := P^;  Inc(LongInt(P));
-  H := P^;  Inc(LongInt(P));
-
-  if Horizon - Y > 0 then
-  begin
-    if Horizon - Y >= H then Exit;
-    Inc(LongInt(P), LongInt(Horizon - Y) * W);
-    Dec(H, Horizon - Y);
-    Y := Horizon;
-  end;
-  if 199 - Y <= 0 then Exit;
-  if 199 - Y < H then H := 199 - Y + 1;
-
-  for R := 0 to H - 1 do
-  begin
-    D := (Y + R) * ScrWidth + X;
-    for C := 0 to W - 1 do
-    begin
-      V := P^;
-      if (V <> 0) and (X + C >= 0) and (X + C < ScrWidth) then
-        Mem[Segment : D] := V + $10;
-      Inc(LongInt(P));
-      Inc(D);
-    end;
-  end;
+{ @asm 001 12c5:05a2 +0 DrawReflection }
+procedure DrawReflection(Src : Pointer; X, Y : Integer; Segment : Word); assembler;
+asm
+        PUSH    DS                      { 12c5:05a5                          }
+        LES     DI, Src                 { 05a6                               }
+        XOR     DX, DX                  { 05a9                               }
+        XOR     CX, CX                  { 05ab                               }
+        MOV     DL, ES:[DI+1]           { 05ad  DX := height                 }
+        XOR     CH, CH                  { 05b1                               }
+        MOV     CL, ES:[DI]             { 05b3  CX := width                  }
+        ADD     DI, 2                   { 05b6                               }
+        MOV     SI, DI                  { 05b9                               }
+        MOV     BX, Y                   { 05bb                               }
+        MOV     AX, Horizon             { 05be  133 -- the clip is from HERE }
+        SUB     AX, BX                  { 05c1    downwards, not from zero   }
+        JLE     @@NoTopClip             { 05c3                               }
+        CMP     AX, DX                  { 05c5                               }
+        JGE     @@Done                  { 05c7                               }
+        SUB     DX, AX                  { 05c9                               }
+        ADD     BX, AX                  { 05cb                               }
+        MOV     DI, DX                  { 05cd  park the row count round MUL }
+        MUL     CX                      { 05cf                               }
+        MOV     DX, DI                  { 05d1                               }
+        ADD     SI, AX                  { 05d3                               }
+@@NoTopClip:
+        MOV     AX, 199                 { 05d5  the bottom of the screen     }
+        SUB     AX, BX                  { 05d8                               }
+        JLE     @@Done                  { 05da                               }
+        CMP     AX, DX                  { 05dc                               }
+        JGE     @@NoBotClip             { 05de                               }
+        INC     AX                      { 05e0                               }
+        MOV     DX, AX                  { 05e1                               }
+@@NoBotClip:
+        ADD     BX, BX                  { 05e3                               }
+        MOV     DI, [BX + OFFSET YOfs]  { 05e5                               }
+        ADD     DI, X                   { 05e9                               }
+        MOV     AX, ES                  { 05ec                               }
+        MOV     DS, AX                  { 05ee                               }
+        MOV     AX, Segment             { 05f0                               }
+        MOV     ES, AX                  { 05f3                               }
+        MOV     BX, CX                  { 05f5                               }
+        MOV     CH, CL                  { 05f7                               }
+@@Row:  MOV     CL, CH                  { 05f9                               }
+@@Pixel:
+        LODSB                           { 05fb                               }
+        OR      AL, AL                  { 05fc                               }
+        JNE     @@Opaque                { 05fe                               }
+        INC     DI                      { 0600                               }
+        DEC     CL                      { 0601                               }
+        JNE     @@Pixel                 { 0603                               }
+        JMP     @@NextRow               { 0605                               }
+@@Opaque:
+        ADD     AL, 10h                 { 0607  sixteen along the palette    }
+        STOSB                           { 0609                               }
+        DEC     CL                      { 060a                               }
+        JNE     @@Pixel                 { 060c                               }
+@@NextRow:
+        ADD     DI, 320                 { 060e                               }
+        SUB     DI, BX                  { 0612                               }
+        DEC     DL                      { 0614                               }
+        JNE     @@Row                   { 0616                               }
+@@Done: POP     DS                      { 0618                               }
 end;
 
 { [transcribed] 12c5:061d -- sort both halves, draw the reflections, then the

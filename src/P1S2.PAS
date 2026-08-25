@@ -8,6 +8,12 @@
 
 unit P1S2;
 
+{$I-}   { NO I/O CHECK, and this unit had no I directive at all so it took the
+          command line's $I+ default -- four five-byte near calls to the
+          runtime's check routine that the original does not have. Part 004's
+          Lemmings unit and part 006's P6S4 were missed the same way; a unit
+          with no I directive at all is worth suspecting on sight. }
+
 {$G+}   { 286: Title_Load 1082:0000 opens ENTER $182; every framed routine
           in the segment does. }
 
@@ -42,7 +48,15 @@ const
 type
   TWorkBuf   = array[0..5199] of Byte;
   TCometBank = array[0..CometFrames * CometSize - 1] of Byte;
-  TFontBuf   = array[0..15103] of Byte;
+  { THREE-DIMENSIONAL, AND FontBias IS THE PROOF -- it was sitting in this
+    file as a named constant for days. 1082:022b reaches a glyph byte as
+    ES:[DI-$2011] with DI built from Ch shifted left 8, Phase shifted left 4 and
+    C added, and $2011 is 8,209 = 32*256 + 1*16 + 1: the three low bounds folded
+    into one displacement. Subtracting the same 8,209 by hand in a flat index
+    makes the compiler do at RUN TIME what the type does at compile time. Part
+    006's scene 1 font is the identical shape. Same 15,104 bytes: 59 glyphs from
+    space to 'Z' of 16 rows of 16 columns. }
+  TFontBuf   = array[#32..#90, 1..16, 1..16] of Byte;
 
 var
   { THE ORDER BELOW IS THE ADDRESSES', and it was not before -- WorkBuf came
@@ -211,28 +225,20 @@ end;
   Every lit pixel is written as colour $79 = 121; there is no shading here,
   the gradient comes from BlurBuffer afterwards.
   -------------------------------------------------------------------------- }
+{ ONE LOCAL, NOT THREE. 1082:0200 opens ENTER $02 and [BP-$02] is the only slot
+  the routine names, so Row and Src were never variables -- both are expressions
+  the compiler evaluates in place, and declaring them cost four bytes of frame
+  and a store apiece. }
 procedure DrawChar(Ch : Char; Phase, Index : Integer);
 var
-  C, Row, Src : Integer;
+  C : Integer;                     { [BP-$02], the whole frame }
 begin
+  for C := 1 to 16 do              { 1082:0204 }
+    if FontBuf^[Ch, Phase, C] <> 0 then                        { 1082:022b }
+      WorkBuf^[C + 5 + ((Index - 1) * 17 + Phase + 1) * 26 - 27] := 121;
   for C := 1 to 16 do
-  begin
-    Src := Ord(Ch) * 256 + Phase * 16 + C - FontBias;
-    if FontBuf^[Src] <> 0 then
-    begin
-      Row := (Index - 1) * 17 + Phase + 1;
-      WorkBuf^[Row * 26 + C + 5 - 27] := 121;
-    end;
-  end;
-  for C := 1 to 16 do
-  begin
-    Src := Ord(Ch) * 256 + (Phase + 1) * 16 + C - FontBias;
-    if FontBuf^[Src] <> 0 then
-    begin
-      Row := (Index - 1) * 17 + Phase + 2;
-      WorkBuf^[Row * 26 + C + 5 - 27] := 121;
-    end;
-  end;
+    if FontBuf^[Ch, Phase + 1, C] <> 0 then
+      WorkBuf^[C + 5 + ((Index - 1) * 17 + Phase + 2) * 26 - 27] := 121;
 end;
 
 { --------------------------------------------------------------------------
@@ -265,95 +271,168 @@ end;
 
 
 { --------------------------------------------------------------------------
-  Sprite_BlitClipped (1082:0128)
+  Sprite_BlitClipped (1082:0128) -- the comet. HAND ASSEMBLER, verbatim.
 
-  A 65x48 blit with transparency (zero bytes are skipped) and clipping
-  against four bounds held at DS:$04/$06 (x) and DS:$08/$0A (y). The clip is
-  done by adjusting the start pointer and the row/column counts before the
-  copy loop, not per pixel.
-  -------------------------------------------------------------------------- }
-{ --------------------------------------------------------------------------
-  Sprite_BlitClipped (1082:0128) -- the comet.
-
-  A 65 x 48 transparent blit, clipped against four bounds in DGROUP:
+  A 65 x 48 transparent blit clipped against four bounds in DGROUP:
 
       DS:$0004  ClipX1 = 0      DS:$0006  ClipX2 = 319
       DS:$0008  ClipY1 = 0      DS:$000A  ClipY2 = 199
 
-  The clip is done by adjusting the START POINTER and the row and column
-  COUNTS before the copy, never per pixel: a top clip advances the source by
-  (rows * 65), a left clip advances it by the column count and shortens the
-  row, and the leftover is added back between rows. Zero bytes are skipped.
+  The clip is done by adjusting the START POINTER and the row and column COUNTS
+  before the copy, never per pixel: a top clip advances the source by
+  (rows * 65) with a MUL, a left clip advances the destination and shortens the
+  row, and both leftovers are added back between rows. Zero bytes are skipped.
 
-  This was left as a comment on the first pass, which is why the scene drew
-  nothing at all.
+  IT IS ASSEMBLER AND THE SIZE CONSTANTS ARE THE FIRST TELL. 1082:0137 is
+  MOV DL,$30 and 1082:013b is MOV CL,$41 -- the height and width as IMMEDIATES
+  into the halves of two registers, with XOR DH,DH and XOR CH,CH to clear the
+  other halves. Compiled Pascal loads a Word constant whole. Add LODSB/STOSB for
+  one byte at a time, DEC CL / JNE for the inner loop, and MUL CX to skip rows,
+  and there is nothing of the code generator left in it. The sister blitters in
+  scene 5 -- DrawPoint and DrawReflection -- are the same routine with the size
+  read from the sprite instead of compiled in.
+
+  TWO LOCALS AND A SPARE. ENTER $06, with [BP-$02] and [BP-$04] both zeroed at
+  the top and written by the horizontal clip; nothing touches [BP-$06]. An
+  `assembler` routine may declare locals and Turbo Pascal frames them, which is
+  why the operand is there at all.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      Rows := CometH;  Cols := CometW;  SkipL := 0;  SkipR := 0;
+      if ClipY1 - Y > 0 then
+      begin
+        if ClipY1 - Y >= Rows then Exit;
+        Dec(Rows, ClipY1 - Y);  Inc(P, (ClipY1 - Y) * CometW);  Y := ClipY1;
+      end;
+      if ClipY2 - Y <= 0 then Exit;
+      if ClipY2 - Y < Rows then Rows := ClipY2 - Y + 1;
+      D := YOfs[Y] + X;
+      if ClipX1 - X > 0 then
+      begin
+        if ClipX1 - X >= Cols then Exit;
+        SkipL := ClipX1 - X;  Inc(D, SkipL);  Dec(Cols, SkipL);
+      end;
+      if ClipX2 - X <= 0 then Exit;
+      if ClipX2 - X < Cols then
+      begin
+        SkipR := Cols - (ClipX2 - X);  Cols := ClipX2 - X;
+      end;
+      for Row := 1 to Rows do
+      begin
+        Inc(P, SkipL);
+        for Col := 1 to Cols do
+        begin
+          if P^ <> 0 then Mem[Segment : D] := P^;
+          Inc(P);  Inc(D);
+        end;
+        Inc(P, SkipR);  Inc(D, 320 - Cols);
+      end;
   -------------------------------------------------------------------------- }
 const
   { TYPED, so they live in DGROUP where the original reads them from. The four
-    addresses recorded above -- DS:$0004, $0006, $0008, $000A -- are the whole
-    argument: an untyped const folds into the instruction and occupies no data
-    at all, and part 001's initialised region opened eight bytes short because
-    of it. P1S4's four bounds two lines further up DGROUP were already typed for
-    exactly this reason. }
+    addresses -- DS:$0004, $0006, $0008, $000A -- are the whole argument: an
+    untyped const folds into the instruction and occupies no data at all, and
+    part 001's initialised region opened eight bytes short because of it. }
   ClipX1 : Integer = 0;      { DS:$0004 }
   ClipX2 : Integer = 319;    { DS:$0006 }
   ClipY1 : Integer = 0;      { DS:$0008 }
   ClipY2 : Integer = 199;    { DS:$000A }
 
-procedure BlitClipped(Src : Pointer; X, Y : Integer; Segment : Word);
+{ @asm 001 1082:0128 +0 BlitClipped }
+procedure BlitClipped(Src : Pointer; X, Y : Integer; Segment : Word); assembler;
 var
-  P            : ^Byte;
-  Rows, Cols   : Integer;
-  SkipL, SkipR : Integer;
-  Row, Col     : Integer;
-  D            : Word;
-  V            : Byte;
-begin
-  P     := Src;
-  Rows  := CometH;
-  Cols  := CometW;
-  SkipL := 0;
-  SkipR := 0;
-
-  { --- vertical --- }
-  if ClipY1 - Y > 0 then
-  begin
-    if ClipY1 - Y >= Rows then Exit;         { entirely above }
-    Dec(Rows, ClipY1 - Y);
-    Inc(LongInt(P), LongInt(ClipY1 - Y) * CometW);
-    Y := ClipY1;
-  end;
-  if ClipY2 - Y <= 0 then Exit;              { entirely below }
-  if ClipY2 - Y < Rows then Rows := ClipY2 - Y + 1;
-
-  { --- horizontal --- }
-  if ClipX1 - X > 0 then
-  begin
-    if ClipX1 - X >= Cols then Exit;
-    SkipL := ClipX1 - X;
-    Dec(Cols, SkipL);
-    X := ClipX1;
-  end;
-  if ClipX2 - X <= 0 then Exit;
-  if ClipX2 - X < Cols then
-  begin
-    SkipR := Cols - (ClipX2 - X);
-    Cols  := ClipX2 - X;
-  end;
-
-  for Row := 0 to Rows - 1 do
-  begin
-    Inc(LongInt(P), SkipL);
-    D := (Y + Row) * ScrWidth + X;
-    for Col := 0 to Cols - 1 do
-    begin
-      V := P^;
-      if V <> 0 then Mem[Segment : D] := V;
-      Inc(LongInt(P));
-      Inc(D);
-    end;
-    Inc(LongInt(P), SkipR);
-  end;
+  SkipL : Integer;                { [BP-$02] }
+  SkipR : Integer;                { [BP-$04] }
+  Spare : Integer;                { [BP-$06], never touched }
+asm
+        PUSH    DS                      { 1082:012c                          }
+        MOV     AX, Segment             { 012d                               }
+        MOV     ES, AX                  { 0130  ES:DI is the screen          }
+        LDS     SI, Src                 { 0132  DS:SI is the sprite...       }
+        XOR     DH, DH                  { 0135                               }
+        MOV     DL, CometH              { 0137  DX := 48 rows                }
+        XOR     CH, CH                  { 0139                               }
+        MOV     CL, CometW              { 013b  CX := 65 columns             }
+        POP     DS                      { 013d  ...but DGROUP again for now, }
+        MOV     WORD PTR SkipL, 0       { 013e    because the clip bounds    }
+        MOV     WORD PTR SkipR, 0       { 0143    are read out of it         }
+        MOV     BX, Y                   { 0148                               }
+        MOV     AX, ClipY1              { 014b                               }
+        SUB     AX, BX                  { 014e                               }
+        JLE     @@NoTop                 { 0150                               }
+        CMP     AX, DX                  { 0152                               }
+        JGE     @@Done                  { 0154  wholly above the window      }
+        SUB     DX, AX                  { 0156                               }
+        ADD     BX, AX                  { 0158                               }
+        MOV     DI, DX                  { 015a  park the row count round MUL }
+        MUL     CX                      { 015c  clipped rows x 65            }
+        MOV     DX, DI                  { 015e                               }
+        ADD     SI, AX                  { 0160                               }
+@@NoTop:
+        MOV     AX, ClipY2              { 0162                               }
+        SUB     AX, BX                  { 0165                               }
+        JLE     @@Done                  { 0167  wholly below it              }
+        CMP     AX, DX                  { 0169                               }
+        JGE     @@NoBot                 { 016b                               }
+        INC     AX                      { 016d                               }
+        MOV     DX, AX                  { 016e                               }
+@@NoBot:
+        ADD     BX, BX                  { 0170                               }
+        MOV     DI, [BX + OFFSET YOfs]  { 0172  DI := Y * 320                }
+        MOV     BX, X                   { 0176                               }
+        ADD     DI, BX                  { 0179                               }
+        MOV     AX, ClipX1              { 017b                               }
+        SUB     AX, BX                  { 017e                               }
+        JLE     @@NoLeft                { 0180                               }
+        CMP     AX, CX                  { 0182                               }
+        JGE     @@Done                  { 0184  wholly left of the window    }
+        MOV     WORD PTR SkipL, AX      { 0186  skip this many per row       }
+        ADD     DI, AX                  { 0189                               }
+        SUB     CX, AX                  { 018b                               }
+@@NoLeft:
+        MOV     AX, ClipX2              { 018d                               }
+        SUB     AX, BX                  { 0190                               }
+        JLE     @@Done                  { 0192  wholly right of it           }
+        CMP     AX, CX                  { 0194                               }
+        JGE     @@NoRight               { 0196                               }
+        SUB     CX, AX                  { 0198                               }
+        MOV     WORD PTR SkipR, CX      { 019a                               }
+        MOV     CX, AX                  { 019d                               }
+@@NoRight:
+        MOV     BX, CX                  { 019f  BX := the drawn width        }
+        { DS IS RELOADED THE LONG WAY ROUND. LDS overwrites SI, and the SI it
+          overwrites is the clipped start the code has just spent forty
+          instructions computing -- so SI is pushed, the LDS is done for its DS
+          alone, and SI is popped straight back. Four bytes and it is what the
+          original does. }
+        PUSH    DS                      { 01a1                               }
+        PUSH    SI                      { 01a2                               }
+        LDS     SI, Src                 { 01a3  for DS only                  }
+        POP     SI                      { 01a6                               }
+        CLD                             { 01a7                               }
+@@Row:  ADD     SI, SkipL               { 01a8  <- once per row              }
+@@Pixel:
+        LODSB                           { 01ab                               }
+        OR      AL, AL                  { 01ac                               }
+        JE      @@Clear                 { 01ae                               }
+        STOSB                           { 01b0                               }
+        DEC     CL                      { 01b1                               }
+        JNE     @@Pixel                 { 01b3                               }
+        JMP     @@NextRow               { 01b5                               }
+@@Clear:
+        INC     DI                      { 01b7                               }
+        DEC     CL                      { 01b8                               }
+        JNE     @@Pixel                 { 01ba                               }
+@@NextRow:
+        ADD     SI, SkipR               { 01bc                               }
+        MOV     CX, BX                  { 01bf  the width back for next row  }
+        ADD     DI, 320                 { 01c1                               }
+        SUB     DI, BX                  { 01c5                               }
+        DEC     DL                      { 01c7                               }
+        JNE     @@Row                   { 01c9                               }
+        POP     DS                      { 01cb                               }
+@@Done:                                 { 01cc is the LEAVE / RET $A         }
 end;
 
 { --------------------------------------------------------------------------
