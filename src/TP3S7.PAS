@@ -33,7 +33,7 @@ end;
   initialised data segment, and the uninitialised region begins where the
   initialised one ENDS rather than where its paragraph padding ends -- so those
   two bytes move EVERY VARIABLE IN THE PART UNDER TEST by two. On part 003 that
-  cost 752 bytes of the coverage walk, 90.6% against 85.2%, once the variable
+  cost 752 bytes of the coverage walk, 90.6%% against 85.2%%, once the variable
   layout was otherwise correct, and it made the initialised image differ where
   it is otherwise byte-identical.
 

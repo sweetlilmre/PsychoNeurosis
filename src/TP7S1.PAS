@@ -28,46 +28,6 @@ begin
   end;
 end;
 
-{ PRINTS WITHOUT THE TEXT RTL, and that is the whole point of it. A single
-  WriteLn anywhere in a harness puts a two-byte constant at the END of the
-  initialised data segment, and the uninitialised region begins where the
-  initialised one ENDS rather than where its paragraph padding ends -- so those
-  two bytes move EVERY VARIABLE IN THE PART UNDER TEST by two. On part 003 that
-  cost 752 bytes of the coverage walk, 90.6% against 85.2%, once the variable
-  layout was otherwise correct, and it made the initialised image differ where
-  it is otherwise byte-identical.
-
-  Measured, 25 Aug 2026: `Write(s, #13, #10)` does NOT avoid it -- the same two
-  bytes land at the same address. BIOS teletype does. INT $10 function $0E
-  writes a character and touches no runtime, and the string literal itself
-  lives in the CODE segment, where literals passed to Write already live.
-
-  So the harness keeps its prompt AND leaves the data segment alone, which is
-  why this is a generated helper rather than a choice between the two. }
-procedure Say(const S : String);
-var
-  I, C : Byte;
-begin
-  for I := 1 to Length(S) do
-  begin
-    C := Ord(S[I]);        { BASM cannot index a reference parameter }
-    asm
-      MOV  AH, $0E
-      MOV  AL, C
-      XOR  BH, BH
-      INT  $10
-    end;
-  end;
-  asm
-    MOV  AX, $0E0D       { carriage return }
-    XOR  BH, BH
-    INT  $10
-    MOV  AX, $0E0A       { line feed }
-    XOR  BH, BH
-    INT  $10
-  end;
-end;
-
 { F IS A LOCAL. See the note on EXIT_PROC in mktests.py: a program-level file
   record displaces every variable in the part under test. }
 procedure CheckData;
@@ -78,8 +38,8 @@ begin
   {$I-} Reset(F, 1); {$I+}
   if IOResult <> 0 then
   begin
-    Say('TP7S1: neurosis.dat not found in the current directory.');
-    Say('       Run this from the run\ folder.');
+    WriteLn('TP7S1: neurosis.dat not found in the current directory.');
+    WriteLn('       Run this from the run\ folder.');
     Halt(1);
   end;
   Close(F);
@@ -88,8 +48,8 @@ end;
 begin
   CheckData;
 
-  Say('part 007 -- the FLI/FLC player');
-  Say('Press a key to start.');
+  WriteLn('part 007 -- the FLI/FLC player');
+  WriteLn('Press a key to start.');
   ReadKey;
 
   ExitProc := @RestoreTextMode;
@@ -98,5 +58,5 @@ begin
   Scene1;
 
 
-  Say('Done.');
+  WriteLn('Done.');
 end.

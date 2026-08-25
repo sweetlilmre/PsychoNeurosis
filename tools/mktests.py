@@ -241,7 +241,70 @@ program %(prog)s;
 
 uses %(uses)s, %(unit)s;
 
-%(exit)s{ PRINTS WITHOUT THE TEXT RTL, and that is the whole point of it. A single
+%(exit)s%(sayproc)s{ F IS A LOCAL. See the note on EXIT_PROC in mktests.py: a program-level file
+  record displaces every variable in the part under test. }
+procedure CheckData;
+var
+  F : file;
+begin
+  Assign(F, 'neurosis.dat');
+  {$I-} Reset(F, 1); {$I+}
+  if IOResult <> 0 then
+  begin
+    %(say)s('%(prog)s: neurosis.dat not found in the current directory.');
+    %(say)s('%(pad)s  Run this from the run\\ folder.');
+    Halt(1);
+  end;
+  Close(F);
+end;
+
+%(vars)sbegin
+  CheckData;
+
+  %(say)s('%(what)s');
+  %(say)s('Press a key to start.');
+  ReadKey;
+%(hook)s
+"""
+
+TAIL = """
+  %(say)s('Done.');
+end.
+"""
+
+
+HOOK = """
+  ExitProc := @RestoreTextMode;
+"""
+
+
+# Harnesses whose opening needs a variable of its own beyond the file check's
+# F. Keyed by program name; the declaration lands in the main var block.
+# Empty at present -- TP3S6 briefly used it for a palette loop that turned out
+# to belong in Waves_LoadCurves itself.
+# WHICH HARNESSES MUST PRINT THROUGH THE TEXT RTL, and it is a fact about the
+# ORIGINALS rather than a preference. A Write or WriteLn anywhere puts a
+# two-byte `0D 0A` constant in DGROUP, and the uninitialised region begins where
+# the initialised one ENDS -- so its presence or absence moves every variable in
+# the part under test by two. Measured across the nine shipped parts on 25 Aug
+# 2026: only 000, 004 and 007 carry that constant. The other six do not, and a
+# harness that writes text puts a byte in their data segment that the original
+# has not got.
+#
+# So the default is `Say`, which prints through BIOS teletype (INT $10 function
+# $0E) and touches no runtime -- the prompt survives and DGROUP is untouched.
+# The parts below keep WriteLn because their originals DO link text output.
+#
+# PART 004 IS A STAND-IN AND IS RECORDED AS ONE. Its original writes text from
+# somewhere our sources do not reproduce -- only the RTL references the constant,
+# so the call site is not in a user segment we have read -- and until that is
+# found the harness supplies the two bytes the original really has. Parts 000 and
+# 007 keep it for the same reason, and both already rebuild with their data
+# byte-identical. If the real call site turns up, remove the part from this set
+# in the same commit that adds it.
+TEXT_RTL = {"TPART0", "TPART4", "TPART7"}
+
+SAY_PROC = """{ PRINTS WITHOUT THE TEXT RTL, and that is the whole point of it. A single
   WriteLn anywhere in a harness puts a two-byte constant at the END of the
   initialised data segment, and the uninitialised region begins where the
   initialised one ENDS rather than where its paragraph padding ends -- so those
@@ -281,58 +344,25 @@ begin
   end;
 end;
 
-{ F IS A LOCAL. See the note on EXIT_PROC in mktests.py: a program-level file
-  record displaces every variable in the part under test. }
-procedure CheckData;
-var
-  F : file;
-begin
-  Assign(F, 'neurosis.dat');
-  {$I-} Reset(F, 1); {$I+}
-  if IOResult <> 0 then
-  begin
-    Say('%(prog)s: neurosis.dat not found in the current directory.');
-    Say('%(pad)s  Run this from the run\\ folder.');
-    Halt(1);
-  end;
-  Close(F);
-end;
-
-%(vars)sbegin
-  CheckData;
-
-  Say('%(what)s');
-  Say('Press a key to start.');
-  ReadKey;
-%(hook)s
 """
 
-TAIL = """
-  Say('Done.');
-end.
-"""
-
-
-HOOK = """
-  ExitProc := @RestoreTextMode;
-"""
-
-
-# Harnesses whose opening needs a variable of its own beyond the file check's
-# F. Keyed by program name; the declaration lands in the main var block.
-# Empty at present -- TP3S6 briefly used it for a palette loop that turned out
-# to belong in Waves_LoadCurves itself.
 EXTRA_VARS = {}
 
 
 def write(prog, unit, entry, uses, opening, closing, what):
+    # A scene harness inherits its part's answer: TP3S4 is part 003.
+    part = "TPART" + (prog[2] if prog.startswith("TP") and prog[2:3].isdigit()
+                      else "")
+    rtl = prog in TEXT_RTL or part in TEXT_RTL
+    say = "WriteLn" if rtl else "Say"
     text = (HEAD % dict(prog=prog, unit=unit, uses=uses, what=what,
                         pad=" " * len(prog), exit=EXIT_PROC, hook=HOOK,
+                        say=say, sayproc="" if rtl else SAY_PROC,
                         vars=EXTRA_VARS.get(prog, ""))
             + opening
             + "  %s;\n\n" % entry
             + closing
-            + TAIL)
+            + TAIL % dict(say=say))
     (SRC / (prog + ".PAS")).write_text(text, encoding="ascii", newline="\r\n")
     print("  %-12s %s" % (prog + ".PAS", what))
 

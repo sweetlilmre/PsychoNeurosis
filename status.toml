@@ -468,7 +468,8 @@ resolution = "NO CAUSE FOUND FOR THE JERKINESS, and this resolution says so rath
 name = "part4-sixteen-bytes"
 finding = "part 004's initialised data was `identical` and is now 16 bytes SHORT, and its coverage fell 96.5 to 94.5 percent, because the harness stopped contributing text-RTL constants to DGROUP."
 seen_in = "TPART4"
-state = "open"
+state = "resolved"
+resolution = "RESOLVED, AND THE 16 BYTES WERE REALLY TWO. The 384-against-368 reading was paragraph rounding: part 004's variables were only 2 bytes low, and the missing constant is the text RTL's `0D 0A`, which the ORIGINAL carries at $0170. MEASURED ACROSS ALL NINE SHIPPED PARTS, which is what turned a guess into a rule: only 000, 004 and 007 carry that constant at all. The other six do not, so a harness that writes text puts a byte in THEIR data segment the original has not got -- and one that does not write puts these three 2 bytes short. It is a per-part fact, not a preference, and tools/mktests.py now holds it as TEXT_RTL with the measurement written beside it. Scene harnesses inherit their part's answer. Part 004 is back to 96.5 percent and its data is identical again. PART 004 IS A STAND-IN AND IS LABELLED ONE. Its original writes text from somewhere our sources do not reproduce: only the RTL references the constant, so the call site is not in any user segment read so far, and `Runtime error ` is present in our build too -- so the error handler is NOT the source of it. Until the real call site is found the harness supplies two bytes the original really has. The generator says to remove the part from TEXT_RTL in the same commit that adds the real one."
 
 [plan.row."001 1012:0004"]
 label = "BuildLens quadrant walk"
