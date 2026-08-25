@@ -86,7 +86,22 @@ const
   generator no longer exists. Bands 17..26 are never drawn, exactly as part
   003's unused shape slots are never drawn, and leaving them out moved every
   typed constant declared after them: CellShape ended at $080A where the
-  original's ends at $0D0A, and CreditText sits at $0D8A. }
+  original's ends at $0D0A, and CreditText sits at $0D8A.
+
+  THE 128-BYTE GAP AFTER THIS TABLE IS NOT A 27TH BAND, and it is not an unread
+  constant either. Both were tested. A 27th band overshoots: it moves every
+  variable in the part from four bytes LOW to 124 HIGH, so the real deficit is
+  four bytes. And declaring 128 unreferenced bytes as a constant of their own
+  changes the load image by exactly nothing, because **Turbo Pascal smart-links
+  away a typed constant no code mentions.**
+
+  That last point is worth carrying, because four holes in this corpus HAVE been
+  closed by declaring them: an unread byte at [BP-$22D], 128 unread bytes in
+  P6S1's Setup, two at [BP-$104], sixteen inside part 007's chunk header. Every
+  one of those is a LOCAL, and locals are allocated whether or not they are
+  read. A hole in the CONSTANT region cannot be filled the same way -- whatever
+  is missing there is referenced by something, or the linker would have dropped
+  it too. }
 {$I gen/P6CELL.INC}    { const CellShape : array[1..26,1..16,1..8] of Byte }
 
 type
