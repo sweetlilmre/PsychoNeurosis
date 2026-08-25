@@ -86,7 +86,19 @@ const
   DataOfs = $0003BE36;
 
 type
-  TDoor = array[0..DoorSize - 1] of Byte;
+  { A HEADER AND A TWO-DIMENSIONAL BITMAP, not a flat byte array. The star
+    plotting computes its address as `IMUL DI, Star[I].Y, $92` then `ADD DI, AX`
+    with Star[I].X in AX and a displacement of $0CB5, and there is no
+    subtraction anywhere -- so both subscripts are folded, which Turbo Pascal
+    only does for a subscript that is not an arithmetic expression. Two 1-based
+    dimensions after a two-byte header put the fold at exactly $0CB5:
+    $0D46 + 2 - $92 - 1. A flat array with `(Y - 1) * DoorW + (X - 1) + 2`
+    written out computes all three corrections at run time, and wrapping that in
+    a function costs a far call per pixel on top. }
+  TDoor = record
+    W, H : Byte;                                { DS:$0D46, $0D47 }
+    Pix  : array[1..DoorH, 1..DoorW] of Byte;   { DS:$0D48 }
+  end;
   TStar = record
     X, Y : Integer;
     C    : Byte;
@@ -96,7 +108,7 @@ var
   { DS:$0D46 -- two header bytes then DoorW * DoorH pixels. The star plotting
     at 1008:03a4 indexes it as [$0CB5 + X + Y * $92] with X and Y both
     ONE-BASED, and $0D46 - $0CB5 = $91, so that lands on pixel (X, Y) with the
-    two-byte header skipped. DoorPix below is that same arithmetic. }
+    two-byte header skipped, which is what the declaration below folds. }
   Door : TDoor;
   { DS:$40BD, $40BF, $40C1 -- stride 5, indices 1..50. }
   Star : array[1..NumStars] of TStar;
@@ -115,10 +127,8 @@ var
   DatFile : file;
 
 { The one-based pixel index Scene1_DoorLoop uses. }
-function DoorPix(X, Y : Integer) : Word;
-begin
-  DoorPix := 2 + (X - 1) + (Y - 1) * DoorW;
-end;
+{ DoorPix is gone: the original has no such routine and no call to one. Its
+  arithmetic is now the declaration's, and the sites read Door.Pix[Y, X]. }
 
 { --------------------------------------------------------------------------
   1008:0000 -- Bitmap_Blit(Src, XOfs, Y, XBase)
@@ -430,8 +440,8 @@ begin
   for Col := 0 to 255 do
     SetRGB(Col, Pal[Col, 0], Pal[Col, 1], Pal[Col, 2]);
 
-  Door[0] := DoorW;
-  Door[1] := DoorH;
+  Door.W := DoorW;
+  Door.H := DoorH;
 end;
 
 { --------------------------------------------------------------------------
@@ -479,13 +489,13 @@ begin
     DoorRaiseOneRow(@Door);
     { DrawStars, inline }
     for I := 1 to NumStars do
-      if Door[DoorPix(Star[I].X, Star[I].Y)] = SkyColour then
-        Door[DoorPix(Star[I].X, Star[I].Y)] := Star[I].C;
+      if Door.Pix[Star[I].Y, Star[I].X] = SkyColour then
+        Door.Pix[Star[I].Y, Star[I].X] := Star[I].C;
     BlitBitmapX(@Door, DoorX, DoorY, DoorBase);
     { EraseStars, inline }
     for I := 1 to NumStars do
-      if Door[DoorPix(Star[I].X, Star[I].Y)] = Star[I].C then
-        Door[DoorPix(Star[I].X, Star[I].Y)] := SkyColour;
+      if Door.Pix[Star[I].Y, Star[I].X] = Star[I].C then
+        Door.Pix[Star[I].Y, Star[I].X] := SkyColour;
     { DriftStars, inline }
     for I := 1 to NumStars do
     begin
@@ -499,13 +509,13 @@ begin
   begin
     { DrawStars, inline }
     for I := 1 to NumStars do
-      if Door[DoorPix(Star[I].X, Star[I].Y)] = SkyColour then
-        Door[DoorPix(Star[I].X, Star[I].Y)] := Star[I].C;
+      if Door.Pix[Star[I].Y, Star[I].X] = SkyColour then
+        Door.Pix[Star[I].Y, Star[I].X] := Star[I].C;
     BlitBitmapX(@Door, DoorX, DoorY, DoorBase);
     { EraseStars, inline }
     for I := 1 to NumStars do
-      if Door[DoorPix(Star[I].X, Star[I].Y)] = Star[I].C then
-        Door[DoorPix(Star[I].X, Star[I].Y)] := SkyColour;
+      if Door.Pix[Star[I].Y, Star[I].X] = Star[I].C then
+        Door.Pix[Star[I].Y, Star[I].X] := SkyColour;
     { DriftStars, inline }
     for I := 1 to NumStars do
     begin

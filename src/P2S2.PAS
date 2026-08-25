@@ -65,7 +65,7 @@ procedure Scene2;
 
 implementation
 
-uses Crt, VGA, P2View, FixMath, DemoVT;
+uses Crt, VGA, FixMath, P2View, DemoVT;
 
 {$I gen/P2OBJ.INC}
 
@@ -354,12 +354,21 @@ end;
       [BP-$2e]..[BP-$23]   P, likewise
       [BP-$30], [BP-$34]   the LES spills -- compiler temps, not declarations
 
-  V AND P ARE ARRAYS, NOT SIX SCALARS, and one instruction proves it: the
-  original loads a vertex with `Move(O.Vert[I], V, 12)` -- 108b:02b2 LEAs
-  [BP-$22], pushes 12, and far-calls Move -- which only works if V[1], V[2]
-  and V[3] are twelve consecutive bytes in that order. The pivot is loaded the
-  same way at 108b:0198, `Move(O.Pivot, P, 12)`. Three separate assignments
-  cannot produce that, and the reconstruction had three.
+  V AND P ARE ARRAYS, NOT SIX SCALARS, and one call proves it: the original
+  loads a vertex with a twelve-byte block copy -- 108b:02b2 LEAs [BP-$22],
+  pushes 12 and far-calls a runtime helper -- which only works if V.X, V.Y
+  and V.Z are twelve consecutive bytes in that order. The pivot is loaded the
+  same way at 108b:0198. Three separate scalar assignments cannot produce that,
+  and the reconstruction had three.
+
+  THE HELPER IS NOT Move, AND COUNTING SETTLED IT. The original calls 04b1:3639
+  at SEVEN sites; our build called 04d9:3d2a at exactly two of them and
+  04d9:3849 at the other five -- and two is exactly how many explicit `Move`
+  calls this unit had. So 3d2a is Move, 3639 is the helper Turbo Pascal emits
+  for a whole-variable ASSIGNMENT of a structured type, and the original's two
+  sites are `P := Pivot` and `V := Vert[I]` rather than Move calls. Reading one
+  call site could not tell the two apart, because both take source, destination
+  and a length.
 
   THE TWO DEAD BLOCKS ARE TRANSCRIBED DELIBERATELY. Their sizes and positions
   are measured; their types are not recoverable, because nothing reads them --
@@ -373,7 +382,7 @@ end;
   and 01c3, 01e3, 0203 for the parameters.
 
   AND THE DEPTH KEY IS TAKEN AFTER Project, NOT BEFORE. The original projects,
-  stores X and Y, and only then computes D from V[3] (108b:0393). That reads
+  stores X and Y, and only then computes D from V.Z (108b:0393). That reads
   like a behavioural difference and is NOT one: Project writes back only its
   first two var parameters -- 108b:36c4 and 36ce store through [BP+$0c] and
   [BP+$08] and nothing stores through [BP+$04] -- so Z is unchanged across the
@@ -384,8 +393,14 @@ var
   Unused1 : array[1..2] of LongInt;   { [BP-$08]..[BP-$01], never read }
   I       : Integer;                  { [BP-$0a] }
   Unused2 : array[1..3] of LongInt;   { [BP-$16]..[BP-$0b], never read }
-  V       : array[1..3] of LongInt;   { [BP-$22] -- the working vertex }
-  P       : array[1..3] of LongInt;   { [BP-$2e] -- the rotated pivot }
+  { TVec3, NOT `array[1..3] of LongInt`: the whole-variable assignments
+    below only compile if the two sides are the SAME type, and the pivot
+    they copy is a TVec3 field of the object. }
+  V       : TVertex;                  { [BP-$22] -- the working vertex, and
+                                        TVertex because that is what Vert
+                                        holds and the assignment needs the
+                                        same type on both sides }
+  P       : TVec3;                    { [BP-$2e] -- the rotated pivot }
 begin
   with O do                             { 108b:00c3 -- @O into [BP-$32] }
   begin
@@ -404,8 +419,8 @@ begin
 
     { Pivot is reached through @O, not through a temp of its own -- 108b:018f
       reloads [BP-$32] and adds $B39 -- so it is NOT inside a `with`. }
-    Move(Pivot, P, 12);                 { 108b:0198 }
-    RotatePoint(P[1], P[2], P[3]);
+    P := Pivot;                         { 108b:0198 -- a 12-byte copy }
+    RotatePoint(P.X, P.Y, P.Z);
 
     with Angle do                       { 108b:01b6 -- @O.Angle into [BP-$36] }
     begin
@@ -427,16 +442,16 @@ begin
 
     for I := 1 to VertCount do
     begin
-      Move(Vert[I], V, 12);             { 108b:02b2 }
-      RotatePoint(V[1], V[2], V[3]);
-      V[1] := V[1] + P[1] + Trans.X;
-      V[2] := V[2] + P[2] + Trans.Y;
-      V[3] := V[3] + P[3] + Trans.Z;    { 108b:033b }
-      Project(V[1], V[2], V[3]);        { 108b:035a }
+      V := Vert[I];                     { 108b:02b2 -- likewise }
+      RotatePoint(V.X, V.Y, V.Z);
+      V.X := V.X + P.X + Trans.X;
+      V.Y := V.Y + P.Y + Trans.Y;
+      V.Z := V.Z + P.Z + Trans.Z;    { 108b:033b }
+      Project(V.X, V.Y, V.Z);        { 108b:035a }
       { both come back zero-extended, so the low word carries the sign }
-      Scr[I].X := Integer(V[1]);        { 108b:0370 }
-      Scr[I].Y := Integer(V[2]);        { 108b:0388 }
-      Scr[I].D := FixedToInt(V[3]);     { 108b:0393 -- AFTER Project }
+      Scr[I].X := Integer(V.X);        { 108b:0370 }
+      Scr[I].Y := Integer(V.Y);        { 108b:0388 }
+      Scr[I].D := FixedToInt(V.Z);     { 108b:0393 -- AFTER Project }
     end;
   end;
 end;

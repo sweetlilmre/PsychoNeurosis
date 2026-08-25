@@ -29,7 +29,7 @@ procedure RunPart2;
 
 implementation
 
-uses Crt, VGA, ModeX, P2View, FixMath, DemoVT, P2S1, P2S2;
+uses Crt, VGA, ModeX, FixMath, P2View, DemoVT, P2S1, P2S2;
 
 { --------------------------------------------------------------------------
   1000:0032 -- the main body.
