@@ -39,6 +39,16 @@ unit Part3Stars;
 {$G+}   { 286: Stars_ProjectAndPlot 10b8:0000 opens ENTER 4; every framed
           routine in 10b8 does. }
 
+{$N+}   { 80x87 CODE ON. The original's segment 10b8 carries 7 emulator
+          traps -- INT $34..$3E, which is how an 80x87 instruction ships
+          under $E+ -- and this unit had no N directive at all, so it took
+          the command line's default and emitted NONE. $N- generates no
+          80x87 instructions and therefore no traps either: floating point
+          becomes far calls into the software six-byte-Real library, so a
+          trap is positive evidence of $N+ rather than against it. Counted
+          in 10b8. Nothing here gains a coprocessor --
+          Turbo Pascal's emulator ran these in 1994 and runs them now. }
+
 interface
 
 procedure Scene2;
