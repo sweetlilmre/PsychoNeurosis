@@ -154,8 +154,17 @@ var
   { DS:$9DDB, stride 9 }
   Star  : array[1..StarCount] of TStar;
 
-  { DS:$7233, 3,776 bytes = 59 glyphs of 8 x 8 }
-  Font  : ^TFont;
+  { DS:$6A2A, 3,776 bytes = 59 glyphs of 8 x 8, AND IT IS INLINE IN DGROUP,
+    not on the heap. It was declared here as a pointer with New and Dispose
+    around it, which put four bytes where the original has 3,776 and moved
+    every variable after it -- including the whole of P1S5's block, which sits
+    above this one.
+
+    The address is the one DrawStep's comment records at line 447 as the base
+    of its subscript arithmetic. An older comment here said $7233, which does
+    not fit: with Font at $6A2A the rest of the unit tiles, and Star's ninety
+    nine-byte records end at $A105, one byte below where P1S5's model begins. }
+  Font  : TFont;
   { DS:$5B6A and DS:$5B9B, 49 bytes each }
   ProfileA, ProfileB : array[1..BlobPixels] of Byte;
   { DS:$672D }
@@ -470,7 +479,7 @@ begin
       G := Ord(S[Ch]) - FontBias;
       if (G < 0) or (G >= FontChars) then G := 0;
       for Row := 1 to TrailRows do
-        if Font^[G, Row, Step] <> 0 then
+        if Font[G, Row, Step] <> 0 then
           Trail[Row * TrailLen].Flag := 1
         else
           Trail[Row * TrailLen].Flag := 0;
@@ -581,7 +590,7 @@ begin
   Assign(F, 'neurosis.dat');
   Reset(F, 1);
   Seek(F, $0003A8E0);
-  BlockRead(F, Font^, SizeOf(TFont));
+  BlockRead(F, Font, SizeOf(TFont));
   BlockRead(F, Pal, 768);
   BlockRead(F, ProfileA, BlobPixels);
   BlockRead(F, ProfileB, BlobPixels);
@@ -617,7 +626,6 @@ end;
   -------------------------------------------------------------------------- }
 procedure Scene4;
 begin
-  New(Font);
   { 1107:097b -- RealToFixed, not Round(.. * 65536.0), and MViewW is READ FROM
     MEMORY rather than folded. FILD WORD [$0014] / FDIV the single at CS:$096F /
     FMUL the single at CS:$0973, then DX/BX/AX pushed into a far call into
@@ -633,7 +641,6 @@ begin
   BuildPoints;
   BannerRun;
 
-  Dispose(Font);
 end;
 
 end.
