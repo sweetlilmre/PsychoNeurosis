@@ -69,16 +69,37 @@ type
 {$I gen/P5MESH.INC}   { const MeshTris : array[1..NumTris] of TTri }
 
 var
+  { THE ORDER IS THE ADDRESSES', and it was not: HeightMap came third and the
+    file record last. Sorted, the recorded addresses tile with one gap left:
+
+        $2D7E  HeightMap   1024
+        $317E  Grid        6144   (1024 x 6)
+        $497E  Proj        5120   (1024 x 5)
+        $5D7E  F            128
+        $5DFE  RowOfs       400   -- and 112 bytes to the next, unaccounted
+        $5FDE  EdgeBuf     1002   to the next unit's block at $63C8
+
+    EdgeBuf is declared array[0..799] here, which is 1600 bytes, and only 1002
+    are available before scene 2's data begins -- so it is 598 too big. That is
+    left alone for now: the size is not measured, only bounded, and this unit's
+    surplus over the original is 384 bytes rather than 598, so there is a
+    missing declaration in here as well as an oversized one. }
+  { DS:$2d7e }
+  HeightMap : array[0..MapSize - 1] of Byte;
   { DS:$317e and DS:$497e }
   Grid   : array[0..GridVerts - 1] of TPoint3;
   Proj   : array[0..GridVerts - 1] of TProj;
-  { DS:$2d7e }
-  HeightMap : array[0..MapSize - 1] of Byte;
+  { DS:$5d7e -- the file record, BEFORE the two tables and not after }
+  F      : file;
   { DS:$5dfe -- scene 1's own row table, not the VGA unit's }
   RowOfs : array[0..199] of Word;
-  { DS:$5fde -- two words per scanline, written going down and read going up }
-  EdgeBuf : array[0..799] of Word;
-  F      : file;
+  { DS:$5fde -- two words per scanline, written going down and read going up.
+    501 WORDS, not 800: $5FDE plus 1002 is $63C8, which is exactly where scene
+    2's data begins, so 1002 bytes is all the room there is. Declared
+    array[0..799] this was 1600 bytes and overran the next unit's block by 598,
+    which in our build simply made DGROUP bigger and in the original would be
+    impossible. }
+  EdgeBuf : array[0..500] of Word;
 
 const
   { DS:$2d0e..$2d14 -- INITIALISED DATA, read straight out of the image:

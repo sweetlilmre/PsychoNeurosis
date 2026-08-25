@@ -677,6 +677,12 @@ finding = "THE BSS SWEEP ACROSS ALL NINE PARTS, in one struct read each and no d
 seen_in = "TPART4"
 state = "open"
 
+[[plan.investigation]]
+name = "part5-layout"
+finding = "PART 005's DATA IS MOSTLY RIGHT ALREADY -- dsmap pairs 113 references and SIXTY of them, across $0000..$978B, carry a shift of ZERO. The whole discrepancy is one region: $A67A..$ABAB over 52 sites, which is scene 3's block. Two measured fixes this batch took it from +388 to -210 and moved the walk five bytes. SCENE 1's DECLARATION ORDER WAS WRONG, and the addresses give it exactly: $2D7E HeightMap (1024), $317E Grid (6144), $497E Proj (5120), $5D7E the file record (128), $5DFE RowOfs (400), $5FDE EdgeBuf. Ours had HeightMap third and the file record LAST. AND EdgeBuf WAS 598 BYTES TOO BIG. It was declared array[0..799] of Word, 1600 bytes, and $5FDE plus 1002 is $63C8 -- exactly where scene 2's data begins -- so 1002 is all the room there is, making it array[0..500]. In our build the overrun merely inflated DGROUP; in the original it would be impossible, which is what makes the bound measurable rather than guessed. WHAT REMAINS is about 210 bytes missing before $A67A, and there are two candidate gaps of exactly the right combined size: 112 bytes between RowOfs and EdgeBuf ($5DFE + 400 is $5F6E, and EdgeBuf is at $5FDE), and 128 bytes after scene 2's palette buffer ($A25A + 768 is $A55A, and the next recorded address is $A5DA). 112 plus 128 is 240 against a measured 210, so they are probably both real and one of my sizes is a little off. AND A NEGATIVE RESULT ON PART 004 THAT SAVES A SESSION: $1240, which the previous batch flagged as an unexplained block in the middle of the sprite banks, IS SPLATBANK'S FOLDED BASE. 1005:03c7 is IMUL DI,ES:[DI+6],$78 then ADD DI,$1240 -- 120-byte frames, and $1240 plus 120 is $12B8, which is SplatBank[1]. So nothing lives at $1240, dsgaps' documented blind spot caught me again, and the 2,646 bytes between TumbleBk and SplatBank are referenced by NOTHING absolute in any of part 004's four segments. Font is not the answer either: TFont is 23,436 bytes and correctly GetMem'd at 1005:00BE. So that block is reached through a pointer or never used, and it will not be found by looking for displacements."
+seen_in = "TPART5"
+state = "open"
+
 [plan.row."001 1012:0004"]
 label = "BuildLens quadrant walk"
 investigation = "pacing"
@@ -1172,6 +1178,11 @@ label = "2,646 bytes unaccounted between TumbleBk and SplatBank"
 investigation = "bss-sweep-all-parts"
 target = "R0"
 
+[plan.row."004 dgroup $1240"]
+label = "NOT a variable -- SplatBank's folded base"
+investigation = "part5-layout"
+target = "R0"
+
 [plan.row."004 gen/harness"]
 label = "part 004 is one paragraph of typed constants short; the harness was hiding it"
 investigation = "part4-sixteen-bytes"
@@ -1205,6 +1216,16 @@ note = "The investigation's premise was stale: the 386 trio (SinCos/RotatePoint/
 [plan.row."005 bss +384"]
 label = "the only SURPLUS; a surplus is easier to place than a shortfall"
 investigation = "bss-sweep-all-parts"
+target = "R0"
+
+[plan.row."005 dgroup $5FDE"]
+label = "EdgeBuf was 598 bytes too big; 1002 is all the room there is"
+investigation = "part5-layout"
+target = "R0"
+
+[plan.row."005 dgroup $A67A"]
+label = "~210 bytes still missing before scene 3's block"
+investigation = "part5-layout"
 target = "R0"
 
 [plan.row."006 1095:0114"]
