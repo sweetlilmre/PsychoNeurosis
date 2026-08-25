@@ -91,14 +91,6 @@ const
   PageOfsA   = 0;
   PageOfsB   = 80;         { second page starts 80 bytes into each row }
 
-{ These four live in DGROUP, not in the code -- the scene assigns them in
-  Morph_InitScene -- so they are TYPED constants, which Borland Pascal puts in
-  initialised data and allows you to write to. }
-const
-  MorphSteps : Integer = 45;     { DS:$BEB6 }
-  ViewDist   : Integer = 2500;   { DS:$BEB4 }
-  ProjScale  : Integer = 256;    { DS:$BEB2 }
-
 const
 
   AngleWrap  = 360;        { $168 }
@@ -131,16 +123,50 @@ type
   RECONSTRUCTION SCAFFOLDING -- see the note in PART1_INTRO.PAS.
   =========================================================================== }
 
-var
-  { [transcribed] The projection centre, DS:$BEB0-ish. Morph_InitScene zeroes
-    both before the first shape and they stay put for this scene. }
-  XCentre, YCentre : Integer;
-
   { [inferred] The shape currently being drawn. The original addresses shapes
     by their DGROUP offset (CurShape, MorphFrom, MorphTo are Words holding
     $0636, $5136, $63F6) and walks them with pointer arithmetic; a working
     copy is the readable equivalent. }
 {$I gen/P3SHAPE.INC}     { const ShapeSphere, ShapeCube, ShapeGrid : TShape }
+
+var
+  { The rotation's sines and cosines. COSINE FIRST IN EACH PAIR: the recorded
+    addresses are SinX $BE92 / CosX $BE90 and SinY $BE96 / CosY $BE94, so the
+    cosine is the lower of the two and the declarations were the wrong way
+    round. Z is the other way about, and that is not a slip -- $BE98 is SinZ
+    and $BE9A is CosZ. }
+  CosX, SinX          : Integer;   { DS:$BE90, $BE92 }
+  CosY, SinY          : Integer;   { DS:$BE94, $BE96 }
+  SinZ, CosZ          : Integer;   { DS:$BE98, $BE9A }
+
+  AngX, AngY, AngZ    : Integer;   { DS:$BE9C, $BE9E, $BEA0 }
+  StepX, StepY, StepZ : Integer;   { DS:$BEA2, $BEA4, $BEA6 }
+
+  { The three shape offsets, and $BEA8..$BEAD is where they go -- the only six
+    bytes the recorded addresses leave unaccounted for between StepZ and
+    XCentre. BindShapes fills them with Ofs(); the original writes the same
+    values as immediates because it knew where its own tables landed. }
+  OfsSphere, OfsCube, OfsGrid : Word;   { DS:$BEA8, $BEAA, $BEAC }
+
+  { [transcribed] The projection centre. Morph_InitScene zeroes both before the
+    first shape and they stay put for this scene. }
+  XCentre, YCentre    : Integer;   { DS:$BEAE, $BEB0 }
+
+  { PLAIN VARS, not typed constants, and their own addresses prove it: the
+    original has these three above the end of its initialised data at $9F20,
+    so they cannot be stored, and it writes all three as immediates inside
+    Morph_InitScene. Declared as typed constants they went into the
+    initialised region instead -- six bytes in the wrong half of DGROUP. }
+  ProjScale           : Integer;   { DS:$BEB2 -- 1139:0328 sets it to 256 }
+  ViewDist            : Integer;   { DS:$BEB4 -- 1139:032e sets it to 2500 }
+  MorphSteps          : Integer;   { DS:$BEB6 -- 1139:0316 sets it to 45 }
+
+  MorphStep           : Integer;   { DS:$BEB8 }
+  CurShape            : Word;      { DS:$BEBA -- shape being drawn }
+  MorphFrom, MorphTo  : Word;      { DS:$BEBC, $BEBE }
+  PageOfs             : Word;      { DS:$BEC0 -- 0 or 80 }
+  Frames              : Integer;   { DS:$BEC2 }
+  Count               : Word;      { DS:$BEC4 -- the point counter }
 
 { --------------------------------------------------------------------------
   SHAPE ADDRESSING
@@ -152,8 +178,6 @@ var
   offsets cannot be reused verbatim because the compiler decides where it
   puts these arrays, but nothing else about the addressing changes.
   -------------------------------------------------------------------------- }
-var
-  OfsSphere, OfsCube, OfsGrid : Word;
 
 procedure BindShapes;
 begin
@@ -212,18 +236,6 @@ asm
 end;
 
 
-var
-  AngX, AngY, AngZ    : Integer;   { DS:$BE9C, $BE9E, $BEA0 }
-  StepX, StepY, StepZ : Integer;   { DS:$BEA2, $BEA4, $BEA6 }
-  SinX, CosX          : Integer;   { DS:$BE92, $BE90 }
-  SinY, CosY          : Integer;   { DS:$BE96, $BE94 }
-  SinZ, CosZ          : Integer;   { DS:$BE98, $BE9A }
-  CurShape            : Word;      { DS:$BEBA -- shape being drawn }
-  MorphFrom, MorphTo  : Word;      { DS:$BEBC, $BEBE }
-  MorphStep           : Integer;   { DS:$BEB8 }
-  PageOfs             : Word;      { DS:$BEC0 -- 0 or 80 }
-  Count               : Word;      { DS:$BEC4 -- the point counter }
-  Frames              : Integer;   { DS:$BEC2 }
   { RowOfs is the Mode-X unit's own table (1192:0000 fills it), not this
     scene's -- see MODEX.PAS. It is imported, not declared here. }
 

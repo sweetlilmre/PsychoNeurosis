@@ -109,6 +109,13 @@ var
   DisplayCount : Integer;                               { DS:$BE0C }
   WaypointIdx  : Integer;                               { DS:$BE0E }
 
+  { DS:$BE10, 128 bytes -- the untyped file record Scene2 reads the waypoint
+    table through. UNIT-LEVEL in the original, not a local: this unit's last
+    var is WaypointIdx at $BE0E and the morph unit's first is SinX at $BE92,
+    and 128 bytes is exactly what sits between them. Nothing else in either
+    unit is that size. }
+  F            : file;
+
 { --------------------------------------------------------------------------
   DegToRad (10b8:0487)
   -------------------------------------------------------------------------- }
@@ -376,8 +383,6 @@ end;
           See docs/07-part3-scene2-stars.md.
   -------------------------------------------------------------------------- }
 procedure Scene2;
-var
-  F : file;
 begin
   Assign(F, 'neurosis.dat');
   Reset(F, 1);
