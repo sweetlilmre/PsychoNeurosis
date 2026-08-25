@@ -194,15 +194,15 @@ var
   DigBank   : array[1..6]  of array[0..220]  of Byte;   { DS:$1498 }
   TunnelBk  : array[1..3]  of array[0..139]  of Byte;   { DS:$19C6 }
   DeathBBk  : array[1..5]  of array[0..159]  of Byte;   { DS:$1B6A }
-  HillAnim  : array[1..3]  of array[0..1031] of Byte;   { DS:$858F }
   DeathABk  : array[1..6]  of array[0..107]  of Byte;   { DS:$1E8A }
   BuildBank : array[1..6]  of array[0..119]  of Byte;   { DS:$2112 }
+  FuseBank  : array[1..5]  of array[0..149]  of Byte;   { DS:$23E2 }
   DeathAPic : array[0..3179] of Byte;    { DS:$BF97 -- 60 x 53, the storm
                                            cloud and its lightning bolt }
+  Explosion : array[1..7]  of array[0..3464] of Byte;   { DS:$26D0 }
+  HillAnim  : array[1..3]  of array[0..1031] of Byte;   { DS:$858F }
   IntroAnim : array[1..7]  of array[0..1559] of Byte;   { DS:$91A7 }
   SideAnim  : array[1..6]  of array[0..139]  of Byte;   { DS:$BC4F }
-  Explosion : array[1..7]  of array[0..3464] of Byte;   { DS:$26D0 }
-  FuseBank  : array[1..5]  of array[0..149]  of Byte;   { DS:$23E2 }
 
 { --------------------------------------------------------------------------
   THE TWO TERRAIN SETS, read out of the code segment at 1005:0B48 / 1005:1496

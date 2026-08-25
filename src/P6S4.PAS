@@ -75,12 +75,12 @@ type
 {$I gen/P6TEXT.INC}   { const CreditText : array[1..99] of String[255] }
 
 var
+  Margin  : array[TopRow..199] of Byte;      { DS:$942c }
+  Stretch : array[TopRow..BotRow] of Integer;{ DS:$94b8 }
   Buf     : Pointer;              { DS:$9648 }
   Font    : ^TFont;               { DS:$964c }
   Line    : Integer;              { DS:$9650 }
   RowIn   : Integer;              { DS:$9652 }
-  Margin  : array[TopRow..199] of Byte;      { DS:$942c }
-  Stretch : array[TopRow..BotRow] of Integer;{ DS:$94b8 }
   F       : file;                 { DS:$9654 }
 
 { --------------------------------------------------------------------------
