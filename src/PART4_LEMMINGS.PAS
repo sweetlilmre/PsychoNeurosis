@@ -954,50 +954,72 @@ end;
   -------------------------------------------------------------------------- }
 procedure Digger(N : Integer);
 var
-  { FIVE LOCALS IN EIGHT BYTES, which is what 1005:0df5's ENTER $8 and its slots
-    say: Words at [BP-$02] and [BP-$04], Bytes at [BP-$05] and [BP-$06], and a
-    Word at [BP-$08] -- 2+2+1+1+2. This routine declared three.
+  { FOUR DECLARED LOCALS AND ONE COMPILER TEMPORARY, in eight bytes. Digger's
+    range contains the WALL set as CS data at 1005:1146, which desynchronises a
+    linear disassembly -- an earlier reading of this frame counted 23 references
+    to [BP-$02] that are in fact Tunneller's, because the walk ran straight
+    through the data and past the next routine's ENTER. Digger itself never
+    touches [BP-$02] at all.
 
-    The pixel is READ INTO A BYTE before it is tested; writing the GetPixel
-    inside the `in` test keeps it in a register and loses the slot. }
-  Col, ColTo : Integer;           { [BP-$02], [BP-$04] }
-  Hit        : Boolean;           { [BP-$05] }
-  Pix        : Byte;              { [BP-$06] }
-  Lim        : Integer;           { [BP-$08], 18 references in the original }
+    So: an Integer at [BP-$02] that is never read, the column at [BP-$04], the
+    flag and the pixel as bytes at [BP-$05] and [BP-$06], and [BP-$08] is the
+    upper bound of the `for` -- evaluated once into a temporary, which is why
+    there is no ColTo. }
+  Unread : Integer;               { [BP-$02], never read }
+  Col    : Integer;               { [BP-$04] }
+  Hit    : Boolean;               { [BP-$05] }
+  Pix    : Byte;                  { [BP-$06] }
 begin
   Hit := False;
-  if Lem[N].Dir < 1 then
+  { THE RIGHTWARD BRANCH COMES FIRST. 1005:0E01 is CMP/JG, which jumps INTO
+    this branch and falls through to the other -- so the source tests
+    `Dir >= 1`, not `Dir < 1`. }
+  if Lem[N].Dir >= 1 then
   begin
-    ColTo := Lem[N].X + 3;
-    for Col := Lem[N].X - 3 to ColTo do
+    for Col := Lem[N].X - 3 to Lem[N].X + 3 + 1 do   { 1005:0E0B }
     begin
       Pix := GetPixel(Col, Lem[N].Y + 1, VirtScrSeg);
       if Pix in Wall then Hit := True;
     end;
-    DrawLine(Lem[N].X - 2, Lem[N].Y - 11, Lem[N].X - 2, Lem[N].Y + 1,
-             0, VirtScrSeg);
-    DrawLine(Lem[N].X - 1, Lem[N].Y - 11, Lem[N].X - 1, Lem[N].Y + 1,
-             0, VirtScrSeg);
-    DrawLine(Lem[N].X - 5, Lem[N].Y + 1,  Lem[N].X + 5, Lem[N].Y + 1,
-             0, VirtScrSeg);
+
+    { EVERY CONSTANT IS WRITTEN THE WAY THE ORIGINAL COMPUTES IT, because Turbo
+      Pascal emits one operation per operator instead of folding first: `+ 3 + 5`
+      is ADD AX,3 / ADD AX,5, `+ 3 + 1 + 1` is ADD AX,3 / INC AX / INC AX, and
+      `- 9 - 0` really does emit SUB AX,0. Collapsing them to + 8 and - 9 is a
+      different instruction stream for the same arithmetic. }
+    VLine(Lem[N].X + 3 + 1,     Lem[N].Y - 9 - 1,     Lem[N].Y,
+          0, VirtScrSeg);                            { 1005:0E6D }
+    VLine(Lem[N].X + 3 + 1 + 1, Lem[N].Y - 9 - 0,     Lem[N].Y - 0,
+          0, VirtScrSeg);                            { 1005:0E98 }
+    VLine(Lem[N].X + 3 + 3,     Lem[N].Y - 9 + 1,     Lem[N].Y - 1,
+          0, VirtScrSeg);                            { 1005:0ECA }
+    VLine(Lem[N].X + 3 + 4,     Lem[N].Y - 9 + 1 + 1, Lem[N].Y - 1 - 1,
+          0, VirtScrSeg);                            { 1005:0EF9 }
+    VLine(Lem[N].X + 3 + 5,     Lem[N].Y - 9 + 3,     Lem[N].Y - 3,
+          0, VirtScrSeg);                            { 1005:0F2A }
+    HLine(Lem[N].X - 3, Lem[N].X + 3 + 1 + 1, Lem[N].Y,
+          0, VirtScrSeg);                            { 1005:0F5D }
   end
   else
   begin
-    ColTo := Lem[N].X + 4;
-    for Col := Lem[N].X - 3 to ColTo do
+    for Col := Lem[N].X - 3 to Lem[N].X + 3 do       { 1005:0F8B }
     begin
       Pix := GetPixel(Col, Lem[N].Y + 1, VirtScrSeg);
       if Pix in Wall then Hit := True;
     end;
-    VLine(Lem[N].X + 4, Lem[N].Y - 10, Lem[N].Y,     0, VirtScrSeg);
-    VLine(Lem[N].X + 5, Lem[N].Y - 9,  Lem[N].Y,     0, VirtScrSeg);
-    VLine(Lem[N].X + 6, Lem[N].Y - 8,  Lem[N].Y - 1, 0, VirtScrSeg);
-    VLine(Lem[N].X + 7, Lem[N].Y - 7,  Lem[N].Y - 2, 0, VirtScrSeg);
-    VLine(Lem[N].X + 8, Lem[N].Y - 6,  Lem[N].Y - 3, 0, VirtScrSeg);
-    HLine(Lem[N].X - 3, Lem[N].X + 5,  Lem[N].Y,     0, VirtScrSeg);
+
+    DrawLine(Lem[N].X - 3 + 1,     Lem[N].Y - 9 - 1 - 1,
+             Lem[N].X - 3 + 1,     Lem[N].Y + 1,
+             0, VirtScrSeg);                         { 1005:0FEC }
+    DrawLine(Lem[N].X - 3 + 1 + 1, Lem[N].Y - 9 - 1 - 1,
+             Lem[N].X - 3 + 1 + 1, Lem[N].Y + 1,
+             0, VirtScrSeg);                         { 1005:1029 }
+    DrawLine(Lem[N].X - 3 - 1 - 1, Lem[N].Y + 1,
+             Lem[N].X + 3 + 1 + 1, Lem[N].Y + 1,
+             0, VirtScrSeg);                         { 1005:1068 }
   end;
 
-  Lem[N].Tick := (Lem[N].Tick mod 3) + 1;
+  Lem[N].Tick := (Lem[N].Tick mod 3) + 1;            { 1005:10A3 }
   if Lem[N].Tick mod 3 = 0 then
   begin
     Lem[N].Frame := (Lem[N].Frame mod 6) + 1;
@@ -1011,13 +1033,6 @@ begin
   if not Hit then SetState(StWalker, N);
 end;
 
-{ --------------------------------------------------------------------------
-  1005:1166 -- state 10, the HORIZONTAL tunneller.
-
-  Same idea as the digger but it never changes Y, so it bores straight
-  through. It tests a two-column by ten-row block ahead against the WALL set
-  and stops the moment that block is empty.
-  -------------------------------------------------------------------------- }
 procedure Tunneller(N : Integer);
 var
   Col, ColTo, Row, RowTo : Integer;
