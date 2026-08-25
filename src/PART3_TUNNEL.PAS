@@ -132,6 +132,26 @@ var
   Angle, Radius : Real;
   PanX, PanY    : Integer;
 
+  { UNIT-LEVEL, and the chain of addresses is what says so. This unit's vars run
+    from Crt's at DS:$9F0E: YOffset 1,600 bytes, PlaneOf 640, RotTmp 15, then
+    Angle at $A7E2 and Radius at $A7E8 -- 1015:075E loads a six-byte Real from
+    each -- and PanX and PanY at $A7EE and $A7F0. PART3_STARS' first variable is
+    at $A880, and TUNNEL and STARS are ADJACENT in the link order, so the 142
+    bytes between belong to this unit and nothing else can put them there. A
+    file record is 128 of them.
+
+    LoadTexture had it as a local, which is behaviourally identical and 128
+    bytes short: every variable in the part below $A880 sat 132 bytes low
+    because of it. Every other scene unit in part 003 already keeps its handle
+    here. }
+  F             : file;
+
+  { FOUR MORE BYTES THIS UNIT DECLARES AND NOBODY READS. $A872..$A87F is
+    fourteen bytes with not one reference to it anywhere in the part, and
+    PART3_STARS' first variable is at $A880, so all fourteen are this unit's.
+    With the file record above, our block still finished four bytes early. }
+  Unread        : LongInt;
+
 { --------------------------------------------------------------------------
   VGA_SetMode (1192:002a) -- mode 13h, then unchain into Mode-X.
   -------------------------------------------------------------------------- }
@@ -203,7 +223,6 @@ end;
   -------------------------------------------------------------------------- }
 procedure LoadTexture(Buffer : Pointer);
 var
-  F     : file;
   Plane : Byte;
 begin
   Assign(F, 'neurosis.dat');

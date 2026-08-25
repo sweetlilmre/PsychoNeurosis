@@ -105,22 +105,18 @@ var
   { DS:$B250. 500 six-byte records read straight off the DAT. The walk is
     Waypoints[50] down to Waypoints[1], and it reads Waypoints[0] once on the
     way out -- see RunScene -- so the array starts at zero. }
-  { [0..500] AND THE SIX BYTES ARE NOT THIS UNIT'S. This was tried as [1..500]
-    and measured worse -- the morph unit's variables went from 4 bytes low to 10
-    -- and the conclusion drawn was that something in THIS unit is six bytes
-    short. dsmap.py says otherwise: the references BELOW this array are already
-    ten bytes low. 12f8:01B3 reads `MOV ES,[$9F0E]` and ours reads $9F04, and
-    the same ten-byte shift holds at $9F12, $9F14, $A888 and $A88A -- every one
-    of them at a lower offset than Waypoints.
+  { [1..500], AND THE SIX BYTES THAT USED TO ARGUE FOR A ZEROTH ENTRY WERE
+    SOMEBODY ELSE'S. Declaring it [0..500] measured better for a long time and
+    the reason has now been found and fixed: PART3_TUNNEL was missing 132 bytes
+    -- a unit-level file record and four unread bytes -- so this unit's data
+    started 132 bytes low and a 501-record array put six of them back by
+    accident. With TUNNEL corrected this unit's variables land on the original's
+    addresses exactly, and the extra record became six bytes of overshoot.
 
-    So the layout is: this unit's data starts TEN bytes low, and a 501-record
-    array puts six of them back by accident, which is what made [0..500] measure
-    better. The offsets still argue for 500 records -- $B250 to $BE08 is 3,000
-    bytes and DataSize says 3000 three lines above -- and the ten bytes are
-    upstream, in whatever the linker lays down before this unit. Both have to be
-    fixed together: correcting either one alone leaves a non-zero shift, and any
-    non-zero shift breaks the same spans. }
-  Waypoints    : array[0..NumWaypoints] of TWaypoint;
+    The offsets were always the better argument: the table is at DS:$B250 and
+    PanY at $BE08, which is 3,000 bytes, and DataSize says 3000 three lines
+    above. It took the measurement agreeing with them to act on it. }
+  Waypoints    : array[1..NumWaypoints] of TWaypoint;
 
   { PanY FIRST: the recorded addresses put it at $BE08 and PanX at $BE0A, so
     the lower of the two was declared second. }
