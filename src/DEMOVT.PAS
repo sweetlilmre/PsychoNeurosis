@@ -117,11 +117,20 @@ type
     assembler, so `Block.Seg` inside an asm block is a syntax error. }
   TFarPtr = record Ofs, Sgmt : Word end;
 
-var
-  { DS:$0286/$0288 the control block, DS:$028A/$028C the dispatch routine.
-    Zero when the player is not resident, which is what every routine tests. }
-  Block : TFarPtr;
-  Entry : TFarPtr;
+const
+  { TYPED CONSTANTS, NOT VARIABLES, and the data segment says so: part 004's
+    image carries eight zero bytes at DS:$010E..$0115 immediately before this
+    unit's field table, and a plain `var` is reserved space that never reaches
+    the file at all. 11d9:0066 is `LES SI,[$010E]` and 11d9:0057 is
+    `LCALL [$0112]`, so the first is the control block and the second the
+    dispatch routine -- exactly these two, in this order.
+
+    Turbo Pascal lets a typed constant be assigned, which is what MusicDetect
+    does to both. DS:$0286/$0288 and $028A/$028C are the same two in part 002's
+    copy. Zero when the player is not resident, which is what every routine
+    tests. }
+  Block : TFarPtr = (Ofs : 0; Sgmt : 0);        { DS:$010E in part 004 }
+  Entry : TFarPtr = (Ofs : 0; Sgmt : 0);        { DS:$0112 }
 
 implementation
 
@@ -135,6 +144,17 @@ const
     reason; a plain const would fold into the instruction and the
     transcription would no longer match. The values are the ones read out of
     part 002's copy of this same unit. }
+  { A WORD OF ZERO AHEAD OF THE TABLE, and it is NOT referenced by anything.
+    Part 004's image has ten zero bytes at DS:$010E..$0117 and the table at
+    $0118: eight are Block and Entry above, and these two are the tenth and
+    eleventh. Nothing in the unit reads or writes them.
+
+    AN UNREFERENCED TYPED CONSTANT IS NOT DROPPED, which is worth stating
+    because the opposite was written down here as the reason a hole like this
+    could not be filled. SyncValue1 and SyncValue2 below have never been read
+    by anything either and both are in our image at $011C and $011E. So the
+    rule is the same as for locals: declared is allocated. }
+  Unread    : Word = 0;          { DS:$0116 in part 004 }
   PosField  : Word = $0125;      { the song position, a LongInt }
   SyncField : Word = $0203;      { the sync FLAG }
   { The two values the note above means by "flag, then two values". They were
