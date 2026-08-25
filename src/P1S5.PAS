@@ -68,6 +68,13 @@ type
     X, Y, D : Integer;      { six bytes, matching the $A5F0 stride }
   end;
 
+  { SortAll takes the array BY POINTER, so it needs a name and a pointer to it.
+    12c5:0621 pushes DS and DI -- a far pointer -- and 12c5:0027 loads it back
+    with LES DI, SS:[link+4]. Declared AFTER TScreenPt: an array of it cannot
+    be named before the element type is. }
+  TScrArr = array[1..MaxPoints * 2] of TScreenPt;
+  PScrArr = ^TScrArr;
+
 var
   { DS:$AAD0 spin, DS:$AAD2 orbit. Local lives in Animate's own frame. }
   Angle      : Integer;
@@ -85,7 +92,7 @@ var
     shared 386 maths object, which does that properly, so the coordinates are
     the original's again. }
   Pt      : array[1..MaxPoints, 1..3] of LongInt;   { DS:$A106, 12 bytes each }
-  Scr     : array[1..MaxPoints * 2] of TScreenPt;   { DS:$A5F0 }
+  Scr     : TScrArr;   { DS:$A5F0 }
   { DS:$A5B6/$A5BA/$A5BE -- object + $4B0, the translation. }
   PosX, PosY, PosZ : LongInt;
   { DS:$A5C2 -- the 52-byte point sprite: a 2-byte (W, H) header and 50 px. }
@@ -260,27 +267,54 @@ end;
   the reflection -- and RenderObject calls it before drawing anything. It was
   missing here entirely.
   -------------------------------------------------------------------------- }
-procedure DepthSort(Lo, Hi : Integer);
-var
-  I, J, P : Integer;
-  T       : TScreenPt;
-begin
-  I := Lo;  J := Hi;
-  P := Scr[(Lo + Hi) div 2].D;
-  repeat
-    while Scr[I].D < P do Inc(I);
-    while Scr[J].D > P do Dec(J);
-    if I <= J then
-    begin
-      if Scr[I].D <> Scr[J].D then
+procedure SortAll(Arr : PScrArr);
+{ 12c5:0190 -- SORT-ONLY, and it takes the array BY POINTER. Ghidra's
+  decompilation of this address is two DepthSort calls and a return, nothing
+  else, so the drawing loops below it belong to RenderObject and not here.
+  12c5:0621 calls it as MOV DI,$A5F6 / PUSH DS / PUSH DI / CALL 0x190, which
+  for a near call puts the offset at [BP+4] and the segment at [BP+6].
+
+  DepthSort IS NESTED INSIDE IT, and that is the whole point: 12c5:0024 is
+  MOV DI,[BP+4] and 0027 is LES DI, SS:[DI+4] -- a static link followed to
+  this routine's Pointer parameter. Its own layout is [BP+8] = Lo, [BP+6] =
+  Hi, [BP+4] = the link, and RET 6 accounts for two Integers plus the link.
+  Top-level with a unit-level Scr, none of its 292 bytes lined up and thirteen
+  further spans downstream of it did not either. }
+  procedure DepthSort(Lo, Hi : Integer);
+  var
+    I, J, P : Integer;      { [BP-2], [BP-4], [BP-6] }
+    T       : TScreenPt;    { [BP-0C]..[BP-07] -- the swap temp }
+    { TWO MORE BYTES, DECLARED AND NEVER READ. The frame is ENTER $0E and the
+      four above it reach only $0C; nothing in the routine touches [BP-0E] or
+      [BP-0D]. Omitting them left the prologue one byte wrong and that was the
+      ONLY byte wrong in the first 64 -- everything else matched once the
+      routine was nested. }
+    Unread  : Integer;      { [BP-0E] }
+  begin
+    I := Lo;  J := Hi;
+    P := Arr^[(Lo + Hi) div 2].D;
+    repeat
+      while Arr^[I].D < P do I := I + 1;   { 12c5:0051, an ASSIGNMENT }
+      while Arr^[J].D > P do J := J - 1;   { not Dec: see below }
+      if I <= J then
       begin
-        T := Scr[I];  Scr[I] := Scr[J];  Scr[J] := T;
+        if Arr^[I].D <> Arr^[J].D then
+        begin
+          T := Arr^[I];  Arr^[I] := Arr^[J];  Arr^[J] := T;
+        end;
+        { ASSIGNMENTS, NOT Inc AND Dec. 12c5:0051 is MOV AX,[BP-2] / INC AX /
+        MOV [BP-2],AX -- seven bytes -- where Inc(I) is a three-byte INC WORD
+        PTR. Ghidra reads the same statements as `local = local + 1`. Four
+        sites: the two while bodies and these two. }
+      I := I + 1;  J := J - 1;
       end;
-      Inc(I);  Dec(J);
-    end;
-  until I > J;
-  if Lo < J then DepthSort(Lo, J);
-  if I < Hi then DepthSort(I, Hi);
+    until I > J;
+    if Lo < J then DepthSort(Lo, J);
+    if I < Hi then DepthSort(I, Hi);
+  end;
+begin
+  DepthSort(1, PtCount);                          { 12c5:0193 }
+  DepthSort(PtCount + 1, PtCount * 2);            { 12c5:01a1 }
 end;
 
 { [transcribed] 12c5:052a -- transparent point sprite, W and H from its own
@@ -366,8 +400,7 @@ procedure RenderObject;
 var
   I : Integer;
 begin
-  DepthSort(1, PtCount);                          { 12c5:0193 }
-  DepthSort(PtCount + 1, PtCount * 2);            { 12c5:01a1 }
+  SortAll(@Scr);                                  { 12c5:0626 }
 
   for I := PtCount + 1 to PtCount * 2 do
     DrawReflection(@ObjMeta, Scr[I].X, Scr[I].Y, WorkSeg);
