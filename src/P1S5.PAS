@@ -790,7 +790,10 @@ begin
   end;
 
 
-  Obj.Pos.X := IntToFixed(0);                  { 12c5:0918 }
+  { 12c5:0918 stores an ALREADY-ZERO AX twice with no call before it, so X is
+    a direct zero. Y and Z below really do go through IntToFixed -- 12c5:091e
+    pushes -70 and 12c5:092c pushes 1600. }
+  Obj.Pos.X := 0;                              { 12c5:0918 }
   Obj.Pos.Y := IntToFixed(-70);                { 12c5:091e }
   Obj.Pos.Z := IntToFixed(1600);               { 12c5:092c }
 

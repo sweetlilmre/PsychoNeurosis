@@ -622,12 +622,36 @@ resolution = "RESOLVED, AND THE BLOCKER I RECORDED DID NOT EXIST. This said the 
 name = "part1-mosaic-run"
 finding = "part 001 at 89.4%. Mosaic_Run at 10e3:00bb is the next span worth reading and it needs a full body pass rather than a declaration fix: prologue.py will not pair it, so its body differs substantially. ENTER $18 is 24 bytes and only four slots are touched -- [BP-6] a Word set to $FFFF, [BP-8] a Word set to 4, [BP-$0B] a BYTE set to 1 then INC'd and compared against 5 (the loop counter), and [BP-$0D] a BYTE set to 4 -- with [BP-2], [BP-4] and everything from [BP-$0E] down to [BP-$18] unreferenced. That is eleven bytes of declared-and-dead below the last live slot, which is a lot even for this author, so read it before transcribing: an odd-offset run has already fooled me once by being a 13-byte record rather than a leading Byte. THE OTHER SPANS, largest first: 1082:036a (110), 1107:04f3 (109), 1107:08fc (111), 1107:00be (83), 1012:0366 (81). None is now worth more than about 130, so the cheap structural wins are done and what is left is per-routine reading. THREE FRAME SIZES STILL MISSING and one is a whole routine: $482 is 1012:05bd, which takes a String by value and reads a 768-byte palette into a local at [BP-$400] and 64,000 bytes through VGA's VirtScr pointer -- P1S1 has no String-taking routine at all. $6 is 1082:0128 BlitClipped, six bytes of locals against our nineteen. $A and $0 are unidentified."
 seen_in = "TPART1"
+state = "resolved"
+resolution = "PART 001 89.4% -> 89.9%, and the fix was one distinction applied in three places: `:= 0` AND `:= IntToFixed(0)` ARE NOT THE SAME CODE. A direct zero is XOR AX,AX and two register stores; IntToFixed(0) is a PUSH and a far call whose result is then stored. 1107:0903 and 1107:094e are the first form (XOR then stores, no call), and 12c5:0918 stores an ALREADY-ZERO AX twice with nothing before it. Three sites corrected: Trail[Idx].Z, Trail[0].X and .Y, and Obj.Pos.X. Note that Obj.Pos.Y and .Z genuinely DO call IntToFixed -- 12c5:091e pushes -70 and 12c5:092c pushes 1600 -- so this is not a blanket rule and each site has to be read. AND THE DISTINCTION WAS ALREADY WRITTEN DOWN IN THIS REPOSITORY, in P2S2.PAS, as a comment explaining exactly which form the original uses and why. Part 002 is at 99.9% and its eight IntToFixed(0) calls are deliberate. So the knowledge existed in one part's source and had not reached two others. A cross-part grep found no other sites, so this class is now closed everywhere. MOSAIC_RUN WAS OPENED AND DELIBERATELY NOT CHANGED. 10e3:00bb's ENTER $18 decomposes plausibly -- two Words at [BP-6] and [BP-8], two Bytes at [BP-$0B] and [BP-$0D], and eleven unreferenced bytes at the deep end that would fit two array[1..5] of Byte if those were declared LAST where ours has them second. But our routine contains an asm block that references every local BY NAME, so reordering the var block silently changes what that block addresses, and the frame cannot distinguish the arrangement I guessed from two others. Not attempted without reading the whole routine."
+
+[[plan.investigation]]
+name = "part1-dgroup-audit"
+finding = "part 001: THE DGROUP SHORTFALL IS NOW THE DOMINANT RESIDUAL and the per-routine work is close to exhausted -- no span exceeds 131 bytes and several of those are displacement noise rather than wrong code. dsmap pairs 88 references and FIFTY-FOUR of them carry a large negative shift: -16808 across $ACEB..$ACFB with 38 sites, -17576 across $AAC2..$AAD2 with 10, and -17176 at $AB54..$AB58 with 6. Each is a wrong two-byte displacement inside an otherwise correct instruction, which is the one defect class that makes a whole routine measure as unaligned while containing nothing wrong. WHAT IS KNOWN AND WHAT IS NOT. P1S4's own block is close: its Col at $6A2F carries -5619, and summing what we declare between $6A2F and $AAC2 -- 2,048 of row buffers, 3,776 of font, 7,395 of blobs, 810 of stars, 1,212 of model, 52 of sprite, 1,200 of screen records, 28 of maths -- gives 16,521 against the original's 16,531, ten bytes out. So the SIZES in that range are essentially right, and a shift that grows by 11,957 across a range whose contents differ by ten CANNOT be explained by those declarations. Either the -5619 pairing is wrong (it has four sites, which is thin) or the units sit in a different ORDER so that something else lies between them. DO NOT GUESS THIS ONE. The arithmetic above is exactly the kind that looked convincing twice this session and was wrong both times. What it needs is a per-unit size audit against the original's inter-variable gaps -- mechanisable, and the sources' own DS: comments are the input, as they were for P1S4. A tool that reads those comments, sorts them, and reports each declaration's declared size beside its measured gap would settle it for every unit at once and is worth writing before another hand pass."
+seen_in = "TPART1"
+state = "open"
+
+[[plan.investigation]]
+name = "part1-buildcell-asm"
+finding = "part 001: BuildCell at 1012:0366 is HAND-WRITTEN ASSEMBLER and ours is Pascal, which is why its frame matches and its body does not -- the frame was corrected earlier and the walk did not move. Two tells settle it: 1012:037a is MOV WORD PTR [BP-2],$4FD6, loading a DATA ADDRESS as an immediate into a local, and 1012:039e is ADD BYTE PTR [BP-7],0, a literal no-op add. A compiler emits neither. It also walks BACKWARDS -- MOV CX,$640 then DEC CX -- which this file's own comment already says. IDENTIFIED: $4FD6 is Cell and $4304 is LensTab, and the file's own arithmetic confirms it ($4FD6 - $4304 = $0CD2 = 1641 words, so Cell begins where the table ends). The loop reads LensTab[cx] as a gather index, fetches a source byte, adds a bias byte held at [BP-7], and stores to Cell[cx]. THE ONE THING NOT IDENTIFIED, and it blocks a verbatim transcription: the source base is 1012:036a's IMUL DI,[BP+4],$669 then LEA AX,[DI-$37F] -- N * 1641 - 895 -- used as a DS-RELATIVE offset. For N = 1 that is 746, a low DS offset well below LensTab at $4304, and nothing in this unit is recorded there. Ours reads the saved background through `Under`, a HEAP pointer, which cannot be what a DS-relative read addresses. Find what lives at DS:$02EA before writing the asm: a wrong verbatim transcription is worse than the Pascal it replaces, because it looks authoritative."
+seen_in = "TPART1"
+state = "open"
+
+[[plan.investigation]]
+name = "part1-bss-shortfall"
+finding = "part 001: THE UNINITIALISED DATA SHORTFALL IS 16,704 BYTES, MEASURED FROM THE EXE HEADER, and that is a hard number rather than an inference. The MZ header's minalloc field is the paragraphs of uninitialised data the loader must add beyond the image: the original asks for 3,784 paragraphs (60,544 bytes) and our build for 2,740 (43,840). The difference is 1,044 paragraphs. The stack segment moves with it -- SS is 13ef in the original and 100f in ours -- which is the same fact read a second way. THREE INDEPENDENT MEASUREMENTS NOW AGREE WITHIN ABOUT 300 BYTES: the header says 16,704; dsmap's dominant shift, carried by 38 of 88 paired references, is -16,808; and the largest undocumented gap in the sources' own DS: comments -- between P1S5's last typed constant at $0282 and P1S1's LensTab at $4304 -- is 16,514. Agreement from three different kinds of evidence is what makes this worth acting on, where each alone would not be: I have twice this session built convincing arithmetic on a single measurement and been wrong. WHAT IT IS NOT. Not DemoVT: that unit is correctly a thin client, nine small routines talking to a third-party TSR, and its own header says so. Not the scene units' arrays, which now tile: P1S4's declarations between $6A2F and $AAC2 sum to 16,521 against the original's 16,531. HOW TO FIND IT, and this is the point of having the header number: it gives a CHEAP FEEDBACK LOOP that needs no disassembly. Add or resize one declaration, rebuild, and read minalloc again -- it moves by exactly what you added. So the shortfall can be bisected by unit: comment out a unit's data, watch the number fall, and the difference is that unit's contribution. Do that before reading any more code, because 16,704 bytes is the single largest defect left in the part and every absolute displacement in it is wrong until it is closed."
+seen_in = "TPART1"
 state = "open"
 
 [plan.row."001 1012:0004"]
 label = "BuildLens quadrant walk"
 investigation = "pacing"
 note = "BuildLens (1012:0004, ENTER $1C) was the coverage walk's largest span in part 001 -- the whole 696-byte routine unaligned while routines.py had nothing to say, because nobody had declared it. The frame size read the source's var block and three corrections fell out of it, none visible in the statements: the original WALKS ONE QUADRANT AND MIRRORS, X and Y each 0..20 with four sign-paired stores per iteration and a separate set of four in each branch (the identity branch indexes from X and Y directly at 1012:0043, never through SX/SY); it holds no D2, recomputing X*X+Y*Y at 1012:0116; it names its Sqrt intermediate, so two Real locals; and the lens radius is a typed constant of type WORD read from DS:$0002, not an untyped const -- 1012:012e is MOV AX,[$0002] / MUL WORD PTR [$0002] where a fold would have emitted MOV AX,1600, and 1012:0135/015e widen it with XOR DX,DX, unsigned, which is what forces the two LongInt conversion slots the ENTER counts. The table is therefore 1641 words, not 1600: mirroring reaches index (20+20)*40+(20+20) = 1640, the unit init clears 3282 bytes at 1012:0008, and in the shipped binary Cell at DS:$4FD6 begins exactly $0CD2 after LensTab at DS:$4304. No overrun and no deviation -- the size was measured for. After the fix the routine aligns in full and part 001's coverage walk moved 66.6% -> 68.4%; routines.py unchanged at 74 locked, 0 failing. Generalised as the wiki observation `The frame is bigger than your locals account for`. Init-time only, so this is alignment rather than a per-frame pacing gain: 441 square roots where the reconstruction did 1600."
+
+[plan.row."001 1012:0366"]
+label = "BuildCell is hand asm; blocked on what lives at DS:$02EA"
+investigation = "part1-dgroup-audit"
+target = "R0"
 
 [plan.row."001 1012:05bd"]
 label = "a String-taking loader we have not written at all"
@@ -774,6 +798,11 @@ label = "Demo_Scene5 preamble"
 investigation = "part1-s4s5-palette"
 note = "Scene5 in the binary flushes keys, does ClearScreen($A000,0), then AllocWork (12c5:0a60: GetMem+clear of the work buffer), THEN Load rewrites the DAC -- so the palette swap happens over black. Ours went straight into Load, recolouring scene 4's still-displayed frame for the whole file read and backdrop build. Scene5 rebuilt to the binary's structure (also: palette is a Load local passed to VGA.SetPalette768, FreeMem(Work) on exit, and P1S5 needs $G+). Opcode-identical modulo fixups after the fix."
 
+[plan.row."001 dgroup $0282"]
+label = "16,514 bytes of DGROUP that no comment in the tree records"
+investigation = "part1-bss-shortfall"
+target = "R0"
+
 [plan.row."001 dgroup $6A2A"]
 label = "Font is inline, not a heap pointer -- worth 3,772 bytes"
 investigation = "part1-p1s4-hole"
@@ -799,9 +828,19 @@ label = "a further +368 step, 38 sites"
 investigation = "part1-unit-sizes"
 target = "R0"
 
+[plan.row."001 dgroup audit"]
+label = "54 of 88 paired refs carry a ~17KB shift; needs a per-unit audit"
+investigation = "part1-dgroup-audit"
+target = "R0"
+
 [plan.row."001 dgroup base"]
 label = "P1S5's block starts 23530 bytes too low; the units below it are too small"
 investigation = "part1-unit-sizes"
+target = "R0"
+
+[plan.row."001 header minalloc"]
+label = "the original asks for 16,704 more bytes of BSS than we do"
+investigation = "part1-bss-shortfall"
 target = "R0"
 
 [plan.row."002 1008:0362"]

@@ -722,7 +722,7 @@ begin
       begin
         Trail[Idx].X    := IntToFixed((Col - 1) * 10 - 90);
         Trail[Idx].Y    := IntToFixed(32 - (Row - 1) * 8);
-        Trail[Idx].Z    := IntToFixed(0);
+        Trail[Idx].Z    := 0;                 { 1107:0903, XOR AX,AX }
         Trail[Idx].Flag := 0;
         Inc(Idx);                                 { 1107:0917 }
         if Idx > TrailCount then                  { 1107:091b, CMP $91 }
@@ -734,8 +734,10 @@ begin
     end;
   end;
 
-  Trail[0].X := IntToFixed(0);
-  Trail[0].Y := IntToFixed(0);
+  { 1107:094e is XOR AX,AX then four stores of AX -- both are direct zeros,
+    not IntToFixed(0), which would push and call. }
+  Trail[0].X := 0;                             { 1107:0950 }
+  Trail[0].Y := 0;                             { 1107:0956 }
   Trail[0].Z := IntToFixed(2000);
 end;
 
