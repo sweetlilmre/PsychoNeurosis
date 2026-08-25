@@ -929,6 +929,14 @@ end;
 
 procedure Scene3;
 begin
+  { THE SHAPE OFFSETS ARE LITERALS HERE, as 1139:03bd..03cf has them: the
+    original knew where its own tables landed. Ofs() is not a compile-time
+    constant, so a variable read at run time is the only alternative and it
+    never matches -- same instruction LENGTH, never the same bytes.
+    BindShapes still runs and still fills OfsSphere, OfsCube and OfsGrid,
+    because removing them takes six bytes out of DGROUP that the original
+    has at $BEA8..$BEAD -- tried, and it cost 106 bytes. What those six
+    bytes really are is therefore still open; they are NOT these three. }
   { EIGHT INLINE BLOCKS, no helpers. 1139:03b4 repeats the same six
     calls eight times over; a Frame/Hold/MorphTo_ trio reads better and
     is 476 bytes of different code. Every keypress test in the original
@@ -936,9 +944,9 @@ begin
     scene -- which is why these are Exit and not a broken-out loop. }
   InitScene;
   PageOfs := PageOfsB;
-  CurShape  := OfsSphere;
-  MorphFrom := OfsSphere;
-  MorphTo   := OfsCube;
+  CurShape  := $0636;
+  MorphFrom := $0636;
+  MorphTo   := $5136;
   StepX := SpinX;  StepY := SpinY;  StepZ := SpinZ;
   AngX  := 0;      AngY  := 0;      AngZ  := 0;
 
@@ -953,8 +961,8 @@ begin
     Dec(Frames);
   until Frames = 0;
 
-  MorphFrom := OfsSphere;
-  MorphTo   := OfsCube;
+  MorphFrom := $0636;
+  MorphTo   := $5136;
   MorphStep := 0;
   Frames := SegFrames;
   repeat
@@ -979,8 +987,8 @@ begin
     Dec(Frames);
   until Frames = 0;
 
-  MorphFrom := OfsCube;
-  MorphTo   := OfsGrid;
+  MorphFrom := $5136;
+  MorphTo   := $63F6;
   MorphStep := 0;
   Frames := SegFrames;
   repeat
@@ -1005,8 +1013,8 @@ begin
     Dec(Frames);
   until Frames = 0;
 
-  MorphFrom := OfsGrid;
-  MorphTo   := OfsCube;
+  MorphFrom := $63F6;
+  MorphTo   := $5136;
   MorphStep := 0;
   Frames := SegFrames;
   repeat
@@ -1032,8 +1040,8 @@ begin
   until Frames = 0;
 
   { 8: morph back to the sphere while the palette fades out }
-  MorphFrom := OfsCube;
-  MorphTo   := OfsSphere;
+  MorphFrom := $5136;
+  MorphTo   := $0636;
   MorphStep := 0;
   Frames := LastFrames;
   repeat
