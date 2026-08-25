@@ -70,6 +70,20 @@ type
   TPal768 = array[0..767] of Byte;
 
 var
+  { DS:$740A, and TWO-DIMENSIONAL. 1118:01c5 writes [$73B9 + I*80 + J], and a
+    1-based array[1..100, 1..80] indexed Grid[I, J] emits exactly that: the
+    compiler folds the low bounds, so the displacement is base - 81 and the
+    base is $73B9 + 81 = $740A.
+
+    Declared FLAT and 0-based the displacement matches just as well -- both
+    forms produce the same instruction -- but they put the array in different
+    places, and $73B9 is not available: P6S1's file record occupies $738A to
+    $7409. $740A is the first free byte after it, and the chain closes from
+    there: $740A + 8,000 is $934A, which is Pic; Pic and TitleB together run to
+    $9420, which is SparkX. An earlier pass rejected the 2-D form on the
+    strength of the flat index at 1118:0938, which simply needed rewriting. }
+  Grid   : array[1..GridH, 1..GridW] of Byte;   { DS:$740A, 8,000 bytes }
+
   Pic    : Pointer;               { DS:$934a }
 
   { DS:$934e. The title bitmap and the 210 bytes read off the file are THE
@@ -82,13 +96,6 @@ var
   SparkX : Real;                  { DS:$9420 }
   SparkY : Real;                  { DS:$9426 }
 
-  { DS:$73b9, and indexed FLAT because that is how the binary indexes it:
-    1118:01c5 writes [$73b9 + I*80 + J], so element [1,1] sits 81 bytes into
-    the variable, not at its start. Declaring it array[1..100,1..80] and
-    writing Grid[I,J] shifts the whole thing by 81 bytes and puts the seed
-    row one byte out. The diffusion also reads [SI+80] on the last row, which
-    runs 80 bytes past the last cell -- hence the slack at the end. }
-  Grid   : array[0..8100] of Byte;
 
 { --------------------------------------------------------------------------
   1118:0028 -- the assets.
@@ -137,7 +144,7 @@ begin
 
   for I := 1 to GridH do                         { 1118:01a8 }
     for J := 1 to GridW do
-      Grid[I * GridW + J] := 0;
+      Grid[I, J] := 0;
   Close(F);                                      { 1118:01dc }
 end;
 
@@ -364,7 +371,9 @@ begin
       the threshold is the extended 0.4 at CS:$08c9. }
     for I := 1 to GridW do
       if Random > 0.4 then                       { 1118:0916 }
-        Grid[7920 + I] := Random(2) * 255;       { 1118:0938 -- $92a9-$73b9 }
+        Grid[99, I] := Random(2) * 255;          { 1118:0938 writes [$92A9+I],
+                                                   and $740A + 98*80 + I - 1 is
+                                                   $92A9 + I -- row 99 }
 
     { ------------------------------------------------------------------
       EQUIVALENT PASCAL, for reference -- the assembler is what runs:
