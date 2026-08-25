@@ -38,7 +38,10 @@ type
     And it TILES: $02EA plus ten rows of 1641 is $4304, which is exactly where
     LensTab begins. }
   TSaveBank = array[1..NumBouncers, 0..BounceW * (BounceH + 1)] of Byte;
-  TCell     = array[0..BounceH * BounceW - 1] of Byte;
+  { 1641 BYTES, the same as a bank row and the same as the lens table, for the
+    same reason: LensTab[I] subscripts both. And it tiles -- Cell at $4FD6 plus
+    1641 is $563F, which is where the file record is. }
+  TCell     = array[0..BounceW * (BounceH + 1)] of Byte;
   { 1641 words, not 1600, and the extra 41 are not slack -- BuildLens walks a
     QUADRANT and mirrors, so it also writes row 20 and column 20, whose index
     is (20+20)*40 + (20+20) = 1640. Two measurements agree: the unit init at
@@ -63,6 +66,11 @@ var
   Under   : TSaveBank;                  { DS:$02EA, 16,410 bytes }
   { DS:$4FD6 -- the single working cell the lens gathers into. }
   Cell    : TCell;
+  { DS:$563F -- THE FILE RECORD IS A GLOBAL. 1012:05d8 pushes DS:$563F to
+    BlockRead and 1012:067b pushes the same address to Assign, in a DIFFERENT
+    routine -- so the file is opened by one routine and read by another, the
+    same split part 001 scene 2 turned out to have. }
+  F       : file;                       { DS:$563F }
   { DS:$4304 -- the gather table, built once by BuildLens. }
   LensTab : TLensTab;
 
@@ -70,15 +78,22 @@ var
   straight into the virtual screen -- NEUROSIS.DAT $000000, 64,768 bytes. }
 procedure LoadLogo;
 var
-  F : file;
+  { THE PALETTE IS A LOCAL, and it was VGA's global. 1012:05dd is
+    LEA DI,[BP-$400] / PUSH SS / PUSH DI / PUSH $300 / BlockRead -- an
+    SS-relative buffer, so 768 bytes of frame and not a unit variable anywhere.
+
+    That matters beyond this routine: VGA's `Palette` existed ONLY for this
+    call, and the original's VGA has no such global -- every palette routine in
+    segment 1491 takes a pointer parameter (1491:01c6 and 1491:01f6 are both
+    LDS SI / LES DI off [BP+6]). Removing it took 768 bytes out of that unit's
+    DGROUP, which is what a data-reference map had been reporting as a +768
+    step between $AB58 and $ACEB. }
+  Pal : array[0..767] of Byte;          { [BP-$400] }
 begin
-  Assign(F, 'neurosis.dat');
-  Reset(F, 1);
   Seek(F, 0);
-  BlockRead(F, Palette, SizeOf(Palette));
-  SetPalette;
-  BlockRead(F, Mem[VirtScrSeg : 0], 64000);
-  Close(F);
+  BlockRead(F, Pal, SizeOf(Pal));       { 1012:05ea }
+  SetPalette768(@Pal);
+  BlockRead(F, Mem[VirtScrSeg : 0], 64000);   { 1012:0601 }
 end;
 
 { --------------------------------------------------------------------------

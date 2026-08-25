@@ -648,6 +648,13 @@ resolution = "THE 16,704-BYTE SHORTFALL IS CLOSED TO 304, and it was ONE DECLARA
 name = "part1-palette-place"
 finding = "part 001: Palette's position inside VGA is the last placement I could not settle, and it is worth ~768 bytes of the residual. A data-reference map shows a step of +788 between $AB58 and $ACEB, meaning our layout has that many more bytes between them than the original -- and 768 of it is Palette. WHAT IS ESTABLISHED. Segment 1491 writes sixteen distinct byte addresses in $ACEA..$ACFC, and the three it never touches -- $ACEF, $ACF1, $ACF7 -- are the high halves of Words at $ACEE, $ACF0 and $ACF6. That is nineteen bytes exactly, and they were not declared at all. They are now, as a documented state block with the widths measured and the purposes explicitly unknown; 1491:044c..045e sets several from one value masked with $7F, zeroes three and sets one to one, which reads like fade machinery. WHAT ADDING THEM DID: nothing to the walk, and it moved the shift by exactly the nineteen bytes, which means THEY ARE NOT WHAT SEPARATES $AB58 FROM $ACEB. Palette still sits in that gap in our build and does not in the original's. So Palette belongs somewhere else -- either before VirtScr, or after the state block, or in a different unit entirely -- and I could not tell which from the references I have. HOW TO SETTLE IT: find where the original's Palette actually is. SetPalette and GetPalette walk it 768 bytes at a time, so look for the base they use in 1491, and for a REP OUTSB or a 768-count loop. Once its address is known the whole unit tiles, and the -1170 and -382 shifts should collapse together. Do NOT move it on the arithmetic alone: the +788 step says how much is in the wrong place, not which declaration it is, and I have twice acted on that kind of inference this session and been wrong."
 seen_in = "TPART1"
+state = "resolved"
+resolution = "RESOLVED. VGA HAD NO Palette GLOBAL IN THE ORIGINAL, and removing it closed the +768 step. Every palette routine in segment 1491 takes a POINTER parameter -- 1491:01c6 and 1491:01f6 both load it off [BP+6] -- so there was nothing for a unit-level buffer to serve. The only thing that used ours was scene 1's loader, and the two no-argument wrappers that existed solely to pass it are gone with it. WHERE THE PALETTES ACTUALLY LIVE, one per scene and neither in VGA. Scene 2 has its own unit-level buffer at DS:$56D2: 1082:003f is MOV DI,$56D2 / PUSH $300 / BlockRead, and 1082:00b8 hands the same address to the fade. Scene 1 reads into an SS-RELATIVE LOCAL: 1012:05dd is LEA DI,[BP-$400] / PUSH SS / PUSH DI. Part 003's sprite scene had already recorded exactly this about itself -- `the scene's own buffer, not VGA.Palette` -- so the finding existed in one part's source and had not reached the others. That is the third time this session that a fact was written in one file and missing from two. AND THE ADDRESSES MADE THREE MORE SIZES FALL OUT, each confirmed by tiling. Scene 2's declaration ORDER was wrong -- WorkBuf came first and belongs fifth -- and sorted it closes with no gap: $56C0 CometBank, $56C4 Backdrop, $56C8 BackdropSeg, $56CA FontBuf, $56CE WorkBuf, $56D2 Pal (768), $59D2 F (128), ending at $5A52. Scene 1's TCell is 1641 bytes and not the 1600 declared, because $4FD6 plus 1641 is $563F -- and $563F is where its file record sits, which is ALSO a global rather than the local it was, since 1012:05d8 and 1012:067b push that address from two DIFFERENT routines. So scene 1 has the same open-here-read-there split scene 2 turned out to have. MEASURED, and this is why the batch was worth it even though the walk did not move: minalloc went from 304 bytes short to 112, and the two dominant data-reference shifts converged from -1170 and -402 to -232 and -212. Twenty bytes apart is close enough that they are now plausibly ONE remaining defect rather than two. All ten parts rebuilt, none regressed, three byte-exact artefacts still holding -- which is the check that makes deleting a declaration from a SHARED unit safe to do at all. THE WALK IS FLAT AT 89.9%, one byte down. That is the second batch in a row where the layout measurements improved sharply and the coverage did not, and the reason is unchanged: a residual shift of ~220 bytes still puts every absolute displacement two bytes wrong inside an otherwise correct instruction. The walk will move when the shift reaches zero, not before, and it is the wrong instrument to steer by until then."
+
+[[plan.investigation]]
+name = "part1-last-112"
+finding = "part 001: TWO INSTRUMENTS NOW REPORT THE SAME 112 BYTES, which is either one missing declaration or a coincidence worth ruling out first. dgimage says our INITIALISED image is 112 bytes short of the original's 752, with the first difference at $0018. The MZ header says our BSS request is 7 paragraphs -- 112 bytes -- short. Those measure different things, so a single 112-byte typed constant cannot straightforwardly explain both, and that is exactly why it should be checked before anything is declared: if they ARE the same thing the fix is one line, and if they are not then acting on the coincidence produces a 112-byte surplus somewhere else. START AT $0018, because dgimage names it as the first differing byte and the initialised region is small enough to read end to end. P1S4 already records $0018 as the projection scale, a 16.16 value set by Demo_Scene4, and $0014/$0016 as 320 and 200 -- so the constants around it are understood and the divergence should be readable directly. AND THE RESIDUAL SHIFT IS NOW ~220 BYTES across 55 of the paired references (-232 over sixteen sites at $AAC2..$AB58, -212 over thirty-nine at $ACEB..$ACFB). Those two being twenty apart means one shortfall of about 212 bytes below both, plus roughly twenty more between them. Small enough now that the per-unit tiling method can finish it: run `dsgaps.py` over each unit and find the declaration whose gap does not match its size."
+seen_in = "TPART1"
 state = "open"
 
 [plan.row."001 1012:0004"]
@@ -805,6 +812,11 @@ label = "Demo_Scene5 preamble"
 investigation = "part1-s4s5-palette"
 note = "Scene5 in the binary flushes keys, does ClearScreen($A000,0), then AllocWork (12c5:0a60: GetMem+clear of the work buffer), THEN Load rewrites the DAC -- so the palette swap happens over black. Ours went straight into Load, recolouring scene 4's still-displayed frame for the whole file read and backdrop build. Scene5 rebuilt to the binary's structure (also: palette is a Load local passed to VGA.SetPalette768, FreeMem(Work) on exit, and P1S5 needs $G+). Opcode-identical modulo fixups after the fix."
 
+[plan.row."001 dgimage $0018"]
+label = "112 bytes short of initialised data, first diff at $0018"
+investigation = "part1-last-112"
+target = "R0"
+
 [plan.row."001 dgroup $0282"]
 label = "16,514 bytes of DGROUP that no comment in the tree records"
 investigation = "part1-bss-shortfall"
@@ -848,6 +860,11 @@ target = "R0"
 [plan.row."001 dgroup base"]
 label = "P1S5's block starts 23530 bytes too low; the units below it are too small"
 investigation = "part1-unit-sizes"
+target = "R0"
+
+[plan.row."001 header 7 para"]
+label = "and 112 bytes short of BSS -- same number, check if same cause"
+investigation = "part1-last-112"
 target = "R0"
 
 [plan.row."001 header minalloc"]

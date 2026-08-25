@@ -140,7 +140,12 @@ var
   StateW3                       : Word;    { $ACF6 }
   State9, StateA, StateB, StateC, StateD : Byte;  { $ACF8 .. $ACFC }
 
-  Palette    : TPalette;
+  { Palette WAS DECLARED HERE and the original's VGA has no such global. Every
+    palette routine in segment 1491 takes a POINTER: 1491:01c6 and 1491:01f6
+    load it off [BP+6]. The only thing that used it was part 001 scene 1's
+    loader, whose original reads into an SS-relative local at [BP-$400], and
+    part 001 scene 2 has its own unit-level buffer at DS:$56D2. Part 003's
+    sprite scene had already recorded the same about itself. }
 
 procedure SetMode13h;
 procedure SetTextMode;
@@ -149,8 +154,6 @@ procedure VirtScrAlloc;
 procedure VirtScrFree;
 procedure ClearVirtual;
 procedure FlushKeys;
-procedure SetPalette;
-procedure GetPalette;
 procedure DrawLine(X1, Y1, X2, Y2 : Integer; Colour : Byte; Segment : Word);
 
 { The palette machinery. These are part 001's copy of the unit (segment 1491)
@@ -1028,16 +1031,9 @@ end;
   original has only the pointer-taking 1491:01C2 and 1491:01DA. The
   WaitRetrace here is OURS -- 1491:01C2 does not wait, because the callers
   that care (both fades below) wait for themselves. }
-procedure SetPalette;
-begin
-  WaitRetrace;
-  SetPalette768(@Palette);
-end;
-
-procedure GetPalette;
-begin
-  GetPalette768(@Palette);
-end;
+{ SetPalette and GetPalette took no arguments and wrapped the 768 versions
+  around the unit's own Palette global. Both are gone with it: there is nothing
+  for them to wrap, and the only caller now passes its own buffer. }
 
 
 { --------------------------------------------------------------------------

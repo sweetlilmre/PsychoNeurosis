@@ -45,13 +45,30 @@ type
   TFontBuf   = array[0..15103] of Byte;
 
 var
-  { All four are HEAP blocks in the original -- Title_Load GetMem's 5,200,
-    64,000, 31,200 and 15,104 bytes in that order. }
-  WorkBuf     : ^TWorkBuf;      { DS:$56CE }
-  Backdrop    : Pointer;        { DS:$56C4, segment kept at DS:$56C8 }
-  BackdropSeg : Word;
+  { THE ORDER BELOW IS THE ADDRESSES', and it was not before -- WorkBuf came
+    first here and belongs fifth. Sorted, this unit's block TILES with no gap:
+
+        $56C0  CometBank      4
+        $56C4  Backdrop       4
+        $56C8  BackdropSeg    2
+        $56CA  FontBuf        4
+        $56CE  WorkBuf        4
+        $56D2  Pal          768
+        $59D2  F            128   -> $5A52
+
+    All four pointers are HEAP blocks in the original -- Title_Load GetMem's
+    5,200, 64,000, 31,200 and 15,104 bytes in that order -- so only their four
+    bytes each live here. }
   CometBank   : ^TCometBank;    { DS:$56C0 -- 10 frames of 65 x 48 }
+  Backdrop    : Pointer;        { DS:$56C4, segment kept at DS:$56C8 }
+  BackdropSeg : Word;           { DS:$56C8 }
   FontBuf     : ^TFontBuf;      { DS:$56CA -- 59 glyphs of 16 x 16 }
+  WorkBuf     : ^TWorkBuf;      { DS:$56CE }
+  { DS:$56D2 -- THIS SCENE'S OWN PALETTE BUFFER, and it was missing entirely.
+    1082:003f is MOV DI,$56D2 / PUSH $300 / BlockRead, so the 768 bytes are
+    read into a unit-level buffer here and not into VGA's global. Part 003's
+    sprite scene already records the same thing about itself. }
+  Pal         : array[0..767] of Byte;  { DS:$56D2 }
   { DS:$59D2 -- THE FILE RECORD IS A GLOBAL. 1082:003a pushes a DS address to
     Assign where a local would be LEA'd off SS, and Load's frame confirms it:
     ENTER $182 is 386 bytes and references only [BP-2], with no room for a
@@ -106,7 +123,7 @@ begin
   { THE FILE IS OPENED BY THE CALLER, not here. 1082:0572..0597 is Assign,
     Reset and Seek in Scene2's own body, and 1082:059c is the near call to this
     routine afterwards -- so Load is entered with the file already positioned. }
-  BlockRead(F, Palette, 768);
+  BlockRead(F, Pal, 768);                         { 1082:004b -> DS:$56D2 }
   BlockRead(F, CometBank^, SizeOf(TCometBank));
   ClearScreen($A000, 0);
   BlockRead(F, Mem[VirtScrSeg : 0], 64000);
@@ -119,7 +136,7 @@ begin
     scene ran correctly and displayed nothing. }
   for I := 0 to 255 do SetRGB(I, 0, 0, 0);        { 1082:0086 }
   CopyScreen(VirtScrSeg, $A000);                  { 1082:00B0 }
-  PaletteFadeUp(@Palette, FadePause);             { 1082:00BB -- 1491:0215 }
+  PaletteFadeUp(@Pal, FadePause);                 { 1082:00b8, DS:$56D2 }
   for I := 1 to 121 do SetRGB(I, I div 2, 0, 0);  { 1082:00C6, the red ramp }
   CopyScreen(VirtScrSeg, $A000);
   CopyScreen(VirtScrSeg, BackdropSeg);            { keep a clean copy }
