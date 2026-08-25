@@ -755,7 +755,8 @@ state = "open"
 name = "part3-morph-asm"
 finding = "PART 003's MORPH SCENE IS HAND ASSEMBLER AND WE HAVE BEEN READING IT AS PASCAL. Segment 1139 is all that is left of the part -- three spans of 35, 29 and 16 bytes plus a dozen small ones -- and a probe settled what it is. THE MEASUREMENT: 1139:0414 is DEC WORD PTR [$BEC2] followed straight by JNE, six bytes. Ours emits DEC, then CMP WORD PTR [$BEC2],0, then JNE -- five more, at each of FOUR loops. probe/DECLOOP.PAS tries seven spellings of `count down and stop at zero` across Turbo Pascal 7, 6.0 and 6.1: Dec then until = 0, with a call in the body, until <= 0, an assignment instead of Dec, Word, Byte, and a while. EVERY ONE emits the CMP. There is no peephole in any dialect, so those six bytes were written by hand. AND THE NEGATIVE EXPLAINS TWO TELLS THAT WERE ALREADY VISIBLE AND DISBELIEVED. 1139:040d is OR DX,DX -- Turbo Pascal returns a Boolean in AL, a word in AX, a LongInt or pointer in DX:AX, and NOTHING in DX alone; the DX form appears exactly once in the whole demo, in this one routine, while every part carries the RTL's AL form. And 1139:02e0, the routine it calls, has NO STACK FRAME AT ALL -- it goes straight to the far call -- which is what `assembler` gives and a compiled procedure does not. So CheckKey is an assembler function returning DX by the author's own convention, and the loop tails that test it are asm too: JE over a JMP is what a person writes when the exit is 367 bytes away, past a short branch's reach. WHAT TO DO, AND IT IS ONE PIECE OF WORK NOT TWO. CheckKey and its four call sites have to change TOGETHER -- making CheckKey `assembler` alone leaves the callers emitting OR AL,AL and would measure worse. The loop tail wants an asm block per loop, and the jump out needs a Pascal `label` at the end of Scene3 because BASM labels do not cross blocks. Demo_Scene3 itself starts at 1139:03b4 with a CALL and no prologue and ends at 0583 with a bare RETF, so the whole procedure may be assembler; that is a SECOND measurement and not this one. Worth roughly 150 bytes, which is part 003 to about 98.7%."
 seen_in = "TPART3"
-state = "open"
+state = "resolved"
+resolution = "RESOLVED, AND PART 003 MEETS THE BAR -- 98.5 then 98.6 then 99.1%, from 97.6% when the investigation was written. Three changes, in the order the evidence allowed. FIRST, THE CHEAP SECOND MEASUREMENT THE NOTE ASKED FOR, and it came free: probe/DECLOOP.PAS already held the answer. Its seven procedures have NO locals and every one of them still opens PUSH BP / MOV BP,SP and closes LEAVE / RETF. Demo_Scene3 opens with a CALL and ends with a bare RETF, so it is not compiled Pascal -- the whole procedure is `assembler`, not just the loop tails. No new build was needed to settle it. AND THE JUMPS OUT PROVE IT TWICE OVER, which is the detail worth keeping. Eight loops test the key and leave the scene; the first FIVE write JE over a JMP and the last THREE write a plain JNE. A compiler is consistent. A person writes `JNE @@Done` every time and inverts it only where the assembler complains the target is out of a short branch's reach -- which is exactly the first five, at $1A3 down to $109 away, and exactly not the last three, at $6D, $43 and $06. THE INCONSISTENCY IS THE SIGNATURE. Transcribed verbatim: 97.6 -> 98.5%, segment 1139's whole body aligned. SECOND, CheckKey as an assembler function returning DX, which had to go WITH Scene3 and not before it: on its own it would have left the callers testing AL and measured worse. 98.5 -> 98.6% and segment 1139 is now entirely aligned. THIRD, AND IT WAS THE LAST 0.5%: the globe scene's ShowFlat and ShowGlobe are NOT procedures in the original. Both were nested here taking the file offset as a LongInt, and the Seek settles it -- 119d:0268 pushes the offset as the immediate pair 6A 0D / 68 82 78 directly in front of the Seek, where a parameterised routine reads [BP+n] and the constant sits at the CALL site, which is what ours emitted. SIX inline copies, and the count is checkable: the file record at DS:$C506 is pushed to a Seek at 0230, 0263, 02e1, 0349, 03d0, 0438 and 04bf -- DataOfs then the six images, with $0D7882 three times over -- and 829 bytes of routine leaves no room for the copies AND two shared routines. 98.6 -> 99.1%. A NOTE ON framehist's $2 SURPLUS, which had been written off as data reading as ENTER: it fell from 11 to 8 across these three changes, so part of it was real all along -- CheckKey's frame and the globe's two nested routines. A count dismissed as noise moved when the noise could not have. MEASURED: part 003 99.1%, no other part moved, three byte-exact artefacts hold, paslint clean at 67 files, and part 003's 92 emulator traps identical opcode for opcode."
 
 [[plan.investigation]]
 name = "part3-frames"
@@ -763,6 +764,12 @@ finding = "PART 003's FRAMES AND ITS 386 HELPERS -- five defects found by walkin
 seen_in = "TPART3"
 state = "resolved"
 resolution = "RESOLVED in the same batch that found it. All six rows fixed and measured: part 003 95.6 -> 97.6%, framehist now reports only a $2 count difference that is data reading as ENTER, and segments 1015, 10b8, 11f3, 120f and 125e are clean of spans down to four bytes. What is left of the part is segment 1139 and segment 119d, and 1139 is a different KIND of work -- see part3-morph-asm."
+
+[[plan.investigation]]
+name = "part3-run-owed"
+finding = "A WATCHED TPART3 RUN IS NOW OWED, and it is the largest behavioural change part 003 has had in one day. Nothing here is unmeasured -- coverage 95.6 -> 99.1%, artefacts holding, traps identical -- but four of the changes are the kind a coverage walk cannot judge: Demo_Scene3 is now one hand-written assembler procedure instead of compiled Pascal; CheckKey returns its answer in DX by the author's convention instead of in AL; the globe scene's two show routines are inlined six times over; and part 003 gained a linked object module, src/asm/STARMATH.ASM, carrying two 386 routines one of which nothing calls. WHAT TO WATCH FOR SPECIFICALLY. The morph scene should still abandon the WHOLE scene on a keypress rather than skipping one segment of it -- every test jumps to the procedure's own RETF, and getting that wrong would show as the morph continuing after a key. The globe scene should show title, city, title, figures, title, DETH in that order with the same fades. And scene 2's star field needs a 386 for DivLong on the projection path, so a failure there would be immediate and total rather than subtle. NOBODY MAY RECORD THIS RUN WHO DID NOT WATCH IT."
+seen_in = "TPART3"
+state = "open"
 
 [plan.row."001 1012:0004"]
 label = "BuildLens quadrant walk"
@@ -1292,6 +1299,21 @@ target = "R0"
 [plan.row."003 125e:077c"]
 label = "Sprites_Run: offsets one slot out, a dead store -- FIXED"
 investigation = "part3-frames"
+target = "R0"
+
+[plan.row."003 386 needed"]
+label = "STARMATH's DivLong is on every point of every frame"
+investigation = "part3-run-owed"
+target = "R0"
+
+[plan.row."003 globe order"]
+label = "six inlined shows -- title, city, title, figures, title, DETH"
+investigation = "part3-run-owed"
+target = "R0"
+
+[plan.row."003 scene3 asm"]
+label = "one assembler procedure now -- watch the keypress exit"
+investigation = "part3-run-owed"
 target = "R0"
 
 [plan.row."003 to 99"]

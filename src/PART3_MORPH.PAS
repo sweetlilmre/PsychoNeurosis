@@ -938,170 +938,261 @@ end;
   declaration's position. }
 function CheckKey : Boolean; forward;
 
-procedure Scene3;
-begin
-  { THE SHAPE OFFSETS ARE LITERALS HERE, as 1139:03bd..03cf has them: the
-    original knew where its own tables landed. Ofs() is not a compile-time
-    constant, so a variable read at run time is the only alternative and it
-    never matches -- same instruction LENGTH, never the same bytes.
-    RESOLVED, AND THIS NOTE'S OWN GUESS WAS WRONG. The offsets come from
-    OFFSET inside the asm block below, which emits the same immediate AND
-    references the tables -- a literal number references nothing, and the
-    linker then drops 8,738 bytes of shape data. BindShapes is gone with its
-    three Ofs() calls; the six bytes it wrote at $BEA8..$BEAD are DX spills
-    belonging to a routine between SetAngles and DrawShape, and they are
-    declared as scratch now. See the var block. }
-  { EIGHT INLINE BLOCKS, no helpers. 1139:03b4 repeats the same six
-    calls eight times over; a Frame/Hold/MorphTo_ trio reads better and
-    is 476 bytes of different code. Every keypress test in the original
-    is a jump to the scene's own RETF, so a key abandons the WHOLE
-    scene -- which is why these are Exit and not a broken-out loop. }
-  InitScene;
-  PageOfs := PageOfsB;
-  { OFFSET IN AN ASM BLOCK, not a literal, and it does two jobs at once. It
-    emits the same immediate the original has -- 1139:03bd..03cf -- AND it is a
-    reference to the table, which is what keeps 8,738 bytes of shape data from
-    being smart-linked out of DGROUP. A literal number references nothing. }
-  asm
-    MOV  WORD PTR CurShape,  OFFSET ShapeSphere   { 1139:03bd  $0636 }
-    MOV  WORD PTR MorphFrom, OFFSET ShapeSphere   { 1139:03c3  $0636 }
-    MOV  WORD PTR MorphTo,   OFFSET ShapeCube     { 1139:03c9  $5136 }
-  end;
-  StepX := SpinX;  StepY := SpinY;  StepZ := SpinZ;
-  AngX  := 0;      AngY  := 0;      AngZ  := 0;
+{ --------------------------------------------------------------------------
+  Demo_Scene3 (1139:03b4) -- HAND ASSEMBLER, and the whole procedure is.
 
-  Frames := SegFrames;
-  repeat
-    ClearPage;
-    DrawShape;
-    FlipPage;
-    WaitRetrace;
-    StepAngles;
-    if CheckKey then Exit;
-    Dec(Frames);
-  until Frames = 0;
+  THREE MEASUREMENTS SAY SO, and two of them had been made and disbelieved.
 
-  asm
-    { ASM, and MorphStep := 0 is why. The original writes it with the
-      IMMEDIATE form at 1139:0426, 048c, 04f2 and 0552 -- six bytes --
-      and Pascal emits XOR AX,AX / MOV for a zero, five. Six hypotheses
-      were eliminated in probe/ZEROSTOR.PAS before the frame on
-      InitScene showed what it really means: hand-written assembler.
-      The shape addresses are OFFSET rather than literals so that the
-      tables stay referenced -- see the note on BindShapes. }
-    MOV  WORD PTR MorphFrom, OFFSET ShapeSphere
-    MOV  WORD PTR MorphTo,   OFFSET ShapeCube
-    MOV  WORD PTR MorphStep, 0
-    MOV  WORD PTR Frames,    SegFrames
-  end;
-  repeat
-    ClearPage;
-    DrawMorph;
-    FlipPage;
-    WaitRetrace;
-    StepAngles;
-    if CheckKey then Exit;
-    Dec(Frames);
-  until Frames = 0;
+  1. NO PROLOGUE AND NO EPILOGUE. 1139:03b4 goes straight into a CALL and the
+     routine ends at 0583 with a bare RETF. A compiled Turbo Pascal procedure
+     opens PUSH BP / MOV BP,SP and closes LEAVE / RETF even with no locals at
+     all -- probe/DECLOOP.PAS has seven such procedures and every one of them
+     carries the frame. Only `assembler` omits it.
 
-  CurShape := MorphTo;
-  Frames := SegFrames;
-  repeat
-    ClearPage;
-    DrawShape;
-    FlipPage;
-    WaitRetrace;
-    StepAngles;
-    if CheckKey then Exit;
-    Dec(Frames);
-  until Frames = 0;
+  2. DEC FOLLOWED STRAIGHT BY JNE. 1139:0414 is DEC WORD PTR [Frames] / JNE,
+     six bytes. Turbo Pascal re-reads the variable: DEC, then CMP ...,0, then
+     JNE -- five bytes more, at each of eight loops. probe/DECLOOP.PAS tries
+     seven spellings of "count down and stop at zero" -- Dec then `until = 0`,
+     with a call in the body, `until <= 0`, an assignment instead of Dec, Word,
+     Byte, and a while -- across Turbo Pascal 7, 6.0 and 6.1. EVERY ONE emits
+     the CMP. There is no such peephole in any dialect.
 
-  asm
-    MOV  WORD PTR MorphFrom, OFFSET ShapeCube
-    MOV  WORD PTR MorphTo,   OFFSET ShapeGrid
-    MOV  WORD PTR MorphStep, 0
-    MOV  WORD PTR Frames,    SegFrames
-  end;
-  repeat
-    ClearPage;
-    DrawMorph;
-    FlipPage;
-    WaitRetrace;
-    StepAngles;
-    if CheckKey then Exit;
-    Dec(Frames);
-  until Frames = 0;
+  3. OR DX,DX. Turbo Pascal returns a Boolean in AL, a word in AX, a LongInt or
+     a pointer in DX:AX, and NOTHING in DX alone. The DX form appears exactly
+     once in the whole demo -- here -- while every part carries the runtime's AL
+     form. CheckKey below is an assembler function returning DX by the author's
+     own convention, and only asm can test it.
 
-  CurShape := MorphTo;
-  Frames := SegFrames;
-  repeat
-    ClearPage;
-    DrawShape;
-    FlipPage;
-    WaitRetrace;
-    StepAngles;
-    if CheckKey then Exit;
-    Dec(Frames);
-  until Frames = 0;
+  AND THE JUMPS OUT PROVE IT TWICE OVER, which is the detail that settles any
+  doubt about extent. Eight loops test the key and leave the scene; the first
+  five write JE over a JMP and the last three write a plain JNE. A compiler is
+  consistent. A PERSON writes `JNE @@Done` every time, and inverts it only where
+  the assembler complains that the target is out of a short branch's reach --
+  which is exactly the first five, whose exits are $1A3 down to $109 bytes away,
+  and exactly not the last three, at $6D, $43 and $06. The inconsistency is the
+  signature.
 
-  asm
-    MOV  WORD PTR MorphFrom, OFFSET ShapeGrid
-    MOV  WORD PTR MorphTo,   OFFSET ShapeCube
-    MOV  WORD PTR MorphStep, 0
-    MOV  WORD PTR Frames,    SegFrames
-  end;
-  repeat
-    ClearPage;
-    DrawMorph;
-    FlipPage;
-    WaitRetrace;
-    StepAngles;
-    if CheckKey then Exit;
-    Dec(Frames);
-  until Frames = 0;
+  So it is transcribed verbatim below, per the standing rule for this target.
+  THE EQUIVALENT PASCAL, which is what was here before and is behaviourally the
+  same thing:
 
-  CurShape := MorphTo;
-  Frames := SegFrames;
-  repeat
-    ClearPage;
-    DrawShape;
-    FlipPage;
-    WaitRetrace;
-    StepAngles;
-    if CheckKey then Exit;
-    Dec(Frames);
-  until Frames = 0;
+      InitScene;  PageOfs := PageOfsB;
+      CurShape := ShapeSphere; MorphFrom := ShapeSphere; MorphTo := ShapeCube;
+      StepX := SpinX; StepY := SpinY; StepZ := SpinZ;
+      AngX := 0; AngY := 0; AngZ := 0;
+      Frames := SegFrames;
+      repeat ClearPage; DrawShape; FlipPage; WaitRetrace; StepAngles;
+             if CheckKey then Exit; Dec(Frames) until Frames = 0;
 
-  { 8: morph back to the sphere while the palette fades out }
-  asm
-    MOV  WORD PTR MorphFrom, OFFSET ShapeCube
-    MOV  WORD PTR MorphTo,   OFFSET ShapeSphere
-    MOV  WORD PTR MorphStep, 0
-    MOV  WORD PTR Frames,    LastFrames
-  end;
-  repeat
-    FadeStep;
-    ClearPage;
-    DrawMorph;
-    FlipPage;
-    WaitRetrace;
-    StepAngles;
-    if CheckKey then Exit;
-    Dec(Frames);
-  until Frames = 0;
+  and seven more of those, alternating DrawShape and DrawMorph, with MorphFrom
+  and MorphTo walking sphere -> cube -> grid -> cube -> sphere and the last one
+  fading the palette out as it morphs.
 
+  A key abandons the WHOLE scene rather than one segment of it -- every test
+  jumps to the procedure's own RETF.
+  -------------------------------------------------------------------------- }
+procedure Scene3; assembler;
+asm
+        CALL    InitScene               { 1139:03b4                          }
+        MOV     WORD PTR PageOfs, PageOfsB      { 03b7 -- draw to page B     }
+
+        { The shape addresses are OFFSET and not literals, and that does two
+          jobs: it emits the same immediate the original has AND it REFERENCES
+          the table, which is what keeps 8,738 bytes of shape data from being
+          smart-linked out of DGROUP. A literal number references nothing. }
+        MOV     WORD PTR CurShape,  OFFSET ShapeSphere  { 03bd  $0636 }
+        MOV     WORD PTR MorphFrom, OFFSET ShapeSphere  { 03c3  $0636 }
+        MOV     WORD PTR MorphTo,   OFFSET ShapeCube    { 03c9  $5136 }
+
+        MOV     WORD PTR StepX, SpinX   { 03cf -- three degrees a frame, and  }
+        MOV     WORD PTR StepY, SpinY   { 03d5    on all three axes at once   }
+        MOV     WORD PTR StepZ, SpinZ   { 03db                                }
+        MOV     WORD PTR AngX, 0        { 03e1                                }
+        MOV     WORD PTR AngY, 0        { 03e7                                }
+        MOV     WORD PTR AngZ, 0        { 03ed                                }
+
+        { ---- 1: the sphere, spinning ---- }
+        MOV     WORD PTR Frames, SegFrames      { 03f3                        }
+@@L1:   CALL    ClearPage               { 03f9                                }
+        CALL    DrawShape               { 03fc                                }
+        CALL    FlipPage                { 03ff                                }
+        CALL    WaitRetrace             { 0402 -- far, it is the VGA unit's   }
+        CALL    StepAngles              { 0407                                }
+        CALL    CheckKey                { 040a                                }
+        OR      DX,DX                   { 040d -- DX, not AL. See above.      }
+        JE      @@K1                    { 040f                                }
+        JMP     @@Done                  { 0411 -- $16F away, past a short JNE }
+@@K1:   DEC     WORD PTR Frames         { 0414                                }
+        JNE     @@L1                    { 0418 -- on the DEC's own flags      }
+
+        { ---- 2: morph sphere -> cube ---- }
+        MOV     WORD PTR MorphFrom, OFFSET ShapeSphere  { 041a                }
+        MOV     WORD PTR MorphTo,   OFFSET ShapeCube    { 0420                }
+        MOV     WORD PTR MorphStep, 0   { 0426 -- the IMMEDIATE form, six     }
+        MOV     WORD PTR Frames, SegFrames      { 042c    bytes; Pascal emits }
+@@L2:   CALL    ClearPage               { 0432    XOR AX,AX / MOV, which is   }
+        CALL    DrawMorph               { 0435    five                        }
+        CALL    FlipPage                { 0438                                }
+        CALL    WaitRetrace             { 043b                                }
+        CALL    StepAngles              { 0440                                }
+        CALL    CheckKey                { 0443                                }
+        OR      DX,DX                   { 0446                                }
+        JE      @@K2                    { 0448                                }
+        JMP     @@Done                  { 044a                                }
+@@K2:   DEC     WORD PTR Frames         { 044d                                }
+        JNE     @@L2                    { 0451                                }
+
+        { ---- 3: the cube, spinning. CurShape := MorphTo rather than the
+          constant -- 0453 reads MorphTo back out of memory. ---- }
+        MOV     AX, WORD PTR MorphTo    { 0453                                }
+        MOV     WORD PTR CurShape, AX   { 0456                                }
+        MOV     WORD PTR Frames, SegFrames      { 0459                        }
+@@L3:   CALL    ClearPage               { 045f                                }
+        CALL    DrawShape               { 0462                                }
+        CALL    FlipPage                { 0465                                }
+        CALL    WaitRetrace             { 0468                                }
+        CALL    StepAngles              { 046d                                }
+        CALL    CheckKey                { 0470                                }
+        OR      DX,DX                   { 0473                                }
+        JE      @@K3                    { 0475                                }
+        JMP     @@Done                  { 0477                                }
+@@K3:   DEC     WORD PTR Frames         { 047a                                }
+        JNE     @@L3                    { 047e                                }
+
+        { ---- 4: morph cube -> grid ---- }
+        MOV     WORD PTR MorphFrom, OFFSET ShapeCube    { 0480  $5136 }
+        MOV     WORD PTR MorphTo,   OFFSET ShapeGrid    { 0486  $63F6 }
+        MOV     WORD PTR MorphStep, 0   { 048c                                }
+        MOV     WORD PTR Frames, SegFrames      { 0492                        }
+@@L4:   CALL    ClearPage               { 0498                                }
+        CALL    DrawMorph               { 049b                                }
+        CALL    FlipPage                { 049e                                }
+        CALL    WaitRetrace             { 04a1                                }
+        CALL    StepAngles              { 04a6                                }
+        CALL    CheckKey                { 04a9                                }
+        OR      DX,DX                   { 04ac                                }
+        JE      @@K4                    { 04ae                                }
+        JMP     @@Done                  { 04b0                                }
+@@K4:   DEC     WORD PTR Frames         { 04b3                                }
+        JNE     @@L4                    { 04b7                                }
+
+        { ---- 5: the grid, spinning ---- }
+        MOV     AX, WORD PTR MorphTo    { 04b9                                }
+        MOV     WORD PTR CurShape, AX   { 04bc                                }
+        MOV     WORD PTR Frames, SegFrames      { 04bf                        }
+@@L5:   CALL    ClearPage               { 04c5                                }
+        CALL    DrawShape               { 04c8                                }
+        CALL    FlipPage                { 04cb                                }
+        CALL    WaitRetrace             { 04ce                                }
+        CALL    StepAngles              { 04d3                                }
+        CALL    CheckKey                { 04d6                                }
+        OR      DX,DX                   { 04d9                                }
+        JE      @@K5                    { 04db                                }
+        JMP     @@Done                  { 04dd -- the LAST that needs this    }
+@@K5:   DEC     WORD PTR Frames         { 04e0                                }
+        JNE     @@L5                    { 04e4                                }
+
+        { ---- 6: morph grid -> cube. From here the exit is within a short
+          branch's reach, and the original stops inverting the test. ---- }
+        MOV     WORD PTR MorphFrom, OFFSET ShapeGrid    { 04e6 }
+        MOV     WORD PTR MorphTo,   OFFSET ShapeCube    { 04ec }
+        MOV     WORD PTR MorphStep, 0   { 04f2                                }
+        MOV     WORD PTR Frames, SegFrames      { 04f8                        }
+@@L6:   CALL    ClearPage               { 04fe                                }
+        CALL    DrawMorph               { 0501                                }
+        CALL    FlipPage                { 0504                                }
+        CALL    WaitRetrace             { 0507                                }
+        CALL    StepAngles              { 050c                                }
+        CALL    CheckKey                { 050f                                }
+        OR      DX,DX                   { 0512                                }
+        JNE     @@Done                  { 0514 -- $6D, so a plain JNE         }
+        DEC     WORD PTR Frames         { 0516                                }
+        JNE     @@L6                    { 051a                                }
+
+        { ---- 7: the cube again ---- }
+        MOV     AX, WORD PTR MorphTo    { 051c                                }
+        MOV     WORD PTR CurShape, AX   { 051f                                }
+        MOV     WORD PTR Frames, SegFrames      { 0522                        }
+@@L7:   CALL    ClearPage               { 0528                                }
+        CALL    DrawShape               { 052b                                }
+        CALL    FlipPage                { 052e                                }
+        CALL    WaitRetrace             { 0531                                }
+        CALL    StepAngles              { 0536                                }
+        CALL    CheckKey                { 0539                                }
+        OR      DX,DX                   { 053c                                }
+        JNE     @@Done                  { 053e -- $43                         }
+        DEC     WORD PTR Frames         { 0540                                }
+        JNE     @@L7                    { 0544                                }
+
+        { ---- 8: morph cube -> sphere while the palette fades out. Sixty-three
+          frames rather than forty-five, which is the fade's length. ---- }
+        MOV     WORD PTR MorphFrom, OFFSET ShapeCube    { 0546 }
+        MOV     WORD PTR MorphTo,   OFFSET ShapeSphere  { 054c  $0636 }
+        MOV     WORD PTR MorphStep, 0   { 0552                                }
+        MOV     WORD PTR Frames, LastFrames     { 0558  $3F = 63             }
+        { DI AND SI ARE SAVED ACROSS FadeStep AND NOWHERE ELSE. 055e is
+          PUSH DI / PUSH SI and 0563 is POP SI / POP DI -- the caller's own
+          save, which a compiled call never needs because a Turbo Pascal
+          callee must preserve both. So FadeStep does not, and it is the one
+          call in this loop written by hand at the other end too. Transcribed
+          as it stands; the pair costs four bytes and changes nothing that can
+          be observed. }
+@@L8:   PUSH    DI                      { 055e                                }
+        PUSH    SI                      { 055f                                }
+        CALL    FadeStep                { 0560                                }
+        POP     SI                      { 0563                                }
+        POP     DI                      { 0564                                }
+        CALL    ClearPage               { 0565                                }
+        CALL    DrawMorph               { 0568                                }
+        CALL    FlipPage                { 056b                                }
+        CALL    WaitRetrace             { 056e                                }
+        CALL    StepAngles              { 0573                                }
+        CALL    CheckKey                { 0576                                }
+        OR      DX,DX                   { 0579                                }
+        JNE     @@Done                  { 057b -- $06                         }
+        DEC     WORD PTR Frames         { 057d                                }
+        JNE     @@L8                    { 0581                                }
+@@Done:                                 { 0583 is the RETF Turbo Pascal adds  }
 end;
 
 { --------------------------------------------------------------------------
-  Morph_CheckKey (1139:0670)
-  The scene tests for a key through its OWN routine, not through Crt's
-  KeyPressed: 1139:040a is a near CALL and CALLF never appears in the
-  loop. The result is tested `OR DX,DX`, which is two bytes, exactly as
-  `OR AL,AL` is here.
+  Morph_CheckKey (1139:02e0) -- ASSEMBLER, AND IT RETURNS IN DX.
+
+  The scene tests for a key through its own routine and not through Crt's
+  KeyPressed directly: 1139:040a is a NEAR call and CALLF never appears in the
+  eight loops. So there is a routine of this unit's own in between.
+
+  TWO THINGS ABOUT IT ARE NOT PASCAL, and both were visible for weeks.
+
+  IT HAS NO STACK FRAME. 1139:02e0 is the far call itself -- no PUSH BP, no
+  MOV BP,SP, and a bare RET at 02f1 with no LEAVE. A compiled procedure gets
+  the frame whether or not it has locals; only `assembler` omits it.
+
+  AND IT ANSWERS IN DX. Turbo Pascal returns a Boolean in AL, a word in AX, a
+  LongInt or a pointer in DX:AX -- and nothing at all in DX alone. The
+  MOV DX,0 / MOV DX,1 pair here, and the OR DX,DX that Scene3 tests it with,
+  appear EXACTLY ONCE in the whole demo: this routine and its callers. Every
+  part carries the runtime's own AL form of the same shape, which is what made
+  the DX form look like a decoding mistake rather than a finding.
+
+  So it is the author's own calling convention, and the callers are asm because
+  nothing else can read it. That is why this and Scene3 had to change together:
+  making this `assembler` on its own leaves the callers testing AL, and the
+  measurement gets WORSE rather than better.
+
+  The declared result type stays Boolean because that is what the routine
+  MEANS; nothing reads AL, so nothing depends on Turbo Pascal's idea of where
+  the answer goes.
   -------------------------------------------------------------------------- }
-function CheckKey : Boolean;
-begin
-  CheckKey := KeyPressed;
+function CheckKey : Boolean; assembler;
+asm
+        CALL    KeyPressed              { 1139:02e0 -- far, into Crt          }
+        OR      AL,AL                   { 02e5 -- Crt's answer IS in AL       }
+        JNE     @@Yes                   { 02e7                                }
+        MOV     DX,0                    { 02e9                                }
+        JMP     @@Out                   { 02ec                                }
+@@Yes:  MOV     DX,1                    { 02ee                                }
+@@Out:                                  { 02f1 is the RET Turbo Pascal adds   }
 end;
 
 { The original gives every unit an EMPTY initialisation section, and the

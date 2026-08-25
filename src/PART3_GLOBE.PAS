@@ -293,41 +293,81 @@ var
   end;
 
 
-  procedure ShowFlat(FileOfs : LongInt);      { straight to the visible screen }
-  var I : Integer;
-  begin
-    Seek(F, FileOfs);
-    BlockRead(F, VirtScr^, 64000);
-    if not KeyPressed then CopyScreen(VirtScrSeg, $A000);
-    ClearScreen(VirtScrSeg, 0);
-    for I := 1 to FadeSteps do FadeIn;
-    if not KeyPressed then Delay(HoldMs);
-    for I := 1 to FadeSteps do FadeOut;
-  end;
+{ SHOWFLAT AND SHOWGLOBE ARE NOT PROCEDURES IN THE ORIGINAL. Both were nested
+  here, taking the file offset as a LongInt parameter, and the Seek settles it:
+  119d:0268 pushes the offset as the IMMEDIATE pair 6A 0D / 68 82 78 right in
+  front of the Seek. A routine taking the offset as a parameter reads it off
+  [BP+n] and the constant appears at the CALL site instead, which is exactly
+  what ours emitted -- 6A 0D / 68 82 78 / PUSH BP / CALL.
 
-  procedure ShowGlobe(FileOfs : LongInt);         { texture for the sphere }
-  var I : Integer;
-  begin
-    Seek(F, FileOfs);
-    if not KeyPressed then BlockRead(F, VirtScr^, 64000);
-    ClearScreen($A000, 0);
-    for I := 1 to FadeSteps do begin FadeIn;  RenderFrame end;
-    for I := 1 to FadeSteps do begin FadeOut; RenderFrame end;
-  end;
+  SIX COPIES, and the count is checkable: the file record's address DS:$C506 is
+  pushed to a Seek at 119d:0230, 0263, 02e1, 0349, 03d0, 0438 and 04bf -- the
+  first being DataOfs before LoadTables, and the other six the image offsets in
+  the order below, with $0D7882 appearing three times over. The routine holding
+  them all is 119d:0211..054e, 829 bytes, and six copies of the sequence plus
+  the file open, the palette blank, the Close and the two FreeMems account for
+  it almost exactly. There is no room in that segment for the copies AND two
+  shared routines.
 
+  So they are written out. The `I` they each declared is the scene's own now,
+  which is also why the scene's frame did not move. }
 begin
-  Assign(F, 'neurosis.dat');
-  Reset(F, 1);
-  Seek(F, DataOfs);
+  Assign(F, 'neurosis.dat');                  { 119d:0215 }
+  Reset(F, 1);                                { 119d:0224 }
+  Seek(F, DataOfs);                           { 119d:0230 }
   LoadTables;
 
   for I := 0 to 255 do SetRGB(I, 0, 0, 0);    { start from black }
 
-  ShowFlat(ImgTitle);   ShowGlobe(ImgCity);
-  ShowFlat(ImgTitle);   ShowGlobe(ImgFigures);
-  ShowFlat(ImgTitle);   ShowGlobe(ImgDeth);
+  { ---- ShowFlat(ImgTitle) at 119d:0263 ---- }
+  Seek(F, ImgTitle);
+  BlockRead(F, VirtScr^, 64000);
+  if not KeyPressed then CopyScreen(VirtScrSeg, $A000);
+  ClearScreen(VirtScrSeg, 0);
+  for I := 1 to FadeSteps do FadeIn;
+  if not KeyPressed then Delay(HoldMs);
+  for I := 1 to FadeSteps do FadeOut;
 
-  Close(F);
+  { ---- ShowGlobe(ImgCity) at 119d:02e1 ---- }
+  Seek(F, ImgCity);
+  if not KeyPressed then BlockRead(F, VirtScr^, 64000);
+  ClearScreen($A000, 0);
+  for I := 1 to FadeSteps do begin FadeIn;  RenderFrame end;
+  for I := 1 to FadeSteps do begin FadeOut; RenderFrame end;
+
+  { ---- ShowFlat(ImgTitle) at 119d:0349 ---- }
+  Seek(F, ImgTitle);
+  BlockRead(F, VirtScr^, 64000);
+  if not KeyPressed then CopyScreen(VirtScrSeg, $A000);
+  ClearScreen(VirtScrSeg, 0);
+  for I := 1 to FadeSteps do FadeIn;
+  if not KeyPressed then Delay(HoldMs);
+  for I := 1 to FadeSteps do FadeOut;
+
+  { ---- ShowGlobe(ImgFigures) at 119d:03d0 ---- }
+  Seek(F, ImgFigures);
+  if not KeyPressed then BlockRead(F, VirtScr^, 64000);
+  ClearScreen($A000, 0);
+  for I := 1 to FadeSteps do begin FadeIn;  RenderFrame end;
+  for I := 1 to FadeSteps do begin FadeOut; RenderFrame end;
+
+  { ---- ShowFlat(ImgTitle) at 119d:0438 ---- }
+  Seek(F, ImgTitle);
+  BlockRead(F, VirtScr^, 64000);
+  if not KeyPressed then CopyScreen(VirtScrSeg, $A000);
+  ClearScreen(VirtScrSeg, 0);
+  for I := 1 to FadeSteps do FadeIn;
+  if not KeyPressed then Delay(HoldMs);
+  for I := 1 to FadeSteps do FadeOut;
+
+  { ---- ShowGlobe(ImgDeth) at 119d:04bf ---- }
+  Seek(F, ImgDeth);
+  if not KeyPressed then BlockRead(F, VirtScr^, 64000);
+  ClearScreen($A000, 0);
+  for I := 1 to FadeSteps do begin FadeIn;  RenderFrame end;
+  for I := 1 to FadeSteps do begin FadeOut; RenderFrame end;
+
+  Close(F);                                   { 119d:0527 }
   FreeMem(SrcOfs, TableSize);
   FreeMem(DstOfs, TableSize);
 end;
