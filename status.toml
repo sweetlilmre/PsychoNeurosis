@@ -710,6 +710,12 @@ finding = "FOUR OF TEN PARTS NOW MEET THE 99% TARGET -- 000, 009 and psycho at 1
 seen_in = "TPART7"
 state = "open"
 
+[[plan.investigation]]
+name = "part6-to-99"
+finding = "PART 006 98.0% -> 98.2%, and segment 100f now has NO frame difference at all. Two findings, and the second is the recipe's static-link check paying again. Setup at 100f:03f8: ENTER $386 is 902 and it decomposes as 128 + 6 + 768. Only three slots plus the palette are referenced, so the 128 bytes NEAREST BP are declared and never read -- an unreferenced file record, the same thing P6S1's Load already has in the same position. First-declared is nearest BP, so the order is that record, then the three Integers at $82/$84/$86, then Pal at $386 -- the address this file already recorded for it. Declared with Pal first, Pal landed at [BP-$300] and the frame came out $306. LoadCel at 100f:00ac IS A NESTED PROCEDURE, and the call site says so: 100f:0112 pushes the slot then 100f:0114 pushes BP -- a STATIC LINK -- before the near call, and 100f:00f9 is RET 8, being four bytes of String pointer plus two of slot plus two of link. That also PLACES the parameters, because the link takes [BP+4]: Slot lands at [BP+6] and Name's offset at [BP+8], which is exactly the pair the routine reads. At unit level it was RET 6 with both parameters two bytes low. Nested inside LoadCels, plus the two unread bytes at [BP-$202] that bring ENTER to $202. AND ONE CHANGE KEPT DESPITE A FLAT MEASUREMENT, which needs saying because the standing rule is that neutral means unmeasured. Setup's palette loop indexes Pal with the counter at [BP-$82] -- 100f:0544 is MOV AL,[BP+DI-$386] after DI is built from [BP-$82] -- and [BP-$82] is the first-declared slot, so I is first and A and J follow. Our order had A there. The walk did not move for it. The difference from the neutral-means-unmeasured cases is that this is a DIRECT reading of the original's displacement rather than an inference from a total, so it is kept; but the walk's silence is recorded rather than glossed."
+seen_in = "TPART6"
+state = "open"
+
 [plan.row."001 1012:0004"]
 label = "BuildLens quadrant walk"
 investigation = "pacing"
@@ -1260,6 +1266,16 @@ label = "~210 bytes still missing before scene 3's block"
 investigation = "part5-layout"
 target = "R0"
 
+[plan.row."006 100f:00ac"]
+label = "LoadCel is NESTED -- the pushed BP is a static link, RET 8"
+investigation = "part6-to-99"
+target = "R0"
+
+[plan.row."006 100f:03f8"]
+label = "Setup: 128 unread bytes nearest BP, then three Integers, then Pal"
+investigation = "part6-to-99"
+target = "R0"
+
 [plan.row."006 1095:0114"]
 label = "Sign has no local: the frame leaves no room for one"
 investigation = "part6-scene1-jerky"
@@ -1273,6 +1289,11 @@ target = "R0"
 [plan.row."006 1095:02ac"]
 label = "BuildPath tests Major and Minor, not two fresh Abs calls"
 investigation = "surplus-fpu-sites"
+target = "R0"
+
+[plan.row."006 1095:067d"]
+label = "Whoosh is two bytes too big and its nine words already tile"
+investigation = "part6-to-99"
 target = "R0"
 
 [plan.row."006 1118:0000"]

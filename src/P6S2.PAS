@@ -138,15 +138,28 @@ var
   what the binary does; the two names it is called with are in the code
   segment and are the only trace of whatever the .cel files once were.
   -------------------------------------------------------------------------- }
-procedure LoadCel(Name : String; Slot : Integer);
-var Buf : TCel;                   { [BP-$200] }
-begin
-  BlockRead(F, Buf, SizeOf(Buf));               { 100f:00d9 }
-  Cels[Slot] := Buf;                            { 100f:00f3 }
-end;
-
 { 100f:010a -- the two of them, in this order. }
 procedure LoadCels;
+
+  { NESTED, and the call site proves it. 100f:0112 pushes the slot number and
+    then 100f:0114 pushes BP -- a STATIC LINK -- before the near call, and
+    100f:00f9 is RET 8: four bytes of String pointer, two of slot, two of link.
+    That also places the parameters, because the link takes [BP+4]: Slot lands
+    at [BP+6] and Name's offset at [BP+8], which is exactly the pair the
+    routine reads.
+
+    Declared at unit level it was RET 6 and the parameters were two bytes low. }
+  procedure LoadCel(Name : String; Slot : Integer);
+  var
+    { ENTER $202 is 514: the String parameter's 256-byte copy at [BP-$100],
+      Buf's 256 at [BP-$200], and TWO BYTES below that which nothing reads. }
+    Buf    : TCel;                { [BP-$200] }
+    Unread : Integer;             { [BP-$202], never referenced }
+  begin
+    BlockRead(F, Buf, SizeOf(Buf));             { 100f:00d9 }
+    Cels[Slot] := Buf;                          { 100f:00f3 }
+  end;
+
 begin
   LoadCel('p5.cel', 2);                          { 100f:0115 }
   LoadCel('p8.cel', 1);                          { 100f:0120 }
@@ -216,8 +229,23 @@ end;
   -------------------------------------------------------------------------- }
 procedure Setup;
 var
-  Pal  : TPal768;                 { [BP-$386] }
-  A, I, J : Integer;
+  { ENTER $386 IS 902 BYTES and it decomposes as 128 + 6 + 768. Only three
+    slots are referenced -- [BP-$82], [BP-$84], [BP-$86] -- plus the palette
+    below them, so the 128 bytes NEAREST BP are declared and never read.
+
+    First declared is nearest BP, which puts that record first, the three
+    Integers next at $82, $84 and $86, and Pal last at $386 -- the address this
+    file already recorded for it. Declared with Pal first, as it was, Pal landed
+    at [BP-$300] and the frame came out $306.
+
+    A file record is what fits, and P6S1's Load has the same thing in the same
+    position, also unreferenced. }
+  Unread  : file;                 { [BP-$80]..[BP-1], never referenced }
+  { I FIRST: the palette loop at 100f:0544 indexes Pal with the counter held at
+    [BP-$82], and that is the first-declared slot. With A there instead, every
+    reference in that loop was two bytes out. }
+  I, A, J : Integer;              { [BP-$82], [BP-$84], [BP-$86] }
+  Pal     : TPal768;              { [BP-$386] }
 begin
   GetMem(Cells, CellSize);                       { 100f:03ff }
   GetMem(YTab, TabSize);                         { 100f:040e }
