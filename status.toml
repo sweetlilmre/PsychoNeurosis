@@ -771,6 +771,13 @@ finding = "A WATCHED TPART3 RUN IS NOW OWED, and it is the largest behavioural c
 seen_in = "TPART3"
 state = "open"
 
+[[plan.investigation]]
+name = "part4-order"
+finding = "PART 004 FROM 96.5% TO 99.0%, and the theme of the whole batch is DECLARATION ORDER -- three routines whose frames were the right SIZE and the wrong SHAPE. framehist had said part 004's frames were fine, and it was right and useless: a frame that matches says nothing about where inside it anything sits. LoadAssets, and it was two defects. Its file record is a GLOBAL at DS:$CF07 -- 1005:00b1 is MOV DI,$CF07 / PUSH DS / PUSH DI, three bytes, where a frame slot is LEA DI,[BP-n] / PUSH SS, four -- and the address TILES: ScenePal ends at $CF07 and VGA's VirtScr begins at $CF88, 129 bytes on, which is the record plus a pad, so it is the last variable the unit declares. And the frame's own order was wrong: only [BP-$683] and [BP-$681] are ever touched, [BP-$681] carries a 768-byte BlockRead, and 897 bytes above it are touched by nothing -- 768 + 128 + 1 exactly, a second palette, an unopened file record and a byte. The same six declarations in our old order also summed to $686. AND THE UNIT HAD NO {$I-} AT ALL, so it took the command line's $I+ default: 29 five-byte near calls to the runtime's I/O check that the original has none of, 145 bytes, and every instruction after the first of them out of step. Every other part's units carry the directive; this one was simply missed. Spawn's four bytes below its counter are NOT a dead declaration, they are the record address a `with` gets whether or not it needs them -- and here it does not, because 1005:070d computes the element's address ONCE into ES:DI and writes all thirteen fields through it. Naming the element at each field, which is what we had, recomputes it thirteen times. THAT IS THE EXACT OPPOSITE READING FROM PART 003's STAR FIELD, where the original recomputes and OUR `with` was the defect. The frame cannot tell them apart; the body can. Explode: C before Pass, and the scene palette is TWO-DIMENSIONAL. The original addresses its three channels as [DI-$33F9], [DI-$33F8], [DI-$33F7] -- three consecutive displacements off one index of C*3 -- where a flat ScenePal[C*3+1] adds the 1 at run time with an INC AX. array[0..255, 0..2] puts the channel in the second subscript, where it is a constant the compiler folds. Intro: I before Pal, which is a byte of displacement on each of nine references. AND A BUG IN THE ORIGINAL, TRANSCRIBED. Explode's three channel tests all read RGB[0]: 1005:19c6, 19db and 19f0 are three identical MOV AL,[BP-7] loads while the increments go to [BP-7], [BP-6] and [BP-5] in turn. The red channel is compared against the green and blue targets -- and red may have been incremented by the first test, so the other two read a value one higher than was measured. The explosion's flash comes up REDDER than the palette it fades towards. A reconstruction that reads RGB[1] and RGB[2] is the tidier program and the wrong one. AND THE PART ENDS WITH A DEBUG PRINT. 1005:1d20 pushes DS:$D232 -- System's `Output` -- then Spawned and a field width of 0, calls the runtime's write-a-LongInt and then its WriteLn. XOR DX,DX and not CWD, so Spawned is a WORD; nothing else in the part distinguishes them, every comparison being against a small positive constant. A CORRECTION KEPT ON THE SOURCE. A note claimed the comparison had to be written `ScenePal[..] > RGB[0]` to make Turbo Pascal load RGB[0] first. It does not -- both spellings emit the same code, and the 81-byte span shrank because of the C/Pass order. Two changes went in together and only one did anything, and the measurement appeared to confirm both. MEASURED: part 004 99.0%, 101 bytes left of which 17 are RTL call targets that cannot close, no other part moved, three byte-exact artefacts hold, paslint clean."
+seen_in = "TPART4"
+state = "resolved"
+resolution = "RESOLVED in the batch that found it: part 004 96.5 -> 99.0%, which is the bar. The 101 bytes left are five spans of seventeen or fewer, and the largest of them is the trailing WriteLn's two RTL call targets and the address of `Output` -- addresses that move with the runtime build and no edit closes. A WATCHED TPART4 RUN IS NOW OWED: the explosion's flash is deliberately redder than it was, the part prints a number to the console when it ends, and Spawn's field writes go through a `with`."
+
 [plan.row."001 1012:0004"]
 label = "BuildLens quadrant walk"
 investigation = "pacing"
@@ -1321,6 +1328,26 @@ label = "95.6% -- check RETF/RET on every unpaired frame"
 investigation = "target-99-remaining"
 target = "R0"
 
+[plan.row."004 1005:00a6"]
+label = "LoadAssets: F is global, frame order wrong -- FIXED"
+investigation = "part4-order"
+target = "R0"
+
+[plan.row."004 1005:06e7"]
+label = "Spawn wants a `with`, the opposite of part 003 -- FIXED"
+investigation = "part4-order"
+target = "R0"
+
+[plan.row."004 1005:19c6"]
+label = "the RGB[0] bug, transcribed -- the flash is REDDER"
+investigation = "part4-order"
+target = "R0"
+
+[plan.row."004 1005:1d20"]
+label = "WriteLn(Spawned) at the end, and Spawned is a Word -- FIXED"
+investigation = "part4-order"
+target = "R0"
+
 [plan.row."004 dgroup $06D2"]
 label = "2,646 bytes unaccounted between TumbleBk and SplatBank"
 investigation = "bss-sweep-all-parts"
@@ -1339,6 +1366,11 @@ target = "R0"
 [plan.row."004 to 99"]
 label = "96.5% -- same, plus the 2,646 unreferenced bytes"
 investigation = "target-99-remaining"
+target = "R0"
+
+[plan.row."004 unit $I-"]
+label = "29 IOCheck calls the original has none of -- FIXED"
+investigation = "part4-order"
 target = "R0"
 
 [plan.row."005 1096:0000"]

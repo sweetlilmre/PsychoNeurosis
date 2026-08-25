@@ -47,6 +47,14 @@
   =========================================================================== }
 
 {$G+}   { 286 instructions: SHL BX,1 with an immediate in the blits. }
+{$I-}   { NO I/O CHECK, and this unit had no I directive at all so it took the
+          command line's default of $I+. LoadAssets' compiled I/O carries a
+          five-byte near call to the runtime's check routine after Reset, Seek
+          and every BlockRead; the original has none of them -- 1005:00c0's
+          Reset is followed straight by the next MOV DI. Twenty-nine call
+          sites in this unit, 145 bytes, and every instruction after the first
+          of them was out of step. Every other part's units carry the
+          directive; this one was simply missed. }
 
 unit Part4Lemmings;
 {$A-}   { DATA ALIGNMENT OFF. The scroller's constants run contiguously in the
@@ -180,13 +188,31 @@ var
   Lem        : array[1..MaxLem] of TLem;
   { DS:$051E and DS:$0520 }
   LiveCount  : Integer;
-  Spawned    : Integer;
+  { A WORD, NOT AN INTEGER, and the WriteLn at the end of Demo_Main is what
+    says so: 1005:1d28 widens it with XOR DX,DX where an Integer widens with
+    CWD. Nothing else in the part distinguishes them -- every comparison is
+    against a small positive constant. }
+  Spawned    : Word;
 
 
 
   { DS:$CC07 -- the scene palette, which Explode fades entries $E0..$E9 up
-    towards. }
-  ScenePal   : TPal768;
+    towards. TWO-DIMENSIONAL, entry by channel: Explode addresses its three
+    channels as three consecutive displacements off one index of C*3, which is
+    a constant second subscript. A flat array[0..767] adds the channel at run
+    time. Same 768 bytes either way. }
+  ScenePal   : array[0..255, 0..2] of Byte;
+  { DS:$CF07 -- A GLOBAL, and LoadAssets had it as a local. 1005:00b1 is
+    MOV DI,$CF07 / PUSH DS / PUSH DI into Assign, and every Reset, Seek,
+    BlockRead and Close in the routine passes the same absolute address; a
+    frame slot would be LEA DI,[BP-n] / PUSH SS. Three bytes against four, at
+    twenty-two call sites, which is why the whole routine was out of step.
+
+    AND THE ADDRESS TILES, which is what makes the placement here rather than
+    anywhere else. ScenePal ends at $CF07 and VGA's VirtScr begins at $CF88 --
+    129 bytes further on, which is this record plus one byte of padding. So it
+    is the LAST variable this unit declares. }
+  F          : file;                                  { DS:$CF07 }
 
 { --------------------------------------------------------------------------
   THE ASSETS.  Lemmings_LoadAssets (1005:00a6) seeks $001228CE and reads
@@ -721,29 +747,40 @@ end;
   -------------------------------------------------------------------------- }
 procedure Spawn;
 var
-  { SIX BYTES FOR ONE COUNTER. 1005:06e7 opens ENTER $06 and [BP-$02] is the
-    only slot anything in the routine names, so the four below it are declared
-    and never read. }
-  N      : Integer;               { [BP-$02] }
-  Unread : LongInt;               { [BP-$06], four bytes, never read }
+  { SIX BYTES, AND THE FOUR BELOW THE COUNTER ARE THE `with`'s. 1005:06e7 opens
+    ENTER $06 and [BP-$02] is the only slot anything names -- but the four below
+    it are not a dead declaration, they are the record address a `with` is
+    allocated whether or not it ends up needing them. Here it does not: the
+    compiler keeps the address in ES:DI for the whole block, because nothing in
+    the block calls anything.
+
+    THE BODY IS WHAT SAYS SO. 1005:070d computes the element's address ONCE --
+    IMUL DI,[BP-2],$15 / ADD DI,$2FC / PUSH DS / POP ES -- and then writes all
+    thirteen fields through ES:[DI+n]. Naming the element at each field, which
+    is what was here, recomputes that address thirteen times over. It is the
+    exact opposite reading from part 003's star field, where the original
+    recomputes and OUR `with` was the defect: the frame alone cannot tell them
+    apart, and the body can. }
+  N : Integer;                    { [BP-$02]; the `with` has [BP-$06] }
 begin
   if Spawned = SpawnLimit then Exit;             { 1005:06ee }
   for N := 1 to MaxLem do
     if Lem[N].Active = 0 then
+    with Lem[N] do                               { 1005:070d }
     begin
-      Lem[N].X         := SpawnX;
-      Lem[N].Y         := SpawnY;
-      Lem[N].TrigX     := SpawnX;
-      Lem[N].TrigY     := SpawnY;
-      Lem[N].TrigState := StFaller;
-      Lem[N].Tick      := 0;
-      Lem[N].Active    := 1;
-      Lem[N].State     := StFaller;
-      Lem[N].Dir       := 1;
-      Lem[N].Frame     := 1;
-      Lem[N].Timer     := 0;
-      Lem[N].FallDist  := 0;
-      Lem[N].Bounces   := 0;
+      X         := SpawnX;
+      Y         := SpawnY;
+      TrigX     := SpawnX;
+      TrigY     := SpawnY;
+      TrigState := StFaller;
+      Tick      := 0;
+      Active    := 1;
+      State     := StFaller;
+      Dir       := 1;
+      Frame     := 1;
+      Timer     := 0;
+      FallDist  := 0;
+      Bounces   := 0;
       Inc(Spawned);
 
       case Spawned of                            { 1005:0761 }
@@ -1300,8 +1337,12 @@ end;
   -------------------------------------------------------------------------- }
 procedure Explode(N : Integer);
 var
-  Pass, C : Integer;
-  RGB     : array[0..2] of Byte;
+  { C IS DECLARED FIRST. 1005:19a4 puts Pass at [BP-$04] and 19ae puts C at
+    [BP-$02], and first declared is nearest BP -- ours had them the other way
+    round, which put a two-byte displacement difference on every one of the
+    fourteen references in the loop. }
+  C, Pass : Integer;              { [BP-$02], [BP-$04] }
+  RGB     : array[0..2] of Byte;  { [BP-$07]..[BP-$05] }
 begin
   Lem[N].Tick := (Lem[N].Tick mod 5) + 1;
   if Lem[N].Tick mod 3 = 0 then
@@ -1316,10 +1357,45 @@ begin
       for Pass := 1 to 5 do
         for C := $E0 to $E9 do
         begin
+          { ALL THREE TESTS READ RGB[0], AND THAT IS A BUG IN THE ORIGINAL.
+            1005:19c6, 19db and 19f0 are three identical MOV AL,[BP-7] loads,
+            and [BP-7] is where GetRGBTo's buffer starts -- so it is RGB[0]
+            every time -- while the increments at 19d8, 19ed and 1a02 go to
+            [BP-7], [BP-6] and [BP-5] in turn. The RED channel is compared
+            against the green and blue targets.
+
+            It is not subtle in effect. Red is also the channel the first test
+            may have just incremented, so the green and blue comparisons read a
+            value one higher than the one that was measured. Where red is
+            already at or above a target the other channel stops rising even
+            though it has not arrived, and where red is below all three, all
+            three rise together. The explosion's flash comes up REDDER than the
+            scene palette it is fading towards.
+
+            Transcribed as it is. A reconstruction that reads RGB[1] and RGB[2]
+            is the tidier program and the wrong one.
+
+            AND THE PALETTE IS TWO-DIMENSIONAL, which is what folds the
+            channel into the displacement. The original computes C*3 in DI --
+            MOV DI,[BP-2] / MOV SI,DI / SHL DI,1 / ADD DI,SI -- and then
+            addresses the three channels as [DI-$33F9], [DI-$33F8] and
+            [DI-$33F7], three consecutive displacements off one index. A flat
+            `ScenePal[C * 3 + 1]` adds the 1 at RUN TIME instead: ours emitted
+            INC AX after the multiply, once for green and twice for blue.
+            Declaring the array as [0..255, 0..2] puts the channel in the
+            SECOND subscript, where it is a constant the compiler folds.
+
+            (An earlier version of this note claimed the comparison had to be
+            written `ScenePal[..] > RGB[0]` to make Turbo Pascal load RGB[0]
+            first. It does not: both spellings emit the same code, and the
+            81-byte span shrank because of the C/Pass declaration order in the
+            var block above, not because of the operator. Kept because the
+            wrong reason survived a measurement that appeared to confirm it --
+            two changes went in together and only one of them did anything.) }
           GetRGBTo(C, @RGB);
-          if RGB[0] < ScenePal[C * 3    ] then Inc(RGB[0]);
-          if RGB[1] < ScenePal[C * 3 + 1] then Inc(RGB[1]);
-          if RGB[2] < ScenePal[C * 3 + 2] then Inc(RGB[2]);
+          if RGB[0] < ScenePal[C, 0] then Inc(RGB[0]);        { 1005:19c6 }
+          if RGB[0] < ScenePal[C, 1] then Inc(RGB[1]);        { 1005:19db }
+          if RGB[0] < ScenePal[C, 2] then Inc(RGB[2]);        { 1005:19f0 }
           SetRGBFrom(C, @RGB);
         end;
     if Lem[N].Frame > 15 then
@@ -1521,14 +1597,34 @@ var
     which fills BP-1 down to BP-$680 exactly -- there is a SECOND 768-byte
     palette. Nothing in the routine reads it, and a local is allocated whether
     or not it is read. }
-  F    : file;                    { [BP-$080] }
-  Pal  : TPal768;                 { [BP-$380] }
-  Pal2 : TPal768;                 { [BP-$680], never read }
-  Spare : Byte;                   { [BP-$681] }
-  I    : Integer;                 { [BP-$683] }
-  Spare2 : Integer;               { [BP-$685], nor this one -- the buffers
-                                    end at $680 and the frame is $686, so
-                                    six bytes of scalars sit below them }
+  { ENTER $686 -- 1,670 bytes -- AND ONLY TWO SLOTS ARE EVER TOUCHED:
+    [BP-$683] seven times and [BP-$681] five. The whole layout follows from
+    those two addresses and the total.
+
+    [BP-$681] is the palette buffer -- 1005:0109 is LEA DI,[BP-$681] / PUSH SS
+    in front of a 768-byte BlockRead -- so it occupies BP-$681 up to BP-$382.
+    That leaves 897 bytes ABOVE it and five below, and the five are [BP-$683]
+    for the loop counter plus one more slot and Turbo Pascal's rounding of an
+    odd total up to even.
+
+    THE 897 ABOVE IS TOUCHED BY NOTHING, and 768 + 128 + 1 is exactly 897 --
+    a second palette, a file record, and a byte. The file record is the one
+    worth naming: the routine's real file is the unit-level global at DS:$CF07
+    now, so these 128 bytes are a SECOND record that is never opened. That is
+    the seventh routine in this target to reserve storage it never uses.
+
+    ORDER IS THE WHOLE POINT HERE. These same six declarations in the order
+    F, Pal, Pal2, Spare, I, Spare2 also sum to $686, and the frame matched
+    while the palette sat at [BP-$380] instead of [BP-$681] -- so every
+    reference to it was four bytes of displacement different from the
+    original's. A frame that matches says nothing about where inside it
+    anything is. }
+  Pal2   : TPal768;               { [BP-$300], never read }
+  Unread : file;                  { [BP-$380], never opened }
+  Spare  : Byte;                  { [BP-$381] }
+  Pal    : TPal768;               { [BP-$681] }
+  I      : Integer;               { [BP-$683] }
+  Spare2 : Integer;               { [BP-$685] -- and BP-$686 is the pad }
 begin
   Assign(F, 'neurosis.dat');
   Reset(F, 1);
@@ -1579,8 +1675,15 @@ end;
   -------------------------------------------------------------------------- }
 procedure Intro;
 var
-  Pal : TPal768;
-  I   : Integer;
+  { I IS DECLARED FIRST, and the difference is a byte of displacement on every
+    one of its nine references. 1005:0a8a passes LEA DI,[BP-$302] to
+    GetPalette768 and 0a97 writes the counter at [BP-$02]; first declared is
+    nearest BP, so the counter comes first and the 768-byte buffer sits below
+    it. Ours had them the other way round, which put the counter at [BP-$302]
+    -- a 16-bit displacement where the original has an 8-bit one, two bytes
+    longer at every reference and everything after them out of step. }
+  I   : Integer;                  { [BP-$02] }
+  Pal : TPal768;                  { [BP-$302] }
 begin
   GetPalette768(@Pal);                           { 1005:0A8A }
   for I := 0 to 255 do SetRGB(I, 0, 0, 0);
@@ -1682,6 +1785,17 @@ begin
   FreeMem(ScrollBuf, ScrollSize);
   MusicStop;                                     { 11d9:004E }
   SetVolume(SavedVol);                           { put it back as we found it }
+  { A LEFTOVER DEBUG PRINT, and it is the last thing the part does. 1005:1d20
+    pushes DS:$D232 -- the System unit's `Output` text record -- then Spawned
+    widened with XOR DX,DX and a field width of 0, calls the runtime's
+    write-a-LongInt routine and then its WriteLn. That is Borland's chaining
+    convention: the write routine leaves the file pointer on the stack for the
+    WriteLn to pop, which is why the second call pushes nothing.
+
+    XOR DX,DX AND NOT CWD, so Spawned is a Word rather than an Integer -- an
+    Integer widens signed. Kept as it is: the number lands on the console
+    behind the demo's own screen and nobody sees it, but it is what ships. }
+  WriteLn(Spawned);                              { 1005:1d20 }
 end;
 
 { 1005:1d3a -- the unit's initialisation body is empty. }
