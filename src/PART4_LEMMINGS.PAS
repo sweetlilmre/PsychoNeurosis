@@ -866,45 +866,65 @@ end;
   -------------------------------------------------------------------------- }
 procedure Faller(N : Integer);
 var
-  DX_ : Integer;
+  { AN OUTER LOOP, and its variable is the Y offset. 1005:0b76 opens ENTER $8
+    and reads the pixel at (X + [BP-4], Y + [BP-2]) -- so the Y offset is a
+    VARIABLE, not the literal 1 this routine used to pass, and it is declared
+    first. The outer loop never reaches a second pass: every path out of the
+    body returns, which is why a single loop produced the right picture and
+    the wrong code. }
+  DY_ : Integer;                  { [BP-$02] }
+  DX_ : Integer;                  { [BP-$04] }
   Pix : Byte;
 begin
-  for DX_ := -3 to 3 do
-  begin
-    Pix := GetPixel(Lem[N].X + DX_, Lem[N].Y + 1, VirtScrSeg);
-    if Pix in Ground then
+  DY_ := 1;
+  repeat
+    for DX_ := -3 to 3 do
     begin
-      if Lem[N].FallDist < 11 then
+      Pix := GetPixel(Lem[N].X + DX_, Lem[N].Y + DY_, VirtScrSeg);
+      if Pix in Ground then
       begin
-        SetState(StWalker, N);
-        Lem[N].FallDist := 0;
-      end
-      else
-      begin
-        Inc(Lem[N].Bounces);
-        if Lem[N].Bounces = 2 then
-          SetState(StSplat, N)
-        else
+        if Lem[N].FallDist < 11 then
         begin
           SetState(StWalker, N);
+          { + DY_ - 1, which is nothing while DY_ is 1 -- transcribed because
+            1005:0bd5 adds it. }
+          Inc(Lem[N].Y, DY_ - 1);
           Lem[N].FallDist := 0;
+        end
+        else
+        begin
+          Inc(Lem[N].Bounces);
+          if Lem[N].Bounces = 2 then
+            SetState(StSplat, N)
+          else
+          begin
+            SetState(StWalker, N);
+            Inc(Lem[N].Y, DY_ - 1);
+            Lem[N].FallDist := 0;
+          end;
         end;
+        Lem[N].Frame := (Lem[N].Frame mod 4) + 1;
+        Exit;
       end;
+      if (Pix > $1F) and (Pix < $2A) then
+      begin
+        SetState(StDeathB, N);
+        Exit;
+      end;
+    end;
+
+    if DY_ = 1 then
+    begin
+      if Lem[N].FallDist < 2 then Inc(Lem[N].X, Lem[N].Dir);
+      Inc(Lem[N].Y);
+      Inc(Lem[N].FallDist);
       Lem[N].Frame := (Lem[N].Frame mod 4) + 1;
       Exit;
     end;
-    if (Pix > $1F) and (Pix < $2A) then
-    begin
-      SetState(StDeathB, N);
-      Exit;
-    end;
-  end;
-
-  if Lem[N].FallDist < 2 then Inc(Lem[N].X, Lem[N].Dir);
-  Inc(Lem[N].Y);
-  Inc(Lem[N].FallDist);
-  Lem[N].Frame := (Lem[N].Frame mod 4) + 1;
+    Inc(DY_);
+  until False;
 end;
+
 
 { --------------------------------------------------------------------------
   1005:0df5 -- state 4, the DIAGONAL digger.
