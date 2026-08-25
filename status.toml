@@ -587,6 +587,13 @@ resolution = "RESOLVED, 2,048 BYTES, AND THE PREDICTION CONFIRMED TWICE OVER. Th
 name = "part1-p1s4-frames"
 finding = "part 001: prologue.py names four frame defects in P1S4 and they are the next work, because a frame is a declaration list and these are cheap to read. Run `prologue.py spans.toml 001 --seg=1107`. It reports 22 candidates, $G+ agreed both ways, and: 1107:0025 opens ENTER $82 against our $02, so ONE HUNDRED AND TWENTY-EIGHT BYTES OF LOCALS ARE MISSING. The routine is Load -- Assign at 1107:0033, Reset at 003f, then a BlockRead -- and 128 bytes in a loader is the shape of a filename or path buffer, String[127] being exactly 128. That is a guess; read the offsets before writing it. 1107:0600 opens ENTER $104 against our $10a, so ours is SIX BYTES TOO BIG -- one declared Real we should not have, or two extra Integers plus a temp. This is the only defect of this direction found on the part so far and it is worth doing first because a surplus is easier to place than a shortfall: something in our var block has no counterpart. AND FOUR ROUTINES OURS DOES NOT LOCATE AT ALL: 1107:03d7, 1107:0446 (ENTER $14), 1107:059f (ENTER $02) and 1107:07a2 (ENTER $202, BuildPoints). Not located means the content differs enough that the tool will not claim a pairing, which is a stronger signal than a frame mismatch -- those four have body defects, not just declaration ones. BuildPoints is the one to read first: it was just changed, so the difference is fresh and the row buffers being unit-level should have brought its frame to $202."
 seen_in = "TPART1"
+state = "resolved"
+resolution = "BOTH FRAMES NOW MATCH AND THIS WAS THE BEST ITERATION SO FAR: part 001 81.7% -> 82.9%, +255 bytes on the walk, and prologue.py reports no frame difference anywhere in segment 1107. Data image unchanged, traps identical opcode for opcode, checks clean. 1107:0600, ShowString -- THE SURPLUS, and doing the surplus first was right. ENTER $104 is 260 bytes: a 256-byte copy of the String value parameter at [BP-$100] plus FOUR, being three declared bytes and the loop's one-byte length temp at [BP-$104]. Ours had four Integers and a word temp. Three corrections, each measured separately: (1) they are BYTES, because every read is MOV AL / XOR AH,AH from a one-byte slot; (2) the order is Ch, Row, Step -- NOT the order the loops nest in, which is how it was written; [BP-$101] is the string subscript at 1107:0661, [BP-$102] is what 1107:064a increments innermost and 1107:0685 multiplies by 18, [BP-$103] is the rest; (3) THERE IS NO FOURTH LOCAL AND NO RANGE GUARD -- 1107:0669..0678 multiplies the RAW Ord by 64 with no SUB anywhere. AND THAT LAST ONE NAMED AN ARRAY BOUND: TFont's low bound is 32, not 0. The displacement $6A2A absorbs the bias, Font is at $7233, and the folded amount is $809 = 2,057 = 32 * 64 + 9 -- thirty-two glyphs plus the nine the two one-based dimensions fold. A low bound of 0 needs a subtraction the original does not have. This is the wiki's subscript-fold-names-the-bounds pattern arriving unprompted. 1107:0025, Load -- THE SHORTFALL. ENTER $82 is 130 bytes and the ONLY slot touched in all 372 bytes of the routine is [BP-$81], one byte, set to 1 and INC'd. First declared is nearest BP, so something 128 bytes wide occupies [BP-$80]..[BP-$01] and is never referenced. Transcribed as String[127], which is exactly 128 bytes and is the obvious thing for a loader to declare and not use; the TYPE is a guess and the SIZE is measured. The counter became a Byte. AND I HAD TO UNDO MY OWN WRONG CORRECTION. Last session I changed Font's comment from $7233 to $6A2A and wrote that $7233 'does not fit'. $7233 was right: $6A2A is the FOLDED base of a subscript, not an address, and the same file explained that in ShowString's own note and again in Load's -- both of which I had read past. A folded displacement is never an address, and that is now written where the declaration is. The comment-versus-code pass works in both directions: it is also how you catch yourself overwriting a correct note with a wrong one."
+
+[[plan.investigation]]
+name = "part1-p1s4-unlocated"
+finding = "part 001: four routines in P1S4 that prologue.py will not pair at all -- 1107:03d7 (no locals), 1107:0446 (ENTER $14), 1107:059f (ENTER $02) and 1107:07a2 (ENTER $202, BuildPoints). Not-located is a STRONGER signal than a frame mismatch: the tool withholds a pairing when the content differs too much, so these have body defects and not merely declaration ones. With every frame in the segment now matching, these four are what is left of P1S4. START WITH 1107:07a2. It was changed twice this session -- the eight row buffers moved out of it to unit level -- so its difference is fresh and its frame should now be $202 exactly, which is a checkable prediction rather than a search. 1107:0446 next: ENTER $14 is 20 bytes and it is the routine DrawStep, whose font subscript is the same arithmetic ShowString's turned out to be, so what was just learned about the raw-Ord index and the low bound of 32 probably applies to it unread. 1107:03d7 has NO locals, which for a called routine means it is either trivial or assembler -- a routine with no frame can only be `assembler`, so check that before assuming it is Pascal."
+seen_in = "TPART1"
 state = "open"
 
 [plan.row."001 1012:0004"]
@@ -614,14 +621,24 @@ label = "Load is 128 bytes of locals short -- likely a path buffer"
 investigation = "part1-p1s4-frames"
 target = "R0"
 
+[plan.row."001 1107:03d7"]
+label = "no locals at all, so check whether it is assembler"
+investigation = "part1-p1s4-unlocated"
+target = "R0"
+
+[plan.row."001 1107:0446"]
+label = "DrawStep, ENTER $14 -- same font subscript as ShowString's"
+investigation = "part1-p1s4-unlocated"
+target = "R0"
+
 [plan.row."001 1107:0600"]
 label = "ours is SIX BYTES TOO BIG, the part's only surplus frame"
 investigation = "part1-p1s4-frames"
 target = "R0"
 
 [plan.row."001 1107:07a2"]
-label = "BuildPoints does not locate; its frame should now be $202"
-investigation = "part1-p1s4-frames"
+label = "BuildPoints does not pair; its frame should now be $202"
+investigation = "part1-p1s4-unlocated"
 target = "R0"
 
 [plan.row."001 1107:097b"]

@@ -124,7 +124,14 @@ type
     Colour          : Byte;
   end;
 
-  TFont = array[0..FontChars - 1, 1..8, 1..8] of Byte;
+  { THE LOW BOUND IS 32, NOT 0, and the subscript arithmetic proves it.
+    1107:0669..0678 is MOV AL,[BP+DI-$100] / XOR AH,AH / SHL DI,6 / ADD DI,DX /
+    ADD DI,CX / CMP BYTE PTR [DI+$6A2A] -- it multiplies the RAW Ord by 64 with
+    no subtraction anywhere, and the displacement $6A2A absorbs the bias. Font
+    is at $7233, so the folded amount is $809 = 2,057 = 32 * 64 + 9: thirty-two
+    glyphs of bias plus the nine that the two one-based dimensions fold. A low
+    bound of 0 would need a SUB the original does not have. }
+  TFont = array[FontBias..FontBias + FontChars - 1, 1..8, 1..8] of Byte;
 
 var
   { DS:$5AD2 -- unit-level, see Load. THIS ADDRESS IS THE MEASUREMENT THAT SAYS
@@ -154,16 +161,21 @@ var
   { DS:$9DDB, stride 9 }
   Star  : array[1..StarCount] of TStar;
 
-  { DS:$6A2A, 3,776 bytes = 59 glyphs of 8 x 8, AND IT IS INLINE IN DGROUP,
+  { DS:$7233, 3,776 bytes = 59 glyphs of 8 x 8, AND IT IS INLINE IN DGROUP,
     not on the heap. It was declared here as a pointer with New and Dispose
     around it, which put four bytes where the original has 3,776 and moved
     every variable after it -- including the whole of P1S5's block, which sits
     above this one.
 
-    The address is the one DrawStep's comment records at line 447 as the base
-    of its subscript arithmetic. An older comment here said $7233, which does
-    not fit: with Font at $6A2A the rest of the unit tiles, and Star's ninety
-    nine-byte records end at $A105, one byte below where P1S5's model begins. }
+    $7233 AND NOT $6A2A, and the difference is worth writing down because this
+    comment said $6A2A for one session and that was wrong. $6A2A is the FOLDED
+    base of ShowString's subscript, not the array's address: ShowString's own
+    note below works it out as $7233 - $809, where $809 is 2,057 = 32 * 64 + 9,
+    the character bias of 32 glyphs plus the nine that array[0..58, 1..8, 1..8]
+    folds for its low bounds. A folded displacement is never an address.
+
+    With $7233 the unit tiles: the row buffers at $6A33 take 2,048 bytes and
+    end exactly here. }
   Font  : TFont;
   { DS:$5B6A and DS:$5B9B, 49 bytes each }
   ProfileA, ProfileB : array[1..BlobPixels] of Byte;
@@ -477,16 +489,32 @@ end;
   -------------------------------------------------------------------------- }
 procedure ShowString(S : String);
 var
-  Ch, Step, Row : Integer;
-  G             : Integer;
+  { THREE BYTES, IN THIS ORDER, and there is no fourth. 1107:0600 opens
+    ENTER $104 -- 260, which is the 256-byte copy of the String value parameter
+    at [BP-$100] plus four: three declared bytes and the loop's one-byte length
+    temp at [BP-$104], written by MOV AL / MOV [BP-$104],AL at 1107:061b.
+
+    The order comes from the offsets, first declared nearest BP: [BP-$101] is
+    read as the string subscript at 1107:0661, [BP-$102] is what 1107:064a
+    increments in the innermost loop and what 1107:0685 multiplies by 18, and
+    [BP-$103] is the remaining term. So Ch, Row, Step -- which is NOT the order
+    the loops are nested in, and declaring them in nesting order puts two of
+    the three at the wrong offset.
+
+    Byte and not Integer: every read is MOV AL / XOR AH,AH, an UNSIGNED widen
+    from a one-byte slot. }
+  Ch, Row, Step : Byte;
 begin
   for Ch := 1 to Length(S) do
     for Step := 1 to 8 do
     begin
-      G := Ord(S[Ch]) - FontBias;
-      if (G < 0) or (G >= FontChars) then G := 0;
+      { NO LOCAL AND NO GUARD. The original indexes with the raw Ord and lets
+        the array's low bound of 32 do the biasing, which is why there is no
+        SUB and no fourth local. The guard that was here -- clamping to 0
+        outside 0..58 -- cannot fire for any character in the three strings
+        this routine is called with, since all of them are $20 or above. }
       for Row := 1 to TrailRows do
-        if Font[G, Row, Step] <> 0 then
+        if Font[Ord(S[Ch]), Row, Step] <> 0 then
           Trail[Row * TrailLen].Flag := 1
         else
           Trail[Row * TrailLen].Flag := 0;
@@ -591,7 +619,21 @@ var
   { THE FILE RECORD IS A GLOBAL, not a local. 1107:007f pushes DS:$5AD2 as the
     file for the second BlockRead -- a data-segment address, where a local
     would be LEA'd off SS. It is declared beside the unit's other data below. }
-  I : Integer;
+
+  { ONE HUNDRED AND TWENTY-EIGHT BYTES DECLARED AND NEVER REFERENCED, and they
+    have to be here or the counter is at the wrong offset. 1107:0025 opens
+    ENTER $82 -- 130 bytes -- and the ONLY slot the routine touches in all 372
+    bytes of it is [BP-$81], one byte, set to 1 at 1107:00b3 and INC'd at
+    1107:00ba. First declared is nearest BP, so whatever occupies
+    [BP-$80]..[BP-$01] comes first and is 128 bytes wide.
+
+    String[127] is exactly 128 bytes and is the obvious thing for a loader to
+    declare and then not use -- a filename it ended up taking from a constant
+    instead. The TYPE is a guess and only the SIZE is measured; what is not a
+    guess is that omitting it moves the counter, which is why an earlier frame
+    of $02 here left this routine unaligned. }
+  Spare : String[127];
+  I     : Byte;
 begin
   Assign(F, 'neurosis.dat');
   Reset(F, 1);
