@@ -249,8 +249,16 @@ end;
   nothing at all.
   -------------------------------------------------------------------------- }
 const
-  ClipX1 = 0;    ClipX2 = 319;
-  ClipY1 = 0;    ClipY2 = 199;
+  { TYPED, so they live in DGROUP where the original reads them from. The four
+    addresses recorded above -- DS:$0004, $0006, $0008, $000A -- are the whole
+    argument: an untyped const folds into the instruction and occupies no data
+    at all, and part 001's initialised region opened eight bytes short because
+    of it. P1S4's four bounds two lines further up DGROUP were already typed for
+    exactly this reason. }
+  ClipX1 : Integer = 0;      { DS:$0004 }
+  ClipX2 : Integer = 319;    { DS:$0006 }
+  ClipY1 : Integer = 0;      { DS:$0008 }
+  ClipY2 : Integer = 199;    { DS:$000A }
 
 procedure BlitClipped(Src : Pointer; X, Y : Integer; Segment : Word);
 var
