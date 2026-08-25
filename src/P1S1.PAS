@@ -349,9 +349,6 @@ const
   ScrollFrom   = 140;      { $8C  -- 1012:05a7, after which it slides out }
   ScrollStep   = 2;        { pixels per frame }
 
-var
-  BX, BY, BDX, BDY : array[1..NumBouncers] of Integer;
-
 { --------------------------------------------------------------------------
   1012:03bd -- ScrollLeft
 
@@ -420,8 +417,18 @@ end;
   -------------------------------------------------------------------------- }
 procedure Scene1;
 var
+  { THE FOUR BOUNCE ARRAYS ARE LOCALS, and the frame closes to the byte:
+    2 + 4 * 20 is 82 and Bounce_Run opens ENTER $54, which is 84 with the two
+    bytes of padding. The offsets give the order -- first declared nearest BP --
+    and they are I at [BP-2], then the two deltas and then the two positions.
+    Declared as unit-level vars they were addressed absolutely, which shares no
+    bytes with the frame-relative form the original uses throughout. }
+  I     : Integer;                            { [BP-$02] }
+  BDX   : array[1..NumBouncers] of Integer;   { [BP-$16] }
+  BDY   : array[1..NumBouncers] of Integer;   { [BP-$2A] }
+  BX    : array[1..NumBouncers] of Integer;   { [BP-$3E] }
+  BY    : array[1..NumBouncers] of Integer;   { [BP-$52] }
   F     : file;
-  I     : Integer;
   Frame : Integer;
 begin
   GetMem(Under, SizeOf(TSaveBank));
