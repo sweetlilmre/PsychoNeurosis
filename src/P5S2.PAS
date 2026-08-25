@@ -140,6 +140,20 @@ var
   TabU       : TTab;              { DS:$8316 }
   TabV       : TTab;              { DS:$92b8 }
   Pal        : TPal768;           { DS:$a25a }
+  { DS:$A55A -- 98 BYTES, and the size is measured by BISECTION rather than by
+    reading a gap. Nothing in part 005's seven segments references an address
+    between the palette buffer's end and Speed, so there is no displacement to
+    read; what settles it is that the data-reference shift for scene 3's whole
+    block goes to ZERO at 98 and to +30 at 128.
+
+    THE 30 BYTES ARE NOT ACCOUNTED FOR, and that is worth saying plainly: the
+    span from Pal's end at $A55A to Speed at $A5DA is 128 bytes, of which 98
+    are needed to put every later block at the right address. So either Pal is
+    30 bytes longer than 768, or something 30 bytes wide sits between this
+    block and Speed, or one of the two addresses is a folded base. dsmap cannot
+    pair Speed, so its position is not directly checkable. Do not treat the 98
+    as a declaration that has been read -- it is a total that balances. }
+  Spare      : array[1..98] of Byte;    { DS:$A55A }
   Speed      : Integer;           { DS:$a5da }
   Index      : Integer;           { DS:$a5dc }
   Key        : Char;              { DS:$a5e0 }

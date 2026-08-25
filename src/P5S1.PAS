@@ -93,6 +93,15 @@ var
   F      : file;
   { DS:$5dfe -- scene 1's own row table, not the VGA unit's }
   RowOfs : array[0..199] of Word;
+  { DS:$5F6E -- 112 BYTES DECLARED AND NEVER REFERENCED. RowOfs starts at $5DFE
+    and its 200 words end at $5F6E; EdgeBuf's own address is $5FDE, 112 bytes
+    further on. Nothing in any of part 005's seven segments touches an address
+    in between -- 100e references $5FDE and nothing below it -- so this is a
+    declaration the original makes and never uses. Transcribed for the same
+    reason the dead locals are: without it EdgeBuf and everything after it sit
+    112 bytes low. The TYPE is unmeasurable; a byte array is the least
+    assuming thing that occupies exactly 112. }
+  Spare  : array[1..112] of Byte;                 { DS:$5F6E }
   { DS:$5fde -- two words per scanline, written going down and read going up.
     501 WORDS, not 800: $5FDE plus 1002 is $63C8, which is exactly where scene
     2's data begins, so 1002 bytes is all the room there is. Declared
