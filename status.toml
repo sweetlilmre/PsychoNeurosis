@@ -456,6 +456,13 @@ finding = "part 003's variable layout needs four separate changes and every one 
 seen_in = "TPART3"
 state = "open"
 
+[[plan.investigation]]
+name = "part6-scene1-jerky"
+finding = "part 006 scene 1 is reported JERKY from a watched run beside ORIG6 on 25 Aug 2026, and the segment's code is already ~99 percent aligned, so there is no large transcription gap to blame."
+seen_in = "TPART6"
+state = "resolved"
+resolution = "NO CAUSE FOUND FOR THE JERKINESS, and this resolution says so rather than offering a theory. What was checked and cleared: the {$N+} trap streams are identical; the whooshtext segment has ONE span over 16 bytes and it is in LoadGlyph, which runs per glyph and not per frame; the per-frame inner loop is hand assembler already transcribed verbatim; and THIS SESSION'S OWN P6S1 CHANGE IS NOT THE CAUSE -- the `if Major <= Minor` fix emits JB at the branch exactly as the original does, verified byte for byte. Scene 1's remaining candidates are outside 1095: the rate MusicPoll is called at, and whether the scene draws straight to $A000 without a retrace wait in a way that differs. Neither is measured. WHAT THE LOOK DID YIELD is three frames in P6S1 each exactly TWO BYTES too big -- Sign $06 against $04, BuildPath $4c against $4a, Whoosh $114 against $112. One cause was likelier than three and the first guess was wrong: {$A-} changed nothing and is REFUTED for this unit. Two were separate redundant declarations. Sign had a local R and assigned `Sign := R` at the end; the original's $04 is the function result plus the FPU status word and leaves no room for a variable, so it assigns the function name directly in each branch. BuildPath declared Limit and then looped `to Limit`, which costs the variable AND the compiler's bound temporary; `for I := 0 to Round(Major)` gives the temporary alone. Both frames now match. Whoosh's two bytes are NOT found -- its declarations account for $112 exactly, so ours is generating a temporary the original does not, and the [BP-$104] filler it carries is separately justified by there being no reference to that slot. None of this moved the coverage walk, which forgives a two-byte displacement, so the gain here is fidelity and not a number."
+
 [plan.row."001 1012:0004"]
 label = "BuildLens quadrant walk"
 investigation = "pacing"
@@ -705,6 +712,16 @@ note = "PARKED at the observer's call on 24 Aug 2026, with part 005 at 88.1% and
 label = "Scene2 motion-table build"
 investigation = "part5-386-trio"
 note = "The investigation's premise was stale: the 386 trio (SinCos/RotatePoint/Project) HAS been transcribed since the 19 Aug part-005 re-read (P5S3, verified fragments). The cost was the motion-table build in Demo_Scene2 -- loop body 1096:051a..0591, entered by the JMP at 1096:0514 -- which is 80x87 code in the original: FILD the index, FDIV by a SINGLE 180.0 at CS:$03c9, FLD the ten-byte EXTENDED Pi at CS:$03cd, then the RTL's Sin (CS:$32ad), Cos (CS:$32b2) and Round. P5S2 compiled under the $N- default, sending those calls through the software six-byte-Real RTL instead. Fixed by {$N+} on P5S2, and the reason is fidelity rather than speed: $N- emits no 80x87 instructions and therefore no emulator traps at all, so the traps in the 1994 file are positive evidence of $N+. TWO FIGURES CORRECTED HERE, both measured against bin/NEUROSIS.005 on 24 Aug 2026. The loop body carries TWELVE traps, not fourteen -- fourteen is the count for the whole of Demo_Scene2 at 1096:03d7..06b7, so the number was right with the wrong extent attached to it. And the loop makes 4,002 trig calls, not 3,424: the counter at DS:$63ca is seeded at 1096:050f and tested against $7D0 at 1096:0592, so it turns 2001 times at two calls a turn. 3,424 is not reproducible from this loop and is dropped. There is no raw 80x87 opcode anywhere in the shipped binary and there is none in ours either; both ship $E+ traps and both are executed by the emulator, since the demo never had a coprocessor. Settled independently of anyone reading a trap by building the unit both ways: $N+ aligns part 005 at 80.4%, $N- at 79.2%, so $N- moves the rebuild 137 bytes further from the 1994 file."
+
+[plan.row."006 1095:0114"]
+label = "Sign has no local: the frame leaves no room for one"
+investigation = "part6-scene1-jerky"
+target = "R0"
+
+[plan.row."006 1095:01a0"]
+label = "BuildPath's loop bound is an expression, not a declared Limit"
+investigation = "part6-scene1-jerky"
+target = "R0"
 
 [plan.row."006 1095:02ac"]
 label = "BuildPath tests Major and Minor, not two fresh Abs calls"

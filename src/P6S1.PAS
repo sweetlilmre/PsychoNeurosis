@@ -89,13 +89,15 @@ var
   if/else chain. That is how the original is written and it is why the routine
   loads and compares the same value three times.
   -------------------------------------------------------------------------- }
+{ NO LOCAL. The frame is ENTER $04 -- two bytes for the function result and
+  two for the FPU status word the comparisons spill -- so there is no room
+  for a variable, and assigning the function name directly is what fits.
+  A local R plus `Sign := R` came out at $06. }
 function Sign(X : Real) : Integer;
-var R : Integer;
 begin
-  if X > 0.0 then R :=  1;        { 1095:0136 }
-  if X < 0.0 then R := -1;        { 1095:015b }
-  if X = 0.0 then R :=  0;        { 1095:0180 }
-  Sign := R;
+  if X > 0.0 then Sign :=  1;     { 1095:0136 }
+  if X < 0.0 then Sign := -1;     { 1095:015b }
+  if X = 0.0 then Sign :=  0;     { 1095:0180 }
 end;
 
 { --------------------------------------------------------------------------
@@ -125,7 +127,6 @@ var
   Points       : Integer;         { [BP-$3a] }
   Accum        : Real;            { [BP-$40] }
   Thresh       : Real;            { [BP-$46] }
-  Limit        : Integer;         { [BP-$48] }
 begin
   Points := 0;                                   { 1095:01a4 }
   Accum  := 0.0;                                 { 1095:01a9 }
@@ -157,9 +158,12 @@ begin
   end;
 
   Err   := Int(Major / Two);                     { 1095:0331 }
-  Limit := Round(Major);                         { 1095:0357 }
 
-  for I := 0 to Limit do
+  { 1095:0357 -- THE BOUND IS AN EXPRESSION, NOT A DECLARED LOCAL. The frame
+    is ENTER $4a and the declarations above reach $46; a Limit variable plus
+    the compiler's own bound temporary came to $4c. Round(Major) in the
+    bound gives the temporary and nothing else. }
+  for I := 0 to Round(Major) do
   begin
     Accum := Accum + Thresh;                     { 1095:038e }
     if Accum > One then                          { 1095:03ad }
