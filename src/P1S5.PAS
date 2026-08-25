@@ -518,10 +518,28 @@ end;
             assets/part001/vector_logo_a.bin   DS:$001C, 48 points
   -------------------------------------------------------------------------- }
 procedure VectorRun;
+type
+  TTriples = array[1..MaxPoints, 1..3] of Integer;
 var
-  W : Word;
+  { ENTER $A, and the slots are $02, $04, $06 and a four-byte pointer whose two
+    words are $0A and $08 -- three Integers and a Pointer, ten bytes exactly.
+    LoadObject is INLINED here, which is why its Src and I live in this frame. }
+  I      : Integer;                       { [BP-$02] }
+  Unread : Integer;                       { [BP-$04], nothing reads it }
+  W      : Word;                          { [BP-$06] }
+  Src    : ^TTriples;                     { [BP-$0A] }
 begin
-  LoadObject(@VecGlobe, GlobePoints);          { 12c5:0874 }
+  { INLINE, both times. 12c5:0874 sets PtCount from an immediate and then runs
+    the point loop in Vector_Run's own frame -- there is no call. }
+  Src := @VecGlobe;
+  PtCount := GlobePoints;
+  for I := 1 to PtCount do
+  begin
+    Pt[I, 1] := IntToFixed(Src^[I, 1]);
+    Pt[I, 2] := IntToFixed(Src^[I, 2]);
+    Pt[I, 3] := IntToFixed(Src^[I, 3]);
+  end;
+
 
   PosX := IntToFixed(0);                       { 12c5:0918 }
   PosY := IntToFixed(-70);                     { 12c5:091e }
@@ -534,7 +552,16 @@ begin
   OrbitAngle := -2042;                         { 12c5:096a }
   Animate;
 
-  LoadObject(@VecLogoA, LogoPoints);           { 12c5:0973 }
+  { INLINE, both times. 12c5:0874 sets PtCount from an immediate and then runs
+    the point loop in Vector_Run's own frame -- there is no call. }
+  Src := @VecLogoA;
+  PtCount := LogoPoints;
+  for I := 1 to PtCount do
+  begin
+    Pt[I, 1] := IntToFixed(Src^[I, 1]);
+    Pt[I, 2] := IntToFixed(Src^[I, 2]);
+    Pt[I, 3] := IntToFixed(Src^[I, 3]);
+  end;
   OrbitAngle := 17;                            { 12c5:0a15 }
   Animate;
 
