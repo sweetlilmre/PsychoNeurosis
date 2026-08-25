@@ -57,9 +57,7 @@ const
     difference left in all three renderer tails. }
   PageIndex : Word = 1;
 
-procedure FillCrtcTable(var T : TCrtcTable);                        { 140c:0000 }
 { @asm 002 140c:0045 }
-procedure SetMode(var T : TCrtcTable);                              { 140c:0045 }
 procedure SetMode400;                                        far;   { 140c:009c }
 { @asm 002 140c:00b1 }
 procedure Plot(X, Y : Integer; Colour : Byte);               far;   { 140c:00b1 }

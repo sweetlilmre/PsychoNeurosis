@@ -145,7 +145,14 @@ type
 
   TStar = record X, Y, Z : Integer end;         { DS:$9485, stride 6 }
   { DS:$5448, 1,550 bytes -- assets/part002/font_5x5.bin }
-  TFont = array[0..FontCount * 25 - 1] of Byte;
+  { THREE DIMENSIONS, AND THE LOW BOUNDS DO THE SUBTRACTING. 108b:0075 is
+    `IMUL DI, AX, $19` on Ord(S[I]) with no subtraction anywhere, R is
+    multiplied by five and C added raw, and the whole constant sits in the
+    displacement: $5122 is $5448 less 32*25 less 5 less 1. A flat array with
+    `- FontFirst`, `- 1` and `- 1` written out computes three subtractions at
+    run time that the declaration can absorb. }
+  TFont = array[FontFirst..FontFirst + FontCount - 1,
+                1..GlyphSide, 1..GlyphSide] of Byte;
   { the GetMem'd 12,800 bytes -- assets/part002/banner_320x40.png }
   TBanner = array[0..BannerH - 1, 0..ScrWidth - 1] of Byte;
   { DS:$8ED5, 1,462 bytes -- assets/part002/rewind_button.bin }
@@ -166,7 +173,12 @@ var
     PUSH DS / PUSH DI`, and no pointer is read at all. }
   Obj    : array[1..4] of TObj;
   Star   : array[1..StarCount] of TStar;
-  Font   : ^TFont;
+  { A STATIC ARRAY, NOT A POINTER. 108b:24A8 loads DI with $5448 and pushes
+    DS:DI straight into BlockRead -- no GetMem, no New, and the glyph blit
+    addresses the table at $5122, which is $5448 less 32*25 less 5 less 1, the
+    folded FontFirst and the two loop biases. A heap block would put a pointer
+    in DGROUP and dereference it. }
+  Font   : TFont;                               { DS:$5448 }
   Banner : ^TBanner;                            { the GetMem'd 12,800 bytes }
   Rewind : TRewind;
   { DS:$5148 -- 256 entries of THREE BYTES, not 768 flat bytes. 108b:1113
@@ -1507,8 +1519,7 @@ begin
       original trusts its two messages to be inside the glyph table. }
     for R := 1 to GlyphSide do
       for C := 1 to GlyphSide do
-        if Font^[(Ord(S[I]) - FontFirst) * 25
-                 + (R - 1) * GlyphSide + (C - 1)] <> 0 then
+        if Font[Ord(S[I]), R, C] <> 0 then       { 108b:0075 }
           Plot(R + X + Pen, C + Y, TextCol);
     Inc(Pen, 6);
   end;
@@ -1916,9 +1927,9 @@ begin
   Obj[1].FaceCount := NFaceEnterprise;
   for I := 1 to Obj[1].VertCount do
   begin
-    Obj[1].Vert[I].X := IntToFixed(VertEnterprise[I - 1, 0] div 2);
-    Obj[1].Vert[I].Y := IntToFixed(VertEnterprise[I - 1, 1] div 2);
-    Obj[1].Vert[I].Z := IntToFixed(VertEnterprise[I - 1, 2] div 2);
+    Obj[1].Vert[I].X := IntToFixed(VertEnterprise[(I - 1) * 3] div 2);
+    Obj[1].Vert[I].Y := IntToFixed(VertEnterprise[(I - 1) * 3 + 1] div 2);
+    Obj[1].Vert[I].Z := IntToFixed(VertEnterprise[(I - 1) * 3 + 1 + 1] div 2);
   end;
   P := 0;
   for I := 1 to Obj[1].FaceCount do
@@ -1954,9 +1965,9 @@ begin
   Obj[2].FaceCount := NFaceRevolver;
   for I := 1 to Obj[2].VertCount do
   begin
-    Obj[2].Vert[I].X := IntToFixed(VertRevolver[I - 1, 0] div 2);
-    Obj[2].Vert[I].Y := IntToFixed(VertRevolver[I - 1, 1] div 2);
-    Obj[2].Vert[I].Z := IntToFixed(VertRevolver[I - 1, 2] div 2);
+    Obj[2].Vert[I].X := IntToFixed(VertRevolver[(I - 1) * 3] div 2);
+    Obj[2].Vert[I].Y := IntToFixed(VertRevolver[(I - 1) * 3 + 1] div 2);
+    Obj[2].Vert[I].Z := IntToFixed(VertRevolver[(I - 1) * 3 + 1 + 1] div 2);
   end;
   P := 0;
   for I := 1 to Obj[2].FaceCount do
@@ -1992,9 +2003,9 @@ begin
   Obj[3].FaceCount := NFaceSailboat;
   for I := 1 to Obj[3].VertCount do
   begin
-    Obj[3].Vert[I].X := IntToFixed(VertSailboat[I - 1, 0] div 2);
-    Obj[3].Vert[I].Y := IntToFixed(VertSailboat[I - 1, 1] div 2);
-    Obj[3].Vert[I].Z := IntToFixed(VertSailboat[I - 1, 2] div 2);
+    Obj[3].Vert[I].X := IntToFixed(VertSailboat[(I - 1) * 3] div 2);
+    Obj[3].Vert[I].Y := IntToFixed(VertSailboat[(I - 1) * 3 + 1] div 2);
+    Obj[3].Vert[I].Z := IntToFixed(VertSailboat[(I - 1) * 3 + 1 + 1] div 2);
   end;
   P := 0;
   for I := 1 to Obj[3].FaceCount do
@@ -2030,9 +2041,9 @@ begin
   Obj[4].FaceCount := NFaceQuad;
   for I := 1 to Obj[4].VertCount do
   begin
-    Obj[4].Vert[I].X := IntToFixed(VertQuad[I - 1, 0] div 2);
-    Obj[4].Vert[I].Y := IntToFixed(VertQuad[I - 1, 1] div 2);
-    Obj[4].Vert[I].Z := IntToFixed(VertQuad[I - 1, 2] div 2);
+    Obj[4].Vert[I].X := IntToFixed(VertQuad[(I - 1) * 3] div 2);
+    Obj[4].Vert[I].Y := IntToFixed(VertQuad[(I - 1) * 3 + 1] div 2);
+    Obj[4].Vert[I].Z := IntToFixed(VertQuad[(I - 1) * 3 + 1 + 1] div 2);
   end;
   P := 0;
   for I := 1 to Obj[4].FaceCount do
@@ -2372,8 +2383,7 @@ begin
     very top of the routine. }
   GetMem(Banner, SizeOf(TBanner));
   BlockRead(DatFile, Banner^, SizeOf(TBanner));
-  New(Font);
-  BlockRead(DatFile, Font^, SizeOf(TFont));
+  BlockRead(DatFile, Font, SizeOf(TFont));       { 108b:24A8 }
 
   MusicStart;                          { 108b:24be }
   Frame := 0;                          { 108b:24c3 }
@@ -2420,7 +2430,6 @@ begin
   SetVolume(SaveVol);
 
   FreeMem(Banner, SizeOf(TBanner));
-  Dispose(Font);
 end;
 
 begin

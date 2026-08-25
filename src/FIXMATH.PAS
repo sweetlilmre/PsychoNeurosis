@@ -55,6 +55,10 @@ unit FixMath;
   skipping. A switch is set to match the emitted code, never to make the
   rebuild faster. *)
 {$S+}
+(* 286 CODE ON. 142a:00A3 is `LEAVE / RETF 4` and this unit had no G directive
+   at all, so it took the command line's default and emitted MOV SP,BP / POP BP
+   -- two bytes more, at the end of every routine in it. *)
+{$G+}
 (* 80x87 CODE ON. 142a:004b calls one runtime routine and then executes x87
    instructions -- 142a:0050 is INT $3C, which under E-plus is what an 80x87
    opcode ships as. This unit had NO N directive at all, so it took the

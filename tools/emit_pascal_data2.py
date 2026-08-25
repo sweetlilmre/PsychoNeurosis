@@ -136,14 +136,19 @@ def emit_p002():
         # so the only place a literal belongs is beside the table it counts.
         out.append(f"  NVert{name} = {nv};")
         out.append(f"  NFace{name} = {nf};")
-        # ZERO-BASED, and the loader indexes it [I - 1, 0..2]. Not a
-        # preference: TP7 folds an array's low bound into the addressing
-        # displacement for a BARE VARIABLE subscript, and the original does
-        # not fold -- it computes the -1 at runtime and leaves the array's
-        # own offset in the displacement. An expression subscript into a
-        # zero-based array reproduces both halves. Worth 42 bytes across
-        # the four loaders; measured, not preferred.
-        out.append(fmt(f"Vert{name}", f"array[0..{nv - 1}, 0..2] of Integer", verts, 9, group=3))
+        # FLAT, and the loader indexes it [(I - 1) * 3 + k]. A two-dimensional
+        # array was an improvement on a bare [I] and still not the shape: for
+        # A[I - 1, 2] the compiler multiplies the outer index by SIX in one go
+        # and folds the inner subscript into the displacement, while the
+        # original multiplies by THREE, adds the inner offset AT RUNTIME -- one
+        # INC per unit, so the third component is INC AX twice -- and only then
+        # doubles for the element size. That is the code for an explicit
+        # `(I - 1) * 3 + k` index into a one-dimensional array of Integer, and
+        # the displacement left over is the table's own DGROUP offset.
+        #
+        # The bytes are identical either way; only the addressing differs. This
+        # closed twelve spans in the four loaders, three per object.
+        out.append(fmt(f"Vert{name}", f"array[0..{nv * 3 - 1}] of Integer", verts, 9))
 
         faces, p = [], 0
         for _ in range(nf):
