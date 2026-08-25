@@ -209,6 +209,12 @@ end;
 procedure Whoosh(S : String);
 var
   Lane           : Integer;   { [BP-$102] }
+  { TWO BYTES AT [BP-$104] THAT NOTHING READS. Whoosh's frame references are
+    $100 (the String parameter's 256-byte local copy), $102, $106, $108, $10A,
+    $10C, $10E, $110 and $112 -- there is no $104. Lane is an Integer, so it
+    ends at BP-$101 and CharIdx should follow at $104, not $106. Without this
+    every local from CharIdx down was two bytes out. }
+  Unread         : Integer;   { [BP-$104], never referenced }
   CharIdx        : Integer;   { [BP-$106] }
   Pass           : Integer;   { [BP-$108] }
   PathSeg        : Word;   { [BP-$10A] }
@@ -284,6 +290,15 @@ begin
 
         { 1095:0741 -- shift this lane one place along, which is what makes
           the dots travel. 164 of the 200 bytes move; the tail does not. }
+        { NEITHER FORM IS RIGHT YET, and both measure the same. `(Lane - 1) *
+          LaneLen` makes the compiler compute Lane-1 with a DEC; writing it as
+          `Lane * LaneLen - LaneLen` replaces the DEC with a SUB and gains
+          nothing. The original has neither: 1095:0741 is `IMUL AX,[Lane],$C8`
+          followed by `ADD DI,$FF38`, so the -200 is folded into the ADDRESS.
+          That fold is what a BARE subscript on a 1-based two-dimensional array
+          gives -- Dots as array[1..Lanes, 1..LaneLen] indexed [Lane, 1] -- and
+          changing it means reshaping the two other places that index Dots
+          linearly. Left as it was until that is done in one piece. }
         Move(Dots^[(Lane - 1) * LaneLen],
              Dots^[(Lane - 1) * LaneLen + 1], $A4);
 
