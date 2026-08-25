@@ -93,15 +93,26 @@ var
   F      : file;
   { DS:$5dfe -- scene 1's own row table, not the VGA unit's }
   RowOfs : array[0..199] of Word;
-  { DS:$5F6E -- 112 BYTES DECLARED AND NEVER REFERENCED. RowOfs starts at $5DFE
-    and its 200 words end at $5F6E; EdgeBuf's own address is $5FDE, 112 bytes
-    further on. Nothing in any of part 005's seven segments touches an address
-    in between -- 100e references $5FDE and nothing below it -- so this is a
-    declaration the original makes and never uses. Transcribed for the same
-    reason the dead locals are: without it EdgeBuf and everything after it sit
-    112 bytes low. The TYPE is unmeasurable; a byte array is the least
-    assuming thing that occupies exactly 112. }
-  Spare  : array[1..112] of Byte;                 { DS:$5F6E }
+  { DS:$5F8E -- EIGHTY BYTES DECLARED AND NEVER REFERENCED, and the note this
+    replaces said 112 on an arithmetic slip that cost thirty-two bytes for days.
+    RowOfs starts at $5DFE and its 200 words end at $5DFE + 400 = **$5F8E**, not
+    the $5F6E that was written here; EdgeBuf's own address is $5FDE, so the gap
+    is EIGHTY bytes and not 112.
+
+    THE SLIP WAS INVISIBLE BECAUSE IT BALANCED SOMEWHERE ELSE. Thirty-two bytes
+    too many here pushed the whole of scene 2's block up by thirty-two -- I1 at
+    $63E8 against $63C8, and every one of its four tables with it -- and scene
+    2's own Spare was then tuned thirty short of its true size to bring scene 3
+    back into place. Both totals stayed exactly right: dgimage reported 11,648
+    bytes against 11,648 with no differing byte and minalloc matched to the
+    paragraph, because nothing was missing or surplus -- thirty-two bytes were
+    in the wrong PLACE. A total that balances is not a layout that matches.
+
+    Nothing in any of part 005's seven segments touches an address between
+    RowOfs's end and EdgeBuf, so this is still a declaration the original makes
+    and never uses; only its size was wrong. The TYPE remains unmeasurable and a
+    byte array is the least assuming thing that occupies exactly eighty. }
+  Spare  : array[1..80] of Byte;                  { DS:$5F8E }
   { DS:$5fde -- two words per scanline, written going down and read going up.
     501 WORDS, not 800: $5FDE plus 1002 is $63C8, which is exactly where scene
     2's data begins, so 1002 bytes is all the room there is. Declared

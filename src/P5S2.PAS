@@ -96,6 +96,12 @@ unit P5S2;
           inside a corrected account of the first two. See
           docs/23-deviations.md, `NOT a deviation: the x87 emulator traps`. }
 
+{$A-}   { DATA ALIGNMENT OFF, and the file record's ODD address is what says so.
+          Key is one byte at DS:$A5E0 and F begins at DS:$A5E1 -- with $A+ Turbo
+          Pascal would push a 128-byte record to the next word boundary and put
+          it at $A5E2, which is exactly where ours was. One byte, and it moved
+          every reference to F in the unit. P5S3 already carried the switch. }
+
 interface
 
 procedure Scene2;
@@ -146,23 +152,29 @@ var
   TabU       : TTab;              { DS:$8316 }
   TabV       : TTab;              { DS:$92b8 }
   Pal        : TPal768;           { DS:$a25a }
-  { DS:$A55A -- 98 BYTES, and the size is measured by BISECTION rather than by
-    reading a gap. Nothing in part 005's seven segments references an address
-    between the palette buffer's end and Speed, so there is no displacement to
-    read; what settles it is that the data-reference shift for scene 3's whole
-    block goes to ZERO at 98 and to +30 at 128.
+  { DS:$A55A -- 128 BYTES, WHICH IS A FILE RECORD, and it was 98 for as long as
+    it was compensating for someone else's error. The span from Pal's end at
+    $A55A to Speed at $A5DA is 128 bytes and always was; 98 was what balanced
+    scene 3 while scene 1's own dead block was thirty-two bytes too big and this
+    whole unit sat thirty-two bytes high. With scene 1 corrected the gap can be
+    read straight off the two addresses, and it reads 128.
 
-    THE 30 BYTES ARE NOT ACCOUNTED FOR, and that is worth saying plainly: the
-    span from Pal's end at $A55A to Speed at $A5DA is 128 bytes, of which 98
-    are needed to put every later block at the right address. So either Pal is
-    30 bytes longer than 768, or something 30 bytes wide sits between this
-    block and Speed, or one of the two addresses is a folded base. dsmap cannot
-    pair Speed, so its position is not directly checkable. Do not treat the 98
-    as a declaration that has been read -- it is a total that balances. }
-  Spare      : array[1..98] of Byte;    { DS:$A55A }
-  Speed      : Integer;           { DS:$a5da }
-  Index      : Integer;           { DS:$a5dc }
-  Key        : Char;              { DS:$a5e0 }
+    THE SIZE IS NOW A DECLARATION RATHER THAN A NUMBER THAT BALANCES, and 128
+    is the size of an untyped `file`. That is the seventh place in this target
+    where a file record is declared and never opened, so it is very likely what
+    this is; the TYPE is still not measurable, because nothing references it,
+    and a byte array is what can be claimed. }
+  Spare      : array[1..128] of Byte;   { DS:$A55A }
+  Speed      : Integer;           { DS:$A5DA }
+  Index      : Integer;           { DS:$A5DC }
+  { TWO MORE BYTES NOTHING REFERENCES, and they can be read straight off two
+    measured addresses now that the block starts in the right place: Index is a
+    word at $A5DC and Key is a byte at $A5E0, so $A5DE and $A5DF are declared
+    and untouched. Before the layout was corrected this pair was invisible --
+    the whole unit was thirty-two bytes high and every gap in it was being read
+    against the wrong baseline. }
+  Spare2     : Integer;           { DS:$A5DE, never read }
+  Key        : Char;              { DS:$A5E0 }
   F          : file;              { DS:$a5e1 }
 
 { --------------------------------------------------------------------------
@@ -294,8 +306,24 @@ begin
       X and Y are NOT reset per pass -- they are set once at 1096:0074 before
       the pass loop -- so a later pass carries on from where the last one ran
       out of dots. }
-    while True do
-    begin
+    { A `repeat` NESTED INSIDE THE `while`, and the two back-jumps say so.
+      1096:0195 and 1096:01b8 are both JMP $E3 -- two separate jumps to the same
+      address -- which is what an inner `repeat` sitting at the top of an outer
+      loop's body produces. And the inner `until`'s two tests JUMP FORWARD out
+      of the loop when they succeed (JE $198, JG $198) and fall through to the
+      back-jump when they do not; a single `if ... then Break` inside one loop
+      inverts that, tests JLE and jumps BACK, which is a byte shorter per site
+      and is what ours emitted.
+
+      AND THE OUTER LOOP IS A `repeat` TOO, not a `while True` with a `Break`.
+      1096:01ab has the same shape as the inner one -- JE $1BB / JL $1BB / JMP
+      $E3, two forward exits and a fall-through to the back-jump -- where a
+      Break emits the exit jump FIRST and the back-jump after it. Two `until`s
+      whose back-jumps land on the SAME address, which is what nesting a repeat
+      at the top of a repeat's body gives, and 1096:0195 and 01b8 are both
+      JMP $E3. }
+    repeat
+     repeat
       if GetPixel(X, Y, VirtScrSeg) <> 0 then    { 1096:00ed }
         if Count < MaxDots then                  { 1096:00f9 }
         begin
@@ -314,16 +342,13 @@ begin
         the row. Six bytes between them, and everything after out of step. See
         the wiki's `Inc is not an assignment`. }
       X := X + 1;                                { 1096:0180 }
-      if (Count = MaxDots) or (X > 319) then     { 1096:0187, 1096:018e }
+     until (Count = MaxDots) or (X > 319);       { 1096:0187, 1096:018e }
+      if X > 319 then                            { 1096:0198 }
       begin
-        if X > 319 then                          { 1096:0198 }
-        begin
-          X := 0;                                { 1096:019f }
-          Y := Y - 1;                            { 1096:01a4 }
-        end;
-        if (Count = MaxDots) or (Y < 1) then Break;   { 1096:01ab, 01b2 }
+        X := 0;                                  { 1096:019f }
+        Y := Y - 1;                              { 1096:01a4 }
       end;
-    end;
+    until (Count = MaxDots) or (Y < 1);          { 1096:01ab, 01b2 }
 
     { 1096:01bb -- the work screen is still black, so this blanks the virtual
       screen. From here on the dots have a black background to erase to. }

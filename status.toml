@@ -789,11 +789,18 @@ resolution = "RESOLVED: part 005 97.4 -> 98.1%. What is left is two investigatio
 name = "part5-dgroup-32"
 finding = "PART 005's REMAINING 99-BYTE SPAN IS A DGROUP ORDER DEFECT, AND IT IS 32 BYTES. Every one of P5S2's variables is exactly 32 higher than the original's -- I1 $63E8 against $63C8, TabSin $63F2 against $63D2, TabCos $7394 against $7374, TabU $8336 against $8316, TabV $92D8 against $92B8 -- while P5S1's are all at +0 and P5S1's EdgeBuf ends at exactly $63C8, which is where scene 2's block begins in the original. AND THE TOTALS ARE BOTH IDENTICAL, which is what makes it an ORDER defect and not a size one: dgimage reports 11,648 bytes against 11,648 with no differing byte, and the MZ header's minalloc is 3,082 paragraphs in both. So nothing is missing and nothing is surplus -- 32 bytes are in the wrong PLACE, sitting between P5S1's block and P5S2's, and P5S2's own Spare is 30 short of the gap it fills to compensate. That is the '30 bytes not accounted for' the Spare's note has carried for days: it is not 30 unexplained bytes, it is a 32-byte block on the wrong side of a unit boundary. WHERE THE 32 BELONG. The original puts P5S3's shared maths variables at $A662 -- 1102:0027 pushes MCos1 at $A662 and MSin1 at $A666, 1102:0018 MCos2 at $A66A and MSin2 at $A66E, and MScale is at $A67A -- which is immediately after P5S2's file record ends at $A661. Six LongInts plus MScale is 28 bytes and the block is 32. So they are the FIRST variables of scene 3's block, and in our link order something 32 bytes wide has landed in front of scene 2's instead. WHAT TO DO. Find what our build places at $63C8 -- the wiki's `DGROUP order reverses the uses clause` is the page for it -- and once it moves, P5S2's Spare becomes 128, WHICH IS A FILE RECORD'S SIZE. This target has found five routines and one unit declaring a file they never open; a sixth at exactly 128 bytes would stop being a number that balances and start being a declaration that was read. Worth the 99-byte span and probably the 13-byte one at 1096:0277 with it. AND A SECOND, SMALLER ONE IN THE SAME FAMILY: dsmap shows +2 at $A5DC and nowhere else, so two bytes sit between Speed and Index in ours that do not in the original."
 seen_in = "TPART5"
-state = "open"
+state = "resolved"
+resolution = "RESOLVED, AND IT WAS AN ARITHMETIC SLIP IN A COMMENT THAT COST THIRTY-TWO BYTES FOR DAYS. Part 005 98.1 -> 98.8%, and its DGROUP is now EXACT: dsmap pairs 181 references with 180 at +0, against 144 paired and 67 unpaired before. THE 32 BYTES WERE IN SCENE 1, NOT SCENE 2. P5S1's dead block was declared 112 bytes on a note that read `RowOfs starts at $5DFE and its 200 words end at $5F6E`. $5DFE plus 400 is $5F8E. EdgeBuf is at $5FDE, so the gap is EIGHTY and not 112. Thirty-two bytes too many there pushed the whole of scene 2's block up by thirty-two -- I1 at $63E8 against $63C8 and all four of its tables with it -- and scene 2's own Spare had then been tuned thirty SHORT of its true size to bring scene 3 back into place. AND THAT IS WHY BOTH TOTALS LOOKED PERFECT THROUGHOUT. dgimage read 11,648 against 11,648 with no differing byte and minalloc matched to the paragraph, because nothing was missing or surplus -- thirty-two bytes were in the wrong PLACE. A TOTAL THAT BALANCES IS NOT A LAYOUT THAT MATCHES, and the two instruments that measure totals cannot tell the difference. Only dsmap can, and its report had been saying so for days: a shift of +32 over a bounded range with +0 either side is the exact signature of a misplaced block. WITH SCENE 1 CORRECTED THE OTHER TWO NUMBERS COULD BE READ RATHER THAN TUNED. Scene 2's Spare is 128 -- the gap from Pal's end at $A55A to Speed at $A5DA, read straight off two measured addresses -- AND 128 IS A FILE RECORD, the seventh in this target. It had been 98, a number that balanced. And two more bytes fall out at $A5DE: Index is a word at $A5DC and Key a byte at $A5E0, so two bytes between them are declared and untouched. That pair was invisible while every gap in the unit was being read against the wrong baseline. P5S2 ALSO NEEDED {$A-}: Key is one byte at $A5E0 and F begins at $A5E1, and with $A+ Turbo Pascal pushes a 128-byte record to the next word boundary and puts it at $A5E2, which is where ours was. One byte, and it moved every reference to F in the unit. AND THE COLLECT LOOP IS TWO NESTED `repeat`s, not a `while True` with a `Break`. Both 1096:0195 and 01b8 are JMP $E3 -- two separate back-jumps to the same address -- and each `until`'s tests jump FORWARD out when they succeed and fall through to the back-jump when they do not. A Break inverts that and emits the exit jump first. MEASURED: 98.8%, initialised image identical, minalloc identical, traps identical opcode for opcode, three byte-exact artefacts holding, paslint clean."
 
 [[plan.investigation]]
 name = "part5-registers-held"
 finding = "AND ONE THING IN P5S3 THAT NO PASCAL SPELLING HAS PRODUCED. 1102:0079 computes CX + Col - Half into AX and then compares AX TWICE -- CMP AX,$13F / JG and CMP AX,0 / JL -- with no store anywhere; 1102:008c does the same into BX for the row; and 1102:00a0 then uses BOTH registers for the address, ADD BX,BX / MOV DI,[BX-$55F6] / ADD DI,AX. So two values are computed once each and held in registers across four comparisons and an address computation. OURS STORES THEM. Declaring SX and SY gives MOV [BP-$13],AX and then CMP [BP-$13],$13F -- Turbo Pascal has no peephole that keeps the accumulator, which our own build proves, and writing the expression out twice instead would evaluate it twice. Neither spelling is the original's. That is 41 bytes at 1102:0082 and it is the only thing in part 005 that is not understood; the frame around it is now exact. Worth a probe rather than another guess -- and worth checking whether it is the same phenomenon as the register-allocation difference part 006 records at 100f:0543, where the original builds an index in DI and ours goes through AX."
+seen_in = "TPART5"
+state = "open"
+
+[[plan.investigation]]
+name = "part5-codegen-two"
+finding = "PART 005's LAST 136 BYTES ARE TWO CODE-GENERATION PUZZLES AND NOTHING ELSE. The layout is exact and the frames are right; what is left is where Turbo Pascal put things. FIRST, AND IT IS BEHAVIOURAL RATHER THAN COSMETIC: the interpolation multiplies UNSIGNED in ours and SIGNED in the original. 1096:0331 is CWD / IMUL WORD PTR [BP-$1B] / IDIV; ours is MUL WORD PTR [BP-$1B] / CWD / IDIV. Same four bytes, different meaning -- and OURS IS ARGUABLY WRONG, because MUL leaves a 32-bit product in DX:AX and the CWD that follows OVERWRITES DX with the sign of AX, throwing the high half away before the divide reads it. Every variable involved is declared Integer, so a signed IMUL is what should be emitted and is not. Four sites, in the erase pass and the draw pass of the dot loop. This one is worth a probe: what makes TP7 choose MUL over IMUL when both operands are Integer? SECOND, at 1102:0079 and 1102:0224: the original computes a value into AX and compares AX TWICE with no store, does the same into BX, and then uses BOTH registers for an address. Ours stores each into a frame slot and reloads. Turbo Pascal has no peephole that keeps the accumulator -- our own build proves it -- and writing the expression out twice would evaluate it twice. Neither spelling is the original's. 68 bytes across the two. IT MAY BE THE SAME PHENOMENON AS PART 006's 100f:0543, where the original builds a palette index in DI and ours goes through AX, and as part 005's own MUL/IMUL choice: all three are the compiler deciding differently about registers and signedness on source that looks identical. Worth ONE probe covering all of them rather than three separate guesses."
 seen_in = "TPART5"
 state = "open"
 
@@ -1417,6 +1424,11 @@ label = "Limit at [BP-$25] is unreferenced -- likely the for temp"
 investigation = "apply-for-temp"
 target = "R0"
 
+[plan.row."005 1096:0331"]
+label = "MUL where the original has CWD/IMUL -- and ours drops the high half"
+investigation = "part5-codegen-two"
+target = "R0"
+
 [plan.row."005 1096:03d7"]
 label = "Scene 1-to-2 switch (PARKED)"
 investigation = "pacing"
@@ -1429,7 +1441,12 @@ note = "The investigation's premise was stale: the 386 trio (SinCos/RotatePoint/
 
 [plan.row."005 1102:0079"]
 label = "two values held in registers across four compares"
-investigation = "part5-registers-held"
+investigation = "part5-codegen-two"
+target = "R0"
+
+[plan.row."005 1102:0224"]
+label = "the same, in the frame loop"
+investigation = "part5-codegen-two"
 target = "R0"
 
 [plan.row."005 bss +384"]
