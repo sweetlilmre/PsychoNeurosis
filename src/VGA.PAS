@@ -523,22 +523,68 @@ end;
   owns, this one reads the hardware back, dims it and writes it out. Both are
   in the unit; each part keeps whichever it calls.
 
-  THE ORIGINAL'S LOOP RUNS 768 DOWN TO 3 IN THREES, touching [i], [i-1] and
-  [i-2] each pass -- so index 768, one PAST the buffer, is decremented and
-  index 0 never is. The loop here is written over 1..767, which is exactly
-  the components that reach the DAC, so the result is identical and nothing
-  lands on Turbo Pascal's frame. See docs/23-deviations.md.
+  THE LOOP IS HAND-WRITTEN ASSEMBLER, and reading the frame is what showed it.
+  The routine opens ENTER $304 for a 768-byte buffer, and the four bytes below
+  BP are not two scalars but one far POINTER: 11e3:0264 is `P := @Buf`, stored
+  as LEA AX / MOV DX,SS / MOV [BP-4],AX / MOV [BP-2],DX. The loop then does
+  LES DI,P once and walks ES:[BX+DI] with BX counting DOWN from 768, three
+  components unrolled per pass and no frame slot for an index at all -- which
+  is why there is none in the frame. A Pascal `for` loop cannot produce that
+  shape, and the method's rule is that hand assembler is transcribed rather
+  than re-expressed, so it is transcribed below.
+
+  BX STARTS AT 768, one PAST the last byte of a 0..767 buffer, and the loop
+  ends when BX reaches 0 -- so index 768 IS decremented, on Turbo Pascal's own
+  frame, and index 0 never is. That is the original's behaviour and it is now
+  reproduced rather than corrected; the deviation that used to be recorded here
+  no longer exists. The four bytes above the buffer are the pointer itself, so
+  what index 768 lands on is the low byte of P.
   -------------------------------------------------------------------------- }
 procedure FadeStep;
+{ EQUIVALENT PASCAL for the asm block -- reference only, not what is compiled:
+
+      for I := 768 downto 1 do
+        if Buf[I] <> 0 then Dec(Buf[I]);
+
+  which reads the same and does not run the same: it needs a frame slot for I
+  and it reloads the buffer's address every pass. }
 var
-  Buf : array[0..767] of Byte;
-  I   : Integer;
+  P   : Pointer;                  { [BP-$004], and it is only ever read by the
+                                    asm block below -- the buffer's address is
+                                    taken once instead of per component }
+  Buf : array[0..767] of Byte;    { [BP-$304] }
 begin
-  GetPalette768(@Buf);                     { 11e3:0264 }
-  for I := 767 downto 1 do                 { 11e3:0271 -- see the note above }
-    if Buf[I] <> 0 then Dec(Buf[I]);
-  WaitRetrace;                             { 11e3:02A6 }
-  SetPalette768(@Buf);                     { 11e3:02AC }
+  P := @Buf;                               { 11e3:0264 }
+  GetPalette768(@Buf);                     { 11e3:0270 }
+  asm
+        LES     DI, P           { 11e3:027A  ES:DI is the buffer, once        }
+        MOV     BX, 300h        { 11e3:027D  768 -- ONE PAST the last byte    }
+    @@Three:
+        MOV     AL, ES:[BX+DI]  { 11e3:0280  the first of three components    }
+        OR      AL, AL          { 11e3:0283                                   }
+        JE      @@Second        { 11e3:0285  already black: leave it alone    }
+        DEC     AL              { 11e3:0287  one step darker                  }
+        MOV     ES:[BX+DI], AL  { 11e3:0289                                   }
+    @@Second:
+        DEC     BX              { 11e3:028C                                   }
+        MOV     AL, ES:[BX+DI]  { 11e3:028D  the second                       }
+        OR      AL, AL          { 11e3:0290                                   }
+        JE      @@First         { 11e3:0292                                   }
+        DEC     AL              { 11e3:0294                                   }
+        MOV     ES:[BX+DI], AL  { 11e3:0296                                   }
+    @@First:
+        DEC     BX              { 11e3:0299                                   }
+        MOV     AL, ES:[BX+DI]  { 11e3:029A  and the third                    }
+        OR      AL, AL          { 11e3:029D                                   }
+        JE      @@Next          { 11e3:029F                                   }
+        DEC     AL              { 11e3:02A1                                   }
+        MOV     ES:[BX+DI], AL  { 11e3:02A3                                   }
+    @@Next:
+        DEC     BX              { 11e3:02A6  the third decrement IS the test  }
+        JNE     @@Three         { 11e3:02A7  BX reached 0: index 0 is skipped }
+  end;
+  WaitRetrace;                             { 11e3:02A9 }
+  SetPalette768(@Buf);                     { 11e3:02AD }
 end;
 
 { ORDER: this sits between PaletteDim and WaitRetrace because that is
