@@ -981,10 +981,19 @@ begin
     Dec(Frames);
   until Frames = 0;
 
-  MorphFrom := $0636;
-  MorphTo   := $5136;
-  MorphStep := 0;
-  Frames := SegFrames;
+  asm
+    { ASM, and MorphStep := 0 is why. The original writes it with the
+      IMMEDIATE form at 1139:0426, 048c, 04f2 and 0552 -- six bytes --
+      and Pascal emits XOR AX,AX / MOV for a zero, five. Six hypotheses
+      were eliminated in probe/ZEROSTOR.PAS before the frame on
+      InitScene showed what it really means: hand-written assembler.
+      The shape addresses are OFFSET rather than literals so that the
+      tables stay referenced -- see the note on BindShapes. }
+    MOV  WORD PTR MorphFrom, OFFSET ShapeSphere
+    MOV  WORD PTR MorphTo,   OFFSET ShapeCube
+    MOV  WORD PTR MorphStep, 0
+    MOV  WORD PTR Frames,    SegFrames
+  end;
   repeat
     ClearPage;
     DrawMorph;
@@ -1007,10 +1016,12 @@ begin
     Dec(Frames);
   until Frames = 0;
 
-  MorphFrom := $5136;
-  MorphTo   := $63F6;
-  MorphStep := 0;
-  Frames := SegFrames;
+  asm
+    MOV  WORD PTR MorphFrom, OFFSET ShapeCube
+    MOV  WORD PTR MorphTo,   OFFSET ShapeGrid
+    MOV  WORD PTR MorphStep, 0
+    MOV  WORD PTR Frames,    SegFrames
+  end;
   repeat
     ClearPage;
     DrawMorph;
@@ -1033,10 +1044,12 @@ begin
     Dec(Frames);
   until Frames = 0;
 
-  MorphFrom := $63F6;
-  MorphTo   := $5136;
-  MorphStep := 0;
-  Frames := SegFrames;
+  asm
+    MOV  WORD PTR MorphFrom, OFFSET ShapeGrid
+    MOV  WORD PTR MorphTo,   OFFSET ShapeCube
+    MOV  WORD PTR MorphStep, 0
+    MOV  WORD PTR Frames,    SegFrames
+  end;
   repeat
     ClearPage;
     DrawMorph;
@@ -1060,10 +1073,12 @@ begin
   until Frames = 0;
 
   { 8: morph back to the sphere while the palette fades out }
-  MorphFrom := $5136;
-  MorphTo   := $0636;
-  MorphStep := 0;
-  Frames := LastFrames;
+  asm
+    MOV  WORD PTR MorphFrom, OFFSET ShapeCube
+    MOV  WORD PTR MorphTo,   OFFSET ShapeSphere
+    MOV  WORD PTR MorphStep, 0
+    MOV  WORD PTR Frames,    LastFrames
+  end;
   repeat
     FadeStep;
     ClearPage;

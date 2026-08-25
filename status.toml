@@ -506,6 +506,13 @@ seen_in = "TPART3"
 state = "resolved"
 resolution = "THE CAPTION TABLE IS TWO-DIMENSIONAL. 92.0 to 92.4 percent, +61 bytes, and the index computation is now byte-identical -- the ten bytes still differing in that window are all RTL far-call targets and near-call displacements. 125e:0741 is `IMUL DI,[BP+4],$0A00` for the member, then a separate Row*256, then Col added last: Captions[N, Row][Col] on an array[1..4, 1..10] of String[255]. Ours was flat, array[1..40], indexed Captions[(N-1)*CaptionRows + Row][Col], which emits a DEC and an IMUL by 10 instead. BOTH REACH THE SAME ADDRESS, which is why this survived so long and why the coverage walk was the only thing that could see it: the flat form's displacement was $75B8 and the two-dimensional form's is $6BB8, and the $A00 difference is exactly the member stride the -1 removes. Same base, same 10,240 bytes, same byte read -- and never the same instructions. The initialised image was identical before this change and is identical after it. The declaration is generated, so the fix is in tools/emit_pascal_data2.py rather than in the include, and the note there says why."
 
+[[plan.investigation]]
+name = "part3-morph-asm-blocks"
+finding = "part 003's four Morph spans at 1139:03e1, 0432, 048c, 04f2 and 0552 all sit on `MorphStep := 0` written with the immediate form, which Pascal never emits for a zero -- 169 bytes turning on one three-byte difference repeated."
+seen_in = "TPART3"
+state = "resolved"
+resolution = "SCENE3'S FOUR MORPH-SETUP GROUPS ARE ASM BLOCKS. 92.4 to 93.2 percent, +115 bytes, three of the four spans closed outright and the remaining two now trace to a single upstream cause at 1139:03b4. The reading came from InitScene: a routine with NO FRAME can only be `assembler`, and that is also the only thing that explains an immediate zero store, because probe/ZEROSTOR.PAS had already eliminated the compiler version, Word against Integer, a named `= 0` constant, interleaving with non-zero stores, the LongInt high-word case, and array-element and record-field targets. Hand-written asm needs no explanation: the author wrote MOV WORD PTR MorphStep,0 and BASM assembled it. Each group is four stores -- MorphFrom, MorphTo, MorphStep, Frames -- and the shape addresses are OFFSET rather than literals, which is what keeps the tables referenced. The 24-byte sequence at 1139:041a is now present in both images byte for byte, and the initialised data stayed identical throughout. WHAT IS LEFT ON THIS PART: 245 bytes to 95 percent. The two biggest spans are in Stars -- 76 bytes at 10b8:07c4, which needs the two 386 routines at 07db and 07f4 in a TASM object because TP's assembler stops at the 286, and 61 at 10b8:069e."
+
 [plan.row."001 1012:0004"]
 label = "BuildLens quadrant walk"
 investigation = "pacing"
@@ -749,6 +756,11 @@ target = "R0"
 [plan.row."003 1139:03e1"]
 label = "three zero stores use the immediate form; and ours makes one extra near call"
 investigation = "part3-morph-zero-stores"
+target = "R0"
+
+[plan.row."003 1139:0426"]
+label = "Scene3's morph-setup groups are asm blocks, with OFFSET for the shapes"
+investigation = "part3-morph-asm-blocks"
 target = "R0"
 
 [plan.row."003 120f:0017"]
