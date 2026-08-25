@@ -185,7 +185,12 @@ def emit_p005():
 # agree with the source it feeds, so both live here as names rather than
 # being derived from however much text the image happens to hold.
 P6_CREDIT_LINES = 113
-P6_CREDIT_WIDTH = 12
+P6_CREDIT_WIDTH = 255      # 256 bytes per element, and the docstring below
+                           # always said so -- a Borland String[n] occupies
+                           # n+1 bytes, so the $100 stride this table is READ
+                           # with IS the declaration. Declared String[12] the
+                           # stride was 13 and the array was 1,469 bytes where
+                           # the original's is 28,928.
 
 
 def pascal_strings(raw, base, first, stride, limit=400):
@@ -211,7 +216,8 @@ def emit_p006_text():
     """
     raw, base = dg("006")
     lines = pascal_strings(raw, base, 0x0D8A, 0x0100, limit=P6_CREDIT_LINES)
-    blank = " " * P6_CREDIT_WIDTH
+    blank = ""             # the trailing slots are ZEROS in the image, which
+                           # is a String of length 0, not a run of spaces
     lines += [blank] * (P6_CREDIT_LINES - len(lines))
     body = header(f"""Part 006 scene 4 -- the credits text.
 
