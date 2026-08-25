@@ -83,9 +83,15 @@ type
     Pad    : array[8..15] of Byte;
   end;
 
+  { TWENTY-TWO BYTES, of which six are read. Play's own recorded offsets are
+    what say so: Fr at [BP-$212] and Ch at [BP-$228], and locals go downward in
+    declaration order, so Ch spans $228 to $213. Declared as six bytes it
+    compiled to [BP-$218] and every reference in the routine was sixteen out.
+    The pad is never touched, exactly as TFrameHdr's is not. }
   TChunkHdr = record
     Size : LongInt;                       { 0 }
     Kind : Word;                          { 4 }
+    Pad  : array[6..21] of Byte;
   end;
 
   TChunkProc = procedure(Hdr, Data : Pointer);
@@ -656,19 +662,21 @@ end;
   -------------------------------------------------------------------------- }
 function Play(Name : String) : Integer;
 var
+  { IN THE ORDER THE RECORDED OFFSETS GIVE -- first declared is nearest BP, so
+    sorting them ascending recovers the original's var block. Five of these
+    were in the wrong place, which put Ch at [BP-$218] where every comment
+    below says [BP-$228]. }
+  Stale  : file;                    { [BP-$182] -- never opened; see below }
   Hdr    : TFlicHdr;                { [BP-$202] }
-  Stale  : file;                    { [BP-$182] -- see below }
   Fr     : TFrameHdr;               { [BP-$212] }
   Ch     : TChunkHdr;               { [BP-$228] }
+  N      : Word;                    { [BP-$22A] }
+  FrameNo: Word;                    { [BP-$22C] }
   Buf    : Pointer;                 { [BP-$231] }
   Speed  : Word;                    { [BP-$233] }
-  Stop   : Boolean;                 { [BP-$235] -- cleared, never set }
   Key    : Char;                    { [BP-$234] }
-  FrameNo: Word;                    { [BP-$22c] }
+  Stop   : Boolean;                 { [BP-$235] -- cleared, never set }
   Chunks : Word;                    { [BP-$237] }
-  N      : Word;                    { [BP-$22a] }
-  CSize  : LongInt;
-  Amount : Word;
 begin
   Stop := False;                                  { 100f:046e }
   Play := 0;                                      { 100f:0475 }
@@ -721,15 +729,24 @@ begin
 
     for N := 1 to Chunks do                       { 100f:0589 }
     begin
-      BlockRead(F, Ch, SizeOf(Ch));               { 100f:05b0 }
-      CSize := Ch.Size;
+      BlockRead(F, Ch, 6);                        { 100f:05b0 -- a literal 6,
+                                                    not SizeOf: 100f:05aa
+                                                    pushes 6 and the record
+                                                    is twenty-two bytes }
 
       { 100f:05b5 -- a COPY chunk's stated size is two short of the truth in
-        the files this player was written against. }
-      if Ch.Kind = 16 then Inc(CSize, 2);
+        the files this player was written against. IN PLACE: 100f:05bc adds
+        the two to [BP-$228], which is Ch.Size itself. A separate CSize local
+        made the binary copy the field before touching it, and took four bytes
+        of frame that moved every local behind it -- Ch is documented at
+        [BP-$228] and was compiling to [BP-$218]. }
+      if Ch.Kind = 16 then Inc(Ch.Size, 2);
 
-      Amount := (CSize - 6) and $FFFF;            { 100f:05d9 }
-      BlockRead(F, Buf^, Amount);                 { 100f:05e4 }
+      { 100f:05d9 -- INLINE, and no masking. The original subtracts six from
+        the 32-bit size and pushes AX, so the truncation to a Word is the
+        push itself. An `Amount` local and an `and $FFFF` produced four more
+        instructions and a store, and took a slot the original does not have. }
+      BlockRead(F, Buf^, Ch.Size - 6);            { 100f:05e4 }
 
       case Ch.Kind of                             { 100f:05e9 }
         18 : ;                                    { 100f:05ed  PSTAMP: skip  }
