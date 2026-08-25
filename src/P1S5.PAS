@@ -64,6 +64,14 @@ const
     and the shared maths object resolves them by name. }
 
 type
+  { A model point, and it needs a NAME because 12c5:01b0 takes one BY VALUE:
+    12c5:01bb is LEA DI,[BP-0C] / LDS SI,[BP+1E] / MOV CX,0C / REP MOVSB, which
+    is how Turbo Pascal hands a structured value parameter to a callee -- the
+    caller pushes a pointer and the callee copies. Twelve bytes, 16.16 fixed. }
+  TPoint3 = record
+    X, Y, Z : LongInt;
+  end;
+
   TScreenPt = record
     X, Y, D : Integer;      { six bytes, matching the $A5F0 stride }
   end;
@@ -91,7 +99,7 @@ var
     middle 32 bits of a 32x32 product; the rotation now goes through the
     shared 386 maths object, which does that properly, so the coordinates are
     the original's again. }
-  Pt      : array[1..MaxPoints, 1..3] of LongInt;   { DS:$A106, 12 bytes each }
+  Pt      : array[1..MaxPoints] of TPoint3;        { DS:$A106, 12 bytes each }
   Scr     : TScrArr;   { DS:$A5F0 }
   { DS:$A5B6/$A5BA/$A5BE -- object + $4B0, the translation. }
   PosX, PosY, PosZ : LongInt;
@@ -164,9 +172,9 @@ begin
   PtCount := Count;
   for I := 1 to Count do
   begin
-    Pt[I, 1] := IntToFixed(Src^[I, 1]);
-    Pt[I, 2] := IntToFixed(Src^[I, 2]);
-    Pt[I, 3] := IntToFixed(Src^[I, 3]);
+    Pt[I].X := IntToFixed(Src^[I, 1]);
+    Pt[I].Y := IntToFixed(Src^[I, 2]);
+    Pt[I].Z := IntToFixed(Src^[I, 3]);
   end;
 end;
 
@@ -212,11 +220,74 @@ end;
   A mirror pair about row 133.5 -- the floor, exactly where Vector_Load's
   gradient turns around. Both carry D = Trunc(Z) for the depth sort.
   -------------------------------------------------------------------------- }
+{ --------------------------------------------------------------------------
+  12c5:01b0 -- TransformPoint, and it is A ROUTINE OF ITS OWN.
+
+  This body was INLINED here, in ObjTransformAll's loop. A note further down
+  this file already said 12c5:02e3 "fans out to 12c5:01b0" and the code did
+  not do it; ten spans traced to this address.
+
+  THE PARAMETER LIST IS RECOVERED FROM THE CALL SITE, not guessed. RET $1E, so
+  30 bytes of parameters, and 12c5:0366..0393 pushes exactly that:
+
+    ES:DI = Obj^ + I*12 - 12    4   [BP+1E]   the point, BY VALUE
+    [bp+8] [bp+6] [bp+4] CWD   12   [BP+1A] [BP+16] [BP+12]
+    three cached LongInts      12   [BP+0E] [BP+0A] [BP+06]
+    [bp-2]                      2   [BP+04]   the loop index
+
+  Pascal convention pushes left to right, so the first parameter declared is
+  the one pushed first and it sits at the HIGHEST offset. Hence this order.
+
+  A1, A2, A3 ARE PASSED AND NEVER READ -- the routine touches [BP+04], +06,
+  +08, +0A, +0C, +0E, +10 and +1E and nothing in between. The three angles
+  were already consumed by the SinCos calls before the loop, so they are dead
+  here. They are transcribed anyway: they are three of the thirty bytes, and
+  dropping them moves every parameter after them.
+
+  The caller widens each angle with CWD, so the parameters are LongInt while
+  the arguments are Integer.
+  -------------------------------------------------------------------------- }
+procedure TransformPoint(P          : TPoint3;
+                         A1, A2, A3 : LongInt;
+                         TX, TY, TZ : LongInt;
+                         I          : Integer);
+var
+  Sx, Sy : Integer;
+begin
+  { P IS the twelve-byte copy at [BP-0C], so there are no coordinate locals to
+    load it into -- the copy the compiler makes for a value parameter is what
+    the rest of the routine works on, and 12c5:01c9 pushes @P.X, @P.Y, @P.Z
+    straight out of the frame. }
+  RotatePoint(P.X, P.Y, P.Z);                     { 12c5:01d7 }
+
+  Inc(P.X, TX);                                   { 12c5:01da }
+  Inc(P.Y, TY);
+  Inc(P.Z, TZ);
+
+  Project(P.X, P.Y, P.Z);                         { 12c5:021f }
+
+  { 12c5:0222 -- both come back zero-extended, so the low word carries the
+    sign and CWD is what puts it back. }
+  Sx := Integer(P.X);
+  Sy := Integer(P.Y);
+
+  { ONE routine writes BOTH records. 133 - Y for the object and Y + 134 for
+    the reflection, the same X and the same D. This was two separate stores
+    in a single loop here, which is the same arithmetic but not the same
+    routine boundary. }
+  Scr[I].X := Sx;                     { the object }
+  Scr[I].Y := Horizon - Sy;
+  Scr[I].D := FixedToIntTrunc(P.Z);   { 12c5:0268 -> 1483:0071 }
+
+  Scr[I + PtCount].X := Sx;           { and its reflection }
+  Scr[I + PtCount].Y := Sy + Horizon + 1;
+  Scr[I + PtCount].D := FixedToIntTrunc(P.Z);
+end;
+
 procedure ObjTransformAll(A1, A2, A3 : Integer);
 var
-  I       : Integer;
-  X, Y, Z : LongInt;
-  Sx, Sy  : Integer;
+  I          : Integer;
+  TX, TY, TZ : LongInt;
 begin
   { 12c5:02f4 -- SinCos(angle, var C, var S). The FIRST var parameter takes
     the COSINE. }
@@ -224,33 +295,15 @@ begin
   SinCos(A2, MCos2, MSin2);
   SinCos(A3, MCos3, MSin3);
 
+  { 12c5:0317..0344 -- the translation is read ONCE, before the loop, into
+    three locals, and those are what get passed per point. Reading PosX, PosY
+    and PosZ inside the loop is the same answer and not the same code. }
+  TX := PosX;
+  TY := PosY;
+  TZ := PosZ;
+
   for I := 1 to PtCount do
-  begin
-    { 12c5:01bb -- the twelve-byte point is copied into locals first, so the
-      model is left untouched and can be transformed again next frame. }
-    X := Pt[I, 1];  Y := Pt[I, 2];  Z := Pt[I, 3];
-
-    RotatePoint(X, Y, Z);                         { 12c5:01d7 }
-
-    Inc(X, PosX);                                 { 12c5:01da }
-    Inc(Y, PosY);
-    Inc(Z, PosZ);
-
-    Project(X, Y, Z);                             { 12c5:021f }
-
-    { 12c5:0222 -- both come back zero-extended, so the low word carries the
-      sign and CWD is what puts it back. }
-    Sx := Integer(X);
-    Sy := Integer(Y);
-
-    Scr[I].X := Sx;                     { the object }
-    Scr[I].Y := Horizon - Sy;
-    Scr[I].D := FixedToIntTrunc(Z);     { 12c5:0268 -> 1483:0071 }
-
-    Scr[I + PtCount].X := Sx;           { and its reflection }
-    Scr[I + PtCount].Y := Sy + Horizon + 1;
-    Scr[I + PtCount].D := FixedToIntTrunc(Z);
-  end;
+    TransformPoint(Pt[I], A1, A2, A3, TX, TY, TZ, I);   { 12c5:0393 }
 end;
 
 { --------------------------------------------------------------------------
@@ -568,9 +621,9 @@ begin
   PtCount := GlobePoints;
   for I := 1 to PtCount do
   begin
-    Pt[I, 1] := IntToFixed(Src^[I, 1]);
-    Pt[I, 2] := IntToFixed(Src^[I, 2]);
-    Pt[I, 3] := IntToFixed(Src^[I, 3]);
+    Pt[I].X := IntToFixed(Src^[I, 1]);
+    Pt[I].Y := IntToFixed(Src^[I, 2]);
+    Pt[I].Z := IntToFixed(Src^[I, 3]);
   end;
 
 
@@ -595,9 +648,9 @@ begin
   PtCount := LogoPoints;
   for I := 1 to PtCount do
   begin
-    Pt[I, 1] := IntToFixed(Src^[I, 1]);
-    Pt[I, 2] := IntToFixed(Src^[I, 2]);
-    Pt[I, 3] := IntToFixed(Src^[I, 3]);
+    Pt[I].X := IntToFixed(Src^[I, 1]);
+    Pt[I].Y := IntToFixed(Src^[I, 2]);
+    Pt[I].Z := IntToFixed(Src^[I, 3]);
   end;
   OrbitAngle := 17;                            { 12c5:0a15 }
   Animate;

@@ -548,6 +548,19 @@ seen_in = "TPART1"
 state = "resolved"
 resolution = "DONE, AND IT IS THE LARGEST SINGLE GAIN ON THIS PART: 76.9 to 79.8 percent, +619 bytes. All 400 bytes of DepthSort now align and only SIX differ -- every one of them the RTL's Move target, which is an address. The restructuring was one step, as specified: SortAll(Arr : PScrArr) at 12c5:0190 containing DepthSort nested, reading Arr^ rather than the unit-level Scr, and RenderObject at 12c5:061d calling SortAll(@Scr) before its drawing loops instead of calling DepthSort twice itself. The array needed a named type and a pointer to it, declared AFTER TScreenPt because an array of a record cannot be named before the record is. TWO SMALLER THINGS FELL OUT OF THE COMPARISON, and both are patterns this session has now seen repeatedly. The frame is ENTER $0E where the four declared locals reach only $0C: two bytes at [BP-0E] that nothing in the routine touches, declared anyway because omitting them left the prologue byte wrong -- and that was the ONLY wrong byte in the first 64 once the nesting was right. And the loop steps are ASSIGNMENTS, not Inc and Dec: 12c5:0051 is MOV AX,[BP-2] / INC AX / MOV [BP-2],AX, seven bytes, where Inc(I) is a three-byte INC WORD PTR. Four sites -- the two while bodies and the two after the swap. Ghidra reads them as `local = local + 1`, which is what sent me to look. WHAT MOVED TO THE FRONT: ten spans now trace to 12c5:01b4, which is the next thing to read on this part, and seven still trace to 1082:0137 in P1S2, which reads as hand assembler."
 
+[[plan.investigation]]
+name = "part1-transformpoint"
+finding = "part 001: ten spans now trace to 12c5:01b0, the per-point transform. Our ObjTransformAll inlines its whole body into a loop, and a note in the source already says 12c5:02e3 FANS OUT to 12c5:01b0. IDENTIFIED, NOT IMPLEMENTED -- one gap remains and it is named below. SPECIFIED BAR ONE PARAMETER, and stopping here rather than guessing it: an extraction with the parameter ORDER wrong measures worse and costs the next session too, which is what the SortAll work showed when it went right. WHAT IS CERTAIN. RET $1E, so the parameter block is exactly 30 bytes, and the offsets the code reads are [BP+04], [BP+06], [BP+0A], [BP+0E] and [BP+1E]. Those plus a 12-byte block at [BP+12] account for 30 exactly: 2 + 4 + 4 + 4 + 12 + 4. Pascal convention pushes left to right, so the LAST declared parameter sits at [BP+04] -- that is the point index, an Integer. Then three LongInts at [BP+06], [BP+0A] and [BP+0E], which Ghidra shows being ADDED to the rotated coordinates: the translation arrives as PARAMETERS here, where ours reads the unit-level PosX, PosY and PosZ directly. THE BODY, from Ghidra. It copies TWELVE BYTES with REP MOVSB from the far pointer at [BP+1E] into three LongInt locals -- which is how TP hands a structured value parameter to a callee -- then calls RotatePoint on them, adds the three translation parameters, calls Project, and then WRITES BOTH THE POINT AND ITS REFLECTION: Scr[I].Y is 133 - Y and Scr[I + PtCount].Y is Y + 134, with the same X and the same FixMath result for D. One routine, two records. Ours writes only one and leaves the reflection to a second loop. THE GAP: the 12 bytes at [BP+12] are never read by the routine. They are needed to make the block reach 30, so they are declared parameters, but nothing says what they are -- three unread LongInts would fit, and so would a structured value the compiler pushed directly rather than by pointer. Settle that with a codegen probe on how TP passes a 12-byte record by value before writing the signature; the probe harness is probe/ZEROSTOR.PAS and it already answers questions of this shape. AND ONE CORRECTION TO THE SOURCE'S OWN COMMENT: Scr's base is $A5F6, not the $A5F0 recorded beside its declaration. The stores are `param_1 * 6 - 0x5A10`, and $A5F0 is the DISPLACEMENT of a one-based array whose first element is at $A5F6 -- which is also the pointer 12c5:0621 pushes to SortAll, so the two readings agree."
+seen_in = "TPART1"
+state = "resolved"
+resolution = "IMPLEMENTED AND MEASURED. part 001 79.8% -> 81.0%, and EVERY SPAN IN 12c5:0000..02FF IS GONE -- the walk now lists nothing at all in that range, where ten spans stood. Data image unchanged (still 112 bytes short, first at $0018, which is a separate matter) and the x87 trap streams stay identical opcode for opcode, so nothing was traded away for it. paslint and encaudit clean. THE GAP CLOSED WITHOUT A PROBE, because the CALL SITE answered it: 12c5:0366..0393 pushes eight things and they account for all thirty bytes -- a far pointer to Obj^ + I*12 - 12, then [bp+8], [bp+6], [bp+4] each widened with CWD, then three cached LongInts, then the loop counter. So the 12 bytes at [BP+12] are THE THREE ANGLES, passed to the per-point routine and never read by it: the SinCos calls before the loop had already consumed them. They are transcribed as dead LongInt parameters because they are three of the thirty bytes and dropping them moves every parameter after them. A probe was written into this investigation as the next step and was not needed -- reading the caller is cheaper than compiling a question, and it is the more direct measurement. The point is a value parameter: the caller pushes a pointer and the callee copies twelve bytes with REP MOVSB into [BP-0C], so P IS that copy and the routine has no coordinate locals -- which is why Pt became array[1..MaxPoints] of TPoint3, same twelve-byte stride, so the change is layout-neutral and the data image confirms it."
+
+[[plan.investigation]]
+name = "part1-object-record"
+finding = "part 001: ObjTransformAll takes THE OBJECT AS A FAR POINTER PARAMETER and ours reads unit-level variables. 12c5:02e3 opens ENTER $12 and RET $A, so ten bytes of parameters: [BP+0A] is a far pointer -- LES DI,[BP+0A] at 12c5:0317 and again at 0361 -- and [BP+08], [BP+06], [BP+04] are the three angles. First declared is highest, so the signature is ObjTransformAll(Obj : PObj; A1, A2, A3 : Integer). AND THE OBJECT IS A RECORD: the point array sits at Obj^+0 (12c5:0366 is IMUL AX,[BP-2],0C / ADD DI,AX / ADD DI,$FFF4, so Obj^ + I*12 - 12) and the translation at Obj^+$4B0 (12c5:031a). $4B0 is 1200, which is EXACTLY 100 POINTS OF TWELVE BYTES, so MaxPoints is 100 and not the 64 declared here. That figure also explains an address this file already records without explaining: PosX is commented as DS:$A5B6 and Pt as DS:$A106, and $A5B6 - $A106 is $4B0 -- the two notes were always the same measurement. NOT ATTEMPTED YET, and deliberately: MaxPoints also sizes TScrArr as array[1..MaxPoints * 2], so raising it to 100 moves Scr from 768 bytes to 1200 and shifts DGROUP. That is a layout bundle and part 003's four-var episode is the warning -- each change measured worse alone and only the bundle was byte-identical. Land the record, the pointer parameter and MaxPoints together, then read the data image, which is 112 bytes short and may well be short BECAUSE of this."
+seen_in = "TPART1"
+state = "open"
+
 [plan.row."001 1012:0004"]
 label = "BuildLens quadrant walk"
 investigation = "pacing"
@@ -596,6 +609,26 @@ target = "R0"
 [plan.row."001 12c5:0190"]
 label = "SortAll(Arr : Pointer) is sort-only; DepthSort nests inside it"
 investigation = "part1-sortall-restructure"
+target = "R0"
+
+[plan.row."001 12c5:01b0"]
+label = "the per-point transform is its own routine, and it writes BOTH records"
+investigation = "part1-transformpoint"
+target = "R0"
+
+[plan.row."001 12c5:0212"]
+label = "the translation arrives as three LongInt parameters, not unit-level vars"
+investigation = "part1-transformpoint"
+target = "R0"
+
+[plan.row."001 12c5:0317"]
+label = "the object is a far pointer parameter, not unit-level vars"
+investigation = "part1-object-record"
+target = "R0"
+
+[plan.row."001 12c5:0361"]
+label = "the point array is at Obj^+0 and MaxPoints is 100, not 64"
+investigation = "part1-object-record"
 target = "R0"
 
 [plan.row."001 12c5:061d"]
