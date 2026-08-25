@@ -20,7 +20,23 @@ procedure RunPart5;
 
 implementation
 
-uses Crt, VGA, DemoVT, P5S1, P5S2, P5S3;
+{ THE THREE SCENE UNITS ARE NAMED BACKWARDS AND THAT IS THE MEASUREMENT.
+  Do not tidy this into scene order. The clause fixes BOTH layouts and they
+  run opposite ways: code segments follow it, DGROUP runs back down it.
+  Measured 25 Aug 2026 by building it both ways --
+
+    scene order (P5S1, P5S2, P5S3)   code P5S3,P5S2,P5S1 -- REVERSED;
+                                     initialised data 5182 of 11648 differ
+    as written below                  code P5S1 at 0x88, and the four
+                                     trailing units EXACT; data differs by
+                                     the 2 harness bytes and nothing else
+
+  THE COVERAGE WALK CANNOT TELL THESE APART -- 10980 of 11440 aligned, the
+  same number to the byte, for a build whose three scene units were in
+  reverse order. spans.py locates a segment by CONTENT, so a unit at the
+  wrong segment number still matches. Only dgimage.py and the segment sizes
+  see it. }
+uses Crt, VGA, DemoVT, P5S3, P5S2, P5S1;
 
 var
   SavedVol : Byte;                { DS:$2d7c }

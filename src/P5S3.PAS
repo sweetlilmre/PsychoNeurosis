@@ -84,10 +84,16 @@ var
   F      : file;                          { DS:$a984 }
 
 const
-  { DS:$2d18 and DS:$2d16, initialised data. Project halves both, so these are
-    the FULL view size and not the centre. }
-  MViewW : Word = 320;
+  { DS:$2d16 and DS:$2d18, initialised data. Project halves both, so these are
+    the FULL view size and not the centre.
+
+    DECLARED H FIRST, and the addresses are the whole reason: the original
+    puts MViewH at $2d16 and MViewW at $2d18, so W-then-H transposes them.
+    They cannot move to P5S1 either -- DEMOMATH.OBJ's EXTRN resolves by
+    Pascal scope in the unit that links it, and declaring them there gives
+    `Undefined external (MViewW)`. }
   MViewH : Word = 200;
+  MViewW : Word = 320;
 
 {$L DEMOMATH.OBJ}
 { 19 bytes and then a NOP, which pads FixDiv up to 1102:03a5. The pad is
