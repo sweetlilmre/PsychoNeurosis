@@ -227,7 +227,13 @@ var
   DotSeg         : Word;   { [BP-$10E] }
   DotOfs         : Word;   { [BP-$110] }
   Len            : Integer;   { [BP-$112] }
-  Idx              : Word;        { SI in the original }
+  { AND NOTHING BELOW $112. The running index is SI and it is ONLY ever SI:
+    1095:06F8 is `XOR SI,SI` where a declared variable would be a store to the
+    frame, and the register is then carried across the `Move` at 1095:0768 --
+    across a far call into the runtime -- without being spilled. Declaring it
+    and moving it in and out of the asm block cost two bytes of frame and four
+    instructions a pass. It is set below in an asm block of its own for that
+    reason. }
 begin
   PathSeg := Seg(Path^);   PathOfs := Ofs(Path^);    { 1095:0698 }
   DotSeg  := Seg(Dots^);   DotOfs  := Ofs(Dots^);    { 1095:06ac }
@@ -238,7 +244,7 @@ begin
     LoadGlyph(Ord(S[CharIdx]));                  { 1095:06e9 }
     for Pass := 1 to Lanes do
     begin
-      Idx := 0;                                { 1095:06f8 }
+      asm XOR SI, SI end;                      { 1095:06f8 -- Idx := 0 }
       for Lane := 1 to Lanes do
       begin
         { --------------------------------------------------------------
@@ -256,7 +262,6 @@ begin
           the index into both AND as the source offset for the MOVSB.
           -------------------------------------------------------------- }
         asm
-          MOV  SI, Idx           { SI is a REGISTER in the original and is   }
           PUSH DS                { 1095:0706  DS is about to be two tables   }
           MOV  AX, 0A000h        { 1095:0707                                 }
           MOV  ES, AX            { 1095:070a  ES is the screen               }
@@ -290,8 +295,7 @@ begin
           CMP  BX, 0C9h          { 1095:073a  201                            }
           JNZ  @@Dot             { 1095:073e                                 }
           POP  DS                { 1095:0740                                 }
-          MOV  Idx, SI           {   carried across the Move below           }
-        end;
+        end;                     { SI is LEFT LIVE across the Move below     }
 
         { 1095:0741 -- shift this lane one place along, which is what makes
           the dots travel. 164 of the 200 bytes move; the tail does not. }
@@ -311,11 +315,16 @@ begin
           the next lane starts from is Move's own side effect. Source is one
           BELOW destination here, so Turbo Pascal's Move takes its backward
           path -- SI := Source + Count, decremented Count times -- and comes
-          out at Source - 1. Written down explicitly because a register cannot
-          be relied on to survive a Pascal call in the reconstruction, and
-          because it is the reason lane L+1 walks lane L's stretch of the
-          tables rather than its own. }
-        Idx := Ofs(Dots^[Lane, 1]) - 1;
+          out at Source - 1. It is the reason lane L+1 walks lane L's stretch
+          of the tables rather than its own.
+
+          IT USED TO BE WRITTEN DOWN, as `Idx := Ofs(Dots^[Lane, 1]) - 1`, on
+          the grounds that a register cannot be relied on to survive a Pascal
+          call. The original relies on exactly that and the statement was the
+          deviation: 1095:0741 to 1095:0768 sets the Move up in AX, DI and ES
+          and never touches SI, so the register arrives at the next pass
+          holding what Move left in it -- which is the value that statement
+          computed. Removing it costs two bytes of frame and the reload. }
       end;
     end;
   end;
@@ -375,7 +384,14 @@ end;
   1095:0578 -- the sixteen paths, and two fans of lines behind them.
   -------------------------------------------------------------------------- }
 procedure DrawFrame;
-var I : Integer;
+var
+  I      : Integer;               { [BP-$02], 18 references }
+  Unread : Integer;               { [BP-$04], never touched -- 1095:0578 opens
+                                    ENTER $04 and [BP-$02] is the only slot the
+                                    routine names, so the second word is either
+                                    a declaration nothing reads or a temporary
+                                    the compiler did not need. Declaring it is
+                                    what closes the frame either way. }
 begin
   for I := 1 to Lanes do                         { 1095:057c }
     BuildPath(320 - I * 2, 0, 0, 199 - I * 6, I);
