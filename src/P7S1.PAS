@@ -830,12 +830,24 @@ begin
 end;
 
 { 100f:06f7 -- UpCase over a whole string. }
-function UpCaseStr(S : String) : String;
+function UpCaseStr(S : String) : String; far;
+{ FAR: 100f:0763 is RETF 4, and 100f:0712 reads the String parameter from
+  [BP+6] where a near routine's first parameter is at [BP+4] -- the two extra
+  bytes are the pushed CS. That is the third routine in this unit declared near
+  that is far; ReadTimer and WaitTicks were the others. }
 var
-  I, L : Integer;
+  { ONE local, not two, and the second slot the routine reads is the FOR
+    LOOP's OWN TEMPORARY. ENTER $104 is 260: the String parameter's 256-byte
+    copy at [BP-$100], I at [BP-$102], and two bytes at [BP-$104] that hold
+    the limit. A probe settles which: `for I := 1 to L` over a local L costs a
+    two-byte temporary ON TOP of L, so declaring both L and the loop gives 262.
+
+    So the length is written into the loop, not into a variable -- 100f:0712
+    stores it to [BP-$104] and 100f:071f and 100f:0749 compare against that
+    same slot, which is the temporary and not a declared L. }
+  I : Integer;                                    { [BP-$102] }
 begin
-  L := Length(S);                                 { 100f:0712 }
-  for I := 1 to L do                              { 100f:071c }
+  for I := 1 to Length(S) do                      { 100f:0712, limit temp }
     S[I] := UpCase(S[I]);                         { 100f:0738 }
   UpCaseStr := S;                                 { 100f:075d }
 end;

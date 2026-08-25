@@ -735,6 +735,13 @@ resolution = "PART 005 97.3% (+2 bytes) and its remaining frame difference is no
 name = "two-byte-temp"
 finding = "THREE ROUTINES IN TWO PARTS ARE EXACTLY TWO BYTES OF FRAME TOO BIG, and in all three our declarations total the original's figure exactly -- so the two bytes are a COMPILER TEMPORARY our body creates and the original's does not. This is one investigation, not three, and it is worth a probe rather than more reading. P5S2's Shatter at 1096:0042: ENTER $26 against our $28. Its seventeen locals sum to 37, which rounds to 38 = $26 exactly, so nothing is missing or mistyped. P6S1's Whoosh at 1095:067d: ENTER $112 against our $114. Nine declared words plus the String parameter's 256-byte copy are 274 = $112 exactly. P7S1's UpCaseStr at 100f:06f7: ENTER $104 against our $106. A 256-byte String copy plus I and L are 260 = $104 exactly, and the loop is NOT the cause -- 100f:071f compares against L directly, so `for I := 1 to L` over a simple local needs no limit temporary. WHAT IS ALREADY RULED OUT: the for-loop limit (measured in UpCaseStr), the declaration order (checked in all three), and a shared construct -- Shatter has `(X1-X0) * T div Denom` expressions and Whoosh has `Length(S)`, with nothing obviously in common. HOW TO SETTLE IT: put the candidate constructs in probe/ and read the frames. TP7's temporaries that are two bytes wide are few, and one build per candidate prices it -- the same loop that settled the LongInt function result in part 007 after three wrong guesses. Do that before touching any of the three bodies; guessing has cost a build each time."
 seen_in = "TPART5"
+state = "resolved"
+resolution = "THE PROBE SETTLED IT: A `for` LOOP COSTS TWO BYTES OF FRAME FOR ITS LIMIT, and it costs them whether the limit is a global OR a local. probe/TWOBYTE.PAS measures it directly -- a routine with `Pad`, I and L, looping `for I := 1 to L`, comes out at 36 where its declarations total 34. So a two-byte slot beyond what the declarations account for is very often a `for` and not a missing variable. ALSO MEASURED, and all FREE: `(a-b)*c div d + e`, a `case` on a variable, an expression used as an array subscript, a Byte in a word expression, and nested function calls. A `with` over an array element costs FOUR, which is the record's address. WHAT IT FIXED. P7S1's UpCaseStr declared BOTH an L and the loop over it, so its frame was 256 + 2 + 2 + 2. The original's three slots are the String copy at [BP-$100], I at [BP-$102] and the loop's own temporary at [BP-$104] -- there is NO L. Written as `for I := 1 to Length(S)` the frame came out $104 and the routine matched to ONE byte. AND THAT LAST BYTE WAS ANOTHER FAR. `LDS SI,[BP+6]` against our `[BP+4]`, and 100f:0763 is RETF 4. UpCaseStr is the THIRD routine in this unit declared near that is far, after ReadTimer and WaitTicks. With the directive it matches except the two RTL call targets. THE PROBE DESIGN IS WORTH REUSING AND THE FIRST ATTEMPT WAS WRONG. I scanned the compiled unit for `ENTER` byte patterns and mapped them to routines BY ORDER, which mis-paired -- data bytes read as C8 xx yy 00, and anchoring on a preceding return did not fix it. The rewrite gives each routine a DISTINCT pad size, so the frame identifies the routine and a temporary shows as +2 on a known base. Self-identifying output beats a scan whose ordering you have to trust. Part 007 reads 99.0% against 99.3% before this batch, and still meets the target. The eleven bytes went on UpCaseStr's callers, which now use the same-segment far-call form; the routine itself went from two differences to none beyond the allowed classes."
+
+[[plan.investigation]]
+name = "apply-for-temp"
+finding = "APPLY THE for-LOOP TEMPORARY FINDING to the two routines it has not been tried on. A `for` costs two bytes of frame for its limit, measured in probe/TWOBYTE.PAS, so a routine whose frame exceeds its declarations by exactly two usually has a `for` -- and one whose frame MATCHES its declarations while ours is two over has declared a limit variable the original left to the temporary. P6S1's Whoosh at 1095:067d, ENTER $112 against our $114: our nine declared words plus the 256-byte String copy come to 274, which IS $112, so on the new reading one of those nine is the loop's temporary rather than a declaration. Len at [BP-$112] is the candidate -- it is the deepest slot and it is what a limit temporary would be -- but the original DOES reference [BP-$112], so check whether that reference is the loop's own compare before removing the declaration. P5S2's Shatter at 1096:0042, ENTER $26 against our $28: seventeen locals sum to 38 = $26 exactly, so again one of them is a temporary. Limit at [BP-$25] is the candidate and the original does NOT reference it, which is the stronger case of the two. Do Shatter first: an unreferenced deepest slot that we declare and the original spends on a loop temporary is exactly the shape the probe describes."
+seen_in = "TPART5"
 state = "open"
 
 [plan.row."001 1012:0004"]
@@ -1258,8 +1265,8 @@ investigation = "part5-dgroup-order"
 target = "R0"
 
 [plan.row."005 1096:0042"]
-label = "Shatter: seventeen locals sum to $26 exactly; 2 bytes are a temp"
-investigation = "two-byte-temp"
+label = "Limit at [BP-$25] is unreferenced -- likely the for temp"
+investigation = "apply-for-temp"
 target = "R0"
 
 [plan.row."005 1096:03d7"]
@@ -1318,8 +1325,8 @@ investigation = "surplus-fpu-sites"
 target = "R0"
 
 [plan.row."006 1095:067d"]
-label = "Whoosh: same, 274 exactly"
-investigation = "two-byte-temp"
+label = "Len at [BP-$112] IS referenced -- check it is the loop compare"
+investigation = "apply-for-temp"
 target = "R0"
 
 [plan.row."006 1118:0000"]
