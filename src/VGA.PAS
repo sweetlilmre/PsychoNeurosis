@@ -315,6 +315,185 @@ end;
 { --------------------------------------------------------------------------
   12f8:0064 -- write one DAC entry. Index to $3C8, then R,G,B to $3C9.
   -------------------------------------------------------------------------- }
+{ AND IT SITS HERE, BEFORE SetRGB, because the original's segment says so:
+  11ee:00b8 is this routine and 11ee:01f7 is SetRGB, and part 004's copy has
+  the same order at 11e3:009c and 11e3:01db. Declared last in the unit, as it
+  was, every VGA routine after FillRect sits at the wrong offset and every far
+  call to one of them from another unit differs. The order of a unit's
+  implementations is a measurement, not a matter of taste. }
+{ --------------------------------------------------------------------------
+  DrawLine -- Bresenham. Part 001's copy of this unit is LARGER than part
+  003's precisely because it carries this routine (1491:0048); parts that
+  never draw a line do not link it.
+
+  Argument order is the original's: segment, colour, then the two endpoints
+  as (Y, X) pairs rather than (X, Y).
+  -------------------------------------------------------------------------- }
+procedure DrawLine(X1, Y1, X2, Y2 : Integer; Colour : Byte; Segment : Word);
+  assembler;
+var
+  { Four words, and the first two are used for two different things -- see the
+    note above the asm. Declared in this order so they land at [BP-2], [BP-4],
+    [BP-6] and [BP-8], which is where 11ee:00b8 puts them. }
+  DXAbs, DYAbs : Integer;         { [BP-2], [BP-4]: |dx| and |dy|, then flags }
+  Inc1, Inc2   : Integer;         { [BP-6], [BP-8]: the two error increments  }
+asm
+    MOV  AX, Segment       { 11ee:00bc                                       }
+    MOV  ES, AX            { 11ee:00bf  loaded ONCE, and never reloaded       }
+    MOV  BX, Y1            { 11ee:00c1                                       }
+    ADD  BX, BX            { 11ee:00c4  a Word index into the row table       }
+    MOV  DI, WORD PTR YOfs[BX]      { 11ee:00c6  Y1 * 320                              }
+    ADD  DI, X1            { 11ee:00ca  the first pixel's offset              }
+
+    MOV  AX, X1            { 11ee:00cd                                       }
+    SUB  AX, X2            {                                                  }
+    JG   @@DXOK            { 11ee:00d3  <= 0, so negate -- Abs, and negating  }
+    NEG  AX                { 11ee:00d5    zero is harmless, which is why the  }
+@@DXOK:                    {              test is JG and not JGE             }
+    MOV  DXAbs, AX         { 11ee:00d7                                       }
+    MOV  AX, Y1            { 11ee:00da                                       }
+    SUB  AX, Y2            {                                                  }
+    JG   @@DYOK            { 11ee:00e0                                       }
+    NEG  AX                { 11ee:00e2                                       }
+@@DYOK:
+    MOV  DYAbs, AX         { 11ee:00e4                                       }
+    CMP  AX, DXAbs         { 11ee:00e7  which axis is the major one?          }
+    JLE  @@Shallow         { 11ee:00ea  |dy| <= |dx|: step along X            }
+    JMP  @@Steep           { 11ee:00ec                                       }
+
+{ ---- shallow: X is the major axis, one step per column ---- }
+@@Shallow:
+    MOV  CX, DXAbs         { 11ee:00ef  the loop count                        }
+    SHL  AX, 1             { 11ee:00f2  AX is still |dy|                      }
+    MOV  Inc1, AX          { 11ee:00f4  2 * |dy|                              }
+    SUB  AX, DXAbs         { 11ee:00f7                                       }
+    MOV  BX, AX            { 11ee:00fa  BX is the error term, in a register   }
+    MOV  AX, DYAbs         { 11ee:00fc                                       }
+    SUB  AX, DXAbs         { 11ee:00ff                                       }
+    SHL  AX, 1             { 11ee:0102                                       }
+    MOV  Inc2, AX          { 11ee:0104  2 * (|dy| - |dx|)                     }
+
+    MOV  DXAbs, 0          { 11ee:0107  REUSED: 0 means X counts down         }
+    MOV  AX, X1            { 11ee:010c                                       }
+    SUB  AX, X2            {                                                  }
+    JG   @@SXSet           { 11ee:0112                                       }
+    MOV  DXAbs, 1          { 11ee:0114    X1 <= X2, so X counts up            }
+@@SXSet:
+    MOV  DYAbs, 0          { 11ee:0119  REUSED the same way for Y             }
+    MOV  AX, Y1            { 11ee:011e                                       }
+    SUB  AX, Y2            {                                                  }
+    JG   @@SYSet           { 11ee:0124                                       }
+    MOV  DYAbs, 1          { 11ee:0126                                       }
+@@SYSet:
+    MOV  AL, Colour        { 11ee:012b  AL holds the colour for both loops    }
+    MOV  ES:[DI], AL       { 11ee:012e  the first pixel                       }
+    CMP  CX, 0             { 11ee:0131                                       }
+    JZ   @@SDone           { 11ee:0134  a zero-length line is one pixel, and
+                             the target is the JMP below, NOT @@Out: the
+                             original's is `JE $016E`, two bytes, where a jump
+                             all the way to the routine's end needs the long
+                             form and three more. Those three bytes put every
+                             VGA routine after this one at the wrong offset. }
+
+@@SLoop:
+    CMP  DXAbs, 0          { 11ee:0136                                       }
+    JZ   @@SLeft           { 11ee:013a                                       }
+    INC  DI                { 11ee:013c                                       }
+    JNC  @@SErr            { 11ee:013d  the carry fix-up below is vestigial:  }
+    INC  DX                { 11ee:013f    DX is never initialised and never   }
+    JMP  @@SErr            { 11ee:0140    reaches ES                         }
+@@SLeft:
+    DEC  DI                { 11ee:0142                                       }
+    JNC  @@SErr            { 11ee:0143                                       }
+    DEC  DX                { 11ee:0145                                       }
+@@SErr:
+    CMP  BX, 0             { 11ee:0146                                       }
+    JGE  @@SStep           { 11ee:0149                                       }
+    ADD  BX, Inc1          { 11ee:014b  no minor-axis step this time          }
+    JMP  @@SPlot           { 11ee:014e                                       }
+@@SStep:
+    ADD  BX, Inc2          { 11ee:0150                                       }
+    CMP  DYAbs, 0          { 11ee:0153                                       }
+    JZ   @@SUp             { 11ee:0157                                       }
+    ADD  DI, 320           { 11ee:0159                                       }
+    JNC  @@SPlot           { 11ee:015d                                       }
+    INC  DX                { 11ee:015f                                       }
+    JMP  @@SPlot           { 11ee:0160                                       }
+@@SUp:
+    SUB  DI, 320           { 11ee:0162                                       }
+    JNC  @@SPlot           { 11ee:0166                                       }
+    DEC  DX                { 11ee:0168                                       }
+@@SPlot:
+    MOV  ES:[DI], AL       { 11ee:0169                                       }
+    LOOP @@SLoop           { 11ee:016c                                       }
+@@SDone:
+    JMP  @@Out             { 11ee:016e                                       }
+
+{ ---- steep: Y is the major axis, one step per row. The mirror of the above,
+       with the two axes exchanged everywhere. ---- }
+@@Steep:
+    MOV  CX, DYAbs         { 11ee:0171                                       }
+    MOV  AX, DXAbs         { 11ee:0174                                       }
+    SHL  AX, 1             { 11ee:0177                                       }
+    MOV  Inc1, AX          { 11ee:0179  2 * |dx|                              }
+    SUB  AX, DYAbs         { 11ee:017c                                       }
+    MOV  BX, AX            { 11ee:017f                                       }
+    MOV  AX, DXAbs         { 11ee:0181                                       }
+    SUB  AX, DYAbs         { 11ee:0184                                       }
+    SHL  AX, 1             { 11ee:0187                                       }
+    MOV  Inc2, AX          { 11ee:0189                                       }
+
+    MOV  DXAbs, 0          { 11ee:018c                                       }
+    MOV  AX, X1            { 11ee:0191                                       }
+    SUB  AX, X2            {                                                  }
+    JG   @@TXSet           { 11ee:0197                                       }
+    MOV  DXAbs, 1          { 11ee:0199                                       }
+@@TXSet:
+    MOV  DYAbs, 0          { 11ee:019e                                       }
+    MOV  AX, Y1            { 11ee:01a3                                       }
+    SUB  AX, Y2            {                                                  }
+    JG   @@TYSet           { 11ee:01a9                                       }
+    MOV  DYAbs, 1          { 11ee:01ab                                       }
+@@TYSet:
+    MOV  AL, Colour        { 11ee:01b0                                       }
+    MOV  ES:[DI], AL       { 11ee:01b3                                       }
+    CMP  CX, 0             { 11ee:01b6                                       }
+    JZ   @@Out             { 11ee:01b9                                       }
+
+@@TLoop:
+    CMP  DYAbs, 0          { 11ee:01bb                                       }
+    JZ   @@TUp             { 11ee:01bf                                       }
+    ADD  DI, 320           { 11ee:01c1                                       }
+    JNC  @@TErr            { 11ee:01c5                                       }
+    INC  DX                { 11ee:01c7                                       }
+    JMP  @@TErr            { 11ee:01c8                                       }
+@@TUp:
+    SUB  DI, 320           { 11ee:01ca                                       }
+    JNC  @@TErr            { 11ee:01ce                                       }
+    DEC  DX                { 11ee:01d0                                       }
+@@TErr:
+    CMP  BX, 0             { 11ee:01d1                                       }
+    JGE  @@TStep           { 11ee:01d4                                       }
+    ADD  BX, Inc1          { 11ee:01d6                                       }
+    JMP  @@TPlot           { 11ee:01d9                                       }
+@@TStep:
+    ADD  BX, Inc2          { 11ee:01db                                       }
+    CMP  DXAbs, 0          { 11ee:01de                                       }
+    JZ   @@TLeft           { 11ee:01e2                                       }
+    INC  DI                { 11ee:01e4                                       }
+    JNC  @@TPlot           { 11ee:01e5                                       }
+    INC  DX                { 11ee:01e7                                       }
+    JMP  @@TPlot           { 11ee:01e8                                       }
+@@TLeft:
+    DEC  DI                { 11ee:01ea                                       }
+    JNC  @@TPlot           { 11ee:01eb                                       }
+    DEC  DX                { 11ee:01ed                                       }
+@@TPlot:
+    MOV  ES:[DI], AL       { 11ee:01ee                                       }
+    LOOP @@TLoop           { 11ee:01f1                                       }
+@@Out:
+end;
+
 { --------------------------------------------------------------------------
   12f8:0064 -- one DAC entry.
 
@@ -809,172 +988,6 @@ end;
 
   Called once in the whole demo, from Demo_Scene2 at 1082:05BB with Pause=10.
   -------------------------------------------------------------------------- }
-{ --------------------------------------------------------------------------
-  DrawLine -- Bresenham. Part 001's copy of this unit is LARGER than part
-  003's precisely because it carries this routine (1491:0048); parts that
-  never draw a line do not link it.
-
-  Argument order is the original's: segment, colour, then the two endpoints
-  as (Y, X) pairs rather than (X, Y).
-  -------------------------------------------------------------------------- }
-procedure DrawLine(X1, Y1, X2, Y2 : Integer; Colour : Byte; Segment : Word);
-  assembler;
-var
-  { Four words, and the first two are used for two different things -- see the
-    note above the asm. Declared in this order so they land at [BP-2], [BP-4],
-    [BP-6] and [BP-8], which is where 11ee:00b8 puts them. }
-  DXAbs, DYAbs : Integer;         { [BP-2], [BP-4]: |dx| and |dy|, then flags }
-  Inc1, Inc2   : Integer;         { [BP-6], [BP-8]: the two error increments  }
-asm
-    MOV  AX, Segment       { 11ee:00bc                                       }
-    MOV  ES, AX            { 11ee:00bf  loaded ONCE, and never reloaded       }
-    MOV  BX, Y1            { 11ee:00c1                                       }
-    ADD  BX, BX            { 11ee:00c4  a Word index into the row table       }
-    MOV  DI, WORD PTR YOfs[BX]      { 11ee:00c6  Y1 * 320                              }
-    ADD  DI, X1            { 11ee:00ca  the first pixel's offset              }
-
-    MOV  AX, X1            { 11ee:00cd                                       }
-    SUB  AX, X2            {                                                  }
-    JG   @@DXOK            { 11ee:00d3  <= 0, so negate -- Abs, and negating  }
-    NEG  AX                { 11ee:00d5    zero is harmless, which is why the  }
-@@DXOK:                    {              test is JG and not JGE             }
-    MOV  DXAbs, AX         { 11ee:00d7                                       }
-    MOV  AX, Y1            { 11ee:00da                                       }
-    SUB  AX, Y2            {                                                  }
-    JG   @@DYOK            { 11ee:00e0                                       }
-    NEG  AX                { 11ee:00e2                                       }
-@@DYOK:
-    MOV  DYAbs, AX         { 11ee:00e4                                       }
-    CMP  AX, DXAbs         { 11ee:00e7  which axis is the major one?          }
-    JLE  @@Shallow         { 11ee:00ea  |dy| <= |dx|: step along X            }
-    JMP  @@Steep           { 11ee:00ec                                       }
-
-{ ---- shallow: X is the major axis, one step per column ---- }
-@@Shallow:
-    MOV  CX, DXAbs         { 11ee:00ef  the loop count                        }
-    SHL  AX, 1             { 11ee:00f2  AX is still |dy|                      }
-    MOV  Inc1, AX          { 11ee:00f4  2 * |dy|                              }
-    SUB  AX, DXAbs         { 11ee:00f7                                       }
-    MOV  BX, AX            { 11ee:00fa  BX is the error term, in a register   }
-    MOV  AX, DYAbs         { 11ee:00fc                                       }
-    SUB  AX, DXAbs         { 11ee:00ff                                       }
-    SHL  AX, 1             { 11ee:0102                                       }
-    MOV  Inc2, AX          { 11ee:0104  2 * (|dy| - |dx|)                     }
-
-    MOV  DXAbs, 0          { 11ee:0107  REUSED: 0 means X counts down         }
-    MOV  AX, X1            { 11ee:010c                                       }
-    SUB  AX, X2            {                                                  }
-    JG   @@SXSet           { 11ee:0112                                       }
-    MOV  DXAbs, 1          { 11ee:0114    X1 <= X2, so X counts up            }
-@@SXSet:
-    MOV  DYAbs, 0          { 11ee:0119  REUSED the same way for Y             }
-    MOV  AX, Y1            { 11ee:011e                                       }
-    SUB  AX, Y2            {                                                  }
-    JG   @@SYSet           { 11ee:0124                                       }
-    MOV  DYAbs, 1          { 11ee:0126                                       }
-@@SYSet:
-    MOV  AL, Colour        { 11ee:012b  AL holds the colour for both loops    }
-    MOV  ES:[DI], AL       { 11ee:012e  the first pixel                       }
-    CMP  CX, 0             { 11ee:0131                                       }
-    JZ   @@Out             { 11ee:0134  a zero-length line is one pixel       }
-
-@@SLoop:
-    CMP  DXAbs, 0          { 11ee:0136                                       }
-    JZ   @@SLeft           { 11ee:013a                                       }
-    INC  DI                { 11ee:013c                                       }
-    JNC  @@SErr            { 11ee:013d  the carry fix-up below is vestigial:  }
-    INC  DX                { 11ee:013f    DX is never initialised and never   }
-    JMP  @@SErr            { 11ee:0140    reaches ES                         }
-@@SLeft:
-    DEC  DI                { 11ee:0142                                       }
-    JNC  @@SErr            { 11ee:0143                                       }
-    DEC  DX                { 11ee:0145                                       }
-@@SErr:
-    CMP  BX, 0             { 11ee:0146                                       }
-    JGE  @@SStep           { 11ee:0149                                       }
-    ADD  BX, Inc1          { 11ee:014b  no minor-axis step this time          }
-    JMP  @@SPlot           { 11ee:014e                                       }
-@@SStep:
-    ADD  BX, Inc2          { 11ee:0150                                       }
-    CMP  DYAbs, 0          { 11ee:0153                                       }
-    JZ   @@SUp             { 11ee:0157                                       }
-    ADD  DI, 320           { 11ee:0159                                       }
-    JNC  @@SPlot           { 11ee:015d                                       }
-    INC  DX                { 11ee:015f                                       }
-    JMP  @@SPlot           { 11ee:0160                                       }
-@@SUp:
-    SUB  DI, 320           { 11ee:0162                                       }
-    JNC  @@SPlot           { 11ee:0166                                       }
-    DEC  DX                { 11ee:0168                                       }
-@@SPlot:
-    MOV  ES:[DI], AL       { 11ee:0169                                       }
-    LOOP @@SLoop           { 11ee:016c                                       }
-    JMP  @@Out             { 11ee:016e                                       }
-
-{ ---- steep: Y is the major axis, one step per row. The mirror of the above,
-       with the two axes exchanged everywhere. ---- }
-@@Steep:
-    MOV  CX, DYAbs         { 11ee:0171                                       }
-    MOV  AX, DXAbs         { 11ee:0174                                       }
-    SHL  AX, 1             { 11ee:0177                                       }
-    MOV  Inc1, AX          { 11ee:0179  2 * |dx|                              }
-    SUB  AX, DYAbs         { 11ee:017c                                       }
-    MOV  BX, AX            { 11ee:017f                                       }
-    MOV  AX, DXAbs         { 11ee:0181                                       }
-    SUB  AX, DYAbs         { 11ee:0184                                       }
-    SHL  AX, 1             { 11ee:0187                                       }
-    MOV  Inc2, AX          { 11ee:0189                                       }
-
-    MOV  DXAbs, 0          { 11ee:018c                                       }
-    MOV  AX, X1            { 11ee:0191                                       }
-    SUB  AX, X2            {                                                  }
-    JG   @@TXSet           { 11ee:0197                                       }
-    MOV  DXAbs, 1          { 11ee:0199                                       }
-@@TXSet:
-    MOV  DYAbs, 0          { 11ee:019e                                       }
-    MOV  AX, Y1            { 11ee:01a3                                       }
-    SUB  AX, Y2            {                                                  }
-    JG   @@TYSet           { 11ee:01a9                                       }
-    MOV  DYAbs, 1          { 11ee:01ab                                       }
-@@TYSet:
-    MOV  AL, Colour        { 11ee:01b0                                       }
-    MOV  ES:[DI], AL       { 11ee:01b3                                       }
-    CMP  CX, 0             { 11ee:01b6                                       }
-    JZ   @@Out             { 11ee:01b9                                       }
-
-@@TLoop:
-    CMP  DYAbs, 0          { 11ee:01bb                                       }
-    JZ   @@TUp             { 11ee:01bf                                       }
-    ADD  DI, 320           { 11ee:01c1                                       }
-    JNC  @@TErr            { 11ee:01c5                                       }
-    INC  DX                { 11ee:01c7                                       }
-    JMP  @@TErr            { 11ee:01c8                                       }
-@@TUp:
-    SUB  DI, 320           { 11ee:01ca                                       }
-    JNC  @@TErr            { 11ee:01ce                                       }
-    DEC  DX                { 11ee:01d0                                       }
-@@TErr:
-    CMP  BX, 0             { 11ee:01d1                                       }
-    JGE  @@TStep           { 11ee:01d4                                       }
-    ADD  BX, Inc1          { 11ee:01d6                                       }
-    JMP  @@TPlot           { 11ee:01d9                                       }
-@@TStep:
-    ADD  BX, Inc2          { 11ee:01db                                       }
-    CMP  DXAbs, 0          { 11ee:01de                                       }
-    JZ   @@TLeft           { 11ee:01e2                                       }
-    INC  DI                { 11ee:01e4                                       }
-    JNC  @@TPlot           { 11ee:01e5                                       }
-    INC  DX                { 11ee:01e7                                       }
-    JMP  @@TPlot           { 11ee:01e8                                       }
-@@TLeft:
-    DEC  DI                { 11ee:01ea                                       }
-    JNC  @@TPlot           { 11ee:01eb                                       }
-    DEC  DX                { 11ee:01ed                                       }
-@@TPlot:
-    MOV  ES:[DI], AL       { 11ee:01ee                                       }
-    LOOP @@TLoop           { 11ee:01f1                                       }
-@@Out:
-end;
 
 begin
   { 1436:017f -- the unit's initialization, and it does ONE thing. }
