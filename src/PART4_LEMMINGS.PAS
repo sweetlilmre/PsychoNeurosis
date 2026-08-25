@@ -592,9 +592,13 @@ end;
   -------------------------------------------------------------------------- }
 procedure ScrollStep;
 var
-  I, Pass : Integer;      { NOT one variable for both loops -- the inner one
-                            would destroy the outer's count and never end }
-  Last    : Byte;
+  { ONE BYTE, AND IT DOES BOTH JOBS. 1005:08ad opens ENTER $02 and the only slot
+    it touches is [BP-$01]: 1005:0950 stores the palette entry it is about to
+    overwrite, and 1005:0974 sets the same byte to zero and 1005:097A increments
+    it -- the `for` counter. There is no Pass either, because the rotation is
+    written out TWICE rather than looped; a Pass counter and a separate index
+    put the frame at $06. }
+  Last : Byte;                    { [BP-$01], then the colour index }
 begin
   Inc(ScrollCol, 2);                             { 1005:08b1 }
   if ScrollCol > GlyphCols then
@@ -603,10 +607,13 @@ begin
     Inc(ScrollIdx);
   end;
 
-  if ScrollIdx < TextLen then                    { 1005:08c8 }
-    ScrollChar(Ord(Message[ScrollIdx]), ScrollCol)
+  { THE SPACE ARM COMES FIRST. 1005:08CC is CMP/JBE, which jumps to the message
+    arm and falls through to the space, so the test is `ScrollIdx > TextLen - 1`
+    with the space as the THEN. }
+  if ScrollIdx > TextLen - 1 then                { 1005:08C7 }
+    ScrollChar(Ord(' '), ScrollCol)
   else
-    ScrollChar(Ord(' '), ScrollCol);
+    ScrollChar(Ord(Message[ScrollIdx]), ScrollCol);
 
   ScrollRender;                                  { 1005:08f4 }
 
@@ -618,14 +625,20 @@ begin
 
   { 1005:093f -- rotate the eight-entry cycle and show it. The original does
     the whole thing TWICE per frame, so the colours run at double speed. }
-  for Pass := 1 to 2 do
-  begin
-    Last := ScrollPal[7, 2];
-    Move(ScrollPal[0, 0], ScrollPal[1, 0], 21);
-    FillChar(ScrollPal[0, 0], 3, Last);
-    for I := 0 to 7 do
-      SetRGB($80 + I, ScrollPal[I, 0], ScrollPal[I, 1], ScrollPal[I, 2]);
-  end;
+  Last := ScrollPal[7, 2];                       { 1005:094D }
+  Move(ScrollPal[0, 0], ScrollPal[1, 0], 21);    { 1005:0953 }
+  FillChar(ScrollPal[0, 0], 3, Last);            { 1005:0964 }
+  for Last := 0 to 7 do                          { 1005:0974 -- the same byte }
+    SetRGB($80 + Last, ScrollPal[Last, 0], ScrollPal[Last, 1],
+           ScrollPal[Last, 2]);
+
+  { and again, written out rather than looped }
+  Last := ScrollPal[7, 2];
+  Move(ScrollPal[0, 0], ScrollPal[1, 0], 21);
+  FillChar(ScrollPal[0, 0], 3, Last);
+  for Last := 0 to 7 do
+    SetRGB($80 + Last, ScrollPal[Last, 0], ScrollPal[Last, 1],
+           ScrollPal[Last, 2]);
 end;
 
 { ==========================================================================
@@ -677,7 +690,11 @@ end;
   -------------------------------------------------------------------------- }
 procedure Spawn;
 var
-  N : Integer;
+  { SIX BYTES FOR ONE COUNTER. 1005:06e7 opens ENTER $06 and [BP-$02] is the
+    only slot anything in the routine names, so the four below it are declared
+    and never read. }
+  N      : Integer;               { [BP-$02] }
+  Unread : LongInt;               { [BP-$06], four bytes, never read }
 begin
   if Spawned = SpawnLimit then Exit;             { 1005:06ee }
   for N := 1 to MaxLem do
@@ -846,9 +863,14 @@ begin
     case Pix of
       DeathAColour, StuckColour, $20..$29 :
         begin
-          if (Pix > $1F) and (Pix < $2A) then SetState(N, StDeathB);
-          if Pix = DeathAColour then SetState(N, StDeathA);
-          if Pix = StuckColour  then SetState(N, StStuck);
+          { THREE MORE CASES, not three ifs. 1005:1524, 1537 and 1546 each
+            reload the pixel into AL and then compare -- `MOV AL,[BP-$06]` then
+            `CMP AL,imm` -- which is a case statement's selector load. An `if`
+            on a byte variable compares memory against the immediate directly
+            and never touches AL. }
+          case Pix of $20..$29     : SetState(N, StDeathB) end;
+          case Pix of DeathAColour : SetState(N, StDeathA) end;
+          case Pix of StuckColour  : SetState(N, StStuck)  end;
           Exit;
         end;
     end;
@@ -951,17 +973,12 @@ begin
       Pix := GetPixel(Lem[N].X + DX_, Lem[N].Y + DY_, VirtScrSeg);
       if Pix in Ground then
       begin
-        if Lem[N].FallDist < 11 then
+        { THE HARD-LANDING ARM COMES FIRST. 1005:0BDC is CMP/JBE, which jumps
+          to the survivable branch, so the test is `FallDist > 10` with the
+          bounce as the THEN and not `< 11` with it as the ELSE. }
+        if Lem[N].FallDist > 10 then
         begin
-          SetState(N, StWalker);
-          { + DY_ - 1, which is nothing while DY_ is 1 -- transcribed because
-            1005:0bd5 adds it. }
-          Inc(Lem[N].Y, DY_ - 1);
-          Lem[N].FallDist := 0;
-        end
-        else
-        begin
-          Inc(Lem[N].Bounces);
+          Inc(Lem[N].Bounces);                   { 1005:0BE2 }
           if Lem[N].Bounces = 2 then
             SetState(N, StSplat)
           else
@@ -970,14 +987,23 @@ begin
             Inc(Lem[N].Y, DY_ - 1);
             Lem[N].FallDist := 0;
           end;
+        end
+        else
+        begin
+          SetState(N, StWalker);
+          { + DY_ - 1, which is nothing while DY_ is 1 -- transcribed because
+            1005:0bd5 adds it. }
+          Inc(Lem[N].Y, DY_ - 1);
+          Lem[N].FallDist := 0;
         end;
         Lem[N].Frame := (Lem[N].Frame mod 4) + 1;
         Exit;
       end;
-      if (Pix > $1F) and (Pix < $2A) then
-      begin
-        SetState(N, StDeathB);
-        Exit;
+      case Pix of $20..$29 :
+        begin
+          SetState(N, StDeathB);
+          Exit;
+        end;
       end;
     end;
 
@@ -1379,8 +1405,13 @@ procedure ColumnSlideIn;
   speed the demo was timed for rather than a crawl.
   -------------------------------------------------------------------------- }
 var
-  C, Pass : Integer;
-  SrcSeg  : Word;
+  { TEN BYTES, NOT SIX. 1005:0000 opens ENTER $A and its slots are [BP-$02] four
+    times, [BP-$04] three times and [BP-$0A] twice -- and SrcSeg, which the asm
+    block reads and writes once each, is the pair at $0A. So the four bytes
+    between [BP-$04] and [BP-$0A] are a declaration nothing reads. }
+  C, Pass : Integer;              { [BP-$02], [BP-$04] }
+  Unread  : LongInt;              { [BP-$08], four bytes, never read }
+  SrcSeg  : Word;                 { [BP-$0A] }
 begin
   { 1005:0004 -- this part IS compiled Pascal in the original: it calls
     Random, so it has to be. }
