@@ -892,21 +892,45 @@ end;
 { --------------------------------------------------------------------------
   Morph_InitScene (1139:02fe)
   -------------------------------------------------------------------------- }
-procedure InitScene;
-begin
-  { called here rather than from Scene3: 1139:03b4's first
-    instruction is the call to THIS routine, and a call ahead of it
-    puts every one of the scene's eight blocks three bytes adrift. }
-  BindShapes;
-  LogicalWidth := 80;          { DS:$76B6 -- 640 logical pixels per row }
-  SetModeX;                    { 1192:002a -- mode 13h -> Mode-X }
-  Set400Lines;                 { and now 320x400 }
-  ModeX.BuildRowTable;         { 1192:0000 -- NOT VGA's BuildRowTable }
-  MorphStep := 0;
-  MorphSteps := 45;
-  XCentre := 0;  YCentre := 0;
-  ProjScale := 256;
-  ViewDist  := 2500;
+{ HAND ASSEMBLER, and the frame is what proves it. 1139:0334 is a bare `C3`:
+  no LEAVE, no POP BP, and therefore no prologue either. Turbo Pascal emits a
+  frame for EVERY Pascal procedure whatever its contents -- measured in
+  probe/ZEROSTOR.PAS, where a procedure with no parameters and no locals still
+  gets one, near or far, under $G- (`55 89E5 ... 5D`) and under $G+
+  (`... C9`). An `assembler` procedure with neither is the only shape that has
+  none.
+
+  IT ALSO EXPLAINS THE ZERO STORES. 1139:0310, 031c and 0322 write zero as
+  `MOV WORD PTR [x],0`, six bytes, where Pascal writes `XOR AX,AX / MOV [x],AX`,
+  five. The probe eliminated every source-level explanation for that -- the
+  compiler version, Word against Integer, a named `= 0` constant, interleaving
+  with non-zero stores, the LongInt high-word case, and an array element or
+  record field as the target. Hand-written asm needs none of them: the author
+  wrote the store and BASM assembled it.
+
+  AND IT DOES NOT CALL BindShapes. The original's first instruction is the
+  LogicalWidth store; there is no call ahead of it.
+
+  FOR REFERENCE ONLY, the equivalent Pascal -- not what the binary does:
+    LogicalWidth := 80;  SetModeX;  Set400Lines;  ModeX.BuildRowTable;
+    MorphStep := 0;  MorphSteps := 45;  XCentre := 0;  YCentre := 0;
+    ProjScale := 256;  ViewDist := 2500; }
+procedure InitScene; assembler;
+asm
+  CALL BindShapes                { NOT in the original -- it has no call ahead
+                                   of the LogicalWidth store. Kept because
+                                   dropping it smart-links the shape tables
+                                   out and costs 8,738 bytes of DGROUP. }
+  MOV  LogicalWidth, 80          { 1139:02fe  640 logical pixels per row }
+  CALL SetModeX                  { 1139:0303  1192:002a, mode 13h -> Mode-X }
+  CALL Set400Lines               { 1139:0308  near, and now 320x400 }
+  CALL ModeX.BuildRowTable       { 1139:030b  1192:0000, NOT VGA's }
+  MOV  WORD PTR MorphStep,  0    { 1139:0310 }
+  MOV  WORD PTR MorphSteps, 45   { 1139:0316 }
+  MOV  WORD PTR XCentre,    0    { 1139:031c }
+  MOV  WORD PTR YCentre,    0    { 1139:0322 }
+  MOV  WORD PTR ProjScale,  256  { 1139:0328 }
+  MOV  WORD PTR ViewDist,   2500 { 1139:032e }
 end;
 
 { --------------------------------------------------------------------------

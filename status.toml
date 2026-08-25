@@ -485,6 +485,13 @@ seen_in = "TPART3"
 state = "resolved"
 resolution = "MEASURED WITH A PROBE, AND FIVE HYPOTHESES ARE ELIMINATED, but the cause is still open. probe/ZEROSTOR.PAS is the record and it is tracked, because a probe is a measurement. WHAT IS ESTABLISHED: `Integer := 0` compiles to XOR AX,AX / MOV [x],AX, five bytes; `Integer := 3` to MOV WORD PTR [x],3, six; `Real := 0.0` to THREE immediate zero word stores; and `LongInt := 45` to MOV [L],45 plus an immediate zero for the HIGH word -- so a lone immediate zero store can be a LongInt's high half. TP6, TP6.1 and TP7 emit identical code for all of it. ELIMINATED: a compiler-version difference, twice over -- the probe shows all three agree, and the ORIGINAL itself uses the xor form five times, so its compiler has the peephole. The variables being Word rather than Integer: not one byte changed. A named `= 0` constant instead of the literal: it folds and the xor form returns. Interleaving zeros with non-zero immediate stores, which is the shape the original has: `A := 0; B := 45; C := 0` still gives xor for both zeros. And the LongInt high-word case, because the original's six stores at 1139:0310..032e are one word each and in our source's exact statement order. THE UNTESTED CORRELATION, and it is the one to try next: the original's InitScene HAS NO STACK FRAME. It ends C3 where ours ends C9 C3, so there is no LEAVE and therefore no prologue -- and every procedure in the probe has a frame and every one uses the xor form. Whether the peephole needs BP set up is a probe question, and the frame is a 4-byte difference in its own right. WHAT IT IS WORTH: the five Morph spans at 1139:03e1, 0426, 048c, 04f2 and 0552 all turn on this, which is 187 bytes of the 1,124 part 003 still owes."
 
+[[plan.investigation]]
+name = "part3-initscene-asm"
+finding = "part 003's Morph InitScene at 1139:02fe ends in a bare C3 -- no LEAVE, no POP BP, so no prologue either -- and writes its three zeros with the immediate form our Pascal never produces."
+seen_in = "TPART3"
+state = "resolved"
+resolution = "IT IS HAND ASSEMBLER, AND THE FRAME IS THE PROOF. 91.9 to 92.0 percent, and the routine body now matches byte for byte apart from segment numbers and call displacements. Turbo Pascal emits a frame for EVERY Pascal procedure whatever it contains -- measured in probe/ZEROSTOR.PAS, where a procedure with no parameters and no locals still gets one, near or far, under $G- as `55 89E5 ... 5D` and under $G+ as `... C9`. An `assembler` procedure with neither is the only shape with no frame at all. AND IT EXPLAINS THE ZERO STORES, which six probes had failed to explain any other way: hand-written asm writes MOV WORD PTR [x],0 because the author wrote it, and BASM assembles what it is given. Eliminated on the way: a compiler-version difference; Word against Integer; a named `= 0` constant; interleaving zeros with non-zero immediate stores; the LongInt high-word case; and an array element or record field as the target -- Arr[2] := 0 and Rec.G := 0 both give XOR too. A USEFUL BY-PRODUCT: $G decides the epilogue shape. $G- gives POP BP (5D) and $G+ gives LEAVE (C9), so an epilogue is a second reading of that switch alongside ENTER. WHAT IS STILL WRONG, and it is deliberate. The original has NO call ahead of the LogicalWidth store; ours keeps `CALL BindShapes` there, three bytes the original does not spend. Dropping it smart-links the shape tables out of DGROUP and costs 8,738 bytes of initialised data -- measured, 86.2 percent against 92.0 -- because BindShapes' Ofs() calls are the only thing referencing them. The original uses LITERAL offsets and must reference those tables somewhere else, most likely as OFFSET inside DrawShape's assembler. Finding that reference is what lets the call go, and it is worth 3 bytes plus whatever the eight scene blocks are adrift by. The four remaining immediate-zero stores at 1139:0426, 048c, 04f2 and 0552 are inside Scene3, which is framed Pascal, so THEY ARE NOT EXPLAINED by this and the same asm-block reading may apply to parts of Scene3."
+
 [plan.row."001 1012:0004"]
 label = "BuildLens quadrant walk"
 investigation = "pacing"
@@ -708,6 +715,11 @@ target = "R0"
 [plan.row."003 10b8:0592"]
 label = "Demo_Scene2's file record is a LOCAL: ENTER $80 says so"
 investigation = "part3-var-bundle"
+target = "R0"
+
+[plan.row."003 1139:02fe"]
+label = "InitScene is assembler: a bare C3 means no frame, and TP always emits one"
+investigation = "part3-initscene-asm"
 target = "R0"
 
 [plan.row."003 1139:03e1"]

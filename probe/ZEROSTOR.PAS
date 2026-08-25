@@ -42,6 +42,8 @@
   a question a probe can answer, and the frame is a 4-byte difference in its own
   right.
   =========================================================================== }
+{$G+}   { 286 codegen -- part 003's Morph unit is $G+, and this probe had no
+          $G directive at all, so it was taking the $G- default. }
 unit ZEROSTOR;
 
 interface
@@ -49,6 +51,8 @@ interface
 procedure ZeroThem;
 procedure Interleaved;
 procedure Longs;
+procedure CallIt;
+procedure Indirect;
 
 implementation
 
@@ -56,6 +60,8 @@ var
   A, B, C : Integer;
   R       : Real;
   L, M    : LongInt;
+  Arr     : array[1..4] of Integer;
+  Rec     : record F, G : Integer end;
 
 procedure ZeroThem;
 begin
@@ -80,6 +86,31 @@ procedure Longs;
 begin
   L := 0;
   M := 45;
+end;
+
+{ A LOCAL procedure -- not in the interface, so NEAR-called. The original's
+  InitScene ends C3 with no LEAVE, so it has no frame and it is near; every
+  procedure above is exported and therefore FAR, and every one of them got a
+  frame and the xor form. This separates the two. }
+procedure LocalZeros;
+begin
+  A := 0;
+  B := 45;
+  C := 0;
+end;
+
+procedure CallIt;
+begin
+  LocalZeros;
+end;
+
+{ Is the target's FORM what decides -- an array element or a record field
+  rather than a plain variable? Both with constant subscripts, so the address
+  is known at compile time exactly as a variable's is. }
+procedure Indirect;
+begin
+  Arr[2] := 0;
+  Rec.G  := 0;
 end;
 
 end.
