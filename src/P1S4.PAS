@@ -235,8 +235,6 @@ var
   -------------------------------------------------------------------------- }
   { DS:$5B52/$5B56, $5B5A/$5B5E, $5B62/$5B66 -- cos then sin, per axis }
   MCos1, MSin1, MCos2, MSin2, MCos3, MSin3 : LongInt;
-  { DS:$0018 -- the projection scale, 16.16, set by Demo_Scene4 }
-  MScale : LongInt;
   { DS:$80F3 }
   Angle : Integer;
 
@@ -249,6 +247,17 @@ const
                               spill and FILD DWORD. Part 002's is a Word and does
                               have the spill, so the two units differ. }
   MViewH : Word = 200;
+  { DS:$0018 -- THE PROJECTION SCALE IS A TYPED CONSTANT, not a var, and that
+    is what its ADDRESS says: $0018 is inside the initialised image, which runs
+    to $02F0 in this part, and a plain `var` reserves space in the uninitialised
+    region instead. The original holds four bytes of zero there -- the value is
+    written at run time by Demo_Scene4 -- and ours had nothing, which shifted
+    every initialised byte after it down by four.
+
+    Scene 5's copy of the same variable IS a var, at $AABE, well past the end of
+    the initialised region. Same name, same purpose, different storage class in
+    the two units, and only the addresses say so. }
+  MScale : LongInt = 0;
 
 {$L DEMOMATH.OBJ}
 

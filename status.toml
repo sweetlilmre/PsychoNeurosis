@@ -655,6 +655,13 @@ resolution = "RESOLVED. VGA HAD NO Palette GLOBAL IN THE ORIGINAL, and removing 
 name = "part1-last-112"
 finding = "part 001: TWO INSTRUMENTS NOW REPORT THE SAME 112 BYTES, which is either one missing declaration or a coincidence worth ruling out first. dgimage says our INITIALISED image is 112 bytes short of the original's 752, with the first difference at $0018. The MZ header says our BSS request is 7 paragraphs -- 112 bytes -- short. Those measure different things, so a single 112-byte typed constant cannot straightforwardly explain both, and that is exactly why it should be checked before anything is declared: if they ARE the same thing the fix is one line, and if they are not then acting on the coincidence produces a 112-byte surplus somewhere else. START AT $0018, because dgimage names it as the first differing byte and the initialised region is small enough to read end to end. P1S4 already records $0018 as the projection scale, a 16.16 value set by Demo_Scene4, and $0014/$0016 as 320 and 200 -- so the constants around it are understood and the divergence should be readable directly. AND THE RESIDUAL SHIFT IS NOW ~220 BYTES across 55 of the paired references (-232 over sixteen sites at $AAC2..$AB58, -212 over thirty-nine at $ACEB..$ACFB). Those two being twenty apart means one shortfall of about 212 bytes below both, plus roughly twenty more between them. Small enough now that the per-unit tiling method can finish it: run `dsgaps.py` over each unit and find the declaration whose gap does not match its size."
 seen_in = "TPART1"
+state = "resolved"
+resolution = "THE INITIALISED IMAGE NOW MATCHES IN SIZE EXACTLY -- 752 bytes against 752 -- with TWENTY-FIVE bytes differing, down from 391 differing and 112 short. The initialised region's data-reference shift is +0 across thirteen sites at $0002..$0282, so that whole region is now correct. AND THE TWO 112s WERE A COINCIDENCE, which is why the finding said to check before declaring anything. The initialised shortfall was 112 bytes and the BSS shortfall is 112 bytes and they are unrelated: everything added here is INITIALISED data, the image grew by 112, and minalloc did not move at all. Acting on the coincidence would have produced a 112-byte surplus in the uninitialised region while leaving the real one open. TWO CAUSES, both found by reading the image side by side rather than by arithmetic. FIRST, FOUR BYTES: P1S4's MScale was a `var` and its address is $0018, which is INSIDE the initialised region -- so it is a TYPED CONSTANT, four bytes of zero written at run time by Demo_Scene4. A plain var reserves space in the uninitialised region instead, and its absence shifted every initialised byte after $0018 down by four. Scene 5's copy of the same variable, same name and same purpose, IS a var, because its address is $AABE, well past the end. Only the addresses distinguish the two storage classes. SECOND, 108 BYTES: a THIRD vector table nothing reads. $001C plus VecLogoA's 288 bytes is $013C, and the globe is read from $01A8 (12c5:08b3 is PUSH WORD PTR [DI+$1A8]), so the 108 bytes between them are a table the run-time code never touches. Decoded, they are eighteen points of a radius-50 circle in the YZ plane at twenty-degree steps -- one of the globe's three rings, emitted on its own. It is now generated from the binary by tools/emit_pascal_data2.py rather than transcribed, and IT SURVIVED THE SMART LINKER, which was the risk: an unreferenced typed constant has been dropped on this target before, and this one is kept because the unit's other constants are referenced. MEASURED ACROSS THE TARGET: all parts unchanged, three byte-exact artefacts still holding, traps identical opcode for opcode. The dominant data shifts halved again, from -232 and -212 to -124 and -104."
+
+[[plan.investigation]]
+name = "part1-last-two"
+finding = "part 001: TWO SMALL DEFECTS LEFT IN THE LAYOUT and both are localised to the byte. FIRST, a two-byte typed constant at DS:$0284 holding $A640. The initialised image matches exactly up to $0283 and diverges there: the original has $A640 and ours goes straight to the next constant, after which everything is shifted by two -- which dsmap confirms as a shift of exactly -2 across ten sites at $0286..$02E2. It sits immediately after P1S5's MViewW and MViewH at $0280 and $0282, so it is most likely a third typed constant in that unit's block. $A640 is 42,560, and read as a DGROUP address it falls inside P1S5's own data ($A106..$AAD4), so a typed constant initialised to the address of one of that unit's variables is the shape to look for -- but that is a hypothesis, not a measurement. Find what reads $0284. SECOND, 112 bytes of UNINITIALISED data, which the MZ header still reports: minalloc is 3,777 paragraphs against the original's 3,784, and it did NOT move when 112 bytes of initialised data were added, so it is a separate shortfall in a separate region. The remaining shifts point at it: -124 across sixteen sites at $AAC2..$AB58 and -104 across thirty-nine at $ACEB..$ACFB, twenty apart. So roughly 104 bytes are missing below both and another twenty between them. USE THE FEEDBACK LOOP rather than inference: add a declaration, rebuild, read minalloc. It moves by exactly what was added, so a candidate can be priced in one build. And run `dsgaps.py` per unit to find the declaration whose gap does not match its size -- that method has now produced four sizes in a row that tiled exactly."
+seen_in = "TPART1"
 state = "open"
 
 [plan.row."001 1012:0004"]
@@ -817,6 +824,11 @@ label = "112 bytes short of initialised data, first diff at $0018"
 investigation = "part1-last-112"
 target = "R0"
 
+[plan.row."001 dgimage $0284"]
+label = "a two-byte typed constant holding $A640 is missing"
+investigation = "part1-last-two"
+target = "R0"
+
 [plan.row."001 dgroup $0282"]
 label = "16,514 bytes of DGROUP that no comment in the tree records"
 investigation = "part1-bss-shortfall"
@@ -860,6 +872,11 @@ target = "R0"
 [plan.row."001 dgroup base"]
 label = "P1S5's block starts 23530 bytes too low; the units below it are too small"
 investigation = "part1-unit-sizes"
+target = "R0"
+
+[plan.row."001 header 112"]
+label = "and 112 bytes of BSS, a separate shortfall from the image's"
+investigation = "part1-last-two"
 target = "R0"
 
 [plan.row."001 header 7 para"]

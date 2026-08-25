@@ -88,7 +88,14 @@ def emit_p001():
 
   See assets/part001/vector_logo_a.png and vector_globe.png.""")]
     total = 0
+    # VecRing sits BETWEEN the two and nothing reads it. It is 18 points of a
+    # radius-50 circle in the YZ plane at 20-degree steps -- one of the globe's
+    # three rings, emitted on its own. The loader reads the globe from $01A8
+    # (12c5:08b3 is PUSH WORD PTR [DI+$1A8]), so these 108 bytes are never
+    # touched at run time. They are in DGROUP all the same, and leaving them
+    # out shifted every initialised byte after $013C.
     for name, off, n, note in (("VecLogoA", 0x001C, 48, "the circled A, Z = 0"),
+                               ("VecRing",  0x013C, 18, "a YZ ring, radius 50 -- NEVER READ"),
                                ("VecGlobe", 0x01A8, 36, "three rings, +/-50")):
         vals = []
         for i in range(n):
