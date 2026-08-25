@@ -68,10 +68,21 @@ header  = """
 
   800, not the 765 the scene draws: the slots are contiguous 4,800-byte blocks
   and $0636 + 4 * 4800 lands exactly on ShapeCube at $5136, which is how the
-  size was read. Slots 1, 2 and 3 are never drawn by this scene and are carved
+  size was read. The middle three are never drawn by this scene and are carved
   anyway -- DGROUP order follows DECLARATION order, so leaving them out moved
   every variable in the unit and made every absolute data reference in the
-  segment differ by two bytes."""
+  segment differ by two bytes.
+
+  THE MIDDLE THREE WERE CARVED FROM THE WRONG PLACE, and the stride is what
+  says so: the slots are at $0636 + n * 4800, which is $18F6, $2BB6 and $3E76,
+  and this file had them at $1926, $2C16 and $3F06 -- 48, 96 and 144 bytes late,
+  eight points more adrift each time. 12,577 bytes of DGROUP differed from the
+  1994 file because of it. NOTHING VISIBLE DEPENDED ON IT: the three slots the
+  scene actually draws are 1, 5 and 6 -- Demo_Scene3 loads $0636, $5136 and
+  $63F6 as literals -- and all three were byte-identical before this fix and
+  after it. The coverage walk could not see it either, because it walks CODE.
+  Two instruments blind to the same thing is why the data segments now get
+  compared head to head."""
 
   # group = 3 is the NESTED-PARENTHESIS rule: a multidimensional typed constant
   # needs ((x, y, z), ...) and Turbo Pascal rejects a flat list of the same
@@ -90,7 +101,7 @@ header  = """
   name = "ShapeSlot1"
   type = "TShape"
   element = "int"
-  offset = 0x1926
+  offset = 0x18F6
   count = 800
   group = 3
   per_line = 9
@@ -99,7 +110,7 @@ header  = """
   name = "ShapeSlot2"
   type = "TShape"
   element = "int"
-  offset = 0x2C16
+  offset = 0x2BB6
   count = 800
   group = 3
   per_line = 9
@@ -108,7 +119,7 @@ header  = """
   name = "ShapeSlot3"
   type = "TShape"
   element = "int"
-  offset = 0x3F06
+  offset = 0x3E76
   count = 800
   group = 3
   per_line = 9
