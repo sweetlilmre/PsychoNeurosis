@@ -225,7 +225,6 @@ procedure Load;
 var
   F : file;
   I : Integer;
-  V : Byte;
 begin
   Assign(F, 'neurosis.dat');
   Reset(F, 1);
@@ -233,11 +232,14 @@ begin
   BlockRead(F, Mem[VirtScrSeg : 0], 64000);
   Close(F);
 
+  { RECOMPUTED THREE TIMES, once per channel, which is what the comment above
+    already said and what the code did not do. 10e3:0075, 0088 and 009b each
+    do FILD [BP-2] / FLD the constant at CS:$000D / FMULP / Round, and each
+    result is pushed separately -- nine x87 sites where a single V costs three.
+    Turbo Pascal does not common up the subexpression, so the source really
+    does write it out. }
   for I := 1 to 255 do
-  begin
-    V := Round(I * 0.247);
-    SetRGB(I, V, V, V);
-  end;
+    SetRGB(I, Round(I * 0.247), Round(I * 0.247), Round(I * 0.247));
 end;
 
 { [transcribed] Demo_Scene3 (10e3:0206) -- clear both screens, load, run,

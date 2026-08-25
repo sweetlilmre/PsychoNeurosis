@@ -547,7 +547,11 @@ begin
 
   { 12c5:093b -- Scale := (ScreenWidth / 2.0) * 10.0, as 16.16.
     CS:$0868 = 2.0, CS:$086C = 10.0. }
-  MScale := Round((ScrWidth / 2.0) * 10.0 * 65536.0);
+  { 12c5:0947 -- RealToFixed, and MViewW is a WORD here where P1S4's is an
+    Integer. The spill is the difference: `MOV [BP-8],AX / MOV [BP-6],DX` then
+    FILD DWORD on the LongInt, which is how a Word reaches the x87. P1S4 does
+    FILD WORD straight off the variable. Same expression, two declarations. }
+  MScale := RealToFixed(MViewW / 2.0 * 10.0);
 
   OrbitAngle := -2042;                         { 12c5:096a }
   Animate;

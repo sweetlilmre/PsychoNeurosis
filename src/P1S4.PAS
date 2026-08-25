@@ -183,7 +183,11 @@ var
 const
   { DS:$0014 = 320 and DS:$0016 = 200, initialised data. Project halves both,
     so these are the FULL view size and not the centre. }
-  MViewW : Word = 320;
+  MViewW : Integer = 320;   { INTEGER here, not Word: 1107:097b is FILD WORD
+                              with no XOR DX,DX spill ahead of it, and a Word in
+                              a Real expression is widened through a LongInt
+                              spill and FILD DWORD. Part 002's is a Word and does
+                              have the spill, so the two units differ. }
   MViewH : Word = 200;
 
 {$L DEMOMATH.OBJ}
@@ -614,7 +618,14 @@ end;
 procedure Scene4;
 begin
   New(Font);
-  MScale := Round((ScrWidth / 2.0) * 10.0 * 65536.0);
+  { 1107:097b -- RealToFixed, not Round(.. * 65536.0), and MViewW is READ FROM
+    MEMORY rather than folded. FILD WORD [$0014] / FDIV the single at CS:$096F /
+    FMUL the single at CS:$0973, then DX/BX/AX pushed into a far call into
+    FixMath. Part 002's P2S2 landed on the same form at 108b:1cd4 after two
+    refutations that both turned out to be confounded, so this is the shape the
+    register already trusts. Note FILD WORD with no XOR DX,DX spill, where
+    part 002 has one -- that is the difference between an Integer and a Word. }
+  MScale := RealToFixed(MViewW / 2.0 * 10.0);
   Angle := 0;
 
   StarInit(8, 9, 10, 1);
