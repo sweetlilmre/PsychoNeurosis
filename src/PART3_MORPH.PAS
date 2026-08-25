@@ -915,17 +915,12 @@ end;
   Eight scripted segments of 45 frames (63 for the last). Odd segments hold a
   shape, even segments morph to the next one. The closing segment also fades.
   -------------------------------------------------------------------------- }
-{ --------------------------------------------------------------------------
-  Morph_CheckKey (1139:0670)
-  The scene tests for a key through its OWN routine, not through Crt's
-  KeyPressed: 1139:040a is a near CALL and CALLF never appears in the
-  loop. The result is tested `OR DX,DX`, which is two bytes, exactly as
-  `OR AL,AL` is here.
-  -------------------------------------------------------------------------- }
-function CheckKey : Boolean;
-begin
-  CheckKey := KeyPressed;
-end;
+{ AND IT IS DECLARED AFTER Scene3, at 1139:0670, which is why only a forward
+  declaration can go here. Placing the body before Scene3 puts Scene3 at the
+  wrong offset and every one of its eight blocks with it -- 476 bytes, the
+  largest single span in this target, and all of it downstream of one
+  declaration's position. }
+function CheckKey : Boolean; forward;
 
 procedure Scene3;
 begin
@@ -1055,6 +1050,18 @@ begin
     Dec(Frames);
   until Frames = 0;
 
+end;
+
+{ --------------------------------------------------------------------------
+  Morph_CheckKey (1139:0670)
+  The scene tests for a key through its OWN routine, not through Crt's
+  KeyPressed: 1139:040a is a near CALL and CALLF never appears in the
+  loop. The result is tested `OR DX,DX`, which is two bytes, exactly as
+  `OR AL,AL` is here.
+  -------------------------------------------------------------------------- }
+function CheckKey : Boolean;
+begin
+  CheckKey := KeyPressed;
 end;
 
 end.
