@@ -169,6 +169,13 @@ var
   ProfileA, ProfileB : array[1..BlobPixels] of Byte;
   { DS:$672D }
   Pal   : array[0..767] of Byte;
+  { DS:$6A33, stride $100 -- THE EIGHT ROW BUFFERS, and they are UNIT-LEVEL.
+    They were declared as locals inside BuildPoints, which is eight 256-byte
+    strings on the stack and 2,048 bytes of DGROUP the original has and we did
+    not. Two measurements say unit-level: 1107:07ab is MOV DI,$6A33 / PUSH DS,
+    which is a DS address and not a frame one, and BuildPoints opens
+    ENTER $202 -- 514 bytes, which cannot hold them. }
+  Rows  : array[1..TrailRows] of String;            { DS:$6A33 }
 
 { --------------------------------------------------------------------------
   THE SHARED 386 MATHS MODULE.
@@ -527,7 +534,6 @@ end;
   -------------------------------------------------------------------------- }
 procedure BuildPoints;
 var
-  Rows  : array[1..TrailRows] of String;
   Row   : Integer;
   Col   : Integer;
   Idx   : Integer;

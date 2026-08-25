@@ -580,6 +580,13 @@ resolution = "FIRST 3,772 BYTES FOUND AND THE PREDICTION CONFIRMED TO THE BYTE. 
 name = "part1-p1s4-hole"
 finding = "part 001: a 2,008-byte hole in P1S4 between Font and Blob, and it is the next concrete piece of the DGROUP shortfall. With Font correctly inline at $6A2A its 3,776 bytes end at $78EA, and the next variable whose address is recorded is Blob at $80C2. Nothing is declared in the 2,008 bytes between them, and P1S4's own totals want about 2,077 more than we declare, so the two agree. WHAT TO LOOK FOR: 2,008 bytes is not a round buffer, which is informative -- a screen or a palette would be 64000 or 768. Candidates worth pricing against it are another glyph or sprite bank, or a table with a stride that divides it: 2008 is 8 x 251, 4 x 502, 251 x 8. The unit already has two 49-byte profiles and a 51-byte blob record, so a bank of those is the shape to check first. METHOD: the sources' DS: comments gave every other size in this unit as the GAP between consecutive recorded addresses, so read the disassembly around $78EA..$80C2 for any absolute displacement in that range -- whatever code touches it names it. dsmap lists 196 unpaired references and some of them are almost certainly in here."
 seen_in = "TPART1"
+state = "resolved"
+resolution = "RESOLVED, 2,048 BYTES, AND THE PREDICTION CONFIRMED TWICE OVER. The eight row buffers are UNIT-LEVEL at DS:$6A33 and were declared as LOCALS inside BuildPoints -- an array[1..8] of String, which is 2,048 bytes on the stack and 2,048 bytes of DGROUP we did not have. Moving them to unit level took the data-reference shift from -19758 to -17710, a difference of exactly 2,048. Part 001 holds at 81.7% (+8 bytes on the walk), data image unchanged, traps identical opcode for opcode, checks clean. TWO INDEPENDENT MEASUREMENTS SAID UNIT-LEVEL, and both were already in the file. 1107:07ab is MOV DI,$6A33 / PUSH DS -- a DS address, so not a frame one -- and BuildPoints opens ENTER $202, which is 514 bytes and cannot hold eight 256-byte strings. The header comment had described `eight row buffers at DS:$6A33 (stride $100)` since the routine was first read, beside code that put them on the stack. That is the FIFTH time on this target that a comment has been right about something the code was wrong about, and it is now worth treating as a search strategy rather than a recurring surprise: grep the sources for DS: addresses beside declarations that are not unit-level. THE 2,008 ESTIMATE WAS 40 BYTES OUT AND THE TRUE FIGURE IS 2,048, which is worth noting because the estimate came from differencing recorded addresses and the real number came from a stride times a count. Prefer a size that factorises over a size that is a difference of two addresses -- $100 times eight is exact, and $80C2 minus $78EA carries whatever error either address has. AND ONE THING IS STILL UNRESOLVED HERE, deliberately left rather than guessed: Font's address. DrawStep's subscript at 1107:0678 is CMP BYTE PTR [DI+$6A2A], and Turbo Pascal folds the low bounds of array[0..58, 1..8, 1..8] into the displacement as minus nine, which puts Font at $6A33 -- the same address as the row buffers. Load at 1107:0058 reads into $7233, which is $800 higher, exactly the row buffers' size. So either the two share storage, with the buffers used as scratch before the font is read, or one of the two readings is wrong. It does not affect the SIZE, which is what the shift measures, so it changes no number yet -- but it will matter as soon as the order inside this unit is worth fixing."
+
+[[plan.investigation]]
+name = "part1-p1s4-frames"
+finding = "part 001: prologue.py names four frame defects in P1S4 and they are the next work, because a frame is a declaration list and these are cheap to read. Run `prologue.py spans.toml 001 --seg=1107`. It reports 22 candidates, $G+ agreed both ways, and: 1107:0025 opens ENTER $82 against our $02, so ONE HUNDRED AND TWENTY-EIGHT BYTES OF LOCALS ARE MISSING. The routine is Load -- Assign at 1107:0033, Reset at 003f, then a BlockRead -- and 128 bytes in a loader is the shape of a filename or path buffer, String[127] being exactly 128. That is a guess; read the offsets before writing it. 1107:0600 opens ENTER $104 against our $10a, so ours is SIX BYTES TOO BIG -- one declared Real we should not have, or two extra Integers plus a temp. This is the only defect of this direction found on the part so far and it is worth doing first because a surplus is easier to place than a shortfall: something in our var block has no counterpart. AND FOUR ROUTINES OURS DOES NOT LOCATE AT ALL: 1107:03d7, 1107:0446 (ENTER $14), 1107:059f (ENTER $02) and 1107:07a2 (ENTER $202, BuildPoints). Not located means the content differs enough that the tool will not claim a pairing, which is a stronger signal than a frame mismatch -- those four have body defects, not just declaration ones. BuildPoints is the one to read first: it was just changed, so the difference is fresh and the row buffers being unit-level should have brought its frame to $202."
+seen_in = "TPART1"
 state = "open"
 
 [plan.row."001 1012:0004"]
@@ -601,6 +608,21 @@ target = "R0"
 label = "Mosaic block sampling BASM"
 investigation = "pacing"
 note = "Scene 3's crawl: the mosaic block sampling (10e3:0148..01cb) is one hand BASM block loading ES/DS once per level and walking blocks register-only, five instructions a pixel; it had been re-expressed as Pascal Mem[] loops that reload a segment register on every one of 128,000 accesses per level. Back in verbatim, fragment @asm 001 10e3:0148 +132 locked at 132. Also recorded as a deviation: the _fpu originals' raw x87 came from a post-build patch a byte-scanner cannot reproduce safely (validated against all six variant pairs and refused), so our $N+ scenes keep TP7's emulator-interrupt encoding -- a bounded per-op cost."
+
+[plan.row."001 1107:0025"]
+label = "Load is 128 bytes of locals short -- likely a path buffer"
+investigation = "part1-p1s4-frames"
+target = "R0"
+
+[plan.row."001 1107:0600"]
+label = "ours is SIX BYTES TOO BIG, the part's only surplus frame"
+investigation = "part1-p1s4-frames"
+target = "R0"
+
+[plan.row."001 1107:07a2"]
+label = "BuildPoints does not locate; its frame should now be $202"
+investigation = "part1-p1s4-frames"
+target = "R0"
 
 [plan.row."001 1107:097b"]
 label = "MScale is RealToFixed, and P1S4's MViewW is an Integer"
