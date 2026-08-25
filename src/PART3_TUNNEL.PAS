@@ -293,6 +293,21 @@ end;
   And the copy is CopyScreen (12f8:00ad), not a Move: 1015:08fa is a far call
   into the VGA unit with VirtScrSeg and $A000 pushed. }
 procedure LoadTexture;
+var
+  { 512 BYTES OF FRAME AND NOT ONE REFERENCE TO THEM. 1015:08a7 opens
+    ENTER $200 and the routine touches no BP-relative slot at all -- every
+    address it uses is absolute: the file record is the unit's own global at
+    DS:$A7FF, the read goes through the far pointer at DS:$E76C and the copy
+    reads the segment word at DS:$E770. So half a kilobyte is declared here
+    and abandoned.
+
+    THE SIZE IS MEASURED, THE SHAPE IS NOT. 512 is a buffer, two Strings, or
+    four file records; nothing in the code distinguishes them because nothing
+    in the code reads them. Written as one array because that is the least
+    that can be claimed. It is the sixth routine in this target to declare
+    storage it never uses, and the largest by a long way -- an earlier draft
+    of this routine that read into its own buffer would explain it. }
+  Spare : array[1..512] of Byte;
 begin
   Assign(F, 'neurosis.dat');                  { 1015:08b5 }
   Reset(F, 1);                                { 1015:08c1 }

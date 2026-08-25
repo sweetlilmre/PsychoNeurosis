@@ -597,13 +597,31 @@ end;
   -------------------------------------------------------------------------- }
 procedure Run;
 var
-  X              : Integer;   { [BP-$4] }
-  Sweep          : Integer;   { [BP-$6] }
-  Angle : array[1..NumSprites] of Integer;   { [BP-$10] .. [BP-8] }
+  { THE OFFSETS WERE ONE SLOT OUT AND THE DEAD STORE WAS THE WRONG VARIABLE.
+    125e:0780 stores 50 into [BP-$2] and 125e:0785 stores 100 into [BP-$4];
+    125e:07e8 then loads [BP-$4] with -20 and 125e:07ef increments it, so
+    [BP-$4] IS Sweep and the 100 is a dead store to Sweep itself, not to a
+    third variable. It is written below because it is five bytes of the
+    original nobody had transcribed.
+
+    Angle's base is the fold at [BP-$E]: 125e:07be is
+    MOV [BP+DI-$E],AX with DI = GI*2 and GI one-based, so Angle[1] is at
+    [BP-$C] and Angle[4] at [BP-$6] -- and the -$E is the fold's phantom
+    base, not a slot. See the wiki's `A folded subscript names its bounds`.
+
+    SO TWO BYTES AT [BP-$E] ARE DECLARED AND UNTOUCHED, and here they can be
+    argued rather than guessed: nothing in this routine can produce a
+    compiler temporary. Every `for` limit is a constant (NumSprites,
+    FadeSteps, SweepFrom..SweepTo), and a constant limit needs no temporary --
+    which is exactly what the probe in probe/TWOBYTE.PAS measured. A
+    temporary being impossible, the two bytes are a declaration. }
+  X              : Integer;   { [BP-$2] }
+  Sweep          : Integer;   { [BP-$4] }
+  Angle : array[1..NumSprites] of Integer;   { [BP-$C] .. [BP-$6] }
+  Spare          : Integer;   { [BP-$E] -- never touched }
 begin
-  X := BaseX;                                    { 125e:0782 }
-  { [BP-6] is also set to 100 here (125e:0787) and never read -- the sweep
-    below overwrites it. }
+  X := BaseX;                                    { 125e:0780 }
+  Sweep := 100;                                  { 125e:0785 -- dead }
 
   for GI := 1 to NumSprites do Prepare(GI);      { 125e:0797 }
 

@@ -242,56 +242,132 @@ end;
   times, between passes.
   -------------------------------------------------------------------------- }
 procedure Run;
+var
+  { SIX BYTES AND ONLY FOUR OF THEM DECLARED. 120f:01f8 opens ENTER $06 with
+    [BP-$02] read 43 times, [BP-$04] 24 and [BP-$06] 12; the third is the
+    compiler's, because 120f:0478 stores a `mod` result into [BP-$06] and the
+    loop below compares against that slot every iteration. So there is no N --
+    the phase count is written as the `for` limit and Turbo Pascal makes the
+    temporary itself. Declaring it produced BOTH and the frame came out $08.
 
-  procedure Pass(SeedCurve, SeedRow : Integer);
-  var
-    { SIX BYTES AND ONLY FOUR OF THEM DECLARED. 120f:01f8 opens ENTER $06 with
-      [BP-$02] 43 times, [BP-$04] 24 and [BP-$06] 12; the third is the
-      compiler's, because 120f:0478 stores the mod result into [BP-$06] and the
-      loop below compares against it every iteration. So there is no N -- the
-      phase count is written as the `for` limit and Turbo Pascal makes the
-      temporary itself. Declaring it produced BOTH, and the frame came out $08.
-
-      WHICH VARIABLE IS WHICH IS ALSO FIXED. The seeding loop and the inner
-      phase-step loop share [BP-$02]; the outer loop of the phase spread has
-      [BP-$04] to itself. First declared is nearest BP, so I is the one that
-      does two jobs and J counts particles in the second loop -- the reverse of
-      how it reads. }
-    I, J : Integer;                 { [BP-$02], [BP-$04] }
-  begin
-    for I := 1 to Particles do
-    begin
-      case SeedCurve of
-        0 : P[I].Curve := 30;                    { pass 1: one curve for all }
-        1 : P[I].Curve := (I mod 100) div 2;     { passes 2 and 3 }
-        2 : P[I].Curve := (I mod 200) div 4;     { pass 4 }
-      end;
-      P[I].Phase := 0;
-      case SeedRow of
-        0 : P[I].Row := I mod 200;
-        1 : P[I].Row := (I * 4) mod 200;
-        2 : P[I].Row := (I * 8) mod 200;
-      end;
-    end;
-
-    for J := 1 to Particles do
-    begin
-      for I := 1 to (J * 15) mod 360 do          { 120f:0470 }
-        P[J].Phase := P[J].Phase mod PhaseWrap + 1;
-    end;
-
-    SweepX := SweepFrom;
-    repeat
-      Step;
-      Inc(SweepX);
-    until SweepX = SweepTo;
-  end;
-
+    WHICH VARIABLE IS WHICH IS ALSO FIXED. The seeding loop and the inner
+    phase-step loop share [BP-$02]; the outer loop of the phase spread has
+    [BP-$04] to itself. First declared is nearest BP, so I is the one that does
+    two jobs and J counts particles in the second loop -- the reverse of how it
+    reads. }
+  I, J : Integer;                 { [BP-$02], [BP-$04] }
 begin
-  Pass(0, 0);      { flat: every particle on curve 30, rows 0..199 }
-  Pass(1, 1);      { curves spread, rows x4 }
-  Pass(1, 2);      { curves spread, rows x8 }
-  Pass(2, 2);      { curves spread wider, rows x8 }
+  { FOUR PASSES WRITTEN OUT, NOT A NESTED PROCEDURE CALLED FOUR TIMES, and
+    the seeding is what proves it. 120f:020c stores 30 into Curve with no test
+    in front of it -- Turbo Pascal has emitted the FIRST pass's constant
+    directly. A `Pass(SeedCurve, SeedRow)` taking the variation as parameters
+    has to dispatch on them, and ours put a CMP AX,0 / JNE and a CMP AX,1 /
+    JNE there instead, which is where the whole routine went out of step.
+
+    THE PROLOGUE SAID SO TOO, and more cheaply. 120f:01f8's frame has three
+    slots and NO [BP+n] references at all: the routine takes no parameters and
+    has no static link, so it cannot be a nested procedure and cannot be one
+    taking two arguments. Reading that would have settled the shape without
+    disassembling a single seeding loop.
+
+    So the four passes are inline, each one seed loop, one phase spread and one
+    sweep, at 120f:01fc, 02a3, 035c and 0415. }
+
+  { --- pass 1 at 120f:01fc: every particle on curve 30, rows 0..199 --- }
+  for I := 1 to Particles do
+  begin
+    P[I].Curve := 30;                            { 120f:020c }
+    P[I].Phase := 0;
+    P[I].Row   := I mod 200;
+  end;
+  { The phase spread, one step at a time -- 120f:0238. The `for` limit is
+    an EXPRESSION, so Turbo Pascal evaluates it once into [BP-$6] and compares
+    against that slot every iteration; that temporary is the third of the three
+    slots in ENTER $06 and is why there is no variable for it. }
+  for J := 1 to Particles do
+    for I := 1 to (J * 15) mod 360 do
+      P[J].Phase := P[J].Phase mod PhaseWrap + 1;
+
+  { The sweep. SweepX := SweepX + 1 is an ASSIGNMENT and not Inc: 120f:0294 is
+    MOV AX,[SweepX] / INC AX / MOV [SweepX],AX, seven bytes through the
+    accumulator where Inc would emit four. }
+  SweepX := SweepFrom;
+  repeat
+    Step;
+    SweepX := SweepX + 1;
+  until SweepX = SweepTo;
+
+  { --- pass 2 at 120f:02a3: curves spread, rows x4 --- }
+  for I := 1 to Particles do
+  begin
+    P[I].Curve := (I mod 100) div 2;             { 120f:02ad }
+    P[I].Phase := 0;
+    P[I].Row   := (I * 4) mod 200;               { 120f:02d6 -- SHL AX,2 }
+  end;
+  { The phase spread, one step at a time -- 120f:02f1. The `for` limit is
+    an EXPRESSION, so Turbo Pascal evaluates it once into [BP-$6] and compares
+    against that slot every iteration; that temporary is the third of the three
+    slots in ENTER $06 and is why there is no variable for it. }
+  for J := 1 to Particles do
+    for I := 1 to (J * 15) mod 360 do
+      P[J].Phase := P[J].Phase mod PhaseWrap + 1;
+
+  { The sweep. SweepX := SweepX + 1 is an ASSIGNMENT and not Inc: 120f:034d is
+    MOV AX,[SweepX] / INC AX / MOV [SweepX],AX, seven bytes through the
+    accumulator where Inc would emit four. }
+  SweepX := SweepFrom;
+  repeat
+    Step;
+    SweepX := SweepX + 1;
+  until SweepX = SweepTo;
+
+  { --- pass 3 at 120f:035c: the same curves, rows x8 --- }
+  for I := 1 to Particles do
+  begin
+    P[I].Curve := (I mod 100) div 2;
+    P[I].Phase := 0;
+    P[I].Row   := (I * 8) mod 200;               { 120f:038f -- SHL AX,3 }
+  end;
+  { The phase spread, one step at a time -- 120f:03aa. The `for` limit is
+    an EXPRESSION, so Turbo Pascal evaluates it once into [BP-$6] and compares
+    against that slot every iteration; that temporary is the third of the three
+    slots in ENTER $06 and is why there is no variable for it. }
+  for J := 1 to Particles do
+    for I := 1 to (J * 15) mod 360 do
+      P[J].Phase := P[J].Phase mod PhaseWrap + 1;
+
+  { The sweep. SweepX := SweepX + 1 is an ASSIGNMENT and not Inc: 120f:0405 is
+    MOV AX,[SweepX] / INC AX / MOV [SweepX],AX, seven bytes through the
+    accumulator where Inc would emit four. }
+  SweepX := SweepFrom;
+  repeat
+    Step;
+    SweepX := SweepX + 1;
+  until SweepX = SweepTo;
+
+  { --- pass 4 at 120f:0415: curves spread wider, rows x8 --- }
+  for I := 1 to Particles do
+  begin
+    P[I].Curve := (I mod 200) div 4;             { 120f:041f }
+    P[I].Phase := 0;
+    P[I].Row   := (I * 8) mod 200;
+  end;
+  { The phase spread, one step at a time -- 120f:0463. The `for` limit is
+    an EXPRESSION, so Turbo Pascal evaluates it once into [BP-$6] and compares
+    against that slot every iteration; that temporary is the third of the three
+    slots in ENTER $06 and is why there is no variable for it. }
+  for J := 1 to Particles do
+    for I := 1 to (J * 15) mod 360 do
+      P[J].Phase := P[J].Phase mod PhaseWrap + 1;
+
+  { The sweep. SweepX := SweepX + 1 is an ASSIGNMENT and not Inc: 120f:04bf is
+    MOV AX,[SweepX] / INC AX / MOV [SweepX],AX, seven bytes through the
+    accumulator where Inc would emit four. }
+  SweepX := SweepFrom;
+  repeat
+    Step;
+    SweepX := SweepX + 1;
+  until SweepX = SweepTo;
 end;
 
 procedure Scene6;

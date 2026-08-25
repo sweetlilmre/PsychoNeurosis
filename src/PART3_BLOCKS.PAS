@@ -119,24 +119,46 @@ end;
   -------------------------------------------------------------------------- }
 procedure Run;
 var
-  { DECLARATION ORDER MATTERS HERE. BlockAt has to land within a byte's reach
-    of BP: the original reads it as [BP-6], an 8-bit displacement, and behind
-    the 128-byte file record it would need [BP-8E] and a 16-bit one -- one
-    byte longer, which shifts every instruction after it. So the scalars come
-    first and the file last, as they do in the original, whose frame is
-    BlockAt at [BP-6], the three counters at [BP-8], [BP-A], [BP-C], and the
-    file and the order table right at the bottom of ENTER $343C. }
-  BlockAt    : Word;
-  I, C, R    : Integer;
-  X, Y       : Integer;
-  P          : Word;
-  F          : file;
-  { LAST, and on the STACK -- the original's frame is ENTER $343C with the
-    file record and the order table at the bottom of it. As a unit-level var
-    this was 13,104 bytes of DGROUP that the original never spends there, and
-    it is what took the data segment over 64K once the six shape slots were
-    carved: TP7 stops with Error 49, which the build did not report. }
-  Order      : TOrder;
+  { THE WHOLE ORDER IS READ OFF THE FRAME, and the earlier note had it half
+    right: BlockAt is at [BP-6], but the file record is at the BOTTOM and not
+    behind the scalars. ENTER $343C, and the four displacements the routine
+    uses are the whole story --
+
+        [BP-$6]      BlockAt         4 references
+        [BP-$8], [BP-$A], [BP-$C]    the three counters, 16/8/8 references
+        [BP-$333C]   the order table, passed to BlockRead
+        [BP-$343C]   the file record, passed to Assign, Reset, Seek, Close
+
+    and the arithmetic between them fixes everything else. $343C is 13,372.
+    The file is 128 and the table is 13,104, so 13,372 - 128 - 13,104 = 140
+    bytes are unaccounted -- but the table's own base is [BP-$333C] = 13,116,
+    which is 13,104 plus TWELVE. So the scalars are twelve bytes, not our
+    fourteen, and there are 128 bytes between the table and the file that
+    nothing references.
+
+    TWO BYTES BEFORE BlockAt ARE NEVER TOUCHED. [BP-2] and [BP-4] appear
+    nowhere in the routine, and BlockAt is at [BP-6], so two words are
+    declared ahead of it -- which is what X and Y are: the equivalent Pascal
+    at the head of this file names them, the inline assembler that replaced
+    that Pascal does not use them, and the original still declares them. P
+    goes, because twelve bytes leaves no room for it.
+
+    AND A SECOND FILE RECORD, unopened -- the 128 bytes between the table and
+    F. That is the FIFTH routine in this target to declare a file it never
+    touches, and the size is exact rather than inferred. What those bytes are
+    is not measurable from here: 128 is also a buffer or a String[127]. A file
+    is what the rest of the corpus says. }
+  X, Y       : Integer;                 { [BP-$2], [BP-$4] -- never read }
+  BlockAt    : Word;                    { [BP-$6] }
+  I, C, R    : Integer;                 { [BP-$8], [BP-$A], [BP-$C] }
+  { ON THE STACK, and the original's is too -- ENTER $343C spends it there.
+    As a unit-level var this was 13,104 bytes of DGROUP that the original
+    never spends, and it is what took the data segment over 64K once the six
+    shape slots were carved: TP7 stops with Error 49, which the build did not
+    report. }
+  Order      : TOrder;                  { [BP-$333C] }
+  Unread     : file;                    { 128 bytes nothing references }
+  F          : file;                    { [BP-$343C] }
 begin
   Assign(F, 'neurosis.dat');
   Reset(F, 1);

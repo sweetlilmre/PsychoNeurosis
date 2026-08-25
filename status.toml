@@ -751,6 +751,19 @@ finding = "PART 006's FRAMES ARE COMPLETE -- framehist reports zero differing fr
 seen_in = "TPART5"
 state = "open"
 
+[[plan.investigation]]
+name = "part3-morph-asm"
+finding = "PART 003's MORPH SCENE IS HAND ASSEMBLER AND WE HAVE BEEN READING IT AS PASCAL. Segment 1139 is all that is left of the part -- three spans of 35, 29 and 16 bytes plus a dozen small ones -- and a probe settled what it is. THE MEASUREMENT: 1139:0414 is DEC WORD PTR [$BEC2] followed straight by JNE, six bytes. Ours emits DEC, then CMP WORD PTR [$BEC2],0, then JNE -- five more, at each of FOUR loops. probe/DECLOOP.PAS tries seven spellings of `count down and stop at zero` across Turbo Pascal 7, 6.0 and 6.1: Dec then until = 0, with a call in the body, until <= 0, an assignment instead of Dec, Word, Byte, and a while. EVERY ONE emits the CMP. There is no peephole in any dialect, so those six bytes were written by hand. AND THE NEGATIVE EXPLAINS TWO TELLS THAT WERE ALREADY VISIBLE AND DISBELIEVED. 1139:040d is OR DX,DX -- Turbo Pascal returns a Boolean in AL, a word in AX, a LongInt or pointer in DX:AX, and NOTHING in DX alone; the DX form appears exactly once in the whole demo, in this one routine, while every part carries the RTL's AL form. And 1139:02e0, the routine it calls, has NO STACK FRAME AT ALL -- it goes straight to the far call -- which is what `assembler` gives and a compiled procedure does not. So CheckKey is an assembler function returning DX by the author's own convention, and the loop tails that test it are asm too: JE over a JMP is what a person writes when the exit is 367 bytes away, past a short branch's reach. WHAT TO DO, AND IT IS ONE PIECE OF WORK NOT TWO. CheckKey and its four call sites have to change TOGETHER -- making CheckKey `assembler` alone leaves the callers emitting OR AL,AL and would measure worse. The loop tail wants an asm block per loop, and the jump out needs a Pascal `label` at the end of Scene3 because BASM labels do not cross blocks. Demo_Scene3 itself starts at 1139:03b4 with a CALL and no prologue and ends at 0583 with a bare RETF, so the whole procedure may be assembler; that is a SECOND measurement and not this one. Worth roughly 150 bytes, which is part 003 to about 98.7%."
+seen_in = "TPART3"
+state = "open"
+
+[[plan.investigation]]
+name = "part3-frames"
+finding = "PART 003's FRAMES AND ITS 386 HELPERS -- five defects found by walking framehist and prologue over a part that had never had that sweep, all fixed in one batch. TUNNEL's LoadTexture: ENTER $200 with NO BP-relative slot touched at all -- every address it uses is absolute -- so 512 bytes are declared and abandoned. The sixth routine in this target to declare storage it never uses, and by far the largest. BLOCKS' Run: the whole declaration order came off four displacements, and the old note had it half right. The file record is at [BP-$343C], the BOTTOM of the frame, not behind the scalars; the order table's base at [BP-$333C] is 13,116, which is its own 13,104 plus TWELVE, so the scalars are twelve bytes and not our fourteen; [BP-2] and [BP-4] appear nowhere in the routine, so two words are declared ahead of BlockAt; and the 128 bytes between the table and F are a SECOND file record nothing opens, the fifth in this target. SPRITES' Run: the offsets were one slot out. 125e:0780 stores 50 into [BP-$2] and 0785 stores 100 into [BP-$4], and 07e8 loads [BP-$4] with -20 -- so [BP-$4] is Sweep and the 100 is a dead store to Sweep itself, five bytes nobody had transcribed. The two bytes at [BP-$E] could be ARGUED rather than guessed: every `for` limit in the routine is a constant, a constant limit needs no temporary, so a temporary is IMPOSSIBLE and the bytes are a declaration. That is the probe's finding used in the negative direction. STARS: NO `with` ANYWHERE IN THE UNIT, worth 0.8% on its own. A `with` over an array element costs four bytes of frame for the record's address and computes it ONCE; the original recomputes IMUL [Idx],$E / LES DI,[Live] / ADD DI,AX for every field it touches -- three times over for one statement and its guard. Ours was $08 against $04. Phase 1's step is an ASSIGNMENT too, not Inc. AND THE 386 HELPERS ARE AN OBJECT MODULE, proved by POSITION and not by instructions: 10b8:07db and 07f4 sit AFTER the unit's initialisation section, which ends at 07da, and nothing can be declared after a unit's `begin`. That also settles the routine that had bothered three sessions -- MulLong is called from NOWHERE in the image and ships anyway, because an object is linked per MODULE where Pascal is smart-linked per PROCEDURE. src/asm/STARMATH.ASM is new and the dead routine came through the linker exactly as that predicts. WAVES' Run IS NOT A NESTED PROCEDURE CALLED FOUR TIMES. 120f:020c stores 30 into Curve with no test in front of it, and the PROLOGUE had said so more cheaply: frame $06 with NO [BP+n] references at all, so no parameters and no static link, so it cannot be nested and cannot take two arguments. Reading that would have settled the shape without disassembling a single seeding loop. The four passes are written out inline and segment 120f is now fully aligned. Its SweepX step was an Inc where the original assigns, too. MEASURED: part 003 95.6 -> 97.6%, no other part moved, three byte-exact artefacts hold, paslint clean, and part 003's 92 emulator traps identical opcode for opcode."
+seen_in = "TPART3"
+state = "resolved"
+resolution = "RESOLVED in the same batch that found it. All six rows fixed and measured: part 003 95.6 -> 97.6%, framehist now reports only a $2 count difference that is data reading as ENTER, and segments 1015, 10b8, 11f3, 120f and 125e are clean of spans down to four bytes. What is left of the part is segment 1139 and segment 119d, and 1139 is a different KIND of work -- see part3-morph-asm."
+
 [plan.row."001 1012:0004"]
 label = "BuildLens quadrant walk"
 investigation = "pacing"
@@ -1167,8 +1180,8 @@ investigation = "surplus-fpu-sites"
 target = "R0"
 
 [plan.row."003 1015:08a7"]
-label = "LoadTexture is parameterless and reads into VGA's VirtScr"
-investigation = "part3-loadtexture"
+label = "LoadTexture: 512 bytes of frame, not one reference -- FIXED"
+investigation = "part3-frames"
 target = "R0"
 
 [plan.row."003 1015:08d0"]
@@ -1191,6 +1204,11 @@ label = "every unit wants an EMPTY initialisation section"
 investigation = "part3-init-and-palette"
 target = "R0"
 
+[plan.row."003 10b8 no with"]
+label = "Stars: no `with` in the unit, the original recomputes -- FIXED"
+investigation = "part3-frames"
+target = "R0"
+
 [plan.row."003 10b8:0592"]
 label = "Demo_Scene2's file record is a LOCAL: ENTER $80 says so"
 investigation = "part3-var-bundle"
@@ -1201,14 +1219,29 @@ label = "Stars_Generate's counter is the unit-level Idx, not a local"
 investigation = "part3-unit-level-counters"
 target = "R0"
 
+[plan.row."003 10b8:07db"]
+label = "the 386 helpers are a linked OBJ, proved by position -- FIXED"
+investigation = "part3-frames"
+target = "R0"
+
 [plan.row."003 1139:0111"]
 label = "$BEA8 and $BEAA are DX spills, not shape offsets"
 investigation = "part3-shape-offsets"
 target = "R0"
 
+[plan.row."003 1139:02e0"]
+label = "CheckKey returns in DX and has no frame -- an assembler function"
+investigation = "part3-morph-asm"
+target = "R0"
+
 [plan.row."003 1139:02fe"]
 label = "InitScene is assembler: a bare C3 means no frame, and TP always emits one"
 investigation = "part3-initscene-asm"
+target = "R0"
+
+[plan.row."003 1139:03b4"]
+label = "Demo_Scene3 has no prologue and a bare RETF -- possibly all asm"
+investigation = "part3-morph-asm"
 target = "R0"
 
 [plan.row."003 1139:03bd"]
@@ -1221,9 +1254,19 @@ label = "three zero stores use the immediate form; and ours makes one extra near
 investigation = "part3-morph-zero-stores"
 target = "R0"
 
+[plan.row."003 1139:0414"]
+label = "DEC then JNE: no compiler emits it, probe-proven across three"
+investigation = "part3-morph-asm"
+target = "R0"
+
 [plan.row."003 1139:0426"]
 label = "Scene3's morph-setup groups are asm blocks, with OFFSET for the shapes"
 investigation = "part3-morph-asm-blocks"
+target = "R0"
+
+[plan.row."003 11f3:0017"]
+label = "Blocks_Run: order off four displacements, a second file -- FIXED"
+investigation = "part3-frames"
 target = "R0"
 
 [plan.row."003 120f:0017"]
@@ -1236,9 +1279,19 @@ label = "Waves_Step erase/draw BASM"
 investigation = "part3-s6-left-dark"
 note = "Erase/draw is hand BASM with ES/CX set only in the erase branch; a skipped erase makes the draw store the colour byte into the curve table at 356+NewX (back half of curve 0). Original's left-half brightness is that corruption plus unerased litter; our Pascal-isation had fixed the bug. Block now transcribed verbatim, fragment target @asm 003 120f:01b1 +59 StepEraseDraw."
 
+[plan.row."003 120f:01f8"]
+label = "Waves_Run: four passes inline, not a nested Pass -- FIXED"
+investigation = "part3-frames"
+target = "R0"
+
 [plan.row."003 125e:012e"]
 label = "SPRITES' F is a LOCAL; ENTER $626 proves it against the DS: note"
 investigation = "part6-and-part3"
+target = "R0"
+
+[plan.row."003 125e:077c"]
+label = "Sprites_Run: offsets one slot out, a dead store -- FIXED"
+investigation = "part3-frames"
 target = "R0"
 
 [plan.row."003 to 99"]

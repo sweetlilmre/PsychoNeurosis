@@ -243,19 +243,41 @@ end;
   The display-list pass in RunScene is the other way round -- it really does
   use signed compares (10b8:035c is JLE) -- so the two are not interchangeable.
   -------------------------------------------------------------------------- }
+{ NO `with` HERE, AND THE FRAME IS HOW YOU KNOW. 10b8:0000 opens ENTER $04 --
+  exactly SX and SY -- and a `with` over an array element costs four bytes more
+  for the record's address, which probe/TWOBYTE.PAS measured directly. Ours had
+  the `with` and came out $08.
+
+  THE BODY SAYS THE SAME THING TWICE OVER. The original recomputes the element's
+  address for EVERY field it touches: 10b8:0010, 0025 and 003b are three
+  identical IMUL [Idx],$E / LES DI,[Live] / ADD DI,AX sequences, one per
+  reference to Z in the guard alone. That is what a subscript written out
+  longhand compiles to; a `with` computes it once. So the original names the
+  element in full at each field, and the record is 14 bytes -- the IMUL's own
+  multiplier -- with X at offset 0, Y at 4 and Z at 8. }
+{ THE DIVIDE IS NOT PASCAL'S. 10b8:006c and 00bb are NEAR calls to 10b8:07f4,
+  a routine of this unit's own -- not the far call into the runtime that a
+  LongInt `div` compiles to. It and its unused twin are 386 code in a linked
+  object; see src/asm/STARMATH.ASM for why the POSITION proves that rather than
+  the instructions. }
+{$L STARMATH.OBJ}
+function MulLong(A, B : LongInt) : LongInt;  external;   { 10b8:07DB }
+function DivLong(A, B : LongInt) : LongInt;  external;   { 10b8:07F4 }
+
 procedure ProjectAndPlot(Dest : Word);
 var
-  SX, SY : Word;
+  SX, SY : Word;                       { [BP-$2], [BP-$4] -- the whole frame }
 begin
   for Idx := 1 to NumPoints do
-    with Live^[Idx] do
-      if (Z < ZPlotNear) and (Z > ZPlotFar) then
-      begin
-        SX := XOfs + ((X shl ProjShift) div Z);
-        SY := YOfs + ((Y shl ProjShift) div Z);
-        if (SX <> 0) and (SX < ScrW) and (SY <> 0) and (SY < ScrH) then
-          PutPixel(SX, SY, ((-Z) shr 6) + 1, Dest);
-      end;
+    if (Live^[Idx].Z < ZPlotNear) and (Live^[Idx].Z > ZPlotFar) then
+    begin
+      SX := Live^[Idx].XOfs
+            + DivLong(Live^[Idx].X shl ProjShift, Live^[Idx].Z);
+      SY := Live^[Idx].YOfs
+            + DivLong(Live^[Idx].Y shl ProjShift, Live^[Idx].Z);
+      if (SX <> 0) and (SX < ScrW) and (SY <> 0) and (SY < ScrH) then
+        PutPixel(SX, SY, ((-Live^[Idx].Z) shr 6) + 1, Dest);
+    end;
 end;
 
 { --------------------------------------------------------------------------
@@ -267,26 +289,53 @@ end;
   -------------------------------------------------------------------------- }
 procedure RunScene;
 var
-  T      : Integer;      { [BP-2]  -- the collapse frame, read by the asm }
-  SX, SY : Integer;      { [BP-4], [BP-6] -- signed here, see below }
-  Col    : Byte;         { [BP-9]  -- ditto }
+  { THE FRAME IS ELEVEN BYTES ROUNDED TO TWELVE, and every slot is accounted
+    for now. ENTER $0C, and the references are
+
+        [BP-$2]   T, the collapse frame, read by the asm
+        [BP-$4]   SX      [BP-$6]  SY
+        [BP-$8]   set to 0 at 10b8:03d3 and NEVER READ
+        [BP-$9]   Col, one byte -- 10b8:0408 stores LODSB's result there
+        [BP-$B]   a WORD at an ODD offset: the `for T` limit temporary
+
+    the last two being the pair that fixes the shape. A one-byte local puts
+    the next slot on an odd boundary, which is how a two-byte TEMPORARY comes
+    to sit at [BP-$B]; and it is a temporary because CollapseFrames is a TYPED
+    constant at DS:$2A6, not a literal -- 10b8:03db loads it into [BP-$B] and
+    10b8:0452 compares against the same slot every iteration. A literal limit
+    would need no slot at all. So nine bytes are declared, two are the
+    compiler's, and Turbo Pascal rounds eleven up to twelve.
+
+    THE EARLIER ELEVEN WERE A COINCIDENCE. This declared seven bytes and a
+    `with` over Live^[Idx], and a `with` costs four for the record's address --
+    seven plus four is also eleven, so the frame matched while both halves
+    were wrong. }
+  T      : Integer;      { [BP-$2] -- the collapse frame, read by the asm }
+  SX, SY : Integer;      { [BP-$4], [BP-$6] -- signed here, see below }
+  Spare  : Integer;      { [BP-$8] -- assigned 0 and never read }
+  Col    : Byte;         { [BP-$9] }
 begin
   { ---- Phase 1: fly the tube, stepping back through the waypoint table ---- }
   WaypointIdx := StartWaypoint;                { 10b8:012a }
   repeat
+    { NO `with`, AND NO Inc. 10b8:013c, 0150 and 015f are three separate
+      IMUL [Idx],$E / LES DI,[Live] / ADD DI,AX sequences for what is one
+      statement and its guard, so the element is named in full each time. And
+      the step is an ASSIGNMENT: 10b8:0147 loads Z, adds $1E, moves it through
+      DX and stores it back through a freshly recomputed address. Inc emits
+      ADD [mem],imm and would touch the address once. }
     for Idx := 1 to NumPoints do
-      with Live^[Idx] do
+    begin
+      Live^[Idx].Z := Live^[Idx].Z + ZStep;    { 10b8:0147 }
+      if Live^[Idx].Z > ZNear then             { flown past -- recycle }
       begin
-        Inc(Z, ZStep);                         { 10b8:014b }
-        if Z > ZNear then                      { flown past -- recycle }
-        begin
-          Inc(Z, ZWrap);                       { 10b8:0183 -- push back 500 }
-          XOfs := Source^[Idx].XOfs + PanX;    { 10b8:01a6 -- pick up the pan }
-          YOfs := Source^[Idx].YOfs + PanY;    { 10b8:01ca }
-          X    := Source^[Idx].X;              { 10b8:01ea }
-          Y    := Source^[Idx].Y;              { 10b8:0210 }
-        end;
+        Live^[Idx].Z := Live^[Idx].Z + ZWrap;  { push back 500 }
+        Live^[Idx].XOfs := Source^[Idx].XOfs + PanX;   { pick up the pan }
+        Live^[Idx].YOfs := Source^[Idx].YOfs + PanY;
+        Live^[Idx].X    := Source^[Idx].X;
+        Live^[Idx].Y    := Source^[Idx].Y;
       end;
+    end;
 
     ClearVirtual;                              { 10b8:023c }
     ProjectAndPlot(VirtScrSeg);                { 10b8:0245 }
@@ -308,18 +357,22 @@ begin
     unlike ProjectAndPlot above. }
   DisplayCount := 0;
   for Idx := 1 to NumPoints do
-    with Live^[Idx] do
+  begin
+    SX := Live^[Idx].XOfs
+          + DivLong(Live^[Idx].X shl ProjShift, Live^[Idx].Z);   { 10b8:02ef }
+    SY := Live^[Idx].YOfs
+          + DivLong(Live^[Idx].Y shl ProjShift, Live^[Idx].Z);   { 10b8:033e }
+    if (SX > 0) and (SX < ScrW) and (SY < ScrH) and (SY > 0) then
     begin
-      SX := XOfs + ((X shl ProjShift) div Z);
-      SY := YOfs + ((Y shl ProjShift) div Z);
-      if (SX > 0) and (SX < ScrW) and (SY < ScrH) and (SY > 0) then
-      begin
-        Inc(DisplayCount);
-        Display[DisplayCount].X      := SX;
-        Display[DisplayCount].Y      := SY;
-        Display[DisplayCount].Colour := ((-Z) shr 6) + 1;
-      end;
+      Inc(DisplayCount);
+      Display[DisplayCount].X      := SX;
+      Display[DisplayCount].Y      := SY;
+      Display[DisplayCount].Colour := ((-Live^[Idx].Z) shr 6) + 1;
     end;
+  end;
+
+  { 10b8:03d3 -- XOR AX,AX / MOV [BP-8],AX, and nothing ever reads it back. }
+  Spare := 0;
 
   { ---- Phase 3: collapse everything into the centre over 32 frames ---- }
   for T := 1 to CollapseFrames do
