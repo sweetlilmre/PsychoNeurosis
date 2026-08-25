@@ -728,6 +728,13 @@ resolution = "PART 006 98.2% -> 98.6%, and TWO of its three 11bb spans are gone:
 name = "part6-last-42"
 finding = "part 006 is at 98.6% and needs about 42 bytes. Three spans are left and two of them are displacement noise rather than wrong code. 11bb:0096 (18 bytes) is SetPalette768(@Pal) followed by Close(F), and the sequence already matches -- the differing bytes are the far-call target into the VGA unit (segment 1ee at offset $212 in the original) and the DS address of the file record at $9654. Both are allowed-difference classes that the walk does not forgive when they are dense. 1095:063c (16 bytes) is unread. 100f:0543 (29 bytes) is Setup's palette loop and IS worth reading, but note the trap: I byte-compared it once by searching for the Pal[I*3] fetch and matched a DIFFERENT routine, because several units in this part share that byte pattern. Locate it by the ENTER $386 prologue instead, which is unique to two routines and can be told apart by what follows. AND ONE FRAME REMAINS: Whoosh at 1095:067d, ENTER $112 against our $114. Its nine declared words plus the String parameter's 256-byte copy are 274, which IS the original's, so the two extra bytes are a temporary our body creates. Given this batch and the last two, look for an expression that stores an intermediate -- and remember the array-dimension lesson: check the multipliers, not just the shape."
 seen_in = "TPART6"
+state = "resolved"
+resolution = "PART 005 97.3% (+2 bytes) and its remaining frame difference is now the two-byte temporary above. P5S3's Setup at 1102:02d1 had NO FRAME AT ALL where the original opens ENTER $82 -- 130 bytes, and not one of them is referenced anywhere in the routine. 128 + 2 is a file record and a word, and this is the FOURTH routine in the target to declare a file it never opens: P6S1's Load, P6S2's Setup, P6S4's Setup and now this. The file it actually uses is the global at DS:$A984 that 1102:02ed pushes. AND PART 006's LAST READABLE SPAN IS A REGISTER-ALLOCATION DIFFERENCE, which is where I stopped. Setup's palette loop at 100f:0543: the original builds the index in DI directly -- MOV DI,[BP-$82] / MOV SI,DI / SHL DI,1 / ADD DI,SI -- and ours builds it in AX and then transfers, MOV AX,[BP-$82] / ... / MOV DI,AX. Two bytes per access, three accesses. The displacements and the -$386 base already match, so this is not a declaration or an expression difference; it is which register the code generator chose, and Pascal does not name that. Recorded rather than chased. Locating it needed care and the note is worth keeping: searching for the Pal[I*3] fetch matched the WRONG routine, because several units in the part share that byte pattern. Pairing the three ENTER $386 sites by byte agreement over their first 512 bytes found the right one."
+
+[[plan.investigation]]
+name = "two-byte-temp"
+finding = "THREE ROUTINES IN TWO PARTS ARE EXACTLY TWO BYTES OF FRAME TOO BIG, and in all three our declarations total the original's figure exactly -- so the two bytes are a COMPILER TEMPORARY our body creates and the original's does not. This is one investigation, not three, and it is worth a probe rather than more reading. P5S2's Shatter at 1096:0042: ENTER $26 against our $28. Its seventeen locals sum to 37, which rounds to 38 = $26 exactly, so nothing is missing or mistyped. P6S1's Whoosh at 1095:067d: ENTER $112 against our $114. Nine declared words plus the String parameter's 256-byte copy are 274 = $112 exactly. P7S1's UpCaseStr at 100f:06f7: ENTER $104 against our $106. A 256-byte String copy plus I and L are 260 = $104 exactly, and the loop is NOT the cause -- 100f:071f compares against L directly, so `for I := 1 to L` over a simple local needs no limit temporary. WHAT IS ALREADY RULED OUT: the for-loop limit (measured in UpCaseStr), the declaration order (checked in all three), and a shared construct -- Shatter has `(X1-X0) * T div Denom` expressions and Whoosh has `Length(S)`, with nothing obviously in common. HOW TO SETTLE IT: put the candidate constructs in probe/ and read the frames. TP7's temporaries that are two bytes wide are few, and one build per candidate prices it -- the same loop that settled the LongInt function result in part 007 after three wrong guesses. Do that before touching any of the three bodies; guessing has cost a build each time."
+seen_in = "TPART5"
 state = "open"
 
 [plan.row."001 1012:0004"]
@@ -1251,9 +1258,9 @@ investigation = "part5-dgroup-order"
 target = "R0"
 
 [plan.row."005 1096:0042"]
-label = "Shatter: P5S2 was missing {$G+}"
-investigation = "pacing"
-note = "THE SWITCH, NOT THE ROUTINE, and the evidence had been sitting in the unit's own comment for days. P5S2 carried no {$G+}, so every framed routine in it opened PUSH BP / MOV BP,SP / SUB SP,n where the original opens ENTER -- a 286 instruction Turbo Pascal emits only under $G+. Both framed routines in segment 1096 open ENTER: $26,0 at 1096:0042 and $04,0 at 1096:03d7. The unit's {$S-} comment quoted `ENTER $26,0` as its justification for the stack-check switch and nobody read it as evidence about $G. Eight other units had the switch added on exactly this evidence; this one was missed. Measured: part 005's coverage walk goes 80.4% to 88.1% -- 885 bytes, the largest single move this target has recorded -- and Shatter's own span at 1096:0042..01ec falls from 426 bytes to 96 at 1096:016d..01cd. routines.py unchanged at 74 locked, 0 failing, so the locked verbatim BASM in the unit survived the codegen change, which was the risk: $G changes register allocation and not merely encodings. HOW IT WAS FOUND MATTERS MORE THAN THE FIX. The observer's scene-by-scene run split scene 2 into a slow image build and a rotozoom that looked right, which named Shatter; the coverage walk independently made Shatter the part's largest span; and the frame comparison then showed the prologue form differing rather than the body. Three instruments, one address. A SWEEP OF THE OTHER UNITS FOUND NO SECOND CASE, and two candidates were REFUTED rather than assumed: FIXMATH's original segments 1483 and 142a carry no ENTER at all, and P2VIEW's 140c carries none either, so both are correctly $G- and adding the switch would have been wrong. What the sweep could not finish is the unit-to-segment mapping for the drivers and the remaining small segments -- linkorder and mapcmp would answer it, and both want target.image, which this target deliberately leaves unanswered because it is nine part binaries rather than one."
+label = "Shatter: seventeen locals sum to $26 exactly; 2 bytes are a temp"
+investigation = "two-byte-temp"
+target = "R0"
 
 [plan.row."005 1096:03d7"]
 label = "Scene 1-to-2 switch (PARKED)"
@@ -1311,8 +1318,8 @@ investigation = "surplus-fpu-sites"
 target = "R0"
 
 [plan.row."006 1095:067d"]
-label = "Whoosh: nine words already tile, so the 2 bytes are a temp"
-investigation = "part6-last-81"
+label = "Whoosh: same, 274 exactly"
+investigation = "two-byte-temp"
 target = "R0"
 
 [plan.row."006 1118:0000"]
@@ -1361,8 +1368,8 @@ investigation = "part7-frames"
 target = "R0"
 
 [plan.row."007 100f:06f7"]
-label = "UpCaseStr is two bytes too big and the loop is not the cause"
-investigation = "part7-string-table"
+label = "UpCaseStr: same, 260 exactly, and the loop is ruled out"
+investigation = "two-byte-temp"
 target = "R0"
 
 [plan.row."007 100f:07a8"]

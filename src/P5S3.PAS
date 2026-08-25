@@ -268,6 +268,19 @@ end;
             768 bytes     its palette
   -------------------------------------------------------------------------- }
 procedure Setup;
+var
+  { ENTER $82 IS 130 BYTES AND NOT ONE OF THEM IS REFERENCED -- the routine
+    touches no [BP-n] slot at any width in its whole body. So this is 130 bytes
+    of declaration that nothing reads, and ours had no frame at all.
+
+    128 + 2 is a file record and one more word, and a file record is what this
+    part's other scenes declare and leave unopened in the same position: P6S1's
+    Load, P6S2's Setup and P6S4's Setup all do it. The file this routine
+    actually uses is the GLOBAL at DS:$A984, which 1102:02ed pushes.
+
+    The TYPES are a guess and only the total is measured. }
+  Unread : file;                  { [BP-$80]..[BP-1], never referenced }
+  Spare  : Integer;               { [BP-$82], never referenced }
 begin
   GetMem(Pic, 64000);                            { 1102:02d5 }
   PicSeg := Seg(Pic^);                           { 1102:02e4 }
