@@ -62,7 +62,17 @@ type
   TFont   = array[0..FontSize - 1] of Byte;
   TPal768 = array[0..767] of Byte;
 
-{$I gen/P6TEXT.INC}   { const CreditText : array[1..113] of String[12] }
+{ THE ARRAY IS 99 AND THE LOOP COUNTS TO 113, and both are the original's.
+  11bb:02fa stops at $72, so Lines really is 113; the table really is 99
+  slots, because P6S1's Path pointer sits at DS:$737E and 99 slots of 256
+  from $0D8A end at $708A -- 113 would run to $7F8A with Path inside it.
+  Lines 100..113 therefore read PAST the array, into constants that are
+  zeros, which is why they draw blank.
+
+  A DEVIATION LIVES HERE. Those fourteen reads land on whatever follows the
+  table, and what follows it in this build is not what follows it in the
+  original. They are blank there and are not guaranteed blank here. }
+{$I gen/P6TEXT.INC}   { const CreditText : array[1..99] of String[255] }
 
 var
   Buf     : Pointer;              { DS:$9648 }

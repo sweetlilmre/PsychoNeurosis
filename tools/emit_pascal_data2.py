@@ -184,7 +184,7 @@ def emit_p005():
 # P6S4 declares `Lines = 113` and indexes String[12]; the generator must
 # agree with the source it feeds, so both live here as names rather than
 # being derived from however much text the image happens to hold.
-P6_CREDIT_LINES = 113
+P6_CREDIT_LINES = 99       # NOT 113 -- see the docstring below
 P6_CREDIT_WIDTH = 255      # 256 bytes per element, and the docstring below
                            # always said so -- a Borland String[n] occupies
                            # n+1 bytes, so the $100 stride this table is READ
@@ -205,14 +205,22 @@ def pascal_strings(raw, base, first, stride, limit=400):
 
 
 def emit_p006_text():
-    """The credits table -- a FIXED 113 entries, not "as many as the image has".
+    """The credits table -- NINETY-NINE entries of 256 bytes from DS:$0D8A.
 
-    The DGROUP array is 113 elements of 256 bytes from DS:$0D8A, and P6S4
-    declares `Lines = 113`. Only the first 99 carry text in the load image;
-    the rest fall past its end and arrive blank at run time, so they are
-    emitted blank rather than dropped. Emitting only the 99 that have bytes
-    renamed and shortened the array, which is exactly what silently broke
-    P6S4 the one time this generator was re-run.
+    This docstring used to say 113, and 113 is the LOOP'S bound, not the
+    array's. The two are not the same and the address of the next variable
+    proves it: P6S1's Path pointer is at DS:$737E, and 99 slots of 256 from
+    $0D8A end at $708A while 113 would run to $7F8A -- with Path inside the
+    array. It cannot be 113.
+
+    P6S4 does count to 113 (11bb:02fa stops at $72), so lines 100..113 read
+    PAST the array into the constants beyond it, which are zeros. That is why
+    they arrive blank at run time, and it is the observation the old docstring
+    had hold of by the wrong end.
+
+    The stride is $100, so the element type is String[255]: a Borland
+    String[n] occupies n+1 bytes. Declared String[12] the table came out 1,469
+    bytes where the original's is 25,344.
     """
     raw, base = dg("006")
     lines = pascal_strings(raw, base, 0x0D8A, 0x0100, limit=P6_CREDIT_LINES)
