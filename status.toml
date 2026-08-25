@@ -714,6 +714,13 @@ state = "open"
 name = "part6-to-99"
 finding = "PART 006 98.0% -> 98.2%, and segment 100f now has NO frame difference at all. Two findings, and the second is the recipe's static-link check paying again. Setup at 100f:03f8: ENTER $386 is 902 and it decomposes as 128 + 6 + 768. Only three slots plus the palette are referenced, so the 128 bytes NEAREST BP are declared and never read -- an unreferenced file record, the same thing P6S1's Load already has in the same position. First-declared is nearest BP, so the order is that record, then the three Integers at $82/$84/$86, then Pal at $386 -- the address this file already recorded for it. Declared with Pal first, Pal landed at [BP-$300] and the frame came out $306. LoadCel at 100f:00ac IS A NESTED PROCEDURE, and the call site says so: 100f:0112 pushes the slot then 100f:0114 pushes BP -- a STATIC LINK -- before the near call, and 100f:00f9 is RET 8, being four bytes of String pointer plus two of slot plus two of link. That also PLACES the parameters, because the link takes [BP+4]: Slot lands at [BP+6] and Name's offset at [BP+8], which is exactly the pair the routine reads. At unit level it was RET 6 with both parameters two bytes low. Nested inside LoadCels, plus the two unread bytes at [BP-$202] that bring ENTER to $202. AND ONE CHANGE KEPT DESPITE A FLAT MEASUREMENT, which needs saying because the standing rule is that neutral means unmeasured. Setup's palette loop indexes Pal with the counter at [BP-$82] -- 100f:0544 is MOV AL,[BP+DI-$386] after DI is built from [BP-$82] -- and [BP-$82] is the first-declared slot, so I is first and A and J follow. Our order had A there. The walk did not move for it. The difference from the neutral-means-unmeasured cases is that this is a DIRECT reading of the original's displacement rather than an inference from a total, so it is kept; but the walk's silence is recorded rather than glossed."
 seen_in = "TPART6"
+state = "resolved"
+resolution = "PART 006 NOW HAS EXACTLY ONE FRAME DIFFERENCE LEFT, down from six, and the walk is flat at 98.2% for this last fix -- which is worth stating rather than hiding. P6S4's Setup at 11bb:0015: Pal's OWN ADDRESS places everything. It sits at [BP-$382] and is 768 bytes, so it ends at [BP-$83], leaving 130 bytes ABOVE it and 4 BELOW against ENTER $386's 902. First declared is nearest BP, so the 130 come first -- an unreferenced 128-byte file record and one Integer -- then Pal. That is the identical shape to P6S2's Setup, fixed earlier in the same batch, and to P6S1's Load: THREE routines in this part declare a file they never open. AND THE FOUR BYTES BELOW Pal ARE THE COMPILER'S. Declared as a LongInt the frame came out $38A, four too many, and framehist named it as a $38A surplus against a $386 shortfall -- an equal-and-opposite pair, which is exactly what its own guidance says is usually ONE routine rather than two defects. Removing the declaration and letting the four be a temporary gave $386. Same trap as part 007's function result: A SLOT THE ROUTINE USES IS NOT NECESSARILY A SLOT IT DECLARES, and that is now twice in two batches. A MIS-COMPARISON WORTH RECORDING so it is not repeated: I byte-compared what I thought was Setup's palette loop and read our counter as [BP-2] and our Pal as [BP-$404], which made no sense against declarations that were demonstrably right. The needle had matched a DIFFERENT routine -- several units in this part have a `SetRGB(I, Pal[I*3], ...)` loop and they share a byte pattern. Locating by content needs a needle that is unique, and a palette loop is not."
+
+[[plan.investigation]]
+name = "part6-last-81"
+finding = "part 006 is at 98.2% and needs about 81 bytes for 99%. Its frames are done bar one and the remaining work is bodies. THE ONE FRAME: Whoosh at 1095:067d, ENTER $112 against our $114. Its nine declared words plus the String parameter's 256-byte copy come to 274 exactly, which IS the original's, so the two extra bytes are a temporary our body creates and the original's does not. Given the last two batches, look for it in an expression that stores an intermediate rather than in a declaration. THE SPANS, and they are small and scattered: 100f:0543 (29, in Setup's palette loop), 11bb:01b5 (20), 11bb:0096 (18), 11bb:01e8 (18), 1095:063c (16). That is 101 bytes in spans of 16 or more against 183 unaligned in total, so 82 bytes are in spans too small to list -- which means even fixing every listed span would not reach 99% on its own. 11bb:0096 IS PARTLY READ: it is Assign/Reset/Seek on the file at DS:$9654 with a palette buffer at [BP-$382] handed to something in segment 1ee, and a LongInt seek offset of 28 pushed as PUSH $1C / PUSH 0. Three spans in 11bb of 18-20 bytes each suggests one repeated shape rather than three problems."
+seen_in = "TPART6"
 state = "open"
 
 [plan.row."001 1012:0004"]
@@ -1292,8 +1299,8 @@ investigation = "surplus-fpu-sites"
 target = "R0"
 
 [plan.row."006 1095:067d"]
-label = "Whoosh is two bytes too big and its nine words already tile"
-investigation = "part6-to-99"
+label = "Whoosh: nine words already tile, so the 2 bytes are a temp"
+investigation = "part6-last-81"
 target = "R0"
 
 [plan.row."006 1118:0000"]
@@ -1314,6 +1321,11 @@ target = "R0"
 [plan.row."006 1118:0907"]
 label = "the reseed test is `<` and the store to Grid[99,I] is UNCONDITIONAL"
 investigation = "part6-fire-height"
+target = "R0"
+
+[plan.row."006 11bb spans"]
+label = "three spans of 18-20 bytes: likely one repeated shape"
+investigation = "part6-last-81"
 target = "R0"
 
 [plan.row."006 dgroup $94E0"]

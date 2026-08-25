@@ -108,8 +108,24 @@ var
   -------------------------------------------------------------------------- }
 procedure Setup;
 var
-  Pal : TPal768;                  { [BP-$382] }
-  I   : Integer;
+  { ENTER $386 IS 902 AND Pal's OWN ADDRESS PLACES EVERYTHING. Pal is at
+    [BP-$382] and is 768 bytes, so it runs to [BP-$83] -- which leaves 130
+    bytes ABOVE it and 4 BELOW. First declared is nearest BP, so those 130 come
+    first: a 128-byte file record and one Integer, neither referenced, and then
+    Pal, and then four more bytes. 128 + 2 + 768 + 4 = 902.
+
+    THE FOUR BELOW Pal ARE THE COMPILER'S, not a declaration. Declared as a
+    LongInt the frame came out $38A -- four too many -- so 898 bytes of
+    declarations plus a four-byte temporary is what makes 902. That is the same
+    trap as part 007's function result: a slot the routine uses is not
+    necessarily a slot it declares.
+
+    P6S2's Setup has the identical shape -- an unreferenced file record nearest
+    BP ahead of its palette -- and so does P6S1's Load. Three routines in this
+    part declare a file they never open. }
+  Unread : file;                  { [BP-$80]..[BP-1], never referenced }
+  I      : Integer;               { [BP-$82] }
+  Pal    : TPal768;               { [BP-$382] }
 begin
   Assign(F, 'neurosis.dat');                     { 11bb:0023 }
   Reset(F, 1);
