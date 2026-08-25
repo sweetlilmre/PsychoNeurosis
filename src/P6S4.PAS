@@ -53,13 +53,39 @@ const
   BufSize   = $FFFF;              { 11bb:00b8 asks GetMem for exactly this }
   FontSize  = $5B8C;              { 23436 -- the same font part 004 scrolls }
   GlyphSt   = $17A;               { 378 bytes per glyph }
+  FirstChar  = 32;                { the font starts at space -- see TFont }
+  GlyphCount = 62;                { 23,436 / 378 }
+  { THE ARRAY's DIMENSIONS ARE NOT THE LOOP BOUNDS, and both are measured.
+    11bb:01b1 is IMUL AX,AX,$17A -- 378 -- so the first dimension's stride is
+    378 = 21 x 18, and 11bb:01cb is IMUL AX,[BP-4],$12 -- 18 -- so the second
+    dimension's is 18. That makes the glyph 21 columns of 18.
+
+    But the LOOPS walk 20 and 19: 11bb:021d counts J to $14 and 11bb:0233 wraps
+    the row at $14. So the code steps outside the declared glyph on both axes,
+    which with range checking off simply reads the next glyph's first bytes.
+    Declaring the array from the loop bounds gives strides of 380 and 19 and
+    every glyph lookup lands two bytes further on per character. }
+  GlyphCols  = 21;                { the array's second dimension, 378 / 18 }
+  GlyphHigh  = 18;                { the array's third }
   MarginN   = $B4;                { 180 }
   DataOfs   = $0018B23F;          { 11bb:0039 pushes $0018 then $B23F }
   FeedAt    = $FA00;              { 64000 -- where a fed row lands }
   Backdrop  = $C8;                { 200 -- the colour of the two bars }
 
 type
-  TFont   = array[0..FontSize - 1] of Byte;
+  { THREE DIMENSIONS, and the addressing proves both the shape and the bounds.
+    11bb:01b5 is LES DI,[Font] followed by THREE separate adds -- ADD DI,AX,
+    ADD DI,DX, ADD DI,CX -- which is what a three-subscript reference emits;
+    summing the terms into AX first and adding once, as a one-dimensional
+    subscript does, is what ours did.
+
+    And the fold gives the low bound. 11bb:01bf is CMP BYTE PTR ES:[DI-$2F53],
+    so 12,115 is folded in, and for array[L.., 1..21, 1..18] the fold is
+    L * 378 + 1 * 18 + 1. Setting that to 12,115 gives L * 378 = 12,096 and
+    L = 32 -- the space character, which is exactly what part 004's font array
+    uses for the same font. 62 glyphs of 378 is FontSize's 23,436. }
+  TFont   = array[FirstChar..FirstChar + GlyphCount - 1,
+                  1..GlyphCols, 1..GlyphHigh] of Byte;
   TPal768 = array[0..767] of Byte;
 
 { THE ARRAY IS 99 AND THE LOOP COUNTS TO 113, and both are the original's.
@@ -168,11 +194,9 @@ begin
   if (Line <= $63) and (RowIn <> GlyphRows) then  { 11bb:016c, 11bb:0176 }
     for I := 0 to Chars - 1 do
       for J := 1 to GlyphW do
-        if Font^[Ord(CreditText[Line][I + 1]) * GlyphSt
-                 + J * 18 + RowIn - 12115] <> 0 then
+        if Font^[Ord(CreditText[Line][I + 1]), J, RowIn] <> 0 then
           Mem[Seg(P^) : FeedAt + I * Pitch + J] :=
-            Font^[Ord(CreditText[Line][I + 1]) * GlyphSt
-                  + J * 18 + RowIn - 12115];      { 11bb:021a }
+            Font^[Ord(CreditText[Line][I + 1]), J, RowIn];  { 11bb:021a }
 
   Inc(RowIn);                                     { 11bb:022f }
   if RowIn = $14 then                             { 11bb:0233 }

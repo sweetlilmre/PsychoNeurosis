@@ -721,6 +721,13 @@ resolution = "PART 006 NOW HAS EXACTLY ONE FRAME DIFFERENCE LEFT, down from six,
 name = "part6-last-81"
 finding = "part 006 is at 98.2% and needs about 81 bytes for 99%. Its frames are done bar one and the remaining work is bodies. THE ONE FRAME: Whoosh at 1095:067d, ENTER $112 against our $114. Its nine declared words plus the String parameter's 256-byte copy come to 274 exactly, which IS the original's, so the two extra bytes are a temporary our body creates and the original's does not. Given the last two batches, look for it in an expression that stores an intermediate rather than in a declaration. THE SPANS, and they are small and scattered: 100f:0543 (29, in Setup's palette loop), 11bb:01b5 (20), 11bb:0096 (18), 11bb:01e8 (18), 1095:063c (16). That is 101 bytes in spans of 16 or more against 183 unaligned in total, so 82 bytes are in spans too small to list -- which means even fixing every listed span would not reach 99% on its own. 11bb:0096 IS PARTLY READ: it is Assign/Reset/Seek on the file at DS:$9654 with a palette buffer at [BP-$382] handed to something in segment 1ee, and a LongInt seek offset of 28 pushed as PUSH $1C / PUSH 0. Three spans in 11bb of 18-20 bytes each suggests one repeated shape rather than three problems."
 seen_in = "TPART6"
+state = "resolved"
+resolution = "PART 006 98.2% -> 98.6%, and TWO of its three 11bb spans are gone: the font lookup now matches with ONE byte differing, and that byte is a jump displacement. THE FONT ARRAY IS THREE-DIMENSIONAL and its bounds are not the loop bounds. Three readings, each needed. FIRST, THE SHAPE. 11bb:01b5 is LES DI,[Font] followed by THREE separate adds -- ADD DI,AX / ADD DI,DX / ADD DI,CX -- which is what a three-subscript reference emits. Ours summed the terms into AX and added once, which is a one-dimensional subscript. SECOND, THE LOW BOUND, from the fold. 11bb:01bf is CMP BYTE PTR ES:[DI-$2F53], so 12,115 is folded into the displacement, and for array[L.., 1..21, 1..18] the fold is L * 378 + 18 + 1. That gives L * 378 = 12,096 and L = 32 -- the space character, which is what part 004's font array uses for the SAME font. Written as a 0-based array with `- 12115` in the subscript, Borland emits a runtime SUB AX,$2F53 instead, because it does not fold a constant across an expression containing variables. THIRD, AND THIS ONE COST AN EXTRA BUILD: THE ARRAY's DIMENSIONS ARE NOT THE LOOP BOUNDS. 11bb:01b1 multiplies by $17A (378) and 11bb:01cb by $12 (18), so the glyph is 21 columns of 18. But the loops walk 20 and 19 -- 11bb:021d counts J to $14 and 11bb:0233 wraps the row at $14 -- so the code steps outside the declared glyph on BOTH axes and, with range checking off, reads into the next glyph. Declaring the array from the loop constants, which is the obvious thing, gave strides of 380 and 19 and put every lookup two bytes further on per character. It also gained 45 bytes on the walk anyway, because the SHAPE was right even while the multipliers were wrong -- a reminder that a partial gain is not a finished reading."
+
+[[plan.investigation]]
+name = "part6-last-42"
+finding = "part 006 is at 98.6% and needs about 42 bytes. Three spans are left and two of them are displacement noise rather than wrong code. 11bb:0096 (18 bytes) is SetPalette768(@Pal) followed by Close(F), and the sequence already matches -- the differing bytes are the far-call target into the VGA unit (segment 1ee at offset $212 in the original) and the DS address of the file record at $9654. Both are allowed-difference classes that the walk does not forgive when they are dense. 1095:063c (16 bytes) is unread. 100f:0543 (29 bytes) is Setup's palette loop and IS worth reading, but note the trap: I byte-compared it once by searching for the Pal[I*3] fetch and matched a DIFFERENT routine, because several units in this part share that byte pattern. Locate it by the ENTER $386 prologue instead, which is unique to two routines and can be told apart by what follows. AND ONE FRAME REMAINS: Whoosh at 1095:067d, ENTER $112 against our $114. Its nine declared words plus the String parameter's 256-byte copy are 274, which IS the original's, so the two extra bytes are a temporary our body creates. Given this batch and the last two, look for an expression that stores an intermediate -- and remember the array-dimension lesson: check the multipliers, not just the shape."
+seen_in = "TPART6"
 state = "open"
 
 [plan.row."001 1012:0004"]
@@ -1283,6 +1290,11 @@ label = "Setup: 128 unread bytes nearest BP, then three Integers, then Pal"
 investigation = "part6-to-99"
 target = "R0"
 
+[plan.row."006 100f:0543"]
+label = "Setup's palette loop -- locate by ENTER $386, not the fetch"
+investigation = "part6-last-42"
+target = "R0"
+
 [plan.row."006 1095:0114"]
 label = "Sign has no local: the frame leaves no room for one"
 investigation = "part6-scene1-jerky"
@@ -1326,6 +1338,11 @@ target = "R0"
 [plan.row."006 11bb spans"]
 label = "three spans of 18-20 bytes: likely one repeated shape"
 investigation = "part6-last-81"
+target = "R0"
+
+[plan.row."006 11bb:0096"]
+label = "SetPalette768 + Close: call target and DS address only"
+investigation = "part6-last-42"
 target = "R0"
 
 [plan.row."006 dgroup $94E0"]
