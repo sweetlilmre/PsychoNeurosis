@@ -118,9 +118,12 @@ type
                                        nothing promoted around it; nothing did
                                        in Walker, and this routine is where it
                                        does. }
-    Bounces    : Integer;     { +4  -- a second hard landing splats }
-    Frame      : Integer;     { +6  -- one-based, indexes the sprite banks }
-    Tick       : Integer;     { +8  -- sub-frame counter }
+    { THREE MORE UNSIGNED FIELDS, and the divide instruction names them: every
+      `mod` on Frame and Tick is XOR DX,DX / DIV -- 1005:1960 and 1005:1979 --
+      where a signed Integer would give CWD / IDIV. Bounces goes with them. }
+    Bounces    : Word;        { +4  -- a second hard landing splats }
+    Frame      : Word;        { +6  -- one-based, indexes the sprite banks }
+    Tick       : Word;        { +8  -- sub-frame counter }
     Timer      : Integer;     { +10 -- >0 counts down to a fuse,
                                        <0 counts up to removal }
     Active     : Byte;        { +12 -- 0 means the slot is free }
@@ -1549,9 +1552,15 @@ end;
   -------------------------------------------------------------------------- }
 procedure MainLoop;
 var
-  Frame, I : Integer;
-  V        : Byte;
-  Done     : Boolean;
+  { THE ORDER IS Frame, V, Done, I, and the byte offsets say so: 1005:1bbb's
+    frame is $06 and its slots are [BP-$02] a word, [BP-$03] a byte with six
+    references, [BP-$04] a byte with four, and [BP-$06] a word with five.
+    1005:1BCB stores Frame and 1005:1BD9 stores Done, in that order, so the
+    volume byte is declared BETWEEN them and the loop counter last. }
+  Frame : Integer;                { [BP-$02] }
+  V     : Byte;                   { [BP-$03] }
+  Done  : Boolean;                { [BP-$04] }
+  I     : Integer;                { [BP-$06] }
 begin
   LiveCount := 0;
   Spawned   := 0;
