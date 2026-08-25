@@ -367,6 +367,13 @@ finding = "part 006 looked identical bar possibly slight timing; a careful scene
 seen_in = "TPART6"
 state = "open"
 
+[[plan.investigation]]
+name = "surplus-fpu-sites"
+finding = "parts 003 and 006 each ship MORE x87 emulator traps than the 1994 binaries do -- three and two -- and the surplus was read for days as a unit compiled {$N+} that the original built {$N-}. It is not a switch on either part: every unit's {$N} already matches, and the surplus is two ordinary expressions that compute the same value more times than the original does."
+seen_in = "TPART6"
+state = "resolved"
+resolution = "NEITHER PART HAD A SWITCH WRONG, and the class is worth the name it now has: the rebuild performed an operation the original had arranged not to perform twice. Localised with fpusites.py --diff, which diffs the two streams of trap NUMBERS rather than pairing our addresses against the original's segment map -- layout-independent, so it works on a part at 87 percent. PART 006, P6S1's BuildPath: the original stores Abs(Dx) and Abs(Dy) into Major and Minor and then tests THOSE TWO VARIABLES; the reconstruction tested Abs(Dy) >= Abs(Dx) and recomputed both. The branch sense fixes which way round the source names them -- the original pushes Major, then Minor, and skips the block on JB, which is `if Major <= Minor` -- and writing it that way took the part from 98 traps to the original's 96, with six bytes of code removed. PART 003, Tunnel_UpdateMotion: the degrees-to-radians conversion is a NESTED function at 1015:0708 in the original -- each call site pushes the six-byte Real and then BP, and the routine opens ENTER 6,0 and closes RET 8 -- and the reconstruction had `Angle * Pi / 180` inline in both statements, so the multiply and the divide were emitted twice instead of once. Extracting the function matched the count exactly and moved the coverage walk 86.6 to 87.1 percent. The unit's own comment had named 1015:0708 and said what it did all along, so the reading had been done and only the transcription had not. WHAT MAKES THIS WORTH RECORDING RATHER THAN JUST FIXING: on part 006 the coverage walk is BLIND to it. A bracket build was run for that reason -- the old expression and the new, nothing else in the tree moved -- and spans.py reported 9229 of 10160 aligned BOTH TIMES, byte for byte the same number, because the six extra bytes sat inside a stretch the walk had already given up on. The general form is the wiki observation operation-count-names-the-shape. NEITHER PART HAS BEEN RE-OBSERVED: both are fidelity fixes measured against the binaries, and part 006 removes work from a path the original does once per frame, so a watched run is still owed."
+
 [plan.row."001 1012:0004"]
 label = "BuildLens quadrant walk"
 investigation = "pacing"
@@ -522,6 +529,11 @@ label = "REGRESSION: the generator and the sources had drifted, and the build wa
 investigation = "pacing"
 note = "Running tools/emit_pascal_data2.py to regenerate P2OBJ.INC also rewrote P6TEXT.INC, renaming CreditText to Credits and shortening it from 113 entries to 99. P6S4 stopped compiling and the failure cascaded to P6MAIN, TP6S4 and TPART6 - so run/TPART6.EXE was STALE from that commit onward, and so were several other EXEs. I did not notice for four commits because I only ever read the last line of the build output, which is the green check you have not read the output of, verbatim. Every part re-measured from a clean build afterwards: 001 68.7 to 68.6, 003 65.8 to 67.4, 004 56.2 to 56.6, 005 88.4 to 88.7, 006 73.0 to 73.4, 007 86.9 to 87.0 - the rises are the VGA layout work reaching parts whose EXEs had been stale, and the 001 fall is a stale number correcting itself. Fixed at the generator, which is where the drift belonged: it emits CreditText and a FIXED 113 entries now, with the two shape facts named as constants beside the reader rather than derived from however much text the image happens to hold. Verified idempotent and the 99 real strings identical to the pre-break file. One slot differs and the NEW output is the correct one: slot 100 has a length byte of ZERO and the old generator ignored the length byte and captured three bytes of padding as text. Also repaired: two string literals in the generator that a heredoc broke by halving a backslash, which is WORKING.md section 9 first entry, and it hid itself - the generator crashed, the include was left as restored, and a diff of two copies of that untouched file reported idempotent."
 
+[plan.row."003 1015:0708"]
+label = "UpdateMotion's degrees-to-radians is a NESTED function"
+investigation = "surplus-fpu-sites"
+target = "R0"
+
 [plan.row."003 120f:0017"]
 label = "Waves_LoadCurves palette"
 investigation = "part3-s6-left-dark"
@@ -546,3 +558,8 @@ note = "PARKED at the observer's call on 24 Aug 2026, with part 005 at 88.1% and
 label = "Scene2 motion-table build"
 investigation = "part5-386-trio"
 note = "The investigation's premise was stale: the 386 trio (SinCos/RotatePoint/Project) HAS been transcribed since the 19 Aug part-005 re-read (P5S3, verified fragments). The cost was the motion-table build in Demo_Scene2 -- loop body 1096:051a..0591, entered by the JMP at 1096:0514 -- which is 80x87 code in the original: FILD the index, FDIV by a SINGLE 180.0 at CS:$03c9, FLD the ten-byte EXTENDED Pi at CS:$03cd, then the RTL's Sin (CS:$32ad), Cos (CS:$32b2) and Round. P5S2 compiled under the $N- default, sending those calls through the software six-byte-Real RTL instead. Fixed by {$N+} on P5S2, and the reason is fidelity rather than speed: $N- emits no 80x87 instructions and therefore no emulator traps at all, so the traps in the 1994 file are positive evidence of $N+. TWO FIGURES CORRECTED HERE, both measured against bin/NEUROSIS.005 on 24 Aug 2026. The loop body carries TWELVE traps, not fourteen -- fourteen is the count for the whole of Demo_Scene2 at 1096:03d7..06b7, so the number was right with the wrong extent attached to it. And the loop makes 4,002 trig calls, not 3,424: the counter at DS:$63ca is seeded at 1096:050f and tested against $7D0 at 1096:0592, so it turns 2001 times at two calls a turn. 3,424 is not reproducible from this loop and is dropped. There is no raw 80x87 opcode anywhere in the shipped binary and there is none in ours either; both ship $E+ traps and both are executed by the emulator, since the demo never had a coprocessor. Settled independently of anyone reading a trap by building the unit both ways: $N+ aligns part 005 at 80.4%, $N- at 79.2%, so $N- moves the rebuild 137 bytes further from the 1994 file."
+
+[plan.row."006 1095:02ac"]
+label = "BuildPath tests Major and Minor, not two fresh Abs calls"
+investigation = "surplus-fpu-sites"
+target = "R0"

@@ -392,11 +392,26 @@ end;
   mouth appears to swing round and slowly settle to centre.
   -------------------------------------------------------------------------- }
 procedure UpdateMotion;
+
+  { 1015:0708 -- a NESTED function, and it has to be one. Each call site
+    pushes the six-byte Angle and then BP, and the routine opens ENTER 6,0
+    and closes RET 8 -- six bytes of Real parameter plus two of static
+    link, which is what TP passes into a routine declared inside another.
+    The body is FLD A, FLD Pi from CS:$06FA, FMULP, FDIV the single at
+    CS:$0704, then the result through the six-byte-Real temp at [BP-6].
+
+    WRITING `Angle * Pi / 180` INLINE AT BOTH CALL SITES COMPILES, RUNS
+    THE SAME, AND IS WRONG: the multiply and the divide are emitted twice
+    instead of once, which is three x87 sites more than the original
+    ships. The coverage walk cannot see it -- fpusites.py --diff can. }
+  function DegToRad(A : Real) : Real;
+  begin
+    DegToRad := A * Pi / 180;
+  end;
+
 begin
-  { 1015:0708 converts degrees to radians -- multiplies by Pi (CS:$06FA)
-    and divides by 180 -- before each trig call. }
-  PanX := Round(Radius * Cos(Angle * Pi / 180)) + CentreX;
-  PanY := Round(Radius * Sin(Angle * Pi / 180)) + CentreY;
+  PanX := Round(Radius * Cos(DegToRad(Angle))) + CentreX;
+  PanY := Round(Radius * Sin(DegToRad(Angle))) + CentreY;
 
   if Radius > RadiusFloor then
     Radius := Radius - RadiusDecay;

@@ -142,8 +142,13 @@ begin
   Minor  := Abs(Dy);                             { 1095:027f }
 
   { 1095:02ac -- if the line is steeper than it is wide, swap which axis is
-    the major one and make the straight step vertical instead. }
-  if Abs(Dy) >= Abs(Dx) then
+    the major one and make the straight step vertical instead.
+
+    THE TEST READS THE STORED VARIABLES, not Abs(Dy) >= Abs(Dx). The original
+    pushes Major then Minor and skips the block on JB, so the source names
+    Major on the left; recomputing the two Abs calls emitted two extra x87
+    sites, which is exactly what fpusites.py counted. }
+  if Major <= Minor then
   begin
     SideDX := 0.0;                               { 1095:02ba }
     SideDY := Sign(Dy);                          { 1095:02d2 }
