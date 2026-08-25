@@ -499,6 +499,13 @@ seen_in = "TPART3"
 state = "resolved"
 resolution = "OFFSET INSIDE AN ASM BLOCK DOES BOTH JOBS, and BindShapes is gone. `MOV WORD PTR CurShape, OFFSET ShapeSphere` emits the same immediate the original has at 1139:03bd..03cf AND counts as a reference to the table, which is what keeps the shape data in DGROUP; a literal number references nothing and the linker drops all 8,738 bytes -- measured, 86.2 percent against 92.0. Coverage held at 92.0 with the initialised image still IDENTICAL, and the executable lost 32 bytes. So this is a correctness gain rather than a coverage one: the invented call is out and the tables are held the way the original holds them. AND A MISIDENTIFICATION IS CORRECTED. $BEA8 and $BEAA are not OfsSphere and OfsCube: they are DX SPILLS. 1139:0111 and 015b are `MOV [$BEA8],DX`, 1139:0132 and 017c read it back, and 00c7/00e8 do the same with $BEAA -- working storage for a routine between SetAngles and DrawShape. $BEAC is never referenced at all. The six bytes are still declared, because the original has them and removing them moves every variable above, but they are named Scratch now and the note that guessed otherwise says so. WHAT THAT ROUTINE IS DOING with them is not yet read."
 
+[[plan.investigation]]
+name = "part3-captions-2d"
+finding = "part 003's largest Sprites span, 69 bytes at 125e:073d, is the tail of Sprites_Prepare -- the typewriter loop that draws the caption characters."
+seen_in = "TPART3"
+state = "resolved"
+resolution = "THE CAPTION TABLE IS TWO-DIMENSIONAL. 92.0 to 92.4 percent, +61 bytes, and the index computation is now byte-identical -- the ten bytes still differing in that window are all RTL far-call targets and near-call displacements. 125e:0741 is `IMUL DI,[BP+4],$0A00` for the member, then a separate Row*256, then Col added last: Captions[N, Row][Col] on an array[1..4, 1..10] of String[255]. Ours was flat, array[1..40], indexed Captions[(N-1)*CaptionRows + Row][Col], which emits a DEC and an IMUL by 10 instead. BOTH REACH THE SAME ADDRESS, which is why this survived so long and why the coverage walk was the only thing that could see it: the flat form's displacement was $75B8 and the two-dimensional form's is $6BB8, and the $A00 difference is exactly the member stride the -1 removes. Same base, same 10,240 bytes, same byte read -- and never the same instructions. The initialised image was identical before this change and is identical after it. The declaration is generated, so the fix is in tools/emit_pascal_data2.py rather than in the include, and the note there says why."
+
 [plan.row."001 1012:0004"]
 label = "BuildLens quadrant walk"
 investigation = "pacing"
@@ -812,4 +819,9 @@ target = "R0"
 [plan.row."006 1118:0907"]
 label = "the reseed test is `<` and the store to Grid[99,I] is UNCONDITIONAL"
 investigation = "part6-fire-height"
+target = "R0"
+
+[plan.row."125e:0741"]
+label = "Captions is array[1..4, 1..10]: the member stride is IMUL by $0A00"
+investigation = "part3-captions-2d"
 target = "R0"

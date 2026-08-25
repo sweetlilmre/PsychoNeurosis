@@ -306,8 +306,15 @@ def emit_p003_captions():
     lines = pascal_strings(raw, base, 0x76B8, 0x0100)
     body = header(f"""Part 003 scene 7 -- the member captions, {len(lines)} lines.
 
-  array[1..{len(lines)}] of String[255], DS:$76B8, stride $100. Ten lines per
+  array[1..4, 1..10] of String[255], DS:$76B8, stride $100. Ten lines per
   member, in the same order as the four rotating portraits.
+  TWO-DIMENSIONAL, and 125e:0741 is why. The original indexes it as
+  Captions[N, Row][Col]: IMUL DI,[BP+4],$0A00 for the member, a separate
+  Row*256, and Col added last. A flat array[1..40] indexed
+  Captions[(N-1)*10 + Row] emits a DEC and an IMUL by 10 instead -- the same
+  address by a different route, because the displacement absorbs the
+  difference, so the bytes never match. Same 10,240 bytes either way.
+
 
   STRING[255], AND THE STRIDE THIS TABLE IS READ WITH IS WHY. A Borland
   String[n] occupies n+1 bytes, so $100 is String[255]; the declaration used to
@@ -319,11 +326,18 @@ def emit_p003_captions():
   reads them: a scan of every code segment for absolute displacements into that
   range found nine scalars at the very top and nothing across the eight
   kilobytes below.""")
-    body += "  Captions : array[1..%d] of String[255] = (\n" % len(lines)
-    for i, s in enumerate(lines):
-        comma = "," if i + 1 < len(lines) else ""
-        body += f"    '{s}'{comma}\n"
-    body += "  );\n"
+    rows = 10
+    members = len(lines) // rows
+    body += ("  Captions : array[1..%d, 1..%d] of String[255] = ("
+             + "\n") % (members, rows)
+    for m in range(members):
+        body += "    (" + "\n"
+        for r in range(rows):
+            s = lines[m * rows + r]
+            comma = "," if r + 1 < rows else ""
+            body += "      '%s'%s" % (s, comma) + "\n"
+        body += "    )%s" % ("," if m + 1 < members else "") + "\n"
+    body += "  );" + "\n"
     OUT.joinpath("P3CAPT.INC").write_text(body, encoding="ascii")
     return len(lines)
 

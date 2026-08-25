@@ -501,7 +501,7 @@ end;
   slots: $6BB8 + 11*$100 = $76B8 is member 1's first line, which is exactly
   where the strings were first found. In Pascal terms it is
 
-      Captions[(N - 1) * 10 + Row][Col]
+      Captions[N, Row][Col]
 
   and the two addresses agree exactly -- see gen/P3CAPT.INC.
 
@@ -566,7 +566,7 @@ begin
     begin
       if KeyPressed then Exit;                   { 125e:070f }
       DrawChar(Col * CharGap, Row * CharGap,
-               Captions[(N - 1) * CaptionRows + Row][Col],
+               Captions[N, Row][Col],
                $A000);                           { 125e:0757 -- straight to
                                                    the visible page }
       Delay(TypeDelay);                          { 125e:075c }
