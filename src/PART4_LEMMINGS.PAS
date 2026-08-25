@@ -201,7 +201,16 @@ var
     assets/part004/lem_fuse.bin              750  5 frames of 10 x 15
   -------------------------------------------------------------------------- }
 type
-  TFont     = array[0..GlyphCount * GlyphPitch - 1] of Byte;   { DS:$CC03 }
+  { THREE DIMENSIONS, NOT ONE, and the subscripts are the raw character and
+    column. ScrollChar computes its address as IMUL AX,[BP+$06],$17A then
+    IMUL AX,[BP+$04],$12 then + (Row + 1) -- two strides of 378 and 18 against a
+    single folded displacement of -$2F53. A flat array indexed with the
+    subtractions written out computes them at run time instead; here they are in
+    the low bounds, and -(32 * 378 + 18 + 1) is exactly -$2F53, which is what
+    fixes FirstChar at 32 and the bounds at 1 and 1. }
+  TFont     = array[FirstChar..FirstChar + GlyphCount - 1,
+                    1..GlyphPitch div ScrollRows,
+                    1..ScrollRows] of Byte;                    { DS:$CC03 }
 var
   Font      : ^TFont;
   WalkBank  : array[1..8]  of array[0..53]   of Byte;   { DS:$0522 }
@@ -234,9 +243,15 @@ var
   is the builder's brick colour -- bricks are solid and walkable.
   -------------------------------------------------------------------------- }
 const
-  Ground : set of Byte =
+  { UNTYPED, WHICH IS WHAT PUTS THEM IN THE CODE SEGMENT. A typed constant
+    `Ground : set of Byte = [...]` is DGROUP data and every `in` test reads it
+    with no segment prefix; an untyped set constant is a compile-time value and
+    Turbo Pascal emits a fresh copy in CS at each use, which is why there are
+    five copies of two distinct 32-byte constants rather than two. 1005:0BC9 is
+    `TEST BYTE PTR CS:[DI+$B48], AL` and the prefix is the whole tell. }
+  Ground =
     [4, 5, $0F, $15..$18, $1D, $1F, $33, $36, $3E..$40, $42..$47, $4D..$52];
-  Wall   : set of Byte =
+  Wall   =
     [4, 5, $0F, $15..$18, $1D, $1F, $20..$29, $33, $36, $3E..$40, $42..$47,
      $4D..$52];
 
@@ -542,16 +557,22 @@ end;
   -------------------------------------------------------------------------- }
 procedure ScrollChar(Ch, Col : Byte);
 var
-  Row : Integer;
-  P   : ^Byte;
+  { SIX BYTES AND ONE OF THEM IS THE ONLY VARIABLE THAT MATTERS. 1005:0853
+    opens ENTER $06 and touches [BP-$02], the row, and [BP-$06], which is
+    assigned $140 at 1005:0857 and never read again. Nothing reaches [BP-$04].
+    There is no pointer local either: 1005:0889 reads the font byte straight
+    into DL. }
+  Row    : Integer;               { [BP-$02] }
+  Unread : Integer;               { [BP-$04], never touched }
+  Edge   : Integer;               { [BP-$06], assigned and never read }
 begin
+  Edge := ScrollEdge;                            { 1005:0857 }
   for Row := 0 to ScrollRows - 1 do
-  begin
-    P := @Font^[(Ch - FirstChar) * GlyphPitch
-                + (Col - 1) * ScrollRows + Row];
-    Mem[Seg(ScrollBuf^) : Ofs(ScrollBuf^) + Row * ScrollPitch + ScrollEdge]
-      := P^;
-  end;
+    { AND THE DESTINATION CARRIES NO Ofs(). 1005:088E does LES DI / MOV AX,ES
+      and uses only the SEGMENT of ScrollBuf; the offset is the arithmetic
+      below and nothing else. }
+    Mem[Seg(ScrollBuf^) : Row * ScrollPitch + ScrollEdge] :=
+      Font^[Ch, Col, Row + 1];
 end;
 
 { --------------------------------------------------------------------------
@@ -813,13 +834,20 @@ begin
   for DX_ := -3 to 3 do
   begin
     Pix := GetPixel(Lem[N].X + DX_, Lem[N].Y + 1, VirtScrSeg);
-    if (Pix = DeathAColour) or (Pix = StuckColour)
-       or ((Pix > $1F) and (Pix < $2A)) then
-    begin
-      if (Pix > $1F) and (Pix < $2A) then SetState(N, StDeathB);
-      if Pix = DeathAColour then SetState(N, StDeathA);
-      if Pix = StuckColour  then SetState(N, StStuck);
-      Exit;
+    { A CASE, NOT AN `or` CHAIN. 1005:1511 loads the pixel into AL ONCE and then
+      runs CMP AL,3 / JE / CMP AL,$12 / JE / CMP AL,$20 / JB / CMP AL,$29 / JA
+      -- one selector and three label groups, which is a case statement's
+      dispatch. An `or` of three comparisons reloads the byte for each and
+      compares memory against an immediate instead. The body then re-reads the
+      pixel to decide which state, and that part was already right. }
+    case Pix of
+      DeathAColour, StuckColour, $20..$29 :
+        begin
+          if (Pix > $1F) and (Pix < $2A) then SetState(N, StDeathB);
+          if Pix = DeathAColour then SetState(N, StDeathA);
+          if Pix = StuckColour  then SetState(N, StStuck);
+          Exit;
+        end;
     end;
     if Pix in Ground then goto Stand;            { 1005:156E }
   end;
@@ -898,18 +926,23 @@ end;
   -------------------------------------------------------------------------- }
 procedure Faller(N : Integer);
 var
-  { AN OUTER LOOP, and its variable is the Y offset. 1005:0b76 opens ENTER $8
-    and reads the pixel at (X + [BP-4], Y + [BP-2]) -- so the Y offset is a
-    VARIABLE, not the literal 1 this routine used to pass, and it is declared
-    first. The outer loop never reaches a second pass: every path out of the
-    body returns, which is why a single loop produced the right picture and
-    the wrong code. }
+  { AN OUTER LOOP THAT RUNS EXACTLY ONCE -- `for DY_ := 1 to 1`. Its variable is
+    the Y offset, and it is a VARIABLE rather than the literal 1 this routine
+    once passed: 1005:0B97 reads [BP-$02] and adds it to Lem[N].Y.
+
+    THE BOUND IS THE CONSTANT 1, and the tell is at the bottom. 1005:0CA1 is
+    `CMP [BP-$02],1 / JE / JMP 0B73` -- which is `JNE @inc` written the long way
+    because @inc is 818 bytes back, out of a short branch's reach. That is a for
+    loop's bound test, not an `if DY_ = 1`, so the code at 1005:0CAA is AFTER
+    the loop rather than inside it. Written as a repeat with the increment at
+    the bottom, the increment lands in the wrong place: the original's is at
+    1005:0B73, above the body, which is where a `for` puts it. }
   DY_ : Integer;                  { [BP-$02] }
   DX_ : Integer;                  { [BP-$04] }
-  Pix : Byte;
+  Pix : Byte;                     { [BP-$05] }
 begin
-  DY_ := 1;
-  repeat
+  for DY_ := 1 to 1 do
+  begin
     for DX_ := -3 to 3 do
     begin
       Pix := GetPixel(Lem[N].X + DX_, Lem[N].Y + DY_, VirtScrSeg);
@@ -945,16 +978,13 @@ begin
       end;
     end;
 
-    if DY_ = 1 then
-    begin
-      if Lem[N].FallDist < 2 then Inc(Lem[N].X, Lem[N].Dir);
-      Inc(Lem[N].Y);
-      Inc(Lem[N].FallDist);
-      Lem[N].Frame := (Lem[N].Frame mod 4) + 1;
-      Exit;
-    end;
-    Inc(DY_);
-  until False;
+  end;
+
+  { 1005:0CAA -- and this is AFTER the loop, reached when nothing was found. }
+  if Lem[N].FallDist < 2 then Inc(Lem[N].X, Lem[N].Dir);
+  Inc(Lem[N].Y);
+  Inc(Lem[N].FallDist);
+  Lem[N].Frame := (Lem[N].Frame mod 4) + 1;
 end;
 
 
@@ -1053,33 +1083,62 @@ end;
 
 procedure Tunneller(N : Integer);
 var
-  Col, ColTo, Row, RowTo : Integer;
-  Hit                    : Boolean;
+  { FOUR DECLARATIONS AND TWO TEMPORARIES, in ten bytes. 1005:1166 opens
+    ENTER $A and touches [BP-$02], [BP-$04], [BP-$05], [BP-$06], [BP-$08] and
+    [BP-$0A]. The last two are the compiler's: 1005:1189 stores the outer
+    loop's limit into [BP-$08] and 1005:11AD stores the inner loop's into
+    [BP-$0A], recomputed on every outer pass -- so neither ColTo nor RowTo is a
+    variable, and declaring them produced them twice over. }
+  Row  : Integer;                 { [BP-$02] }
+  Col  : Integer;                 { [BP-$04] }
+  Hit  : Boolean;                 { [BP-$05] }
+  Pix  : Byte;                    { [BP-$06] -- the pixel is READ INTO A BYTE
+                                    before it is tested; inside the `in` test
+                                    it stays in a register and loses the slot }
 begin
   Hit := False;
-  RowTo := Lem[N].Y;
-  if Lem[N].Dir < 1 then
+  { THE RIGHTWARD BRANCH COMES FIRST: 1005:1172 is CMP/JG, which jumps into it
+    and falls through to the other, so the test is `Dir >= 1`. }
+  if Lem[N].Dir >= 1 then
   begin
-    ColTo := Lem[N].X - 4;
-    for Col := Lem[N].X - 5 to ColTo do
-      for Row := Lem[N].Y - 9 to RowTo do
-        if GetPixel(Col, Row, VirtScrSeg) in Wall then Hit := True;
-    VLine(Lem[N].X - 4, Lem[N].Y - 9, Lem[N].Y,     0, VirtScrSeg);
-    VLine(Lem[N].X - 5, Lem[N].Y - 7, Lem[N].Y - 2, 0, VirtScrSeg);
-    VLine(Lem[N].X - 6, Lem[N].Y - 6, Lem[N].Y - 3, 0, VirtScrSeg);
+    for Col := Lem[N].X + 3 + 1 to Lem[N].X + 3 + 1 + 1 do   { 1005:117C }
+      for Row := Lem[N].Y - 9 to Lem[N].Y do                 { 1005:11A5 }
+      begin
+        Pix := GetPixel(Col, Row, VirtScrSeg);
+        if Pix in Wall then Hit := True;
+      end;
+
+    { Every constant is written as the original computes it -- one operation
+      per operator, so `+ 3 + 1 + 1` is ADD AX,3 / INC AX / INC AX and `+ 3 + 0`
+      really does emit ADD AX,0. See the wiki's one-operation-per-operator. }
+    VLine(Lem[N].X + 3 - 1 - 1, Lem[N].Y - 9 - 1,     Lem[N].Y,
+          0, VirtScrSeg);                                    { 1005:1204 }
+    VLine(Lem[N].X + 3 - 1,     Lem[N].Y - 9,         Lem[N].Y - 1,
+          0, VirtScrSeg);                                    { 1005:1230 }
+    VLine(Lem[N].X + 3 + 0,     Lem[N].Y - 9 + 1,     Lem[N].Y - 1 - 1,
+          0, VirtScrSeg);                                    { 1005:125C }
+    VLine(Lem[N].X + 3 + 1,     Lem[N].Y - 9 + 1 + 1, Lem[N].Y - 3,
+          0, VirtScrSeg);                                    { 1005:128C }
+    VLine(Lem[N].X + 3 + 1 + 1, Lem[N].Y - 9 + 3,     Lem[N].Y - 4,
+          0, VirtScrSeg);                                    { 1005:12BC }
+    VLine(Lem[N].X + 3 + 3,     Lem[N].Y - 9 + 4,     Lem[N].Y - 5,
+          0, VirtScrSeg);                                    { 1005:12EE }
   end
   else
   begin
-    ColTo := Lem[N].X + 5;
-    for Col := Lem[N].X + 4 to ColTo do
-      for Row := Lem[N].Y - 9 to RowTo do
-        if GetPixel(Col, Row, VirtScrSeg) in Wall then Hit := True;
-    VLine(Lem[N].X + 1, Lem[N].Y - 10, Lem[N].Y,     0, VirtScrSeg);
-    VLine(Lem[N].X + 2, Lem[N].Y - 9,  Lem[N].Y - 1, 0, VirtScrSeg);
-    VLine(Lem[N].X + 3, Lem[N].Y - 8,  Lem[N].Y - 2, 0, VirtScrSeg);
-    VLine(Lem[N].X + 4, Lem[N].Y - 7,  Lem[N].Y - 3, 0, VirtScrSeg);
-    VLine(Lem[N].X + 5, Lem[N].Y - 6,  Lem[N].Y - 4, 0, VirtScrSeg);
-    VLine(Lem[N].X + 6, Lem[N].Y - 5,  Lem[N].Y - 5, 0, VirtScrSeg);
+    for Col := Lem[N].X - 3 - 1 - 1 to Lem[N].X - 3 - 1 do   { 1005:1324 }
+      for Row := Lem[N].Y - 9 to Lem[N].Y do
+      begin
+        Pix := GetPixel(Col, Row, VirtScrSeg);
+        if Pix in Wall then Hit := True;
+      end;
+
+    VLine(Lem[N].X - 3 - 1,     Lem[N].Y - 9,         Lem[N].Y,
+          0, VirtScrSeg);                                    { 1005:13A6 }
+    VLine(Lem[N].X - 3 - 1 - 1, Lem[N].Y - 9 + 1 + 1, Lem[N].Y - 1 - 1,
+          0, VirtScrSeg);                                    { 1005:13D0 }
+    VLine(Lem[N].X - 3 - 3,     Lem[N].Y - 9 + 3,     Lem[N].Y - 3,
+          0, VirtScrSeg);                                    { 1005:1400 }
   end;
 
   Lem[N].Frame := (Lem[N].Frame mod 3) + 1;
