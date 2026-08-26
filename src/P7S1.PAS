@@ -817,6 +817,13 @@ begin
 
       case Ch.Kind of                             { 100f:05e9 }
         18 : ;                                    { 100f:05ed  PSTAMP: skip  }
+         { CALLED THROUGH THE VARIABLES, and measured: naming FliSS2, FliLC,
+           FliCopy and FliBrun directly here costs 6 bytes. The original's
+           100f:0662 does read as PUSH CS / CALL $de -- a direct same-segment
+           far call -- but that is a DIFFERENT ARM of this case: the six-byte
+           push sequence ahead of it occurs six times in this dispatch, so an
+           exact eight-byte anchor lands on whichever one the aligner prefers.
+           Exactness is not uniqueness. }
          7 : HSS2(@Hdr, Buf^);                     { 100f:0606 }
         12 : HLC(@Hdr, Buf^);                      { 100f:061d }
         16 : HCopy(@Hdr, Buf^);                    { 100f:0634 }
