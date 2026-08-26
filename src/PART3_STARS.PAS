@@ -33,6 +33,13 @@
   =========================================================================== }
 
 unit Part3Stars;
+
+{ BYTE ALIGNMENT. RunScene's `for T` limit temporary sits at [BP-$0B], an ODD
+  offset -- 10b8:03db writes CollapseFrames into it and 10b8:0452 compares
+  against it every iteration. Nine bytes are declared above it (T, SX, SY,
+  Spare and the one-byte Col), and word alignment pads Col to two, which puts
+  the temporary at [BP-$0C] and every reference below it a byte out. }
+{$A-}
 {$I-}   { no I/O check: the original goes straight on after each file
           call, with no near CALL to the RTL's check routine. }
 
@@ -377,7 +384,9 @@ begin
   { ---- Phase 3: collapse everything into the centre over 32 frames ---- }
   for T := 1 to CollapseFrames do
   begin
-    ClearVirtual;
+    { CLEARSCREEN, NOT ClearVirtual: 10b8:03ee pushes [$E770] and 0 before
+      the call -- two arguments -- where ClearVirtual takes none. }
+    ClearScreen(VirtScrSeg, 0);
 
     { ----------------------------------------------------------------------
       10b8:03f9 -- HAND ASSEMBLER, transcribed verbatim.

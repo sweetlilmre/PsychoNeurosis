@@ -880,10 +880,16 @@ begin
       else
         Blit(@TumbleBk[L.Frame], L.X - 3, L.Y - 10, 10, 10, WorkSeg);
     StWalker:
-      if L.Dir < 1 then
-        Blit(@WalkBank[L.Frame + 4], L.X - 3, L.Y - 8, 6, 9, WorkSeg)
+      { THE BARE-FRAME ARM COMES FIRST, and the order of the two branches is
+        what says so rather than the condition. 1005:050e ends the first arm
+        and JMPs over the second, and the second -- at 1005:0513 -- is the one
+        that does MOV AX,ES:[DI+6] / ADD AX,4 before the IMUL, so `Frame + 4`
+        is the ELSE. Written `if Dir < 1 then <+4> else <bare>` the two arms
+        come out the other way round; the test is the same either way. }
+      if L.Dir >= 1 then
+        Blit(@WalkBank[L.Frame], L.X - 3, L.Y - 8, 6, 9, WorkSeg)
       else
-        Blit(@WalkBank[L.Frame], L.X - 3, L.Y - 8, 6, 9, WorkSeg);
+        Blit(@WalkBank[L.Frame + 4], L.X - 3, L.Y - 8, 6, 9, WorkSeg);
     StTunneller:
       Blit(@TunnelBk[L.Frame], L.X - 8, L.Y - 9, 14, 10, WorkSeg);
     StDeathB:
@@ -1096,7 +1102,7 @@ begin
           else
           begin
             SetState(N, StWalker);
-            Inc(Lem[N].Y, DY_ - 1);
+            Lem[N].Y := Lem[N].Y + DY_ - 1;
             Lem[N].FallDist := 0;
           end;
         end
@@ -1105,7 +1111,7 @@ begin
           SetState(N, StWalker);
           { + DY_ - 1, which is nothing while DY_ is 1 -- transcribed because
             1005:0bd5 adds it. }
-          Inc(Lem[N].Y, DY_ - 1);
+          Lem[N].Y := Lem[N].Y + DY_ - 1;
           Lem[N].FallDist := 0;
         end;
         Lem[N].Frame := (Lem[N].Frame mod 4) + 1;
