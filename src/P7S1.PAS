@@ -458,6 +458,17 @@ var
   Spare2  : Integer;                { [BP-$14], never touched }
 begin
   Base  := 0;                                     { 100f:01e0 }
+  { FOUR BYTES HERE ARE NOT REACHABLE FROM PASCAL, and probe/SEGOFS.PAS says
+    so rather than a guess. The original takes both halves off ONE far load --
+    LES DI,[BP+6] / MOV AX,ES / MOV [BP-4],AX / MOV AX,DI / MOV [BP-6],AX --
+    where these two statements emit a second LES between them. Six spellings
+    were driven through TP7, TP6 and TP6.1: the order either way round gives
+    two loads, a local pointer gives two, a record cast gives none, and all
+    three compilers emit identical code. Turbo Pascal does not keep a loaded
+    pointer across statements.
+    That points at hand assembler, and the routing supports it: a compiler
+    holding the offset in DI has no reason to move it through AX before
+    storing, and the original does that for BOTH halves, symmetrically. }
   Sg    := Seg(Data^);                            { 100f:01e8 }
   Cur   := Ofs(Data^);                            { 100f:01ed }
   Start := Cur;                                   { 100f:01f2 }
