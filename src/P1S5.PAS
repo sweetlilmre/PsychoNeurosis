@@ -963,12 +963,21 @@ var
     explain a slot that turns out to be a compiler temp. }
   I      : Integer;                       { [BP-$02] }
   W      : Word;                          { [BP-$04] -- the slide-out counter }
-  { A THIRD TWO-BYTE LOCAL, and P's address is what asks for it. 12c5:08a0
-    stores the pointer's offset at [BP-$0A] and its segment at [BP-$08]; with
-    only I and W above it P lands at [BP-$08] instead, and the whole frame
-    below shifts two bytes with it. Nothing reads this slot. }
-  Spare  : Integer;                       { [BP-$06], never read }
-  P      : PPoint3;                       { [BP-$0A], the point being filled }
+  { AND THAT IS THE WHOLE VAR BLOCK: two words, and ENTER $0A is 4 declared plus
+    6 of COMPILER TEMPORARIES. The frame's own ORDER proves the point pointer is
+    not declared. Temps are allocated below every declared local, so a declared
+    P would sit at [BP-$08] with the for-limit temp beneath it at [BP-$0A]. The
+    original has them the other way round -- 12c5:087d writes the limit to
+    [BP-$06] and 12c5:08a0 writes the pointer to [BP-$0A] -- which only happens
+    if BOTH are temps, taken in the order the statements need them: the loop's
+    limit first, then the record address.
+
+    So the pointer is a `with`'s hidden slot, not a variable. The note that used
+    to be here argued P was declared because "the record's address is taken
+    ONCE, which three separate `Obj.Pt[I].X :=` statements do not do" -- true,
+    and a `with` takes it once as well, for four bytes, without being named.
+    A Spare was then added to push P down to the measured offset, which made the
+    frame $0E against the original's $0A. }
 begin
   { INLINE, both times. 12c5:0874 sets PtCount from an immediate and then runs
     the point loop in Vector_Run's own frame -- there is no call.
@@ -990,12 +999,12 @@ begin
     The bound is set in tools/emit_pascal_data2.py, which generates the table. }
   PtCount := GlobePoints;                        { 12c5:0874 }
   for I := 0 to PtCount - 1 do
-  begin
-    P := @Obj.Pt[I + 1];                         { 12c5:08a0 }
-    P^.X := IntToFixed(VecGlobe[I * 3]);      { 12c5:08b3 }
-    P^.Y := IntToFixed(VecGlobe[I * 3 + 1]);
-    P^.Z := IntToFixed(VecGlobe[I * 3 + 2]);
-  end;
+    with Obj.Pt[I + 1] do                        { 12c5:08a0 }
+    begin
+      X := IntToFixed(VecGlobe[I * 3]);          { 12c5:08b3 }
+      Y := IntToFixed(VecGlobe[I * 3 + 1]);
+      Z := IntToFixed(VecGlobe[I * 3 + 2]);
+    end;
 
 
   { 12c5:0918 stores an ALREADY-ZERO AX twice with no call before it, so X is
@@ -1020,10 +1029,12 @@ begin
   PtCount := LogoPoints;
   for I := 0 to PtCount - 1 do
   begin
-    P := @Obj.Pt[I + 1];
-    P^.X := IntToFixed(VecLogoA[I * 3]);
-    P^.Y := IntToFixed(VecLogoA[I * 3 + 1]);
-    P^.Z := IntToFixed(VecLogoA[I * 3 + 2]);
+    with Obj.Pt[I + 1] do
+    begin
+      X := IntToFixed(VecLogoA[I * 3]);
+      Y := IntToFixed(VecLogoA[I * 3 + 1]);
+      Z := IntToFixed(VecLogoA[I * 3 + 2]);
+    end;
   end;
   OrbitAngle := 17;                            { 12c5:0a15 }
   Animate;
