@@ -37,7 +37,7 @@ implementation
   part 007's order means changing the harness's clause in tools/mktests.py, the
   way part 002's was. Measured, not assumed: this clause was reversed and the
   map came out identical. }
-uses Crt, VGA, DemoVT, P7S1;
+uses Crt, DemoVT, P7S1, VGA;
 
 var
   SavedVol : Byte;                { DS:$0066 }

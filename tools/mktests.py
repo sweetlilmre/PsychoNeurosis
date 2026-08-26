@@ -187,8 +187,12 @@ PARTS = [
     ("TPART6", "P6Main", "RunPart6",
      "DemoVT, Crt, VGA",
      "part 006 -- all four scenes, through the main body at 1000:002d"),
+    # VGA is NOT named here on purpose, same reasoning as part 002's ModeX.
+    # The original's order is VGA (100b), P7S1 (100f), Crt (1099), DemoVT
+    # (10fb), so VGA has to FINISH LAST in the post-order walk -- which it can
+    # only do if nothing but P7Main reaches it, and P7Main names it last.
     ("TPART7", "P7Main", "RunPart7",
-     "Crt, VGA, DemoVT",
+     "DemoVT, Crt",
      "part 007 -- the animation, through the main body at 1000:001e"),
 ]
 
