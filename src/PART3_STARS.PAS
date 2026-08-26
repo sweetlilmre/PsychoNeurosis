@@ -73,7 +73,10 @@ const
   ProjShift    = 8;         { CX passed to RTL_Shl32: X*256 before the divide }
 
   ZStep        = 30;        { $1E per frame, toward the viewer }
-  ZWrap        = -500;      { $1F4 subtracted -- recycle distance }
+  { POSITIVE, AND SUBTRACTED AT THE USE SITE. 10b8:0183 is SUB AX,$1F4;
+    a negative constant ADDED gives ADD AX,$FE0C instead -- the same value,
+    the same three bytes, a different opcode. }
+  ZWrap        =  500;      { $1F4 subtracted -- recycle distance }
   ZNear        = -10;       { past this the point has flown by }
   ZPlotNear    = -3;        { nearer than this is not drawn }
   ZPlotFar     = -500;      { $FE0C }
@@ -268,7 +271,7 @@ begin
       Live^[Idx].Z := Live^[Idx].Z + ZStep;    { 10b8:0147 }
       if Live^[Idx].Z > ZNear then             { flown past -- recycle }
       begin
-        Live^[Idx].Z := Live^[Idx].Z + ZWrap;  { push back 500 }
+        Live^[Idx].Z := Live^[Idx].Z - ZWrap;  { push back 500 }
         Live^[Idx].XOfs := Source^[Idx].XOfs + PanX;   { pick up the pan }
         Live^[Idx].YOfs := Source^[Idx].YOfs + PanY;
         Live^[Idx].X    := Source^[Idx].X;

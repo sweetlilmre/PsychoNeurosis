@@ -64,10 +64,6 @@ type
 
   So Ramp(I) = Round(I / 5) + 19: it starts at 19 and reaches 63 -- the top of
   the VGA DAC -- at I = 220, one short of the end of the loop. }
-function Ramp(I : Integer) : Byte;
-begin
-  Ramp := Round(I * 0.2) + 19;
-end;
 
 { --------------------------------------------------------------------------
   Blocks_Run (11f3:0017)
@@ -174,7 +170,10 @@ begin
   for I := 1 to 255 do SetRGB(I, 0, 0, 0);
   { SetRGB takes (B, G, R, Col), and the ramp is on BLUE only -- read off the
     x87 at 11f3:0072..00a7. See the note at the foot of this file. }
-  for I := 1 to RampTop do SetRGB(I, 0, 0, Ramp(I));
+  { INLINE, NOT A FUNCTION. 11f3:0084 runs the x87 stream and the +$13 inside
+    the loop body and there is no CALL anywhere in it, so the original had no
+    Ramp function to call -- Turbo Pascal does not inline one. }
+  for I := 1 to RampTop do SetRGB(I, 0, 0, Round(I * 0.2) + 19);
 
   BlockRead(F, Order, DataSize);
   Close(F);
