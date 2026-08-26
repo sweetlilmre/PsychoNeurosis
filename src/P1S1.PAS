@@ -96,82 +96,15 @@ begin
   BlockRead(F, Mem[VirtScrSeg : 0], 64000);   { 1012:0601 }
 end;
 
-{ --------------------------------------------------------------------------
-  The ten bouncing sprites -- Bounce_Run 1012:03e3, with the blit at
-  1012:0311 and the matching save at 1012:02bc.
-
-  Transcribed. An earlier reconstruction had the right IDEA -- save the
-  background, draw, restore in reverse -- but the wrong numbers:
-
-  * the sprites are 40 x 40, not 20 x 20;
-  * they are drawn CENTRED, at (X - 20, Y - 20);
-  * the blit is opaque (REP MOVSB), with no transparency test;
-  * save and restore are the SAME routine, just with source and destination
-    swapped -- restoring is a blit out of the saved-background buffer.
-
-  The save slots are 1,641 bytes apart ($669) at DS:$FC81 + N * $669, which is
-  more than the 1,600 a 40 x 40 block needs; the slack is not used.
-
-  Erasing in REVERSE order is what makes overlapping sprites restore
-  correctly, and is only necessary because of the save/restore scheme.
-
-  HAND ASSEMBLER, verbatim. Instruction for instruction it is SaveUnder with
-  LDS/LES swapped and DI walking the screen instead of SI -- see the notes
-  there for the shift-based row offset.
-
-  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
-
-      P := Src;
-      for Row := 0 to 39 do
-      begin
-        Move(P^, Mem[Segment : (Y - 20 + Row) * 320 + X - 20], 40);
-        Inc(LongInt(P), 40);
-      end;
-  -------------------------------------------------------------------------- }
-{ @asm 001 1012:02bc }
-procedure BlitSprite(X, Y : Integer; Src : Pointer; Segment : Word); assembler;
-asm
-  PUSH DS                 { DS becomes the source buffer's segment below    }
-  LDS  SI, Src            { DS:SI := the 40 x 40 block to draw              }
-  MOV  AX, X              { the sprite's centre X                           }
-  MOV  BX, Y              {   and Y                                         }
-  MOV  CX, $14            { 20 -- half of 40                                }
-  SUB  AX, CX             { AX := the LEFT edge                             }
-  SUB  BX, CX             { BX := the TOP edge                              }
-  MOV  CX, Segment        { the screen to write to                          }
-  MOV  ES, CX             { ES := it                                        }
-  MOV  CX, AX             { park the left edge                              }
-  MOV  AX, BX             { AX := the top row                               }
-  MOV  BH, BL             { BX := row * 256                                 }
-  XOR  BL, BL             {                                                 }
-  SHL  AX, 1              { row * 2                                         }
-  SHL  AX, 1              { row * 4                                         }
-  SHL  AX, 1              { row * 8                                         }
-  SHL  AX, 1              { row * 16                                        }
-  SHL  AX, 1              { row * 32                                        }
-  SHL  AX, 1              { row * 64                                        }
-  ADD  BX, AX             { row * 320                                       }
-  MOV  AX, CX             { the left edge back                              }
-  ADD  AX, BX             { + the row offset                                }
-  MOV  DI, AX             { ES:DI := the first screen byte to write         }
-  MOV  DL, $28            { 40 rows to go                                   }
-  XOR  CH, CH             {                                                 }
-  MOV  CL, DL             { CX := 40, the bytes per row                     }
-  CLD                     { forwards                                        }
-  MOV  AX, CX             { keep the row length -- REP destroys CX          }
-@@Row:                    { <- once per row of the block                    }
-  MOV  BX, DI             { keep the row's start -- REP moves DI on         }
-  MOV  CX, AX             { CX := 40 again                                  }
-  REP  MOVSB              { draw the row                                    }
-  MOV  DI, BX             { back to where the row started                   }
-  DEC  DL                 { one row done                                    }
-  JZ   @@Out              { all forty drawn                                 }
-  ADD  DI, $140           { 320 -- down one screen row                      }
-  JMP  @@Row              { round again                                     }
-@@Out:                  { <- all forty rows done                          }
-  POP  DS                 { restore our data segment                        }
-end;
-
+{ THE SAVE COMES FIRST AND THE BLIT SECOND, and the two were the other way
+  round here for as long as this file has existed. The direction of the far
+  pointer settles it and takes one instruction to read: 1012:02c0 is
+  LES DI,[BP+6], so at 02bc the POINTER is the destination and the screen the
+  source -- that is the save. 1012:0315 is LDS SI,[BP+6], so at 0311 the
+  pointer is the source and the screen the destination -- that is the blit.
+  Turbo Pascal emits routines in source order, so having them the wrong way
+  round put each one at the other's address and every byte of both measured as
+  different while both were correct. }
 { --------------------------------------------------------------------------
   1012:02bc -- SaveUnder(X, Y, Dest, Segment). HAND ASSEMBLER, verbatim.
 
@@ -194,7 +127,7 @@ end;
         Inc(LongInt(P), 40);
       end;
   -------------------------------------------------------------------------- }
-{ @asm 001 1012:0311 }
+{ @asm 001 1012:02bc }
 procedure SaveUnder(X, Y : Integer; Dest : Pointer; Segment : Word); assembler;
 asm
   PUSH DS                 { DS becomes the screen's segment below           }
@@ -233,6 +166,82 @@ asm
   DEC  DL                 { one row done                                    }
   JZ   @@Out              { all forty copied                                }
   ADD  SI, $140           { 320 -- down one screen row                      }
+  JMP  @@Row              { round again                                     }
+@@Out:                  { <- all forty rows done                          }
+  POP  DS                 { restore our data segment                        }
+end;
+
+{ --------------------------------------------------------------------------
+  The ten bouncing sprites -- Bounce_Run 1012:03e3, with the blit at
+  1012:0311 and the matching save at 1012:02bc.
+
+  Transcribed. An earlier reconstruction had the right IDEA -- save the
+  background, draw, restore in reverse -- but the wrong numbers:
+
+  * the sprites are 40 x 40, not 20 x 20;
+  * they are drawn CENTRED, at (X - 20, Y - 20);
+  * the blit is opaque (REP MOVSB), with no transparency test;
+  * save and restore are the SAME routine, just with source and destination
+    swapped -- restoring is a blit out of the saved-background buffer.
+
+  The save slots are 1,641 bytes apart ($669) at DS:$FC81 + N * $669, which is
+  more than the 1,600 a 40 x 40 block needs; the slack is not used.
+
+  Erasing in REVERSE order is what makes overlapping sprites restore
+  correctly, and is only necessary because of the save/restore scheme.
+
+  HAND ASSEMBLER, verbatim. Instruction for instruction it is SaveUnder with
+  LDS/LES swapped and DI walking the screen instead of SI -- see the notes
+  there for the shift-based row offset.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      P := Src;
+      for Row := 0 to 39 do
+      begin
+        Move(P^, Mem[Segment : (Y - 20 + Row) * 320 + X - 20], 40);
+        Inc(LongInt(P), 40);
+      end;
+  -------------------------------------------------------------------------- }
+{ @asm 001 1012:0311 }
+procedure BlitSprite(X, Y : Integer; Src : Pointer; Segment : Word); assembler;
+asm
+  PUSH DS                 { DS becomes the source buffer's segment below    }
+  LDS  SI, Src            { DS:SI := the 40 x 40 block to draw              }
+  MOV  AX, X              { the sprite's centre X                           }
+  MOV  BX, Y              {   and Y                                         }
+  MOV  CX, $14            { 20 -- half of 40                                }
+  SUB  AX, CX             { AX := the LEFT edge                             }
+  SUB  BX, CX             { BX := the TOP edge                              }
+  MOV  CX, Segment        { the screen to write to                          }
+  MOV  ES, CX             { ES := it                                        }
+  MOV  CX, AX             { park the left edge                              }
+  MOV  AX, BX             { AX := the top row                               }
+  MOV  BH, BL             { BX := row * 256                                 }
+  XOR  BL, BL             {                                                 }
+  SHL  AX, 1              { row * 2                                         }
+  SHL  AX, 1              { row * 4                                         }
+  SHL  AX, 1              { row * 8                                         }
+  SHL  AX, 1              { row * 16                                        }
+  SHL  AX, 1              { row * 32                                        }
+  SHL  AX, 1              { row * 64                                        }
+  ADD  BX, AX             { row * 320                                       }
+  MOV  AX, CX             { the left edge back                              }
+  ADD  AX, BX             { + the row offset                                }
+  MOV  DI, AX             { ES:DI := the first screen byte to write         }
+  MOV  DL, $28            { 40 rows to go                                   }
+  XOR  CH, CH             {                                                 }
+  MOV  CL, DL             { CX := 40, the bytes per row                     }
+  CLD                     { forwards                                        }
+  MOV  AX, CX             { keep the row length -- REP destroys CX          }
+@@Row:                    { <- once per row of the block                    }
+  MOV  BX, DI             { keep the row's start -- REP moves DI on         }
+  MOV  CX, AX             { CX := 40 again                                  }
+  REP  MOVSB              { draw the row                                    }
+  MOV  DI, BX             { back to where the row started                   }
+  DEC  DL                 { one row done                                    }
+  JZ   @@Out              { all forty drawn                                 }
+  ADD  DI, $140           { 320 -- down one screen row                      }
   JMP  @@Row              { round again                                     }
 @@Out:                  { <- all forty rows done                          }
   POP  DS                 { restore our data segment                        }
@@ -348,28 +357,79 @@ begin
     end;
 end;
 
-{ [transcribed] 1012:0366 -- gather the working cell for bouncer N out of the
-  background saved under it, through the lens table. 1,600 bytes, walked
-  backwards. }
-procedure BuildCell(N : Integer);
-var
-  { ENTER 8 is eight bytes and the referenced slots are [BP-2], [BP-4], [BP-6]
-    and [BP-7]. The odd one names the split: three Integers first, then two
-    Bytes, of which [BP-8] is never read. 6 + 1 + 1 = 8.
+{ --------------------------------------------------------------------------
+  1012:0366 -- gather the working cell through the lens table. HAND ASSEMBLER.
 
-    OUR BODY ONLY USES THE FIRST of them, where the original reads all four --
-    so this routine still has a body defect and the declarations are only the
-    frame half of it. They are transcribed because the frame is a prerequisite:
-    while the ENTER operand is wrong the routine cannot align at all, and its
-    four prologue bytes differ before any statement is reached. }
-  I       : Integer;                    { [BP-2] }
-  Spare1  : Integer;                    { [BP-4], read by the original }
-  Spare2  : Integer;                    { [BP-6], read by the original }
-  Spare3  : Byte;                       { [BP-7], read by the original }
-  Spare4  : Byte;                       { [BP-8], never read }
-begin
-  for I := BounceH * BounceW - 1 downto 0 do
-    Cell[I] := Under[N, LensTab[I]];
+  THE LOOP COUNTER IS CX AND IT NEVER TOUCHES MEMORY -- 1012:03b3 is DEC CX and
+  03b4 compares it against -1 -- which Turbo Pascal does not do for a `for`
+  variable, ever. And the three table ADDRESSES are kept in frame slots and
+  added to an index each time round, rather than folded into each reference,
+  which is the same idiom this target's other hand-written gathers use.
+
+  THE ADDRESSES ALSO TILE, and that is what identifies the frame's four slots:
+
+      [BP-$4]  IMUL DI,N,$669 then LEA AX,[DI-$37F]  =  Ofs(Under[N])
+               $669 is 1641, a saved cell; N * 1641 - 895 is a ONE-based
+               array whose element 1 sits at $2EA, which is Under
+      [BP-$2]  $4FD6  =  Ofs(Cell)
+      [BP-$6]  $4304  =  Ofs(LensTab), and $4304 - $2EA is 16,410,
+               which is ten rows of 1641 -- so Under has ten of them
+      [BP-$7]  a Byte, zeroed at the top of every iteration
+
+  TWO OF THE THREE TESTS IN THE BODY DO NOTHING, and they are in the original.
+  1012:0391 compares the lens entry against the index and, when they differ,
+  sets the bias byte to zero -- which it already is, because 1012:0384 zeroed
+  it at the top of the same iteration. 1012:0399 compares the entry against
+  1640 and, when it matches, ADDS ZERO to the bias. So the bias is zero at
+  every one of the 1,600 iterations and the ADD AL at 1012:03ae adds nothing.
+  It is the second dead construct found in this part today, after part 004's
+  forty-nine conditional self-assignments, and like that one it is transcribed
+  because it is what ships.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      for I := 1599 downto 0 do
+        Cell[I] := Under[N, LensTab[I]];
+  -------------------------------------------------------------------------- }
+{ @asm 001 1012:0366 +0 BuildCell }
+procedure BuildCell(N : Integer); assembler;
+var
+  CellOfs : Word;                       { [BP-$2] }
+  SrcBase : Word;                       { [BP-$4] }
+  LensOfs : Word;                       { [BP-$6] }
+  Bias    : Byte;                       { [BP-$7] }
+  Spare   : Byte;                       { [BP-$8], never read }
+asm
+        IMUL    DI, N, 1641             { 1012:036a  N * $669               }
+        LEA     AX, [DI - 895]          { 036f  ...minus one element        }
+        MOV     SrcBase, AX             { 0373  = Ofs(Under[N])             }
+        MOV     CX, 1600                { 0376  40 x 40                     }
+        DEC     CX                      { 0379    counted from 1599 down    }
+        MOV     WORD PTR CellOfs, OFFSET Cell     { 037a  $4FD6             }
+        MOV     WORD PTR LensOfs, OFFSET LensTab  { 037f  $4304             }
+@@Pixel:
+        MOV     BYTE PTR Bias, 0        { 0384  <- once per pixel           }
+        MOV     BX, CX                  { 0388                              }
+        SHL     BX, 1                   { 038a  a word index                }
+        ADD     BX, LensOfs             { 038c                              }
+        MOV     AX, [BX]                { 038f  AX := LensTab[I]            }
+        CMP     AX, CX                  { 0391  DEAD: sets the bias to zero }
+        JE      @@Same                  { 0393    when it is already zero   }
+        MOV     BYTE PTR Bias, 0        { 0395                              }
+@@Same: CMP     AX, 1640                { 0399  DEAD: adds zero to it       }
+        JNE     @@Gather                { 039c                              }
+        ADD     BYTE PTR Bias, 0        { 039e                              }
+@@Gather:
+        MOV     BX, SrcBase             { 03a2                              }
+        ADD     BX, AX                  { 03a5  + the lens offset           }
+        MOV     AL, [BX]                { 03a7  the saved pixel             }
+        MOV     BX, CX                  { 03a9                              }
+        ADD     BX, CellOfs             { 03ab                              }
+        ADD     AL, Bias                { 03ae  and the bias is always 0    }
+        MOV     [BX], AL                { 03b1                              }
+        DEC     CX                      { 03b3                              }
+        CMP     CX, -1                  { 03b4                              }
+        JG      @@Pixel                 { 03b7                              }
 end;
 
 { Draw order per frame, from Bounce_Run: save the background, build the lens
