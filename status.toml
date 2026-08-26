@@ -1014,6 +1014,12 @@ label = "no I directive at all -- the third unit today -- FIXED"
 investigation = "part1-blitters"
 target = "R0"
 
+[plan.row."001 P1S4 $5B52"]
+label = "our maths block is 18,000 bytes out, not 4 -- an ORDER defect"
+investigation = "part1-layout"
+target = "R0"
+note = "PART 001's +4 IS NOT WHAT IT LOOKED LIKE, AND P1S4's BLOCK IS THE REAL PROBLEM. The cheapest probe in this target settled it in one command: SinCos is called with the ADDRESSES of MCos1 and MSin1 as literals, so both builds print their own maths block's position.   the original   1107:0456 pushes $5B52, $5B56   and   12c5:02ea pushes $AAA6, $AAAA   ours           pushes $A0F0, $A0F4             and   pushes $AAAA, $AAAE P1S5's maths block is +4, as dsmap said. But P1S4's is at $A0F0 against $5B52 -- EIGHTEEN THOUSAND BYTES OUT, not four. That is not a shift, it is a declaration ORDER defect inside P1S4: the original declares its maths EXTRNs near the START of the unit's block and ours declares them near the END, after F, Trail, Outp, Blob, Star, Font, the two profiles, Pal, Row/Col/Idx and Rows. AND THE ADDRESSES ALREADY RECORDED IN THE FILE CONFIRM IT AND DO NOT TILE. P1S4's own comments hold $5B52 (MCos1), $6A2D/$6A2F/$6A31 (Row, Col, Idx), $6A33 (Rows), $80C2 (stride $33), $80F3 (Angle) and $9DDB (stride 9). Sorted, MCos1 comes FIRST of those and Angle nearly last -- while the source declares the two adjacent. The unit's block runs from about $5A52, where P1S2's ends, to $A105 where P1S5's begins: roughly 18,900 bytes, with MCos1 sitting 256 bytes into it, so two 128-byte records or one 256-byte buffer precede it. DO THE TILING EXERCISE, exactly as part 005's was done this morning: sort every measured address, difference the consecutive pairs, and match each gap against a declared size. That took one of part 005's numbers from 112 to 80 and made two further declarations readable that had been invisible against the wrong baseline. Part 001 has MORE addresses recorded than part 005 did, so it should close faster -- and until it does, every absolute displacement in two of the part's largest units is wrong and correct code measures as wrong. DO NOT CHASE THE +4 SEPARATELY. It is P1S5's block sitting four bytes high because P1S4's ends four bytes late; fixing P1S4's tiling is likely to take it with it."
+
 [plan.row."001 dgimage $0018"]
 label = "112 bytes short of initialised data, first diff at $0018"
 investigation = "part1-last-112"
