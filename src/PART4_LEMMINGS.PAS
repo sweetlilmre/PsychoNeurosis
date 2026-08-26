@@ -1274,10 +1274,27 @@ begin
 
   end;
 
-  { 1005:0CAA -- and this is AFTER the loop, reached when nothing was found. }
-  if Lem[N].FallDist < 2 then Inc(Lem[N].X, Lem[N].Dir);
-  Inc(Lem[N].Y);
-  Inc(Lem[N].FallDist);
+  { 1005:0CAA -- and this is AFTER the loop, reached when nothing was found.
+
+    LONGHAND, NOT Inc, AND IT IS FORTY BYTES. This routine was missed when
+    Splat, Builder, DeathA, DeathB and Fuse were converted. The original loads
+    each field into a register, changes it there and stores it back with the
+    subscript's IMUL recomputed for every access -- 1005:0cd9 is IMUL
+    DI,[BP+4],$15 / MOV AX,[DI+$2FE] / INC AX / IMUL again / MOV [DI+$2FE],AX
+    -- where Inc emits an in-place ADD on the memory and touches the address
+    once. Three statements at roughly seventeen bytes each against three short
+    ones is the whole difference.
+
+    AND THE WALK PRICED IT AT ONE BYTE. Because it locates code by content it
+    found both frame-step blocks, just 40 bytes apart instead of the original's
+    spacing, and reported only the single byte where a JMP changed from near to
+    short. The way it was actually found was to locate the same recognisable
+    block in both images and compare its OFFSETS: 0c6b and 0d01 in the
+    original, 0c6b and 0cd9 in ours. }
+  if Lem[N].FallDist < 2 then
+    Lem[N].X := Lem[N].X + Lem[N].Dir;
+  Lem[N].Y := Lem[N].Y + 1;
+  Lem[N].FallDist := Lem[N].FallDist + 1;
   Lem[N].Frame := (Lem[N].Frame mod 4) + 1;
 end;
 
