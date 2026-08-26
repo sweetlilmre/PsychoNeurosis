@@ -23,6 +23,12 @@ rem
 rem  A batch file rather than a Pascal launcher on purpose: DOS Exec would have
 rem  to stay resident while the part runs, and these parts want the memory.
 rem
+rem  THIS FILE MUST BE CRLF. It was written with bare LF once and DOSBox's shell
+rem  mis-parsed the `if not exist` line below, reporting NEUR2.EXE as missing
+rem  while it sat in the same directory. .gitattributes marks .BAT as -text, so
+rem  git stores whatever is on disk and will not correct it -- which is why
+rem  kit/tools/eolcheck.py now checks.
+rem
 rem  Usage, from the folder holding the parts and NEUROSIS.DAT:
 rem
 rem      RUNPART 4
@@ -48,9 +54,12 @@ echo Run it from the folder holding the parts and NEUROSIS.DAT.
 goto end
 
 :nopart
-echo RUNPART: NEUR%1.EXE is not here.
-echo          Only parts rebuilt as real programs have one; the rest are
-echo          still TPARTn.EXE test harnesses.
+echo RUNPART: NEUR%1.EXE is not in this directory:
+cd
+echo.
+echo          Parts rebuilt as real programs have one -- 2, 3, 4, 6 and 7.
+echo          Part 001 still runs through TPART1.EXE and part 005 through
+echo          TPART5.EXE.
 goto end
 
 :nodata
