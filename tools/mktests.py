@@ -186,9 +186,10 @@ PARTS = [
     ("TPART5", "P5Main", "RunPart5",
      "DemoVT, Crt, VGA",
      "part 005 -- all three scenes, through the main body at 1000:002d"),
-    ("TPART6", "P6Main", "RunPart6",
-     "DemoVT, Crt, VGA",
-     "part 006 -- all four scenes, through the main body at 1000:002d"),
+    # PART 006 HAS NO HARNESS ANY MORE. src/NEUR6.PAS is the real program --
+    # the main body that P6MAIN.PAS held as a unit -- and part 006 went 99.6% to
+    # 100.0% with 32 far-call bytes closing at once. Its one remaining byte is
+    # the recorded je-form floor at 100f:07b7.
     # PART 007 HAS NO HARNESS ANY MORE. src/NEUR7.PAS is the real program --
     # the main body that P7MAIN.PAS held as a unit -- so the harness program and
     # the driver unit, neither of which the original has, are gone. That was

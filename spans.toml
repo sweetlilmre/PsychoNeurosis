@@ -63,7 +63,8 @@ rtl  = 0x1288
 segs = [0x1005, 0x11d9, 0x11e3, 0x1226]
 
 [part."006"]
-exe  = "TPART6.EXE"
+# The real program, from src/NEUR6.PAS: no harness, no driver unit.
+exe  = "NEUR6.EXE"
 rtl  = 0x128a
 segs = [0x100f, 0x1095, 0x1118, 0x11bb, 0x11ee, 0x1217, 0x1279]
 

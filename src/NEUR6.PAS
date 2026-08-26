@@ -1,38 +1,45 @@
 { ===========================================================================
-  Psycho Neurosis (Asphyxia, 1994) -- NEUROSIS.006, the main body.
+  Psycho Neurosis (Asphyxia, 1994) -- NEUROSIS.006, the program itself.
 
-  Segment 1000, offsets $00..$ef. Everything up to 1000:0028 is Turbo Pascal's
-  unit initialisation chain; the program starts at 1000:002d.
+  THIS IS THE MAIN BODY, NOT A UNIT CALLED BY A HARNESS. Segment 1000, offsets
+  $00..$ef: everything up to 1000:0028 is Turbo Pascal's unit initialisation
+  chain and the program starts at 1000:002d.
+
+  It replaces P6MAIN.PAS, which held this code as a unit with a RunPart6 entry,
+  and the generated TPART6.PAS that called it. Neither has a counterpart in the
+  1994 binary -- its main body IS its program -- and carrying them put Turbo
+  Pascal's runtime on a different paragraph, so every far call into it differed.
 
   THE SCENE ORDER IS NOT THE SEGMENT ORDER. The units initialise 100f last of
   the four, but the main body calls 1095 first. Segment number tells you the
   link order, not the running order.
 
+  THE USES CLAUSE IS THE LINK ORDER, REVERSED, and P6S2 BEFORE P6S1 IS
+  LOAD-BEARING -- this note comes from P6MAIN and it still applies. The
+  original's variable region opens with P6S2's Cells at DS:$70EE and its block
+  ends at $737D, exactly where P6S1's Path begins at $737E; its constants open
+  with P6S2's CellShape at DS:$000A too. Named the other way round, P6S1 came
+  first and every variable in the part was out. The walk is a reverse DFS
+  post-order from the PROGRAM, so the whole clause reads backwards: DemoVT
+  first here finishes first and lands last in code.
+
+  THERE IS NO SetTextMode AT THE END, and that is the original's doing: the demo
+  ran under PSYCHO.EXE and part 006 left the adapter in mode 13h for whatever
+  came next. RUNPART.BAT restores it with VIDMODE.
+
   DGROUP
     DS:$70ec  the volume as we found it   DS:$70ed  the fade's copy of it
   =========================================================================== }
 
-unit P6Main;
+program Neur6;
 
-interface
-
-procedure RunPart6;
-
-implementation
-
-{ P6S2 LAST, so it comes FIRST in DGROUP -- the data segment runs backwards
-  down this clause. The original's variable region opens with P6S2's Cells at
-  DS:$70EE and its block ends at $737D, exactly where P6S1's Path begins at
-  $737E; its constants open with P6S2's CellShape at DS:$000A too. Named the
-  other way round P6S1 came first and every variable in the part was out. }
-uses Crt, VGA, DemoVT, P6S4, P6S3, P6S1, P6S2;
+uses DemoVT, Crt, VGA, P6S4, P6S3, P6S1, P6S2;
 
 var
   SavedVol : Byte;                { DS:$70ec }
   V        : Byte;                { DS:$70ed }
 
-{ 1000:002d -- and it ends in Halt(0), exactly as the main body does. }
-procedure RunPart6;
+{ 1000:002d -- and it ends in Halt(0), exactly as the original's does. }
 begin
   SetMode13h;                     { 1000:0030 -> 11ee:0000 }
   VirtScrAlloc;                   { 1000:0035 -> 11ee:0006 }
@@ -65,7 +72,4 @@ begin
   SetVolume(SavedVol);            { 1000:00dd }
   VirtScrFree;                    { 1000:00e2 -> 11ee:0033 }
   Halt(0);                        { 1000:00e8 }
-end;
-
-begin
 end.
