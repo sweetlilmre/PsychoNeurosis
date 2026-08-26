@@ -230,6 +230,42 @@ matched = 32
 [routine."VGA.WaitRetrace"]
 matched = 14
 
+[observation."NEUR2"]
+harness = "NEUR2"
+tier = "part"
+outcome = "matches"
+achieved = "R3"
+observer = "maintainer"
+date = "2026-08-26"
+confirmed_at = "c4043281e85d"
+fingerprint = "abb701542b9809e6"
+against = "work/split/NEUROSIS_002.exe"
+note = "Watched RUNPART 2 on 26 Aug 2026, the FIRST EVER RUN of part 002 as a real program rather than a harness. The maintainer reports it looking the same as ORIG2. This run covers a large change: all sixteen of P2S2's routines were reordered to the original's segment order, FillFan's Colour became a Word, ObjTransform's two additions per component were split, the object Face arrays became zero-based, the palette calls were qualified to VGA.SetRGB, and the last five Choreography loops lost both Present and the frame counter. That last one is a genuine behaviour change and the run says it is not visible against the original -- which is the answer to whether it is safe, and NOT an answer to why the original is like that. part2-draw-no-flip is opened to keep that question."
+
+[observation."NEUR3"]
+harness = "NEUR3"
+tier = "part"
+outcome = "matches"
+achieved = "R3"
+observer = "maintainer"
+date = "2026-08-26"
+confirmed_at = "c4043281e85d"
+fingerprint = "94598e1abf4dbfbd"
+against = "work/split/NEUROSIS_003.exe"
+note = "Watched RUNPART 3 on 26 Aug 2026, the FIRST EVER RUN of part 003 as a real program. The maintainer reports it looking the same as ORIG3. Covers P3Tunnel losing its private SetModeX to ModeX's, P3Globe gaining the I-minus switch and four ordering corrections -- B, G, R declared backwards, greater-than-zero for not-equal-zero, Target as 256 triples, SrcOfs and DstOfs transposed -- two of three title showings gaining a keyboard guard before the BlockRead, and P3Stars making DegToRad far and moving Generate's body into the initialisation section. Part 003 is now aligned on every one of its 13,920 bytes."
+
+[observation."NEUR6"]
+harness = "NEUR6"
+tier = "part"
+outcome = "matches"
+achieved = "R3"
+observer = "maintainer"
+date = "2026-08-26"
+confirmed_at = "c4043281e85d"
+fingerprint = "24c1c52d44c032fc"
+against = "work/split/NEUROSIS_006.exe"
+note = "Watched RUNPART 6 on 26 Aug 2026, the FIRST EVER RUN of part 006 as a real program. The maintainer reports it looking the same as ORIG6, in one sentence covering parts 2, 3 and 6 together. READ WHAT THAT DOES AND DOES NOT SETTLE. The 25 Aug TPART6 run called scene 1 JERKY and no cause was ever found; this report is about the part as a whole and says it looks the same, so it does bear on scene 1 rather than being silent about it, which is why part6-confirm-r3 can close on it where the fire-only report could not. What has changed in between is the harness: TPART6 was a generated program plus a driver unit, which put the runtime on a different paragraph, and NEUR6.EXE is the main body itself. Nobody has measured the harness as a cause of the jerkiness and this run does not prove it was one."
+
 [observation."TPART1"]
 harness = "TPART1"
 tier = "part"
@@ -367,7 +403,7 @@ name = "part6-confirm-r3"
 finding = "part 006 looked identical bar possibly slight timing; a careful scene-by-scene pass could raise it to R3"
 seen_in = "TPART6"
 state = "resolved"
-resolution = "CONFIRMED ON A WATCHED RUN, 26 Aug 2026, by the maintainer: part 006 scene 3 behaves. This was the careful-run investigation with no code change attached -- it wanted eyes, not edits, and it has had them."
+resolution = "Resolved by the maintainer's watched RUNPART 6 on 26 Aug 2026, recorded as observation NEUR6 against work/split/NEUROSIS_006.exe: the part looks the same as ORIG6. This is the first ever run of part 006 as a real program rather than a harness -- TPART6 was a generated program plus a driver unit, two segments the 1994 binary does not have, which put Turbo Pascal's runtime on a different paragraph. WHAT THIS CLOSES AND WHAT IT DOES NOT. It closes the investigation, because the 25 Aug report that held it open was that scene 1 looked JERKY and this report is about the part as a whole rather than about the fire alone -- the distinction the TPART6 note was careful to draw. It does NOT identify a cause for the jerkiness. The harness went away in the same window and nobody has bracketed it, so it is available as a hypothesis and not as a measurement; if the jerkiness is ever reported again, that is the first thing to test and the way to test it is to rebuild the harness and watch the two side by side."
 
 [[plan.investigation]]
 name = "surplus-fpu-sites"
@@ -1016,6 +1052,12 @@ state = "open"
 [[plan.investigation]]
 name = "part1-program-blocked"
 finding = "PART 001'S HARNESS REMOVAL IS BLOCKED ON TWO RECONSTRUCTION QUESTIONS, and neither is about the harness. The other six parts are done: 002, 003, 004, 006 and 007 are real programs now and 005 never had a driver unit. THE ORIGINAL'S PROGRAM DOES NOT CALL VirtScrAlloc. 1000:0044 is CALLF 1491:0000 (SetMode13h) and 1000:0049 is CALLF 1532:0000 (MusicDetect) -- five bytes apart, with no room for another call between them. Then MusicFunc3, MusicCue, MusicStart, Scene1, and the keyboard drain INLINE at 1000:0062 as every other part has it. But P1INTRO's RunIntro calls VirtScrAlloc right after SetMode13h, and NOTHING ELSE IN THE SOURCE DOES: grepping the tree finds VirtScrAlloc only in the five NEURn programs. So writing the program faithfully would leave part 001's scenes drawing into a virtual screen nobody allocated, and part 001 is a part the maintainer has confirmed running. Where the original allocates it is the first question. AND THE PROGRAM CALLS 1012:0798 FOR SCENE 1, NOT 1012:0678. P1S1.PAS records Demo_Scene1 at 1012:0678 in three places with evidence for it -- PUSH BP / MOV BP,SP and no ENTER -- and our build puts Scene1 at its segment's 0668. The original's program calls 0798, which is 288 bytes further on. Either the recorded address is wrong or 0798 is a routine that reaches Scene1, and that is the second question. WHAT THE SIZES SAY, checked before starting rather than after: part 001's units are P1S1 -32, P1S2 -16, P1S5 -16 against the original's, a net -64, so the runtime stays displaced whatever the program does. Removing the harness would not have closed part 001's far calls in any case -- the same finding as parts 002 and 003, where it also did not. THE PART ALREADY READS 100.0% (21,257 of 21,264, two far-call bytes on the walk) so there is nothing forcing this. Do the two questions first, then the program."
+state = "open"
+
+[[plan.investigation]]
+name = "part2-draw-no-flip"
+finding = "part 002 Choreography: 81 frames are drawn and never flipped, and the frame counter stops advancing across them. NOT A DEFECT IN THE RECONSTRUCTION -- it is what the 1994 bytes have, and the maintainer's watched RUNPART 2 on 26 Aug 2026 reports the part looking the same as ORIG2, so the behaviour is not visible as a difference between them. WHAT IS OPEN IS WHY. The last five of Choreography's eleven animation loops call neither Present -- 108b:175e in ours was CALL 0F66 and the original goes straight from RenderB to the loop test -- nor Frame := Frame + 1; the first six call both, and the original calls Present six times in this routine where ours called it eleven. Every loop still does the full ObjTranslate, ObjTransform, FillRect, ObjSortFaces and RenderB into the write page, so the work happens and the result is discarded until whatever presents next. Two readings, neither measured: five loops written from a template that had both lines removed, or a deliberate fast-forward through 81 frames of motion. The maintainer has asked for this to be kept findable and wants to look at it later; the note is in src/P2S2.PAS immediately above the first of the five loops. NOTHING SHOULD BE CHANGED HERE WITHOUT A DECISION: putting Present back costs 15 bytes and the frame counter 100 more, and undoes what took the part to 100.0% with no unaligned span."
+seen_in = "NEUR2"
 state = "open"
 
 [plan.row."001 $0284"]

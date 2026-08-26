@@ -2063,10 +2063,30 @@ begin
     JE plus JMP.
 
     SO THESE 81 FRAMES ARE DRAWN AND NEVER FLIPPED, and Frame stops advancing
-    across them. That is a real behaviour difference and it is the original's,
-    not ours -- five loops written from a template that had neither line. It
-    has not been watched yet, and a watched run is the only thing that can say
-    whether the 1994 demo really looks like that. }
+    across them. Every one of the five loops still does the full ObjTranslate,
+    ObjTransform, FillRect, ObjSortFaces and RenderB into the write page, so the
+    work happens and the result is thrown away until whatever presents next.
+
+    WATCHED, AND IT LOOKS THE SAME AS THE ORIGINAL. The maintainer ran
+    RUNPART 2 beside ORIG2 on 26 Aug 2026 -- the first time part 002 had ever
+    run as a real program rather than through a harness -- and reports no
+    visible difference. Recorded as observation NEUR2, part tier, matches, R3.
+    That settles whether this is SAFE. It says nothing about why the original
+    is like this.
+
+    ---> LEFT DELIBERATELY, AND THE MAINTAINER WANTS TO COME BACK TO IT. <---
+    The open question is carried in the plan as investigation
+    `part2-draw-no-flip`; run
+        kit/tools/pascal/plan.py status.toml --report
+    to find it. Two readings and neither is measured: five loops written from a
+    template that had both lines removed, or a deliberate fast-forward through
+    81 frames of motion that were never meant to be seen.
+
+    DO NOT "FIX" THIS. Putting Present back costs 15 bytes and the frame counter
+    about 100 more, and it would undo part of what took this part from 99.9% to
+    100.0% with no unaligned span at all. If it is ever changed, it should be
+    because somebody decided the demo should look different from its own
+    binary -- which is a decision, not a correction. }
 
   for I := 1 to 12 do
   begin
