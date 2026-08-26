@@ -1009,4 +1009,14 @@ begin
 
 end;
 
+{ AN EMPTY INITIALISATION SECTION, AND THE ORIGINAL GIVES EVERY UNIT ONE. 1107:09b7
+  is PUSH BP / MOV BP,SP / LEAVE / RETF -- five bytes, doing nothing -- and the
+  main body opens with a chain of far calls that runs one per unit. The chain is
+  twelve calls at 1000:0000..003b in the 1994 binary and was SEVEN in ours,
+  because the five scene units ended `end.` with no `begin`, so TP7 emitted no
+  section and the chain had nothing to call. Twenty-five bytes of stub and
+  twenty-five of chain, and the body started twenty-five bytes early.
+
+  Without the `begin` below this unit does not appear in that chain at all. }
+begin
 end.

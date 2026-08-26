@@ -662,8 +662,14 @@ begin
 
     for I := 1 to NumBouncers do
     begin
-      Inc(BX[I], BDX[I]);
-      Inc(BY[I], BDY[I]);
+      { PLAIN ASSIGNMENTS, NOT Inc, AND THE SUBSCRIPT IS RECOMPUTED THREE TIMES
+        BECAUSE OF IT. 1012:04ed loads BX[I] into AX, 04f5 adds BDX[I], and
+        04f8 reloads I and shifts it AGAIN before storing at 04fd -- three
+        separate MOV DI,[BP-$52] / SHL DI,1 pairs for one statement. Inc folds
+        the whole thing into ADD [BP+DI-$3E],AX and saves nine bytes a site,
+        which is why the two of them cost eighteen. }
+      BX[I] := BX[I] + BDX[I];
+      BY[I] := BY[I] + BDY[I];
       { four separate tests in the original, 1012:0518..1012:058b -- X and Y
         are checked against their own low and high bounds independently }
       if BX[I] < BounceMinX then BDX[I] := -BDX[I];
@@ -782,7 +788,24 @@ begin
   DrawLine(319, 0, 319, 199, 0, VirtScrSeg);
   DrawLine(318, 0, 318, 199, 0, VirtScrSeg);
 
-  BounceRun;
+  { THE LOGO IS SHOWN BEFORE THE BOUNCERS START, and this line was missing.
+    1012:06dc is PUSH [$AB58] / PUSH $A000 / LCALL 1491:0382 -- CopyScreen from
+    the virtual screen to video memory -- and 1012:06e8 is the CALL to BounceRun
+    after it. Twelve bytes, and the whole of P1S1's remaining shortfall. Without
+    it the freshly loaded logo sat in the virtual screen unseen until BounceRun's
+    first frame happened to blit it. }
+  CopyScreen(VirtScrSeg, $A000);        { 1012:06dc }
+  BounceRun;                            { 1012:06e8 }
 end;
 
+{ AN EMPTY INITIALISATION SECTION, AND THE ORIGINAL GIVES EVERY UNIT ONE. 1012:06ed
+  is PUSH BP / MOV BP,SP / LEAVE / RETF -- five bytes, doing nothing -- and the
+  main body opens with a chain of far calls that runs one per unit. The chain is
+  twelve calls at 1000:0000..003b in the 1994 binary and was SEVEN in ours,
+  because the five scene units ended `end.` with no `begin`, so TP7 emitted no
+  section and the chain had nothing to call. Twenty-five bytes of stub and
+  twenty-five of chain, and the body started twenty-five bytes early.
+
+  Without the `begin` below this unit does not appear in that chain at all. }
+begin
 end.

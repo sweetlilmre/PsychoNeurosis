@@ -167,9 +167,11 @@ SCENES = [
 # displaced. Changing the part unit's own clause does nothing, which is the
 # evidence for the walk starting here.
 PARTS = [
-    ("TPART1", "P1Intro", "RunIntro",
-     "DemoVT, Crt, VGA",
-     "part 001 -- all five scenes, through the driver at 1000:003c"),
+    # PART 001 HAS NO HARNESS ANY MORE. src/NEUR1.PAS is the real program and
+    # its segment matches the original's 288 bytes; P1INTRO.PAS is gone with it.
+    # Reading those 288 bytes first is what made the rest possible -- both of the
+    # things recorded as blocking part 001's program turned out to be readings of
+    # something else, and the segment says so in one pass.
     # PART 002 HAS NO HARNESS ANY MORE. src/NEUR2.PAS is the real program and
     # its segment matches the original's 128 bytes exactly. The walk did not
     # move, and that was PREDICTED before the work rather than discovered after:

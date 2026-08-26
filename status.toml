@@ -1060,6 +1060,11 @@ finding = "part 002 Choreography: 81 frames are drawn and never flipped, and the
 seen_in = "NEUR2"
 state = "open"
 
+[[plan.investigation]]
+name = "part1-p1s4-one-byte"
+finding = "part 001 P1S4 is one byte short and three findings inside it push in opposite directions, so none of them can be applied alone. MEASURED, NOT ARGUED: the part walks at 21,264 of 21,264 and every segment is the original's exact size, but the program segment's two references into P1S4 are off by one -- 1000:0029 is LCALL 0107:09b7 in the 1994 file and 0107:09b8 in ours, and 1000:009d is Scene4 at 0977 against our 0978 -- so P1S4's code is one byte long somewhere before 0977. A masked instruction diff of P1S4 finds four differences, and the arithmetic is why this is a ticket and not a fix: (a) 1107:0390 writes an increment and a decrement LONGHAND, MOV AX,[BP-2] / INC AX / MOV [BP-2],AX and the same for [BP-4], where ours has the two in-place forms -- correcting it makes ours SIX BYTES LONGER; (b) 1107:044a copies a pointer with LES DI,[BP+n] / MOV [BP-m],DI / MOV [BP-m],ES where ours loads and stores two words separately, four bytes more in ours; (c) ours has an extra LES DI,[BP+n] at 04cd and again at 04e4, four bytes each. So (a) alone would take a one-byte shortfall to a five-byte excess. They have to be read together, in one pass over the routine, and the pass has not been done. THERE IS ALSO A CORRECTNESS ITEM THAT IS NOT ABOUT SIZE: 1107:0491 is LES DI,[BP-n], a LOCAL, and ours is LES DI,[BP+n], a PARAMETER -- the same instruction reading different memory, which no length check can see and which the watched runs would not necessarily show either. That one is worth settling first, independently of the byte. 1107:0921 is JL where ours has JLE, the same class as part 003's > 0 against <> 0."
+state = "open"
+
 [plan.row."001 $0284"]
 label = "the 2-byte typed constant holding $A640, still missing"
 investigation = "part1-layout"

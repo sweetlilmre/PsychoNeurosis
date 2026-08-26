@@ -127,7 +127,7 @@ list = [
   "P1STAR.PAS",
   "P1S4.PAS",
   "P1S5.PAS",
-  "P1INTRO.PAS",
+  "NEUR1.PAS",
   "P2VIEW.PAS",
   "P2S1.PAS",
   "P2S2.PAS",
@@ -197,7 +197,7 @@ alongside = ["*.BAT"]
 "P1STAR.PAS" = ["P1STAR.PAS", "P1Star", "P1Star"]
 "P1S4.PAS" = ["P1S4.PAS", "P1S4", "P1S4"]
 "P1S5.PAS" = ["P1S5.PAS", "P1S5", "P1S5"]
-"P1INTRO.PAS" = ["P1INTRO.PAS", "P1Intro", "P1Intro"]
+"NEUR1.PAS" = ["NEUR1.PAS", "Neur1", "Neur1"]
 "P2VIEW.PAS" = ["P2VIEW.PAS", "P2View", "P2View"]
 "P2S1.PAS" = ["P2S1.PAS", "P2S1", "P2S1"]
 "P2S2.PAS" = ["P2S2.PAS", "P2S2", "P2S2"]

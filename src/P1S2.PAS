@@ -544,10 +544,15 @@ var
   CometPos, Frame, Phase : Real;      { [BP-$108], [BP-$10E], [BP-$114] }
   CharIdx                : Integer;   { [BP-$116] }
 begin
+  { CharIdx BEFORE Phase, WHICH READS ODDLY AND IS WHAT THE ORIGINAL DOES.
+    1082:033c stores $FFFF into [BP-$116], CharIdx, and only then does
+    1082:0342 begin the three words of Phase at [BP-$114]. Assignment order is
+    emission order, so the natural grouping -- the three Reals together, the
+    Integer after -- puts these six bytes in the wrong place. }
   CometPos := -48.0;
   Frame   :=   1.0;
-  Phase   :=   1.0;
   CharIdx :=  -1;
+  Phase   :=   1.0;
 
   { 1082:0354 -- FillChar(WorkBuf, 5200, 0). ShowWord clears the work buffer
     on EVERY call, which is what stops the first word's blurred remains (and,
@@ -555,9 +560,21 @@ begin
     any byte above 20, so without this there is a permanent stripe. }
   FillChar(WorkBuf^, SizeOf(TWorkBuf), 0);
 
-  Count := 80;
+  { A FOR ... DOWNTO, NOT A REPEAT WITH A Dec, AND THE TWO LOOPS IN THIS
+    ROUTINE HAVE THE SAME SHAPE. 1082:0364 is MOV [BP-$102],$50 / JMP into the
+    body / 1082:036c DEC [BP-$102], and the bottom at 1082:0510 is
+    CMP [BP-$102],-$12 / JE out / JMP back to the DEC -- which is exactly what
+    the outro's `for Count := 1 to 100` emits below with INC in place of DEC.
+    The decrement belongs at the TOP, skipped on the first pass by that JMP.
 
-  repeat
+    Written as `Count := 80; repeat ... Dec(Count) ... until Count = -18` the
+    decrement lands at the bottom instead, which is four bytes there and six
+    missing here, and the loop runs 98 times against the original's 99: a for
+    loop's body runs for the limit value too, so the original's last pass has
+    Count = -18 and ours stopped at -17. One frame of the comet, and it is the
+    frame furthest off the left edge. }
+  for Count := 80 downto -18 do
+  begin
     CopyScreen(BackdropSeg, VirtScrSeg);
     DrawRevealed;                    { 1082:01d0 -- the characters so far }
 
@@ -576,14 +593,22 @@ begin
 
     { Only the character currently animating is drawn here; Trunc(Phase) is
       its animation step, one of 1, 3, 5, 7, 9, 11, 13, 15. }
-    if (CharIdx > 0) and (CharIdx <= Length(S)) then
+    { CharIdx < Length(S) + 1, AND NOT CharIdx <= Length(S). 1082:03d9 is
+      INC AX on the length before the compare, and the branch is JLE where the
+      shorter form gives JL -- so the original added one to the limit and used a
+      strict less-than. The two are the same test on an Integer; only one of
+      them costs the extra byte, and it is the one that is there. }
+    if (CharIdx > 0) and (CharIdx < Length(S) + 1) then
       DrawChar(S[CharIdx], Trunc(Phase), CharIdx);
 
     Phase := Phase + 2.0;
     if Phase > 15.0 then
     begin
       Phase := 1.0;
-      Inc(CharIdx);                  { eight frames per character }
+      { LONGHAND. 1082:0466 is MOV AX,[BP-$116] / INC AX / MOV [BP-$116],AX --
+        nine bytes -- where Inc emits one four-byte INC WORD PTR [mem]. Eighth
+        time in this project. }
+      CharIdx := CharIdx + 1;          { eight frames per character }
     end;
 
     CopyScreen(VirtScrSeg, $A000);
@@ -593,15 +618,13 @@ begin
 
     CometPos := CometPos + 2.0;
 
-    Dec(Count);
-
     { 1082:050c -- the KeyPressed test has TWO destinations: the `je` falls
-      through to the Count test, the `jmp` goes to 1082:054c, which is PAST
-      the 100-frame outro below. An `or` in the `until` would send both exits
-      to the same place, so this is not one condition -- it is an Exit, and a
-      key pressed during the word therefore skips the fade entirely. }
+      through to the loop's own test, the `jmp` goes to 1082:054c, which is
+      PAST the 100-frame outro below. So this is not part of the loop
+      condition -- it is an Exit, and a key pressed during the word therefore
+      skips the fade entirely. }
     if KeyPressed then Exit;
-  until Count = -18;
+  end;
 
   { --------------------------------------------------------------------
     The outro, 1082:051a..054a -- 100 frames, and it REDRAWS every one:
@@ -653,4 +676,14 @@ begin
   FreeMem(WorkBuf,   SizeOf(TWorkBuf));
 end;
 
+{ AN EMPTY INITIALISATION SECTION, AND THE ORIGINAL GIVES EVERY UNIT ONE. 1082:0602
+  is PUSH BP / MOV BP,SP / LEAVE / RETF -- five bytes, doing nothing -- and the
+  main body opens with a chain of far calls that runs one per unit. The chain is
+  twelve calls at 1000:0000..003b in the 1994 binary and was SEVEN in ours,
+  because the five scene units ended `end.` with no `begin`, so TP7 emitted no
+  section and the chain had nothing to call. Twenty-five bytes of stub and
+  twenty-five of chain, and the body started twenty-five bytes early.
+
+  Without the `begin` below this unit does not appear in that chain at all. }
+begin
 end.

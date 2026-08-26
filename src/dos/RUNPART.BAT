@@ -57,9 +57,8 @@ goto end
 echo RUNPART: NEUR%1.EXE is not in this directory:
 cd
 echo.
-echo          Parts rebuilt as real programs have one -- 2, 3, 4, 6 and 7.
-echo          Part 001 still runs through TPART1.EXE and part 005 through
-echo          TPART5.EXE.
+echo          Parts rebuilt as real programs have one -- 1, 2, 3, 4, 6 and 7.
+echo          Part 005 still runs through TPART5.EXE.
 goto end
 
 :nodata

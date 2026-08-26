@@ -75,6 +75,58 @@ var
   F : file;                             { DS:$5A52 }
 
 
+{ LOAD IS DEFINED FIRST, BEFORE MosaicRun, AND THE STRING LITERAL IS THE PROOF.
+  The original's segment OPENS with 0C 'neurosis.dat' at 10e3:0000 -- a code-
+  segment string constant, which TP7 emits immediately ahead of the routine
+  that references it -- and the first routine after it is ENTER $02 at
+  10e3:0017, the two bytes of Load's frame. Defined after MosaicRun the literal
+  landed at 10e3:014b instead, and 10e3:0020's MOV DI,offset carried that
+  address rather than zero. The map at the top of this file already gave
+  Load 0017 and Mosaic_Run 00bb; nothing had checked the order against it. }
+
+
+{ --------------------------------------------------------------------------
+  Mosaic_Load (10e3:0017)
+
+  This was missing, which is why the scene ran to completion and drew nothing:
+  it was pixelating an empty screen through a black palette.
+
+      Seek $02AEE0, read 64,000 bytes into the VIRTUAL screen
+      for I := 1 to 255 do SetRGB(I, Round(I*K), Round(I*K), Round(I*K))
+
+  All three channels take the SAME value, so it is a neutral GREY ramp. K is
+  the 80-bit constant at CS:$000D = 0.247, which puts I = 255 at 63 -- the top
+  of the DAC exactly.
+  -------------------------------------------------------------------------- }
+procedure Load;
+var
+  { ENTER $02 at 10e3:0017 is TWO BYTES -- just the counter. The file record is
+    a GLOBAL, declared with the unit's other data above, which is what every
+    other scene in this part turned out to do as well. }
+  I : Integer;
+begin
+  Assign(F, 'neurosis.dat');
+  Reset(F, 1);
+  Seek(F, $02AEE0);
+  { VirtScr^, NOT Mem[VirtScrSeg : 0]. 10e3:004a is LES DI,[mem] -- one
+    instruction loading a stored far POINTER -- where the segment-plus-zero form
+    reads only VGA's segment word and builds the pointer around it: MOV AX,[mem]
+    / PUSH AX / XOR DI,DI / POP ES, three bytes more, and this unit's only
+    remaining excess. The two address the same memory; only one of them is what
+    the original wrote. }
+  BlockRead(F, VirtScr^, 64000);
+  Close(F);
+
+  { RECOMPUTED THREE TIMES, once per channel, which is what the comment above
+    already said and what the code did not do. 10e3:0075, 0088 and 009b each
+    do FILD [BP-2] / FLD the constant at CS:$000D / FMULP / Round, and each
+    result is pushed separately -- nine x87 sites where a single V costs three.
+    Turbo Pascal does not common up the subexpression, so the source really
+    does write it out. }
+  for I := 1 to 255 do
+    SetRGB(I, Round(I * 0.247), Round(I * 0.247), Round(I * 0.247));
+end;
+
 procedure MosaicRun;
 var
   { ENTER $18 IS TWENTY-FOUR BYTES AND EVERY ONE OF THEM IS NOW ACCOUNTED FOR,
@@ -253,41 +305,6 @@ begin
   until Level = MosaicLevels + 1;
 end;
 
-{ --------------------------------------------------------------------------
-  Mosaic_Load (10e3:0017)
-
-  This was missing, which is why the scene ran to completion and drew nothing:
-  it was pixelating an empty screen through a black palette.
-
-      Seek $02AEE0, read 64,000 bytes into the VIRTUAL screen
-      for I := 1 to 255 do SetRGB(I, Round(I*K), Round(I*K), Round(I*K))
-
-  All three channels take the SAME value, so it is a neutral GREY ramp. K is
-  the 80-bit constant at CS:$000D = 0.247, which puts I = 255 at 63 -- the top
-  of the DAC exactly.
-  -------------------------------------------------------------------------- }
-procedure Load;
-var
-  { ENTER $02 at 10e3:0017 is TWO BYTES -- just the counter. The file record is
-    a GLOBAL, declared with the unit's other data above, which is what every
-    other scene in this part turned out to do as well. }
-  I : Integer;
-begin
-  Assign(F, 'neurosis.dat');
-  Reset(F, 1);
-  Seek(F, $02AEE0);
-  BlockRead(F, Mem[VirtScrSeg : 0], 64000);
-  Close(F);
-
-  { RECOMPUTED THREE TIMES, once per channel, which is what the comment above
-    already said and what the code did not do. 10e3:0075, 0088 and 009b each
-    do FILD [BP-2] / FLD the constant at CS:$000D / FMULP / Round, and each
-    result is pushed separately -- nine x87 sites where a single V costs three.
-    Turbo Pascal does not common up the subexpression, so the source really
-    does write it out. }
-  for I := 1 to 255 do
-    SetRGB(I, Round(I * 0.247), Round(I * 0.247), Round(I * 0.247));
-end;
 
 { [transcribed] Demo_Scene3 (10e3:0206) -- clear both screens, load, run,
   clear both again. }
@@ -301,4 +318,14 @@ begin
   ClearScreen(VirtScrSeg, 0);
 end;
 
+{ AN EMPTY INITIALISATION SECTION, AND THE ORIGINAL GIVES EVERY UNIT ONE. 10e3:023b
+  is PUSH BP / MOV BP,SP / LEAVE / RETF -- five bytes, doing nothing -- and the
+  main body opens with a chain of far calls that runs one per unit. The chain is
+  twelve calls at 1000:0000..003b in the 1994 binary and was SEVEN in ours,
+  because the five scene units ended `end.` with no `begin`, so TP7 emitted no
+  section and the chain had nothing to call. Twenty-five bytes of stub and
+  twenty-five of chain, and the body started twenty-five bytes early.
+
+  Without the `begin` below this unit does not appear in that chain at all. }
+begin
 end.
