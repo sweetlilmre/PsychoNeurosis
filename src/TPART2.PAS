@@ -14,7 +14,7 @@ program TPART2;
   -- the two variants are byte-identical apart from exactly those pairs --
   so the faithful build keeps the $E+ default. See dosbuild.py. }
 
-uses Crt, VGA, ModeX, P2View, FixMath, DemoVT, P2Main;
+uses Crt, VGA, FixMath, P2View, DemoVT, P2Main;
 
 { Runs on the way out of Halt, of a run-time error, or of a normal end --
   see the note in mktests.py, including why this ends the chain rather than

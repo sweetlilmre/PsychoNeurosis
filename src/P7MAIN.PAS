@@ -29,6 +29,14 @@ procedure RunPart7;
 
 implementation
 
+{ THE HARNESS DECIDES THIS, NOT THIS CLAUSE. build/TPART7.MAP has ours as
+  P7S1, DemoVT, VGA, Crt where the original is VGA (100b), P7S1 (100f), Crt
+  (1099), DemoVT (10fb). Reordering here changes NOTHING -- the link walk is a
+  reverse DFS post-order starting at the PROGRAM, and TPART7.PAS names Crt,
+  VGA and DemoVT itself, which pins them before this unit is reached. Fixing
+  part 007's order means changing the harness's clause in tools/mktests.py, the
+  way part 002's was. Measured, not assumed: this clause was reversed and the
+  map came out identical. }
 uses Crt, VGA, DemoVT, P7S1;
 
 var

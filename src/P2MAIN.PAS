@@ -29,7 +29,15 @@ procedure RunPart2;
 
 implementation
 
-uses Crt, VGA, ModeX, FixMath, P2View, DemoVT, P2S1, P2S2;
+{ THE ORDER IS THE LINK ORDER, REVERSED, and the map says ours was wrong. The
+  original's segments run P2S1 (1008), ModeX (107c), P2S2 (108b), DemoVT
+  (13f9) ... Crt (144f); build/TPART2.MAP had ours as P2S2, P2S1, DemoVT,
+  FixMath, P2View, ModeX, VGA, Crt -- a different order entirely, with ModeX
+  eighth instead of second. The coverage walk cannot see this: it locates each
+  segment by CONTENT, so it aligned every one of them and still read 99.9%.
+  What DID see it was the initialised data image, where ModeX's LogicalWidth
+  sat at DS:$0CDC against the original's DS:$0002. }
+uses Crt, VGA, FixMath, P2View, DemoVT, P2S2, ModeX, P2S1;
 
 { --------------------------------------------------------------------------
   1000:0032 -- the main body.

@@ -168,8 +168,15 @@ PARTS = [
     ("TPART1", "P1Intro", "RunIntro",
      "DemoVT, Crt, VGA",
      "part 001 -- all five scenes, through the driver at 1000:003c"),
+    # ModeX is NOT named here on purpose. Naming it makes the program visit it
+    # directly, so it finishes early and lands sixth in code; the original has
+    # it SECOND, immediately after P2S1, which is where a reverse DFS
+    # post-order puts it when P2S1 is the only thing that reaches it. With this
+    # clause and P2Main's own `... DemoVT, P2S2, ModeX, P2S1`, the order comes
+    # out P2S1, ModeX, P2S2, DemoVT, P2View, FixMath, VGA, Crt -- the 1994
+    # file's exactly.
     ("TPART2", "P2Main", "RunPart2",
-     "Crt, VGA, ModeX, P2View, FixMath, DemoVT",
+     "Crt, VGA, FixMath, P2View, DemoVT",
      "part 002 -- both scenes, through the driver at 1000:0032"),
     ("TPART3", "P3Main", "RunPart3",
      "DemoVT, Crt, VGA",
