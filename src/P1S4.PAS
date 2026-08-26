@@ -565,17 +565,48 @@ begin
 end;
 
 { [transcribed] 12b2:00c0 -- StarStep. X := X + DX, wrapping on 0 and 319. }
-procedure StarStep;
-var
-  I, X : Integer;
-begin
-  for I := 1 to StarCount do
-  begin
-    X := Star[I].X + Star[I].DX;
-    if X < 0 then Inc(X, 319)
-    else if X > 319 then Dec(X, 319);
-    Star[I].X := X;
-  end;
+{ HAND ASSEMBLER, TRANSCRIBED VERBATIM. 12b2:00c0 has no prologue at all -- it
+  goes straight into MOV BX,0 and ends with a bare RETF -- so no frame and no
+  locals; the star count lives in CX and DEC CX / JNE closes the loop; and BX
+  walks the array by NINE, the record's size, rather than being multiplied up
+  from an index. None of the three is something the code generator produces.
+
+  DX PARKS THE ROW POINTER. BX is copied to DX at the top of each iteration and
+  restored from it at the bottom before the ADD BX,9 -- because the two field
+  reads and the store all use BX as the index and the wrap arithmetic is done in
+  DI. Nothing needs it, and it is what the original does.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      for I := 1 to StarCount do
+      begin
+        X := Star[I].X + Star[I].DX;
+        if X < 0 then Inc(X, 319) else if X > 319 then Dec(X, 319);
+        Star[I].X := X;
+      end;
+  -------------------------------------------------------------------------- }
+{ @asm 001 12b2:00c0 +0 StarStep }
+procedure StarStep; assembler;
+asm
+        MOV     BX, 0                   { 12b2:00c0  a byte offset, not an   }
+        MOV     CX, StarCount           { 00c3        index -- ninety stars  }
+@@Star: MOV     DX, BX                  { 00c6  park it round the field work }
+        MOV     DI, [BX + OFFSET Star]          { 00c8  X                    }
+        ADD     DI, [BX + OFFSET Star + 4]      { 00cc  + DX                 }
+        OR      DI, DI                  { 00d0                              }
+        JGE     @@NotLeft               { 00d2                              }
+        ADD     DI, 319                 { 00d4  wrapped off the left edge   }
+        JMP     @@Store                 { 00d8                              }
+@@NotLeft:
+        CMP     DI, 319                 { 00da                              }
+        JLE     @@Store                 { 00de                              }
+        SUB     DI, 319                 { 00e0  or off the right            }
+@@Store:
+        MOV     [BX + OFFSET Star], DI  { 00e4                              }
+        MOV     BX, DX                  { 00e8                              }
+        ADD     BX, 9                   { 00ea  one record on               }
+        DEC     CX                      { 00ed                              }
+        JNE     @@Star                  { 00ee                              }
 end;
 
 { --------------------------------------------------------------------------
@@ -914,8 +945,11 @@ begin
     Blob[I].W := BlobW;
     Blob[I].H := BlobH;
   end;
-  Blob[LastEntry].W := BlobW;
-  Blob[LastEntry].H := BlobH;
+  { AND NOT A 145th PAIR. The loop's test at 1107:0178 is CMP BYTE PTR
+    [BP-$81],$90 -- 144, which is TrailCount -- and 1107:017f is the
+    ClearScreen straight after it, with nothing in between. Two extra
+    statements for Blob[LastEntry] were sitting here on the assumption that the
+    spare entry needed its header too; the original never writes it. }
 
   ClearScreen(VirtScrSeg, 0);
   WaitRetrace;

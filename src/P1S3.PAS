@@ -239,11 +239,15 @@ begin
     end;
 
     Delay(20);
-    Inc(Level, Dir);
+    { ASSIGNMENTS, NOT Inc. 10e3:01ea is MOV AX,[Level] / ADD AX,[Dir] /
+      MOV [Level],AX -- nine bytes through the accumulator -- where
+      Inc(Level, Dir) emits ADD [Level],reg, which is shorter. Both steps of
+      the level have the long form. }
+    Level := Level + Dir;
     if Level = -1 then
     begin
       Dir := -Dir;                      { turn around at the coarsest level }
-      Inc(Level, Dir);
+      Level := Level + Dir;             { 10e3:01ea }
       Delay(5000);                      { hold on the clear image }
     end;
   until Level = MosaicLevels + 1;

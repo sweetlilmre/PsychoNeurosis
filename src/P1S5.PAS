@@ -752,17 +752,28 @@ end;
   points with their Y pulled up seven rows (12c5:06ab). }
 procedure RenderObject;
 var
-  I : Integer;
+  { A BYTE, NOT AN INTEGER. 12c5:0688 is MOV BYTE PTR [BP-1],AL and 068d is
+    INC BYTE PTR [BP-1], so the counter is one byte; and the for limit's
+    temporary is a byte too -- 12c5:067b loads PtCount into [BP-5] and 0683
+    compares AL against that slot. ENTER $0A then decomposes as the counter,
+    the temporary, and the four bytes a `with` gets for the record's address. }
+  I : Byte;                                       { [BP-$1] }
 begin
   SortAll(@Scr);                                  { 12c5:0626 }
 
+  { A `with` IN BOTH LOOPS, and the two bytes at 12c5:06a3 say so: PUSH DS /
+    POP ES puts the segment in ES before the address pair is stored at [BP-9],
+    and every field then goes through LES DI,[BP-9]. Naming Scr[I] at each
+    field recomputes I * 6 and the fold for every one of them. }
   for I := PtCount + 1 to PtCount * 2 do
-    DrawReflection(@ObjMeta, Scr[I].X, Scr[I].Y, WorkSeg);
+    with Scr[I] do
+      DrawReflection(@ObjMeta, X, Y, WorkSeg);    { 12c5:0670 }
   for I := 1 to PtCount do
-  begin
-    Dec(Scr[I].Y, 7);
-    DrawPoint(@ObjMeta, Scr[I].X, Scr[I].Y, WorkSeg);
-  end;
+    with Scr[I] do
+    begin
+      Dec(Y, 7);                                  { 12c5:06ab, SUB on memory }
+      DrawPoint(@ObjMeta, X, Y, WorkSeg);         { 12c5:06c3 }
+    end;
 end;
 
 { --------------------------------------------------------------------------

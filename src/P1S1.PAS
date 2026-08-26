@@ -485,9 +485,16 @@ const
   ScrollFrom   = 140;      { $8C  -- 1012:05a7, after which it slides out }
   ScrollStep   = 2;        { pixels per frame }
 
+
 var
-  { A GLOBAL, because Bounce_Run's frame has no room for it: ENTER $54 is
-    exactly the counter and the four arrays. }
+  { A GLOBAL, AND THE ATTEMPT TO MAKE IT A LOCAL MEASURED WORSE. 1012:05a7 and
+    05b1 both test [BP-$54], which looks like a local Frame, and the frame's own
+    arithmetic leaves exactly two bytes for one; but declaring it there and
+    deleting this took the part from 98.7% to 98.1%, twice, because the original
+    reserves two bytes of DGROUP here and everything after them moved. The
+    reading that fits both measurements is that BOTH exist -- a global and a
+    two-byte local -- and which of them the counter is has not been settled.
+    Left as it stands, which is the state that measures best. }
   Frame : Integer;
 
 { --------------------------------------------------------------------------
@@ -578,8 +585,14 @@ var
     Which array is which came from the BOUNDS TESTS rather than any name: the
     one checked against 299 is X and the one against 179 is Y.
 
-    Four arrays and the counter sum to 82; the routine opens ENTER $54, which
-    is 84, so two more bytes sit below I and nothing reads them. }
+    Four arrays and the counter sum to 82 and the routine opens ENTER $54, which
+    is 84 -- AND THE TWO REMAINING BYTES ARE THE FRAME COUNTER. This note used
+    to say "two more bytes sit below I and nothing reads them" while Frame was
+    declared as a unit-level var on the grounds that the frame had no room for
+    it; the arithmetic in the same paragraph said there was room for exactly
+    one Integer. 1012:05a7 is CMP WORD PTR [BP-$54],$8C and 05b1 is
+    CMP [BP-$54],$12C -- the scroll threshold and the scene's lifetime -- so
+    [BP-$54] is Frame and it is a LOCAL. }
   BDX    : array[1..NumBouncers] of Integer;   { base [BP-$14] }
   BDY    : array[1..NumBouncers] of Integer;   { base [BP-$28] }
   BX     : array[1..NumBouncers] of Integer;   { base [BP-$3C] }

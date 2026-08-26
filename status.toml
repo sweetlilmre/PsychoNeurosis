@@ -887,6 +887,13 @@ seen_in = "TPART1"
 state = "resolved"
 resolution = "RESOLVED in the batch that found it: part 001 98.1%, from 90.9% at the start of the day -- SEVEN AND A HALF POINTS. 413 bytes left in about a dozen spans, none above 24. Six of the ten parts are at 99% or better and the other four at 98.1% or better."
 
+[[plan.investigation]]
+name = "part1-final-four"
+finding = "PART 001 98.1 -> 98.7%: FOUR MORE, AND ONE BACKED OUT TWICE. RenderObject's counter is a BYTE and both its loops use a `with`. 12b2's tell again: 12c5:0688 is MOV BYTE PTR [BP-1],AL and 068d INCs the same byte, and 12c5:06a3 is PUSH DS / POP ES before the address pair is stored at [BP-9], which is what `with` does. ENTER $0A then decomposes as the counter, the for limit's byte temporary, and the four bytes a `with` gets. Both 12c5 spans went. StarStep IS HAND ASSEMBLER: 12b2:00c0 has no prologue at all and ends with a bare RETF, the count lives in CX with DEC CX / JNE, and BX walks the array by NINE -- the record's size -- rather than being multiplied up from an index. DX parks the row pointer round the field work. Transcribed verbatim. Banner_Load does NOT write a 145th blob header. The loop's test at 1107:0178 is CMP BYTE PTR [BP-$81],$90 -- 144 -- and 1107:017f is the ClearScreen straight after it with nothing between. Two statements for Blob[LastEntry] were here on the assumption the spare entry needed its header; the original never writes it. And the mosaic's level steps are ASSIGNMENTS, not Inc: 10e3:01ea is MOV AX,[Level] / ADD AX,[Dir] / MOV [Level],AX. THE ONE BACKED OUT, AND IT IS WORTH THE ROW IT GETS. 1012:05a7 and 05b1 both test [BP-$54] -- CMP against $8C and $12C, the scroll threshold and the scene's lifetime -- which reads as a LOCAL frame counter, and BounceRun's frame arithmetic leaves exactly two bytes for one. Declaring it there and deleting the unit-level Frame took the part from 98.7% to 98.1%, TWICE -- once with the global gone and once with it replaced by a spare -- because the original reserves two bytes of DGROUP there and everything after them moved. The reading that fits both measurements is that BOTH exist: a global AND a two-byte local, and which one the counter is has not been settled. Left in the state that measures best, with the failure written on the declaration so the next reader does not repeat it."
+seen_in = "TPART1"
+state = "resolved"
+resolution = "RESOLVED: part 001 98.7%, from 90.9% at the start of the day -- SEVEN AND EIGHT TENTHS OF A POINT. 268 unaligned bytes; 99% needs 212, so about 56 more. The largest spans are 1012:05a8 (19), 1107:03dc (17) and 1012:0466 (16), and the BounceRun question above is one of them."
+
 [plan.row."001 $0284"]
 label = "the 2-byte typed constant holding $A640, still missing"
 investigation = "part1-layout"
@@ -915,6 +922,11 @@ target = "R0"
 [plan.row."001 1012:0366"]
 label = "the lens gather is asm, and two of its tests are dead -- FIXED"
 investigation = "part1-asm-two"
+target = "R0"
+
+[plan.row."001 1012:05a7"]
+label = "OPEN: [BP-$54] reads as a local Frame but removing the global measures worse"
+investigation = "part1-final-four"
 target = "R0"
 
 [plan.row."001 1012:05bd"]
@@ -980,6 +992,11 @@ target = "R0"
 [plan.row."001 1107:00b3"]
 label = "49 iterations of two conditional self-assignments -- FIXED"
 investigation = "part1-code"
+target = "R0"
+
+[plan.row."001 1107:0178"]
+label = "no 145th blob header -- FIXED"
+investigation = "part1-final-four"
 target = "R0"
 
 [plan.row."001 1107:03d7"]
@@ -1048,8 +1065,8 @@ investigation = "part1-mass-targets"
 target = "R0"
 
 [plan.row."001 12b2:00c0"]
-label = "StarStep has NO STACK FRAME in the original: hand assembler"
-investigation = "part1-missing-star-unit"
+label = "StarStep is hand assembler -- FIXED"
+investigation = "part1-final-four"
 target = "R0"
 
 [plan.row."001 12b2:00f1"]
@@ -1110,6 +1127,11 @@ target = "R0"
 [plan.row."001 12c5:061d"]
 label = "the drawing loops belong to the caller, which passes @Scr"
 investigation = "part1-sortall-restructure"
+target = "R0"
+
+[plan.row."001 12c5:0688"]
+label = "RenderObject: byte counter and two withs -- FIXED"
+investigation = "part1-final-four"
 target = "R0"
 
 [plan.row."001 12c5:075e"]
