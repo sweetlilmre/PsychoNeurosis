@@ -112,6 +112,7 @@ flags = "/ML /Z"
 # TPART0 (uses Detect) was added above DETECT.PAS.
 mode = "uses"
 list = [
+  "VIDMODE.PAS",
   "PSYCHO.PAS",
   "BYEBYE.PAS",
   "STARTUP.PAS",
@@ -181,6 +182,7 @@ alongside = ["*.BAT"]
 # unit name inside a file is independent of the filename, but TP7 finds a unit
 # BY FILENAME, so `uses Part3Sprites` must become `uses P3Sprite`.
 [names]
+"VIDMODE.PAS" = ["VIDMODE.PAS", "VidMode", "VidMode"]
 "PSYCHO.PAS" = ["TPSYCHO.PAS", "Psycho", "Psycho"]
 "BYEBYE.PAS" = ["TPART9.PAS", "ByeBye", "ByeBye"]
 "STARTUP.PAS" = ["TPART0.PAS", "Startup", "Startup"]

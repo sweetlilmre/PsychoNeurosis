@@ -27,6 +27,7 @@ uses Crt, VGA, DemoVT, Part4Lemmings;
 
 { 1000:001e -- and every instruction of it is accounted for:
 
+      001c  CALLF 11e3:0000     SetMode13h
       0021  CALLF 11e3:0006     VirtScrAlloc
       0026  CALLF 1005:1cd6     Demo_Main, this part's RunPart4
       002b  CALLF 1226:0308     KeyPressed        0030  OR AL,AL / JZ 003b               > while KeyPressed do ReadKey
@@ -49,6 +50,7 @@ uses Crt, VGA, DemoVT, Part4Lemmings;
   80 and cost 23 bytes on the walk, because a short program segment moves the
   runtime just as a long one does. }
 begin
+  SetMode13h;                     { 1000:001c -> 11e3:0000 }
   VirtScrAlloc;                   { 1000:0021 -> 11e3:0006 }
   RunPart4;                       { 1000:0026 -> 1005:1cd6, Demo_Main }
   while KeyPressed do ReadKey;    { 1000:002b }
