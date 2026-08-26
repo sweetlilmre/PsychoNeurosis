@@ -839,6 +839,13 @@ seen_in = "TPART1"
 state = "resolved"
 resolution = "RESOLVED in the batch that found it: part 001 90.9 -> 95.1% over the day. What is left is 1,042 bytes in about a dozen spans, the largest being 1107:04f3 (109), 1012:060b (75) and 10e3:01d8 (42). The method that has worked all day is unchanged: disassemble the original's segment and ask what Pascal produces that shape -- never re-read the reconstruction."
 
+[[plan.investigation]]
+name = "part1-mosaic"
+finding = "PART 001 95.1 -> 95.5%, AND THE MOSAIC'S FRAME TOOK THREE READINGS OF THE SAME TWENTY-FOUR BYTES. It opened ENTER $18 in the original and ENTER $1E in ours, and the six-byte gap was three separate misreadings compounding. THE TWO TABLES ARE ONE ARRAY OF PAIRS. 10e3:00dd writes [BP+DI-$1A] and 00ec writes [BP+DI-$19] with DI = Level * 2 in BOTH -- one index, two consecutive bytes -- so it is an array of two-byte records and not two byte arrays, which would have separate bases and separate indices. That is the same reading as the two-dimensional palettes, one level down: the SHARED index is the tell, not the stride. I AND CurSize ARE THE SAME VARIABLE, at [BP-$8]: 00bf sets it to 4 and 00f9 doubles it in the init loop, and 013a loads it from the table in the main loop. So are Sh and CurShift, at [BP-$D]: 00c4 sets it to 4, 00ef adds two, and 0145 loads it from the table. Two variables where we had four, and that is four of the six bytes. AND FOUR OF THEM ARE BYTES where we had Integers -- the init counter (00c8 is MOV BYTE PTR [BP-$B],1), the shift, and the two block counters. The Inc(Sh, 2) is an ASSIGNMENT too: 00ef loads, widens, INCs twice and stores back, where Inc on a byte emits ADD [mem],2. The order closes at exactly 24 and every slot is now named. Both of segment 10e3's spans went, 80 bytes together. MEASURED: 95.5%, initialised image identical, three byte-exact artefacts holding, paslint clean, traps identical opcode for opcode."
+seen_in = "TPART1"
+state = "resolved"
+resolution = "RESOLVED in the batch that found it. Part 001 90.9 -> 95.5% over the day, and EVERY PART IS NOW AT OR ABOVE 95%. What is left in 001 is 949 bytes, the largest spans being 1107:04f3 (109), 1012:060b (75) and two of 37."
+
 [plan.row."001 $0284"]
 label = "the 2-byte typed constant holding $A640, still missing"
 investigation = "part1-layout"
@@ -867,6 +874,11 @@ target = "R0"
 [plan.row."001 1012:05bd"]
 label = "a String-taking loader we have not written at all"
 investigation = "part1-frame-residue"
+target = "R0"
+
+[plan.row."001 1012:060b"]
+label = "75 bytes, next after it"
+investigation = "part1-mosaic"
 target = "R0"
 
 [plan.row."001 1082:0076"]
@@ -905,8 +917,8 @@ investigation = "part1-trap-deficit"
 target = "R0"
 
 [plan.row."001 10e3:00bb"]
-label = "Mosaic_Run: 24-byte frame, four live slots, eleven dead bytes"
-investigation = "part1-mosaic-run"
+label = "the mosaic's 24 bytes: one array of pairs, two shared variables -- FIXED"
+investigation = "part1-mosaic"
 target = "R0"
 
 [plan.row."001 10e3:0148"]
@@ -940,8 +952,8 @@ investigation = "part1-p1s4-unlocated"
 target = "R0"
 
 [plan.row."001 1107:04f3"]
-label = "109 bytes, the largest left; upstream at 1107:03ee"
-investigation = "part1-asm-two"
+label = "109 bytes, the largest left anywhere"
+investigation = "part1-mosaic"
 target = "R0"
 
 [plan.row."001 1107:0600"]

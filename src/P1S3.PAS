@@ -77,22 +77,48 @@ var
 
 procedure MosaicRun;
 var
-  { CntX and CntY first, so they land at [BP-2] and [BP-4] as the binary
-    has them; the asm block references everything by name regardless. }
-  CntX, CntY        : Word;
-  Size, Shift       : array[1..MosaicLevels] of Byte;
-  I, Sh, Level, Dir : Integer;
-  CurSize           : Word;
-  CurShift          : Byte;
-  RowsB, ColsB      : Byte;
+  { ENTER $18 IS TWENTY-FOUR BYTES AND EVERY ONE OF THEM IS NOW ACCOUNTED FOR,
+    which took three separate readings of the same routine.
+
+    THE TWO TABLES ARE ONE ARRAY OF PAIRS. 10e3:00dd writes [BP+DI-$1A] and
+    10e3:00ec writes [BP+DI-$19] with DI = Level * 2 in both -- ONE index, two
+    consecutive bytes -- so it is an array of two-byte records and not two
+    separate byte arrays, which would have separate bases and separate indices.
+
+    I AND CurSize ARE THE SAME VARIABLE, at [BP-$8]. 10e3:00bf sets it to 4 and
+    00f9 doubles it in the init loop; 10e3:013a loads it from the table in the
+    main loop. So is Sh AND CurShift, at [BP-$D]: 00c4 sets it to 4 and 00ef
+    adds two, and 0145 loads it from the table. Two variables, not four -- and
+    that is where the six bytes went that made ours ENTER $1E.
+
+    AND FOUR OF THEM ARE BYTES. The init loop's counter is a byte (10e3:00c8 is
+    MOV BYTE PTR [BP-$B],1) and so are the shift and the two block counters; we
+    had Integers. The `Inc(Sh, 2)` is also an ASSIGNMENT -- 00ef loads, widens,
+    INCs twice and stores back, where Inc on a byte emits ADD [mem],2.
+
+    Order, nearest BP first, and the arithmetic closes at 24:
+        [BP-$2] CntX  [BP-$4] CntY  [BP-$6] Dir  [BP-$8] CurSize
+        [BP-$A] Level [BP-$B] LevIdx [BP-$C] ColsB [BP-$D] CurShift
+        [BP-$E] RowsB  [BP-$18] the five pairs }
+  CntX, CntY        : Word;             { [BP-$2], [BP-$4] }
+  Dir               : Integer;          { [BP-$6] }
+  CurSize           : Word;             { [BP-$8], and it is the init loop's I }
+  Level             : Integer;          { [BP-$A] }
+  LevIdx            : Byte;             { [BP-$B] }
+  ColsB             : Byte;             { [BP-$C] }
+  CurShift          : Byte;             { [BP-$D], and it is the init loop's Sh }
+  RowsB             : Byte;             { [BP-$E] }
+  Lev               : array[1..MosaicLevels] of record
+                        Size, Shift : Byte;
+                      end;              { [BP-$18] }
 begin
-  I := 4;  Sh := 4;
-  for Level := 1 to MosaicLevels do
+  CurSize := 4;  CurShift := 4;
+  for LevIdx := 1 to MosaicLevels do
   begin
-    Size[Level]  := I;
-    Shift[Level] := Sh;
-    Inc(Sh, 2);
-    I := I shl 1;
+    Lev[LevIdx].Size  := CurSize;                { 10e3:00dd }
+    Lev[LevIdx].Shift := CurShift;               { 10e3:00ec }
+    CurShift := CurShift + 2;                    { 10e3:00ef }
+    CurSize  := CurSize shl 1;                   { 10e3:00f9 }
   end;
 
   Dir   := -1;
@@ -104,8 +130,8 @@ begin
       CopyScreen(VirtScrSeg, $A000)     { level 0 = the unpixelated image }
     else
     begin
-      CurSize  := Size[Level];          { 10e3:0130 }
-      CurShift := Shift[Level];         { 10e3:013d }
+      CurSize  := Lev[Level].Size;      { 10e3:0130 }
+      CurShift := Lev[Level].Shift;     { 10e3:013d }
 
       { EQUIVALENT PASCAL, for reference -- the assembler below is what
         runs. For each block: sum its pixels from the virtual screen,
