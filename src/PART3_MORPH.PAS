@@ -152,7 +152,19 @@ var
     They are still declared, because the original really has six bytes here and
     removing them moves every variable above. What they are FOR is now read
     correctly; what the routine that spills into them is doing is not yet. }
-  Scratch1, Scratch2, Scratch3 : Word;   { DS:$BEA8, $BEAA, $BEAC }
+  { AND TWO OF THE THREE ARE TransformPoint's T2 AND T1. 1139:00c5 stores DX to
+    $BEAA and 1139:010f to $BEA8 -- the two scratch words the routine keeps its
+    shifted high halves in -- and this unit was declaring them TWICE: three
+    unreferenced Scratch words here at the right addresses, and a separate
+    `var T1, T2` block further down whose own comment already said
+    "DS:$BEAA and DS:$BEA8". Declared after Count they landed at $BEC6 and
+    $BEC8, and every reference from $C506 up carried the four bytes -- which is
+    the +4 dsmap has been reporting across fifty-three sites in this part.
+
+    T2 first, because declaration order runs upward and 1139:010f is the store
+    to the lower address. $BEAC really is never referenced. }
+  T2, T1    : Integer;                   { DS:$BEA8, $BEAA }
+  Scratch3  : Word;                      { DS:$BEAC, never referenced }
 
   { [transcribed] The projection centre. Morph_InitScene zeroes both before the
     first shape and they stay put for this scene. }
@@ -330,12 +342,6 @@ end;
   its `shr` on a LongInt is a LOGICAL shift, where SHL/RCL keeping DX is an
   arithmetic one.
   -------------------------------------------------------------------------- }
-var
-  { DS:$BEAA and DS:$BEA8 -- TransformPoint's two scratch words. Globals in
-    the original, so globals here; making them locals changes the frame size
-    and every displacement in the routine with it. }
-  T1, T2 : Integer;
-
 { @asm 003 1139:0096 ? }
 
 { @asm 003 1139:0096 ? }
