@@ -22,6 +22,7 @@
   =========================================================================== }
 
 {$N+}   { Demo_Scene4's scale arithmetic is x87 -- 1107:097b FILD/FDIV/FMUL. }
+{$A-}   { BYTE ALIGNMENT, AND IT IS NOW A NET GAIN. See TTrail and Tail3. }
 {$G+}   { 286 instructions: REP OUTSB in SetPalette768 (1107:0011). The
           original targets 386 and above. }
 
@@ -427,6 +428,16 @@ var
   Angle : Integer;                                  { DS:$80F3 }
   { DS:$80F5, stride $33 }
   Blob  : array[1..LastEntry] of TBlob;             { DS:$80F5 }
+  { THREE BYTES, MEASURED, AT THE END OF THIS UNIT'S BLOCK. With A-minus set --
+    which every address in this unit up to Blob requires -- StarInit's fold
+    reads $9DCF where the original has $9DD2, so P1STAR's Star begins three
+    bytes early and everything after it slides. Blob ends at $9DD8 and the
+    original's block ends at $9DDB. The default's padding, one byte before
+    ProfileB and two before Work, adds up to exactly these three and had been
+    standing in for them -- which is why turning A-minus on always cost what it
+    gained. Type unknown, size measured; a three-byte record or a String[2]
+    would do as well. }
+  Tail3 : array[1..3] of Byte;                      { DS:$9DD8 }
 
 const
   { DS:$0014 = 320 and DS:$0016 = 200, initialised data. Project halves both,
