@@ -626,6 +626,13 @@ asm
   IDIV WORD PTR [MorphSteps]       { / 45                                    }
   ADD  AX, [SI]                    { + source = the blended Z                }
   MOV  DX, AX                      { DX is where TransformPoint wants Z      }
+  { A THIRD ADVANCE, AND IT IS DEAD. 1139:0283 is ADD SI,2 / ADD DI,2
+    immediately before the two calls, and the POP SI / POP DI after them puts
+    both walkers back regardless -- so stepping them here changes nothing. It is
+    what the original does: three identical blocks, each ending with the
+    register store and the step, rather than two steps and a bare store. }
+  ADD  SI, 2                       { 1139:0283                               }
+  ADD  DI, 2                       { 1139:0286                               }
 
   CALL TransformPoint              { rotate and project: out in DI and BX    }
   CALL PlotPixel                   { plot it straight from those registers   }
