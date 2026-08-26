@@ -487,6 +487,27 @@ begin
       ClearScreen(VGASeg, 0);                    { 100f:079b }
 
     Frame := (Frame + 1) mod Angles;             { 100f:07a0 }
+  { ONE BYTE HERE IS A FLOOR, and Ghidra's boundaries make it exact rather than
+    guessed. The original is
+
+        07b5  08 c0        OR   AL, AL
+        07b7  74 02        JZ   07bb        KeyPressed false -> test ScrollY
+        07b9  eb 0b        JMP  07c6        KeyPressed true  -> the LEAVE
+        07bb  81 be f9 fa 92 00   CMP [BP-$507], $92
+        07c1  7d 03        JGE  07c6
+        07c3  e9 28 fe     JMP  06de        back to the top
+        07c6  c9 c3        LEAVE / RET
+
+    Both exits converge on 07c6, so this IS a plain `until A or B` and not the
+    Exit that P1S2's ShowWord turned out to be -- there the two jumps went to
+    DIFFERENT places, one of them past a whole loop, and that is the only thing
+    that distinguishes the two shapes. Checked here, they converge.
+
+    What differs is only the FORM: the original spends four bytes jumping over a
+    jump where TP7 gives us a single two-byte JNE to the same place. Ours is
+    shorter and does the same thing. Three separate attempts have failed to find
+    a spelling that produces the longer form, and the operand order cannot be it
+    -- 100f:07b0 calls KeyPressed first, which is the order written here. }
   until KeyPressed or (ScrollY >= $92);          { 100f:07b0, 100f:07bb }
 end;
 
