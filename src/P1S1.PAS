@@ -613,7 +613,32 @@ var
     it; the arithmetic in the same paragraph said there was room for exactly
     one Integer. 1012:05a7 is CMP WORD PTR [BP-$54],$8C and 05b1 is
     CMP [BP-$54],$12C -- the scroll threshold and the scene's lifetime -- so
-    [BP-$54] is Frame and it is a LOCAL. }
+    [BP-$54] is Frame and it is a LOCAL.
+
+    AND IT IS A `for` LOOP, WHICH THE BOTTOM TEST SETTLES: 1012:05b1 tests for
+    EQUALITY against $12C and jumps to the LEAVE, then JMPs back, with no
+    increment between the last statement and the test. Equality plus a
+    head-of-loop increment is what Turbo Pascal emits for `for`; a
+    `repeat ... until Frame > 300` emits an Inc and a greater-than.
+
+    A FOURTH ATTEMPT AT CONVERTING IT CLOSED THIS SPAN AND COST 47 BYTES, and
+    the reason is now located rather than guessed. With the loop using a local,
+    the unit-level Frame is referenced by nothing, Turbo Pascal smart-links it
+    away, and this unit's data block loses two bytes: the original's absolute
+    references run $56C0, $56C2 ... $56D0 and ours came out $56BE, $56C2 ...
+    $56CC, two low throughout.
+
+    BOTH THINGS ARE TRUE AT ONCE. The counter is a local AND two bytes of this
+    unit's data need a home something references. Every previous attempt chose
+    between them.
+
+    AND THE TWO BYTES ARE NOT A VARIABLE IN THE ORIGINAL. $56C0's only two
+    references are from segment 1082, so it is P1S2's; nothing anywhere reads
+    $56BF. F sits at $563F and is 128 bytes, ending at $56BE, so $56BF is odd
+    and word alignment pads it to $56C0 -- one byte of padding, not a variable.
+    So something ELSE in this block is two bytes larger than we have it, and
+    Frame has been standing in for it. Find those two bytes first; converting
+    the loop before that will always cost the same 47. }
   BDX    : array[1..NumBouncers] of Integer;   { base [BP-$14] }
   BDY    : array[1..NumBouncers] of Integer;   { base [BP-$28] }
   BX     : array[1..NumBouncers] of Integer;   { base [BP-$3C] }
