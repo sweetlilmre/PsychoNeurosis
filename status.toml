@@ -860,6 +860,19 @@ seen_in = "TPART1"
 state = "resolved"
 resolution = "RESOLVED in the batch that found it: part 001 96.9%, up from 90.9% at the start of the day. It needs about 450 more bytes for 99% and has 649 unaligned. WORTH CHECKING THE SAME RULE ELSEWHERE: part 005's 1096:0331 MUL/IMUL puzzle and part 006's 100f:0543 were both filed as register-allocation mysteries, and one of those two has already turned out to be a type difference rather than the compiler's freedom."
 
+[[plan.investigation]]
+name = "part5-mulimul"
+finding = "THE NEW OPERAND-ORDER RULE WAS TESTED AGAINST PART 005's MUL/IMUL PUZZLE AND IT IS NOT THAT. One build settled it: writing the interpolation as LongInt(X1 - X0) * T div Denom took part 005 from 98.8% to 98.4% -- the cast forces the runtime's 32-bit multiply instead of the IMUL, which is further from the original, not nearer. Reverted. WHAT THE TWO ACTUALLY DIFFER BY IS THE WIDTH OF THE INTERMEDIATE, and that is now stated precisely. The original is CWD / IMUL WORD / IDIV WORD -- a 32-bit signed product in DX:AX divided as 32 bits, which is Turbo Pascal's overflow-safe `a * b div c`. Ours is MUL WORD / CWD / IDIV WORD -- a 16-bit product whose high half is discarded, then sign-extended for the divide. The dead CWD in the ORIGINAL is the tell that its expression is typed 32-bit; ours is typed 16-bit and the CWD sits after the multiply rather than before it. So the question is what makes TP7 choose the wide path, and an explicit LongInt cast is NOT it. Still open, and now with one candidate eliminated rather than none."
+seen_in = "TPART5"
+state = "open"
+
+[[plan.investigation]]
+name = "part1-with"
+finding = "PART 001 96.9 -> 97.1%: TransformAll READS THE TRANSLATION THROUGH A `with`. 12c5:031a is ADD DI,$4B0 and the three fields are then read at ES:[DI], [DI+4] and [DI+8] with no further displacement -- the record's address computed ONCE for three reads. Naming AObj^.Pos at each field folds the $4B0 into every displacement instead, which is what ours did. That is the FOURTH `with` decided this way in two days, and the rule is stable: one address computation for several fields is a `with`, several computations or several folded displacements are not."
+seen_in = "TPART1"
+state = "resolved"
+resolution = "RESOLVED: part 001 97.1%, from 90.9% at the start of the day. 612 bytes left, the largest spans being 1107:04f3 (109), 1107:04a0 (37) and 12c5:03a6 (29)."
+
 [plan.row."001 $0284"]
 label = "the 2-byte typed constant holding $A640, still missing"
 investigation = "part1-layout"
@@ -1038,6 +1051,11 @@ target = "R0"
 [plan.row."001 12c5:0317"]
 label = "the object is a far pointer parameter, not unit-level vars"
 investigation = "part1-object-record"
+target = "R0"
+
+[plan.row."001 12c5:031a"]
+label = "TransformAll wants a `with` over Obj.Pos -- FIXED"
+investigation = "part1-with"
 target = "R0"
 
 [plan.row."001 12c5:0361"]
@@ -1574,8 +1592,8 @@ investigation = "apply-for-temp"
 target = "R0"
 
 [plan.row."005 1096:0331"]
-label = "MUL where the original has CWD/IMUL -- and ours drops the high half"
-investigation = "part5-codegen-two"
+label = "the LongInt cast is eliminated; the width of the intermediate is the question"
+investigation = "part5-mulimul"
 target = "R0"
 
 [plan.row."005 1096:03d7"]

@@ -447,9 +447,17 @@ begin
   { 12c5:0317..0344 -- the translation is read ONCE, before the loop, into
     three locals, and those are what get passed per point. Reading PosX, PosY
     and PosZ inside the loop is the same answer and not the same code. }
-  TX := AObj^.Pos.X;
-  TY := AObj^.Pos.Y;
-  TZ := AObj^.Pos.Z;
+  { A `with`, AND THE ONE ADD SAYS SO. 12c5:031a is ADD DI,$4B0 and the three
+    fields are then read at ES:[DI], [DI+4] and [DI+8] with no further
+    displacement -- the record's address computed ONCE for three reads. Naming
+    AObj^.Pos at each field folds the $4B0 into every displacement instead,
+    which is what ours did: three reads at [DI+$4B0], [DI+$4B4], [DI+$4B8]. }
+  with AObj^.Pos do
+  begin
+    TX := X;                                   { 12c5:031e }
+    TY := Y;                                   { 12c5:032b }
+    TZ := Z;                                   { 12c5:0339 }
+  end;
 
   for I := 1 to PtCount do
     TransformPoint(AObj^.Pt[I], A1, A2, A3, TX, TY, TZ, I);   { 12c5:0393 }
