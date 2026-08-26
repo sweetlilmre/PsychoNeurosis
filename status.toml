@@ -926,6 +926,10 @@ resolution = "FIXED and rebuilt. Scene1's local F is gone with a note on the rou
 name = "part5-hand-asm-three"
 state = "open"
 
+[[plan.investigation]]
+name = "shared-unit-near-far"
+state = "open"
+
 [plan.row."001 $0284"]
 label = "the 2-byte typed constant holding $A640, still missing"
 investigation = "part1-layout"

@@ -57,6 +57,15 @@ procedure Scene1;
 
 implementation
 
+{ EVERY ROUTINE IN THIS UNIT IS FAR, and the calls say so as clearly as the
+  returns. 100f:084b is CB -- RETF at the end of PlayAll, which nothing outside
+  this unit calls -- and 100f:0883 and 0887 are 0E E8, PUSH CS then a NEAR CALL,
+  which is Turbo Pascal's four-byte far call to a routine in the SAME segment.
+  With only Scene1 in the interface the other two compiled near: C3 for the
+  return and a plain E8 for each call, one byte lighter at every site and at the
+  wrong address for all of them. }
+{$F+}
+
 uses Crt;
 
 const

@@ -129,7 +129,14 @@ var
 
 procedure SetMode13h;
 procedure SetTextMode;
-procedure BuildRowTable;
+{ BuildRowTable IS NOT AN INTERFACE ROUTINE, and part 007 says so in one byte.
+  Its segment 100b is the whole of this unit smart-linked down to four items,
+  and 100b:0030 is C3 -- a NEAR return. Turbo Pascal compiles every interface
+  routine FAR, so a near return means the routine is implementation-only; and
+  100b:0034 is E8 D5 FF, a NEAR call to it from the initialisation section,
+  which is the same fact from the caller's side. Nothing outside this unit calls
+  it: ModeX declares its own BuildRowTable and that is the one part 002 scene 1
+  reaches. Declared here it returned FAR and cost a byte at both ends. }
 procedure VirtScrAlloc;
 procedure VirtScrFree;
 procedure ClearVirtual;
@@ -959,19 +966,17 @@ end;
   to transcribe. They are written as ordinary Pascal doing the same job.
   =========================================================================== }
 
-procedure BuildRowTable;
-var
-  Y : Integer;
-begin
-  for Y := 0 to ScrHeight - 1 do
-    YOfs[Y] := Y * ScrWidth;
-end;
-
-{ 12f8:0000 -- mode 13h and nothing else, then the row table. The asm block
-  is two instructions because a BIOS call has no Pascal equivalent; Intr()
-  would push a Registers record the original does not have. }
 { --------------------------------------------------------------------------
   12f8:0033 -- back to 80-column colour text.
+
+  SIX BYTES AND NO FRAME, and it comes BEFORE BuildRowTable. Part 007's
+  segment 100b is this unit reduced by the smart linker to SetMode13h,
+  SetTextMode, BuildRowTable and the initialisation, in that order and in 64
+  bytes: 100b:0006 is B8 03 00 / CD 10 / CB and nothing else. Written as a
+  Pascal procedure wrapping an asm block it gained a frame -- PUSH BP /
+  MOV BP,SP ... LEAVE -- and four bytes with it, and being declared after
+  BuildRowTable it also shipped after it, which put both routines at the
+  other's address.
 
   EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
 
@@ -979,12 +984,19 @@ end;
       to make one without an asm block or an Intr(), which would push a
       Registers record the original does not have.
   -------------------------------------------------------------------------- }
-procedure SetTextMode;
+procedure SetTextMode; assembler;
+asm
+  MOV  AX, $0003        { BIOS function 0, mode 3: 80x25 colour text        }
+  INT  $10              { the video BIOS                                   }
+end;
+
+{ 100b:000c -- the row table, and it is NEAR: see the note in the interface. }
+procedure BuildRowTable;
+var
+  Y : Integer;
 begin
-  asm
-    MOV  AX, $0003      { BIOS function 0, mode 3: 80x25 colour text        }
-    INT  $10            { the video BIOS                                    }
-  end;
+  for Y := 0 to ScrHeight - 1 do
+    YOfs[Y] := Y * ScrWidth;
 end;
 
 { The unit's own 64,000-byte staging screen: GetMem, keep the segment out
