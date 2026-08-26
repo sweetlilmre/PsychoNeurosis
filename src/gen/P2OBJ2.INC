@@ -6,7 +6,7 @@ const
 
   { a revolver, modelled along Y -- vertices DS:$067E }
   NVertRevolver = 68;
-  NFaceRevolver = 65;
+  NFaceRevolver = 64;
   VertRevolver : array[0..203] of Integer = (
     -45, 235, -35, 45, 235, -35, -45, 235, 35,
     45, 235, 35, 0, 235, 55, 0, 235, -55,
@@ -32,7 +32,7 @@ const
     75, -620, 190, -75, -590, 290, -75, -735, 290,
     75, -590, 290, 75, -735, 290
   );
-  { 65 faces -- DS:$0816, 376 words }
+  { 64 faces the loader reads, 376 words in DGROUP -- DS:$0816 }
   FaceRevolver : array[1..376] of Integer = (
     4, 10, 6, 2, 12, 20, 4, 4, 13, 11, 8, 23,
     4, 4, 5, 14, 13, 24, 4, 5, 3, 15, 14, 23,
@@ -70,7 +70,7 @@ const
 
   { a sailboat, modelled along Y -- vertices DS:$0B06 }
   NVertSailboat = 32;
-  NFaceSailboat = 22;
+  NFaceSailboat = 21;
   VertSailboat : array[0..95] of Integer = (
     -295, -95, -5, 300, -95, 0, -380, 15, 0,
     -380, 15, 0, -380, 15, 0, -175, -50, 50,
@@ -84,7 +84,7 @@ const
     140, 355, 105, 245, 65, -15, -25, 40, -15,
     300, 65, 105, 390, 15, 0
   );
-  { 22 faces -- DS:$0BC6, 116 words }
+  { 21 faces the loader reads, 116 words in DGROUP -- DS:$0BC6 }
   FaceSailboat : array[1..116] of Integer = (
     4, 19, 20, 17, 18, 26, 4, 20, 22, 23, 17, 15,
     4, 22, 21, 24, 23, 20, 4, 21, 19, 18, 24, 22,
@@ -105,7 +105,7 @@ const
     -100, -100, 0, 100, -100, 0, 100, 100, 0,
     -100, 100, 0
   );
-  { 1 faces -- DS:$0CC6, 6 words }
+  { 1 faces the loader reads, 6 words in DGROUP -- DS:$0CC6 }
   FaceQuad : array[1..6] of Integer = (
     4, 1, 2, 3, 4, 32
   );

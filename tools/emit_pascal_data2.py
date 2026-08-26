@@ -127,21 +127,33 @@ def emit_p001():
 
 # ---------------------------------------------------------------- part 002
 
-# THE FACE COUNTS ARE DERIVED FROM THE EXTENTS, NOT TYPED IN. Each stream ends
-# where the next thing in DGROUP begins, and those addresses are measured: the
-# Enterprise's faces run to MViewW at $046A, the Revolver's to the Sailboat's
-# vertices at $0B06, the Sailboat's to the Quad's at $0CAE. Hand-written counts
-# of 55, 64 and 21 gave 338, 371 and 111 words where the extents are 338, 376
-# and 116 -- so the Revolver and the Sailboat were each one whole face short,
-# ten bytes apiece, and everything behind them sat low. dgimage found the first
-# of them at DS:$0AFC as a count of 3 with indices 44, 51, 50 and colour 21.
-# The Quad's end is not bounded by another object, so its one face stays a
-# count.
+# THE ARRAY SIZE AND THE FACE COUNT ARE TWO DIFFERENT NUMBERS, and conflating
+# them cost two bytes and a wrong reading. The ARRAY has to span the whole
+# extent, because DGROUP's bytes are what dgimage compares and everything after
+# a short array sits low: the Enterprise's stream runs to MViewW at $046A, the
+# Revolver's to the Sailboat's vertices at $0B06, the Sailboat's to the Quad's
+# at $0CAE, giving 338, 376 and 116 words. The COUNT is what the LOADER reads,
+# and the original states it in its own code:
+#
+#     108b:1ec0  MOV word ptr [$65A7], $44     68  NVertRevolver
+#     108b:1ec6  MOV word ptr [$65A9], $40     64  NFaceRevolver
+#     108b:209e  MOV word ptr [$70FA], $15     21  NFaceSailboat
+#
+# 64 faces occupy 371 words of the Revolver's 376, and 21 occupy 111 of the
+# Sailboat's 116. So five words at the end of each stream are IN DGROUP and are
+# NEVER READ -- the same shape as part 001's VecRing, where 108 bytes sit in the
+# image untouched and leaving them out shifted everything behind them.
+#
+# Deriving the count from the extent made both counts one too high and put 65
+# and 22 into the loader where the original has 64 and 21, which is exactly the
+# two one-byte spans at 108b:1ec8 and 209e. The extent gives the array; only the
+# loader gives the count.
 P2_OBJECTS = [
-    ("Enterprise", 0x0004, 75, 0x01C6, 0x046A, "the USS Enterprise"),
-    ("Revolver",   0x067E, 68, 0x0816, 0x0B06, "a revolver, modelled along Y"),
-    ("Sailboat",   0x0B06, 32, 0x0BC6, 0x0CAE, "a sailboat, modelled along Y"),
-    ("Quad",       0x0CAE,  4, 0x0CC6, None,   "a single quad"),
+    # name, voff, nv, foff, fend (array extent), nf (what the loader reads)
+    ("Enterprise", 0x0004, 75, 0x01C6, 0x046A, 55, "the USS Enterprise"),
+    ("Revolver",   0x067E, 68, 0x0816, 0x0B06, 64, "a revolver, modelled along Y"),
+    ("Sailboat",   0x0B06, 32, 0x0BC6, 0x0CAE, 21, "a sailboat, modelled along Y"),
+    ("Quad",       0x0CAE,  4, 0x0CC6, None,    1, "a single quad"),
 ]
 
 
@@ -161,13 +173,12 @@ def emit_p002():
   See assets/part002/obj_*.png -- five projections of each, because a model
   is often unrecognisable from the obvious X/Y view.""")]
     total = 0
-    for name, voff, nv, foff, fend, note in P2_OBJECTS:
-        # walk the stream to its measured end rather than trusting a count
-        nf, p = 0, 0
-        while fend is None and nf < 1 or (fend is not None and p * 2 < fend - foff):
+    for name, voff, nv, foff, fend, nf, note in P2_OBJECTS:
+        # the ARRAY spans the whole extent; nf is only what the loader reads
+        p = 0
+        while (fend is None and p < 6) or (fend is not None and p * 2 < fend - foff):
             cnt = struct.unpack_from("<h", raw, base + foff + p * 2)[0]
             p += cnt + 2
-            nf += 1
         verts = []
         for i in range(nv):
             verts.extend(struct.unpack_from("<hhh", raw, base + voff + i * 6))
@@ -191,14 +202,15 @@ def emit_p002():
         # closed twelve spans in the four loaders, three per object.
         out.append(fmt(f"Vert{name}", f"array[0..{nv * 3 - 1}] of Integer", verts, 9))
 
-        faces, p = [], 0
-        for _ in range(nf):
-            cnt = struct.unpack_from("<h", raw, base + foff + p * 2)[0]
-            faces.append(cnt)
-            for k in range(cnt + 1):
-                faces.append(struct.unpack_from("<h", raw, base + foff + (p + 1 + k) * 2)[0])
-            p += cnt + 2
-        out.append(f"  {{ {nf} faces -- DS:${foff:04X}, {p} words }}")
+        # the array spans the EXTENT, read as flat words: past the nf faces the
+        # stream is not necessarily well-formed, and it does not need to be --
+        # nothing reads it, and only its BYTES have to be in DGROUP
+        nw = p if fend is None else (fend - foff) // 2
+        faces = [struct.unpack_from("<h", raw, base + foff + i * 2)[0]
+                 for i in range(nw)]
+        p = nw
+        out.append(f"  {{ {nf} faces the loader reads, {nw} words in DGROUP"
+                   f" -- DS:${foff:04X} }}")
         out.append(fmt(f"Face{name}", f"array[1..{p}] of Integer", faces, 12))
         total += len(verts) + len(faces)
         if name == P2_OBJECTS[0][0]:
