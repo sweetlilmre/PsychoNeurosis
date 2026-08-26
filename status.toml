@@ -366,7 +366,8 @@ resolution = "Resolved by two watched TPART2 runs on 25 Aug 2026, bracketing ONE
 name = "part6-confirm-r3"
 finding = "part 006 looked identical bar possibly slight timing; a careful scene-by-scene pass could raise it to R3"
 seen_in = "TPART6"
-state = "open"
+state = "resolved"
+resolution = "CONFIRMED ON A WATCHED RUN, 26 Aug 2026, by the maintainer: part 006 scene 3 behaves. This was the careful-run investigation with no code change attached -- it wanted eyes, not edits, and it has had them."
 
 [[plan.investigation]]
 name = "surplus-fpu-sites"
@@ -914,6 +915,11 @@ finding = "EVERY PART IS NOW AT 99% OR BETTER, and the last one turned on a sing
 seen_in = "TPART5"
 state = "resolved"
 resolution = "RESOLVED -- THE 99% TARGET IS MET ON ALL TEN PARTS. What remains is a different kind of work and is registered separately: part 002's initialised image (544 bytes short, 1,863 differing) is the one data-layout job left; part 005's 1102:0082 and 1096:034a are the two code-generation puzzles in part5-codegen-two; and FOUR WATCHED RUNS ARE OWED, three of them on parts that changed behaviour today. Nobody may record a run they did not watch."
+
+[[plan.investigation]]
+name = "p1s1-shadowed-file"
+state = "resolved"
+resolution = "FIXED and rebuilt. Scene1's local F is gone with a note on the routine saying why (the original has no ENTER and three DS:$563F file calls); DrawLine's Y arguments are the right way round; and P1S1's DGROUP is Under-LensTab-Cell-F, which its own four addresses tile out exactly. Part 001 holds 99.0% with the single known 19-byte span at 1012:05a8, dgimage identical at 752 bytes, fpusites identical, paslint clean at 67 files, 3 artefacts holding. A WATCHED RUN OF TPART1 IS STILL OWED -- the fix is measured against the original's disassembly, not against a screen, and the screen is the only instrument that saw the defect in the first place."
 
 [plan.row."001 $0284"]
 label = "the 2-byte typed constant holding $A640, still missing"

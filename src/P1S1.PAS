@@ -64,15 +64,20 @@ var
     A heap block cannot be reached that way; it would need the pointer loaded
     into a segment register first. }
   Under   : TSaveBank;                  { DS:$02EA, 16,410 bytes }
+  { DS:$4304 -- the gather table, built once by BuildLens. AND IT COMES SECOND,
+    which the four addresses already in these comments tile out exactly:
+    Under at $02EA plus 16,410 is $4304, plus LensTab's 3,282 is $4FD6, plus
+    Cell's 1,641 is $563F, which is F. Declared Cell-F-LensTab instead, the
+    block ran 129 bytes long and dsmap reported one bounded +4864 run over
+    $433B..$56C0 with zero either side -- a misplaced block, not a shift. }
+  LensTab : TLensTab;                   { DS:$4304, 3,282 bytes }
   { DS:$4FD6 -- the single working cell the lens gathers into. }
-  Cell    : TCell;
+  Cell    : TCell;                      { DS:$4FD6, 1,641 bytes }
   { DS:$563F -- THE FILE RECORD IS A GLOBAL. 1012:05d8 pushes DS:$563F to
     BlockRead and 1012:067b pushes the same address to Assign, in a DIFFERENT
     routine -- so the file is opened by one routine and read by another, the
     same split part 001 scene 2 turned out to have. }
   F       : file;                       { DS:$563F }
-  { DS:$4304 -- the gather table, built once by BuildLens. }
-  LensTab : TLensTab;
 
 { [transcribed] Scene 1 loads a 768-byte palette then a 320x200 screen
   straight into the virtual screen -- NEUROSIS.DAT $000000, 64,768 bytes. }
@@ -662,8 +667,13 @@ end;
   The scene: load, draw the frame, then hand over to BounceRun.
   -------------------------------------------------------------------------- }
 procedure Scene1;
-var
-  F : file;
+{ NO LOCALS AT ALL, and a local `F : file` here is what blanked this scene to a
+  flat red screen. 1012:0678 is PUSH BP / MOV BP,SP with no ENTER, and all three
+  file calls -- Assign at 067b, Reset at 068a, Close at 06a6 -- address DS:$563F,
+  which is the UNIT-LEVEL F that LoadLogo reads from. With a local F this routine
+  opened one file and LoadLogo read another that was never opened; with I/O
+  checking off both BlockReads failed silently, so the DAC took 768 bytes of uninitialised
+  stack and the virtual screen was never loaded. }
 begin
   BuildLens;
   Assign(F, 'neurosis.dat');
@@ -675,8 +685,10 @@ begin
 
   { Two black vertical lines down the right edge -- the artwork evidently
     has rubbish in its last two columns. }
-  DrawLine(319, 199, 319, 0, 0, VirtScrSeg);
-  DrawLine(318, 199, 318, 0, 0, VirtScrSeg);
+  { TOP TO BOTTOM, not bottom to top: 1012:06b0 pushes $13F, 0, $13F, $C7 --
+    Y1 is zero and Y2 is 199. Same line either way; different bytes. }
+  DrawLine(319, 0, 319, 199, 0, VirtScrSeg);
+  DrawLine(318, 0, 318, 199, 0, VirtScrSeg);
 
   BounceRun;
 end;
