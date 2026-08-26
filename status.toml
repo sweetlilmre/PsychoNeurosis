@@ -894,6 +894,13 @@ seen_in = "TPART1"
 state = "resolved"
 resolution = "RESOLVED: part 001 98.7%, from 90.9% at the start of the day -- SEVEN AND EIGHT TENTHS OF A POINT. 268 unaligned bytes; 99% needs 212, so about 56 more. The largest spans are 1012:05a8 (19), 1107:03dc (17) and 1012:0466 (16), and the BounceRun question above is one of them."
 
+[[plan.investigation]]
+name = "part1-inline-sprites"
+finding = "PART 001 98.7 -> 98.9%: DrawSprite AND EraseSprite ARE NOT PROCEDURES, and the INDEX says so. 1012:0466 computes @Under[I] as IMUL DI,[BP-$52],$669 then ADD DI,-895, and [BP-$52] is BOUNCE_RUN's loop counter -- a slot in the frame of the routine doing the looping, not a parameter of a called one. A DrawSprite(N, X, Y) reads its N off [BP+n]. So the three calls are written out inline in the loop body and the erase with them. AND A THIRD ATTEMPT AT THE FRAME COUNTER FAILED, WHICH EXPLAINS THE FIRST TWO. 1012:05a7 and 05b1 both test [BP-$54], so the original's counter is a LOCAL, and 1012:05b1 has NO increment between the last statement and the test -- which is what a `for` loop's top-of-body increment leaves behind. All three ways of writing that cost 0.6%:   counter local, the global deleted             98.9 -> 98.3   counter local, the global renamed to a Spare  98.9 -> 98.3   counter local as a `for` variable, ditto      98.9 -> 98.3 AN UNREFERENCED UNIT-LEVEL VARIABLE IS SMART-LINKED AWAY. Turbo Pascal drops it, so `declare a spare global to hold the space` IS NOT A MOVE THAT EXISTS -- the space can only be held by something the code reads. That is why every attempt moved P1S2's code as well as this unit's data: the two bytes vanished rather than being reserved. It is the exact mirror of the object-file rule -- an OBJ is linked whole so a dead routine in one SHIPS, and Pascal is smart-linked per item so a dead variable does NOT. So the original has both a two-byte global and a local counter, and the global is read by something not yet reconstructed. Recorded on the declaration, with the three measurements, so nobody spends a fourth attempt on it."
+seen_in = "TPART1"
+state = "resolved"
+resolution = "RESOLVED: part 001 98.9%, from 90.9% at the start of the day -- EIGHT POINTS. 231 unaligned bytes and 99% needs 212, so TWENTY BYTES SHORT. The only two spans left are 1012:05a8 (19) and 1107:03dc (17), and either one closes it: the first is the frame-counter question above, the second is that BuildBlobs passes its array pointer with LES DI,[BP+4] / PUSH ES / PUSH DI where ours pushes two words -- which is what `var Arr : TOutArr` and SortOutp(Arr^) would give instead of a pointer parameter."
+
 [plan.row."001 $0284"]
 label = "the 2-byte typed constant holding $A640, still missing"
 investigation = "part1-layout"
@@ -924,9 +931,19 @@ label = "the lens gather is asm, and two of its tests are dead -- FIXED"
 investigation = "part1-asm-two"
 target = "R0"
 
+[plan.row."001 1012:0466"]
+label = "DrawSprite and EraseSprite are inline in BounceRun -- FIXED"
+investigation = "part1-inline-sprites"
+target = "R0"
+
 [plan.row."001 1012:05a7"]
 label = "OPEN: [BP-$54] reads as a local Frame but removing the global measures worse"
 investigation = "part1-final-four"
+target = "R0"
+
+[plan.row."001 1012:05b1"]
+label = "OPEN: the counter is a local but a spare global cannot hold the space"
+investigation = "part1-inline-sprites"
 target = "R0"
 
 [plan.row."001 1012:05bd"]
@@ -1002,6 +1019,11 @@ target = "R0"
 [plan.row."001 1107:03d7"]
 label = "no locals at all, so check whether it is assembler"
 investigation = "part1-p1s4-unlocated"
+target = "R0"
+
+[plan.row."001 1107:03dc"]
+label = "OPEN: BuildBlobs passes its pointer with LES, not two pushes"
+investigation = "part1-inline-sprites"
 target = "R0"
 
 [plan.row."001 1107:03ee"]

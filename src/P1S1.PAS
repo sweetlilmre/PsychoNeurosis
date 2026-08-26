@@ -462,17 +462,12 @@ end;
 { Draw order per frame, from Bounce_Run: save the background, build the lens
   cell from it, blit it. Erasing is the same blit with the saved background as
   the source -- which is why the erase pass runs in REVERSE order. }
-procedure DrawSprite(N, X, Y : Integer);
-begin
-  SaveUnder(X, Y, @Under[N], VirtScrSeg);
-  BuildCell(N);
-  BlitSprite(X, Y, @Cell, VirtScrSeg);
-end;
-
-procedure EraseSprite(N, X, Y : Integer);
-begin
-  BlitSprite(X, Y, @Under[N], VirtScrSeg);
-end;
+{ DrawSprite AND EraseSprite ARE NOT PROCEDURES IN THE ORIGINAL, and the index
+  is what says so. 1012:0466 computes @Under[I] as IMUL DI,[BP-$52],$669 then
+  ADD DI,-895, and [BP-$52] is BOUNCE_RUN's loop counter -- a slot in the frame
+  of the routine doing the looping, not a parameter of a called one. A
+  DrawSprite(N, X, Y) would read its N off [BP+n]. So the three calls are
+  written out inline in the loop body, and the same goes for the erase. }
 
 { ===========================================================================
   Scene 1 -- logo and bouncing sprites            Demo_Scene1  1012:0678
@@ -487,14 +482,26 @@ const
 
 
 var
-  { A GLOBAL, AND THE ATTEMPT TO MAKE IT A LOCAL MEASURED WORSE. 1012:05a7 and
-    05b1 both test [BP-$54], which looks like a local Frame, and the frame's own
-    arithmetic leaves exactly two bytes for one; but declaring it there and
-    deleting this took the part from 98.7% to 98.1%, twice, because the original
-    reserves two bytes of DGROUP here and everything after them moved. The
-    reading that fits both measurements is that BOTH exist -- a global and a
-    two-byte local -- and which of them the counter is has not been settled.
-    Left as it stands, which is the state that measures best. }
+  { THE COUNTER IS HERE AND IT PROBABLY SHOULD NOT BE, AND THE REASON IT STAYS
+    IS SMART LINKING. 1012:05a7 and 05b1 both test [BP-$54], so the original's
+    frame counter is a LOCAL, and BounceRun's frame arithmetic leaves exactly
+    two bytes for one. THREE attempts to move it cost 0.6% each:
+
+      counter local, this declaration deleted            98.9 -> 98.3
+      counter local, this renamed to an unread Spare     98.9 -> 98.3
+      counter local as a `for` variable, ditto           98.9 -> 98.3
+
+    and every one of them moved P1S2's code as well as this unit's data, which
+    is the tell: the two bytes really are reserved in the original's DGROUP.
+    THE THIRD ATTEMPT EXPLAINS THE FIRST TWO. An unreferenced unit-level
+    variable is SMART-LINKED AWAY -- Turbo Pascal drops it -- so "declare a
+    spare global to hold the space" is not a move that exists. The space can
+    only be held by something the code reads, which is what this is.
+
+    So the original has both a two-byte global AND a local counter, and the
+    global is read by something we have not reconstructed yet. Until that turns
+    up, the counter lives here: it measures 0.6% better and the alternative
+    cannot be expressed. }
   Frame : Integer;
 
 { --------------------------------------------------------------------------
@@ -610,13 +617,23 @@ begin
 
   CopyScreen(VirtScrSeg, $A000);
 
-  { 1012:0442 -- a counted loop, not an open one. }
+  { A `for` LOOP IS WHAT THE ORIGINAL HAS, and it cannot be written yet. 1012:05b1
+    is CMP [BP-$54],$12C / JE to the exit and 05b8 is JMP back -- with NO
+    increment between the last statement and the test, which is what a `for`
+    loop's top-of-body increment leaves behind. But the counter has to be the
+    local for that, and see the note on Frame above for why it cannot be. }
   Frame := 1;
   repeat
-    for I := 1 to NumBouncers do DrawSprite(I, BX[I], BY[I]);
+    for I := 1 to NumBouncers do
+    begin
+      SaveUnder(BX[I], BY[I], @Under[I], VirtScrSeg);   { 1012:0475 }
+      BuildCell(I);
+      BlitSprite(BX[I], BY[I], @Cell, VirtScrSeg);
+    end;
     CopyScreen(VirtScrSeg, $A000);
     { erase in REVERSE order so overlapping sprites restore correctly }
-    for I := NumBouncers downto 1 do EraseSprite(I, BX[I], BY[I]);
+    for I := NumBouncers downto 1 do
+      BlitSprite(BX[I], BY[I], @Under[I], VirtScrSeg);
 
     for I := 1 to NumBouncers do
     begin
