@@ -809,8 +809,6 @@ end;
       end;
   -------------------------------------------------------------------------- }
 { @asm 001 12b2:00c0 +0 StarStep }
-
-{ @asm 001 12b2:00c0 +0 StarStep }
 procedure StarStep; assembler;
 asm
         MOV     BX, 0                   { 12b2:00c0  a byte offset, not an   }

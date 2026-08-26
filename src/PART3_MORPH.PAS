@@ -243,8 +243,6 @@ end;
       SetAngles(AngX, AngY, AngZ);
   -------------------------------------------------------------------------- }
 { @asm 003 1139:0035 }
-
-{ @asm 003 1139:0035 }
 procedure StepAngles; assembler;
 asm
   MOV  BX, [AngX]                { BX := the X angle                        }
@@ -342,8 +340,6 @@ end;
   its `shr` on a LongInt is a LOGICAL shift, where SHL/RCL keeping DX is an
   arithmetic one.
   -------------------------------------------------------------------------- }
-{ @asm 003 1139:0096 ? }
-
 { @asm 003 1139:0096 ? }
 procedure TransformPoint; assembler;
 var
@@ -493,8 +489,6 @@ end;
       end;
   -------------------------------------------------------------------------- }
 { @asm 003 1139:01bb }
-
-{ @asm 003 1139:01bb }
 procedure PlotPixel; assembler;
 asm
   CMP  DI, 0            { X off the left?                                    }
@@ -542,8 +536,6 @@ end;
         Inc(P, 80);
       end;
   -------------------------------------------------------------------------- }
-{ @asm 003 1139:02a2 }
-
 { @asm 003 1139:01f9 }
 procedure DrawShape; assembler;
 asm
@@ -584,8 +576,6 @@ end;
           for k = 1, 2, 3));
       Inc(MorphStep);
   -------------------------------------------------------------------------- }
-{ @asm 003 1139:021d ? }
-
 { @asm 003 1139:021d ? }
 procedure DrawMorph; assembler;
 asm
@@ -698,8 +688,6 @@ end;
       PageOfs := 80 - PageOfs;
   -------------------------------------------------------------------------- }
 { @asm 003 1139:02c3 }
-
-{ @asm 003 1139:02c3 }
 procedure FlipPage; assembler;
 asm
   MOV  BX, [PageOfs]    { BX := the offset of the page just drawn            }
@@ -740,8 +728,6 @@ end;
       for I := 1 to 765 do
         PlotPixel(TransformPoint(S^[I,1], S^[I,2], S^[I,3]));
   -------------------------------------------------------------------------- }
-{ @asm 003 1139:01f9 }
-
 { @asm 003 1139:02f2 }
 procedure Set400Lines; assembler;
 asm
@@ -769,8 +755,6 @@ end;
       SinY := SinTab[AngY];  CosY := SinTab[AngY + 90];
       SinZ := SinTab[AngZ];  CosZ := SinTab[AngZ + 90];
   -------------------------------------------------------------------------- }
-{ @asm 003 1139:0000 ? }
-
 { HAND ASSEMBLER, and the frame is what proves it. 1139:0334 is a bare `C3`:
   no LEAVE, no POP BP, and therefore no prologue either. Turbo Pascal emits a
   frame for EVERY Pascal procedure whatever its contents -- measured in
@@ -938,8 +922,6 @@ end;
   That Pascal is genuinely equivalent here. It is written in assembler
   because the original is, not because Pascal could not express it.
   -------------------------------------------------------------------------- }
-{ @asm 003 1139:02f2 }
-
 { @asm 003 1139:034d }
 procedure GetPalette768(var P); assembler;
 asm
@@ -964,8 +946,6 @@ end;
       Port[$3C8] := 0;
       for I := 0 to 767 do Port[$3C9] := B[I];
   -------------------------------------------------------------------------- }
-{ @asm 003 1139:0335 }
-
 { --------------------------------------------------------------------------
   Morph_FadeStep (1139:0365)
   Read the whole DAC back, decrement every non-zero component by one, wait

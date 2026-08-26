@@ -667,8 +667,6 @@ end;
       FillChar(Mem[Segment : YOfs[Y] + X1], X2 - X1 + 1, Colour);
   -------------------------------------------------------------------------- }
 { @asm 004 1005:0354 }
-
-{ @asm 004 1005:0354 }
 procedure HLine(X1, X2, Y : Integer;
                 Colour : Byte; Segment : Word); assembler;
 asm
@@ -715,8 +713,6 @@ end;
       end;
   -------------------------------------------------------------------------- }
 { @asm 004 1005:037a }
-
-{ @asm 004 1005:037a }
 procedure Blit(Src : Pointer; X, Y, W, H : Integer;
                Segment : Word); assembler;
 asm
@@ -761,8 +757,6 @@ end;
 
       Move(Mem[SrcSeg : 0], Mem[DestSeg : 0], 64000);
   -------------------------------------------------------------------------- }
-{ @asm 004 1005:0835 }
-
 { IT TAKES THE LEMMING, NOT ITS INDEX, and it has no locals at all. 1005:03b9
   opens PUSH BP / MOV BP,SP with no ENTER, and every field access is
   `LES DI, [BP+$04]` followed by `ES:[DI+n]` -- so the parameter is a four-byte
@@ -1070,8 +1064,6 @@ end;
         Mem[Seg(ScrollBuf^) : Row * 341] := 0;
       Move(Mem[Seg(ScrollBuf^) : 2], Mem[Seg(ScrollBuf^) : 0], 6136);
   -------------------------------------------------------------------------- }
-{ @asm 004 1005:07f9 }
-
 { --------------------------------------------------------------------------
   1005:0853 -- write ONE column of one glyph into the buffer's run-up.
 
@@ -1210,8 +1202,6 @@ end;
   that column down the screen; the rest just count up. The result is 200
   vertical strips arriving at staggered times.
   -------------------------------------------------------------------------- }
-{ @asm 004 1005:0029 }
-
 { --------------------------------------------------------------------------
   1005:0a86 -- blank the DAC, put the hillside up, fade it in, then run a
   seven-frame animation BACKWARDS at (5, 50) and start the music.

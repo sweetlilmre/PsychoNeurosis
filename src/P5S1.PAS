@@ -856,8 +856,6 @@ end;
   both arrays with LODSW/STOSW rather than indexing them.
   -------------------------------------------------------------------------- }
 { @asm 005 100e:05d3 +87 Project }
-
-{ @asm 005 100e:05d3 +87 Project }
 procedure Project(Src, Dst : Pointer); assembler;
 asm
   PUSH DS                { 100e:05d6  DS is about to be the source array     }
@@ -925,8 +923,6 @@ end;
   colour byte is fetched by reading the WORD at +3 and keeping its high half,
   which is one instruction shorter than a byte load.
   -------------------------------------------------------------------------- }
-{ @asm 005 100e:062a +132 DrawMesh }
-
 { @asm 005 100e:062a +132 DrawMesh }
 procedure DrawMesh(Verts, Tris : Pointer); assembler;
 var

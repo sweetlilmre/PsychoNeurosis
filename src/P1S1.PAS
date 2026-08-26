@@ -248,8 +248,6 @@ end;
       for I := 1599 downto 0 do
         Cell[I] := Under[N, LensTab[I]];
   -------------------------------------------------------------------------- }
-{ @asm 001 1012:0366 +0 BuildCell }
-
 { @asm 001 1012:02bc }
 procedure SaveUnder(X, Y : Integer; Dest : Pointer; Segment : Word); assembler;
 asm
@@ -326,8 +324,6 @@ end;
         Inc(LongInt(P), 40);
       end;
   -------------------------------------------------------------------------- }
-{ @asm 001 1012:0311 }
-
 { @asm 001 1012:0311 }
 procedure BlitSprite(X, Y : Integer; Src : Pointer; Segment : Word); assembler;
 asm
@@ -779,8 +775,6 @@ end;
         Inc(LongInt(P), 40);
       end;
   -------------------------------------------------------------------------- }
-{ @asm 001 1012:02bc }
-
 { --------------------------------------------------------------------------
   The scene: load, draw the frame, then hand over to BounceRun.
   -------------------------------------------------------------------------- }

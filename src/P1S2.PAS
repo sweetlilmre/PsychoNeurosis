@@ -198,8 +198,6 @@ end;
   The mask is a THRESHOLD, not a key: source bytes of 20 or less are skipped,
   so the anti-aliased edges of the glyphs drop out and only the solid core is
   copied. }
-{ @asm 001 1082:01d0 +0 DrawRevealed }
-
 { @asm 001 1082:0128 +0 BlitClipped }
 procedure BlitClipped(Src : Pointer; X, Y : Integer; Segment : Word); assembler;
 var
@@ -421,8 +419,6 @@ end;
                         WorkBuf^[I + 25] + WorkBuf^[I + 27]) shr 2;
   -------------------------------------------------------------------------- }
 { @asm 001 1082:02ba +0 BlurBuffer }
-
-{ @asm 001 1082:02ba +0 BlurBuffer }
 procedure BlurBuffer; assembler;
 asm
         LES     DI, WorkBuf             { 1082:02ba  ES:DI := the buffer      }
@@ -510,8 +506,6 @@ end;
         Inc(P, SkipR);  Inc(D, 320 - Cols);
       end;
   -------------------------------------------------------------------------- }
-
-{ @asm 001 1082:0128 +0 BlitClipped }
 
 { --------------------------------------------------------------------------
   Title_ShowWord (1082:02fd)
