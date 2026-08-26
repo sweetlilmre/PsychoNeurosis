@@ -507,29 +507,38 @@ end;
   -------------------------------------------------------------------------- }
 procedure StarInit(C0, Ca, Cb, Speed : Byte);
 var
-  { ENTER 6, and it is a Byte plus a four-byte pointer: 12b2:0009 is
-    MOV BYTE PTR [BP-1],1 and 12b2:000f INCs the same byte, so the counter is
-    a Byte; 12b2:0020 stores DI and ES into [BP-6] and every field write then
-    goes through LES DI,[BP-6]. 1 + 4 = 5, and ENTER rounds it to 6.
+  { ENTER 6, AND IT IS TWO BYTES PLUS A `with`. 12b2:0009 sets [BP-1] to 1 and
+    12b2:000f INCs it, so the counter is a Byte; 12b2:004a stores Random(3)'s
+    result into [BP-2] and 12b2:004d reads it straight back for the case, which
+    is a second Byte and not a compiler temporary -- a temporary is not read
+    through memory when the value is already in AL; and 12b2:0020 puts DI and
+    ES into [BP-6], which is the four bytes a `with` gets for the record's
+    address. 1 + 1 + 4 = 6.
 
-    The pointer is the same idiom scene 5's point loops use -- the record's
-    address taken once per iteration rather than three subscript computations. }
-  I : Byte;                             { [BP-1] }
-  P : ^TStar;                           { [BP-6] }
+    IT IS A `with` AND NOT A POINTER, and the two bytes at 12b2:001e are what
+    separate them: PUSH DS / POP ES puts the segment in ES before the pair is
+    stored, which is what `with` over a DGROUP record does. Assigning
+    @Star[I] to a declared pointer moves DS through AX instead, and leaves no
+    room for the case's byte. }
+  I    : Byte;                          { [BP-1] }
+  Band : Byte;                          { [BP-2] }
 begin
   Randomize;                            { 12b2:0004 }
   for I := 1 to StarCount do
-  begin
-    P := @Star[I];                      { 12b2:0017, IMUL DI,AX,9 + $9DD2 }
-    P^.X     := Random(319);            { 12b2:0026, PUSH $13F }
-    P^.Y     := Random(199);            { 12b2:0034, PUSH $C7 }
-    P^.Spare := 0;                      { 12b2:0067, XOR AX,AX then store }
-    case Random(3) of
-      0 : begin P^.Colour := C0;  P^.DX := Speed;     end;
-      1 : begin P^.Colour := Ca;  P^.DX := Speed * 2; end;
-      2 : begin P^.Colour := Cb;  P^.DX := Speed * 3; end;
+    with Star[I] do                     { 12b2:0017, IMUL DI,AX,9 + $9DD2 }
+    begin
+      X := Random(319);                 { 12b2:0026, PUSH $13F,  field +0 }
+      Y := Random(199);                 { 12b2:0034, PUSH $C7,   field +2 }
+      { AND Spare := 0 IS INSIDE EACH BRANCH, not before the case. 12b2:0067,
+        008a and their third are three separate XOR AX,AX / MOV ES:[DI+6],AX,
+        one per arm; hoisting it above the case emits it once. }
+      Band := Random(3);                { 12b2:0043 }
+      case Band of
+        0 : begin Colour := C0;  DX := Speed;      Spare := 0 end;
+        1 : begin Colour := Ca;  DX := Speed * 2;  Spare := 0 end;
+        2 : begin Colour := Cb;  DX := Speed * 3;  Spare := 0 end;
+      end;
     end;
-  end;
 end;
 
 { [transcribed] 12b2:00c0 -- StarStep. X := X + DX, wrapping on 0 and 319. }

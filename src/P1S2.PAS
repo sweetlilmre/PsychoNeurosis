@@ -47,7 +47,14 @@ const
 
 type
   TWorkBuf   = array[0..5199] of Byte;
-  TCometBank = array[0..CometFrames * CometSize - 1] of Byte;
+  { ONE-BASED AND TWO-DIMENSIONAL, and the fold at the blit call says so.
+    1082:0396 is IMUL AX,AX,$C30 -- the frame number times 3,120 -- and then
+    1082:03a0 is ADD DI,$F3D0, which as a signed word is MINUS 3,120: one
+    element's worth, folded into the address, which is what a 1-based array of
+    3,120-byte frames gives. A flat array indexed (Frame - 1) * CometSize makes
+    the compiler subtract the one at RUN TIME instead. Same 31,200 bytes. }
+  TCometFrame = array[0..CometSize - 1] of Byte;
+  TCometBank = array[1..CometFrames] of TCometFrame;
   { THREE-DIMENSIONAL, AND FontBias IS THE PROOF -- it was sitting in this
     file as a named constant for days. 1082:022b reaches a glyph byte as
     ES:[DI-$2011] with DI built from Ch shifted left 8, Phase shifted left 4 and
@@ -178,34 +185,33 @@ end;
   The mask is a THRESHOLD, not a key: source bytes of 20 or less are skipped,
   so the anti-aliased edges of the glyphs drop out and only the solid core is
   copied. }
-procedure DrawRevealed;
-var
-  Row, Col : Integer;
-  V        : Byte;
-  D, P     : Word;
-begin
-  { The destination stride is 318, NOT 320: after 26 columns the original does
-    ADD DI,$124 (292), and DI is already 26 further on, so each row starts two
-    bytes EARLIER than the one above. Over 150 rows that is a 300-pixel lean --
-    the revealed block is deliberately SHEARED, not upright.
-
-    Source and destination both advance on every pixel; only the STORE is
-    conditional, on the byte exceeding 20. }
-  P := 0;
-  D := RevealOfs;
-  for Row := 1 to 150 do
-  begin
-    for Col := 1 to 26 do
-    begin
-      V := WorkBuf^[P];
-      if V > 20 then Mem[VirtScrSeg : D] := V;
-      Inc(P);
-      Inc(D);
-    end;
-    Inc(D, 292);            { 26 + 292 = 318 }
-  end;
+{ @asm 001 1082:01d0 +0 DrawRevealed }
+procedure DrawRevealed; assembler;
+asm
+        PUSH    ES                      { 1082:01d0                          }
+        PUSH    DS                      { 01d1                               }
+        MOV     AX, [VirtScrSeg]        { 01d2                               }
+        MOV     ES, AX                  { 01d5  ES:DI is the virtual screen   }
+        MOV     DI, RevealOfs           { 01d7  $266                         }
+        ADD     DI, 320                 { 01da  one row down to start         }
+        LDS     SI, WorkBuf             { 01de  DS:SI is the working buffer   }
+        MOV     BX, 150                 { 01e2  rows                         }
+@@Row:  MOV     CX, 26                  { 01e5  columns, reloaded per row     }
+@@Pixel:
+        MOV     AL, [SI]                { 01e8                               }
+        CMP     AL, 20                  { 01ea  THE MASK IS A THRESHOLD       }
+        JLE     @@Skip                  { 01ec    and not a colour key        }
+        MOV     ES:[DI], AL             { 01ee                               }
+@@Skip: INC     DI                      { 01f1  BOTH advance either way, so   }
+        INC     SI                      { 01f2    the skip is a hole and not  }
+        DEC     CX                      { 01f3    a shift                     }
+        JNE     @@Pixel                 { 01f4                               }
+        ADD     DI, 292                 { 01f6  $124 -- and DI is already 26  }
+        DEC     BX                      { 01fa    further on, so the stride   }
+        JNE     @@Row                   { 01fb    is 318 and the block LEANS  }
+        POP     DS                      { 01fd                               }
+        POP     ES                      { 01fe                               }
 end;
-
 { [stub] 1082:0200 -- draws the character currently animating. Phase is
   Trunc(Phase) from ShowWord: one of 1, 3, 5, 7, 9, 11, 13, 15. }
 { --------------------------------------------------------------------------
@@ -260,13 +266,47 @@ end;
 
   The earlier name and body were guesses from the call site alone.
   -------------------------------------------------------------------------- }
-procedure BlurBuffer;
-var
-  I : Integer;
-begin
-  for I := 27 to 27 + 3899 do
-    WorkBuf^[I] := (LongInt(WorkBuf^[I - 27]) + WorkBuf^[I - 25] +
-                    WorkBuf^[I + 25] + WorkBuf^[I + 27]) shr 2;
+{ HAND ASSEMBLER, TRANSCRIBED VERBATIM, and three things say so. 1082:02ba goes
+  straight into LES DI with no prologue at all, so the routine has no frame and
+  no locals; the counter is CX and the loop is LOOP; and the store is STOSB,
+  which also advances DI, so the pointer walks itself and there is no index
+  variable anywhere. Compiled Pascal emits none of the three for this shape.
+
+  IT ALSO READS AND WRITES THE SAME BUFFER AS IT GOES. DI starts 27 bytes in and
+  STOSB writes at DI before incrementing it, so the four neighbours are read
+  relative to the byte about to be overwritten -- and the two ABOVE it
+  ([DI-$1B] and [DI-$19]) have already been blurred by earlier iterations. It is
+  a running smear, not a clean convolution, and that is what makes a hundred
+  passes dissolve the word rather than merely soften it.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      for I := 27 to 27 + 3899 do
+        WorkBuf^[I] := (WorkBuf^[I - 27] + WorkBuf^[I - 25] +
+                        WorkBuf^[I + 25] + WorkBuf^[I + 27]) shr 2;
+  -------------------------------------------------------------------------- }
+{ @asm 001 1082:02ba +0 BlurBuffer }
+procedure BlurBuffer; assembler;
+asm
+        LES     DI, WorkBuf             { 1082:02ba  ES:DI := the buffer      }
+        ADD     DI, 27                  { 02be  the first byte with four      }
+                                        {         diagonal neighbours         }
+        MOV     CX, 3900                { 02c1  26 x 150, the whole band      }
+        XOR     AX, AX                  { 02c4                                }
+        XOR     BX, BX                  { 02c6  BH stays zero for the whole   }
+                                        {         loop, so BX is a widened BL }
+@@Pixel:
+        MOV     BL, ES:[DI-27]          { 02c8  up and left                   }
+        MOV     AX, BX                  { 02cc                                }
+        MOV     BL, ES:[DI-25]          { 02ce  up and right                  }
+        ADD     AX, BX                  { 02d2                                }
+        MOV     BL, ES:[DI+25]          { 02d4  down and left                 }
+        ADD     AX, BX                  { 02d8                                }
+        MOV     BL, ES:[DI+27]          { 02da  down and right                }
+        ADD     AX, BX                  { 02de                                }
+        SHR     AX, 2                   { 02e0  the average of the four       }
+        STOSB                           { 02e3  and DI steps on by itself     }
+        LOOP    @@Pixel                 { 02e4                                }
 end;
 
 { ===========================================================================
@@ -500,7 +540,7 @@ begin
 
       so it sweeps from the top right down to the bottom left. The bank index
       is (Frame - 1), which the original writes as +$F3D0, i.e. -CometSize. }
-    BlitClipped(@CometBank^[(Trunc(Frame) - 1) * CometSize],
+    BlitClipped(@CometBank^[Trunc(Frame)],       { 1082:0396 }
                 Count * 4, Trunc(CometPos), VirtScrSeg);
 
     { Only the character currently animating is drawn here; Trunc(Phase) is
