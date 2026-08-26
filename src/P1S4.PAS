@@ -252,7 +252,13 @@ var
     which is a 1-based array of seven-byte records, so the array itself starts
     seven bytes further on. And it tiles: $6336 plus 145 * 7 is $672D, which is
     where the palette begins. }
-  Outp  : array[0..LastEntry] of TOut;              { DS:$6336 }
+  { ONE-BASED, AND THE FOLD IS WHAT SAYS SO -- 1107:0268 is IMUL DI,AX,7 then
+    [DI+$632F], and $632F is SEVEN BELOW the array. A zero-based array folds to
+    its own address and a one-based one folds to the address minus one element,
+    so the base is $6336 either way and only the ELEMENT COUNT differs: ours had
+    an index 0 the original does not have, seven bytes, and every variable from
+    the palette upwards sat seven bytes high because of it. }
+  Outp  : array[1..LastEntry] of TOut;              { DS:$6336 }
   { DS:$672D, 768 bytes, ending exactly at Row below. }
   Pal   : array[0..767] of Byte;                    { DS:$672D }
   { DS:$6A2D, $6A2F, $6A31 -- BuildPoints' THREE COUNTERS ARE UNIT-LEVEL, and

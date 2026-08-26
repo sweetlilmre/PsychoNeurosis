@@ -221,6 +221,21 @@ const
     Project halves both, so these are the FULL view size, not the centre. }
   MViewW : Word = 320;
   MViewH : Word = 0;
+  { DS:$0284 = $A640, AND IT IS NOT AN ADDRESS. The original's initialised image
+    holds `40 a6` here, immediately after MViewH, and ours held zero -- which is
+    the -2 that dsmap reports across SIXTY-SEVEN paired references from $0286 to
+    $ACFB, every one of them a byte of correct code measuring as wrong.
+
+    $A640 is 42,560, and 42,560 is 320 * 133 -- the screen width times the
+    mirror row, which is the byte offset of the horizon. Read as a DGROUP
+    address it lands inside this unit's own Scr array at no element boundary, so
+    the arithmetic reading is the one that survives.
+
+    NOTHING IN THE PART REFERENCES IT. There is no absolute displacement of
+    $0284 anywhere in the seven user segments, so it is a typed constant the
+    original declares and never reads; it is here because the image says so and
+    because every later byte of the image depends on it. }
+  MirrorOfs : Word = ScrWidth * Horizon;            { DS:$0284 = $A640 }
 
 {$L DEMOMATH.OBJ}
 procedure SinCos(A : Integer; var C, S : LongInt);        external; { 12c5:192D }
