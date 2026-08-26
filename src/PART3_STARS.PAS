@@ -410,7 +410,13 @@ end;
 { --------------------------------------------------------------------------
   DegToRad (10b8:0487)
   -------------------------------------------------------------------------- }
-function DegToRad(D : Real) : Real;
+{ FAR, AND NOTHING OUTSIDE THIS UNIT CALLS IT. Every one of Generate's four
+  calls is PUSH CS then CALL NEAR -- 0e e8 at 10b8:0634, 0664, 06c0 and 06fc --
+  which is what TP7 emits for a FAR routine that happens to sit in the calling
+  segment: four bytes instead of a far call's five, and one more than the plain
+  near call a local function gets. Declared the ordinary way ours lost a byte at
+  each of the four sites and every offset after the first one drifted. }
+function DegToRad(D : Real) : Real;  far;
 begin
   DegToRad := D * Pi / 180.0;
 end;
@@ -487,7 +493,13 @@ end;
 
   This is the only floating point in the scene.
   -------------------------------------------------------------------------- }
-procedure Generate;
+{ NO `procedure Generate` -- THIS IS THE INITIALISATION SECTION ITSELF. The
+  original's 10b8:05f2 opens PUSH BP / MOV BP,SP and closes LEAVE / RETF, which
+  is an initialisation section, and its last instruction before Math_DivLong is
+  that RETF. Written as a procedure the unit ended LEAVE / RET-near followed by
+  a separate five-byte stub that called it -- eight bytes the original does not
+  spend, and the note that used to sit at the bottom of this file already said
+  so and left it as written. }
 { NO LOCAL COUNTER. 10b8:069d is `MOV WORD PTR [$A88A],2` and 10b8:06a5 is
   `INC WORD PTR [$A88A]` -- the loop runs on the UNIT-LEVEL Idx, which is
   already declared at that address and which the var block's own note says is
@@ -520,13 +532,6 @@ begin
     Source is the reset template every recycled point is rebuilt from. }
   for Idx := 1 to NumPoints do
     Move(Live^[Idx], Source^[Idx], RecSize);
-end;
-
-begin
-  { 1000:0037 -- the unit initialisation. The original has Generate's code
-    directly in this section rather than in a procedure it calls; the extra
-    call is the only difference. }
-  Generate;
 end.
 
 { ===========================================================================

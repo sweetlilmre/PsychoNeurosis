@@ -225,11 +225,21 @@ var
       Port[$3C9] := Blue[I + 1];
     end;
 }
-{ SetModeX IS NOT IN THIS SEGMENT IN THE ORIGINAL. Its first routine is
-  UploadPalette at 1015:0000, so SetModeX is either inlined into Scene1 or
-  lives in another unit; declared first here it took the address UploadPalette
-  should have. Moved past Scene1 with a forward until that is settled. }
-procedure SetModeX; forward;
+{ SETMODEX IS NOT DECLARED HERE, AND THAT IS NOW SETTLED. It is ModeX's, at
+  107c:006d in part 002, and ModeX is in this unit's uses clause -- so the call
+  in Scene1 resolves to it exactly as the SelectPlane calls do. The note that
+  used to sit here said SetModeX "is either inlined into Scene1 or lives in
+  another unit" and left it open; the measurement that closed it is the segment
+  length. This unit was 2,752 bytes against the original's 2,608, and the 144
+  were a private copy of SetModeX sitting after Scene1: our tail ran
+  ENTER 2,0 / MOV AX,$13 / INT $10 and on through the Sequencer and CRTC writes
+  to B0 50 into CRTC $13, where the original has only the five bytes of an empty
+  unit initialisation. Every routine before it was already at an identical
+  offset, which is what said the excess was all in one place.
+
+  The local copy also made the call NEAR. ModeX's is far, which is two bytes
+  more at the call site and what the original has -- the same trap the
+  SelectPlane note below describes. }
 
 procedure UploadPalette; assembler;
 var
@@ -678,28 +688,6 @@ end;
 { --------------------------------------------------------------------------
   VGA_SetMode (1192:002a) -- mode 13h, then unchain into Mode-X.
   -------------------------------------------------------------------------- }
-procedure SetModeX;
-var
-  Dummy : Byte;
-begin
-  asm mov ax,0013h; int 10h end;             { start from mode 13h }
-
-  PortW[$3C4] := $0604;                      { Seq 4: chain-4 off, ext mem on }
-  Port[$3CE] := 5;  Port[$3CF] := Port[$3CF] and $EF;   { GC 5: odd/even off }
-  Port[$3CE] := 6;  Port[$3CF] := Port[$3CF] and $FD;   { GC 6: chain o/e off }
-
-  PortW[$3C4] := $0F02;                      { Map Mask: all four planes }
-  { All 256K at once -- Map Mask $0F means one write hits all four planes.
-    Split in two because FillChar's count is a Word and 65536 will not
-    fit in one. }
-  FillChar(Mem[$A000 : 0],     32768, 0);
-  FillChar(Mem[$A000 : 32768], 32768, 0);
-
-  Port[$3D4] := $14; Port[$3D5] := Port[$3D5] and $BF; { CRTC 14: dword off }
-  Port[$3D4] := $17; Port[$3D5] := Port[$3D5] or  $40; { CRTC 17: byte mode }
-  Port[$3D4] := $13; Port[$3D5] := CrtcOffset;         { CRTC 13: 640 wide }
-end;
-
 { SelectPlane IS NOT DECLARED HERE. 1015:08d7 is a FAR call to 1192:0087 --
   ModeX's SelectPlane -- and a local copy made it a near call, which is three
   bytes shorter and never matches. ModeX is in the uses clause, so the calls

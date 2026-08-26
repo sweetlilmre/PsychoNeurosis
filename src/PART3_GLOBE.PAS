@@ -22,6 +22,17 @@
   =========================================================================== }
 
 {$G+}   { 286: the original's procedures open with ENTER, a 286 instruction. }
+{$I-}   { NO I/O CHECK, and this unit was the last of part 003's to be told so.
+          Every other unit in the part already had it. The original follows each
+          file call with nothing; ours followed all eighteen of them with a far
+          call to System:04f4, the runtime's I/O result check, which $I+ --
+          the default -- emits and $I- does not. Ninety bytes, and they were
+          what displaced the runtime: this unit measured 1,456 bytes against the
+          original's 1,376, P3Stars was sixteen over, and those ninety-six bytes
+          moved System six paragraphs, so all thirty-four of part 003's
+          remaining unaligned bytes were the low byte of a far-call operand.
+          Nothing else in the segment differed -- every prologue was at an
+          identical offset and the tail matched byte for byte, shifted. }
 
 unit Part3Globe;
 
@@ -80,16 +91,27 @@ var
     nothing in the instruction stream points at either. }
   Unread  : Word;                 { [BP-$02], never read }
   I       : Word;                 { [BP-$04] }
-  R, G, B : Byte;                 { [BP-$05], [BP-$06], [BP-$07] }
+  B, G, R : Byte;                 { [BP-$05], [BP-$06], [BP-$07] }
   Spare   : Byte;                 { [BP-$08], never read }
 begin
   WaitRetrace;
   for I := 0 to 255 do
   begin
+    { DECLARED B, G, R AND NOT R, G, B, which reads backwards and is the point.
+      Locals go down from BP in declaration order, so the first byte named gets
+      [BP-$05] and the last gets [BP-$07]; the original pushes the address of
+      [BP-$07] FIRST at 119d:0017, so R is the lowest of the three and B the
+      highest. Declared the natural way round the three LEA/PUSH pairs came out
+      in the opposite order -- the same bytes, in the wrong sequence, which no
+      length check would ever have caught. }
     GetRGB(I, R, G, B);
-    if R <> 0 then Dec(R);
-    if G <> 0 then Dec(G);
-    if B <> 0 then Dec(B);
+    { > 0, NOT <> 0. The original tests each component with CMP byte,0 / JBE
+      (76 03); <> 0 compiles to JZ (74 03), the same two bytes with the wrong
+      condition. For an unsigned Byte the two behave identically, so only the
+      comparison against the 1994 image says which was written. }
+    if R > 0 then Dec(R);
+    if G > 0 then Dec(G);
+    if B > 0 then Dec(B);
     SetRGB(I, R, G, B);
   end;
 end;
@@ -111,8 +133,24 @@ var
     these three through a static link.
         SS:[link-$0A]  SrcOfs        SS:[link-$06]  DstOfs
         SS:[link-$30A] Target                                                 }
-  SrcOfs, DstOfs : ^TOffsets;      { two GetMem'd 45994-byte tables }
-  Target         : array[0..767] of Byte;   { fade-in destination palette }
+  { DstOfs FIRST, so that SrcOfs lands at [link-$0A] and DstOfs at [link-$06].
+    Pointers go down from BP in declaration order, four bytes each, so whichever
+    is named first gets the HIGHER slot -- and the original's LoadTables stores
+    its first GetMem result to [$0A]. Declared SrcOfs, DstOfs the two GetMem
+    calls came out storing to the other one's slot, and so did the two FreeMem
+    calls at the end of Scene4, which is why the unit's last two call pairs were
+    in the opposite order from the original. One declaration, two sites. }
+  DstOfs, SrcOfs : ^TOffsets;      { two GetMem'd 45994-byte tables }
+  { TWO HUNDRED AND FIFTY-SIX TRIPLES, NOT 768 FLAT BYTES, and the instruction
+    stream is what says so. FadeIn's three loads are ss:[di-$030a],
+    ss:[di-$0309] and ss:[di-$0308] -- the component offset is folded into the
+    DISPLACEMENT and there is no arithmetic for it at all. Written flat as
+    Target[I * 3 + 1] the compiler evaluates the whole subscript instead and
+    emits INC AX, then INC AX twice for the third, keeping one displacement:
+    three bytes the original does not spend. A constant second subscript folds;
+    a constant added to the first does not. Same 768 bytes, same $30A slot, and
+    BlockRead still fills it in one call. }
+  Target         : array[0..255] of array[0..2] of Byte;
 
   { --------------------------------------------------------------------------
     Palette_FadeIn (119d:0064)
@@ -127,17 +165,22 @@ var
       both declared two of their locals and never read them. }
     Unread     : Word;              { [BP-$02], never read }
     I          : Word;              { [BP-$04] }
-    R, G, B    : Byte;              { [BP-$05], [BP-$06], [BP-$07] }
+    B, G, R    : Byte;              { [BP-$05], [BP-$06], [BP-$07] }
     Spare      : Byte;              { [BP-$08], never read }
   begin
     if KeyPressed then Exit;
     WaitRetrace;
     for I := 0 to 255 do
     begin
+      { B, G, R, backwards, for the reason FadeOut's note gives: the original
+        pushes the address of [BP-$07] first, so R is the lowest of the three. }
       GetRGB(I, R, G, B);
-      if R < Target[I * 3 + 0] then Inc(R);
-      if G < Target[I * 3 + 1] then Inc(G);
-      if B < Target[I * 3 + 2] then Inc(B);
+      { Target[I][c] and never Target[I * 3 + c] -- see the declaration's note.
+        The first subscript multiplies by the element size, three, exactly as
+        the flat form did; the second is a constant and folds away. }
+      if R < Target[I][0] then Inc(R);
+      if G < Target[I][1] then Inc(G);
+      if B < Target[I][2] then Inc(B);
       SetRGB(I, R, G, B);
     end;
   end;
@@ -337,7 +380,15 @@ begin
 
   { ---- ShowFlat(ImgTitle) at 119d:0349 ---- }
   Seek(F, ImgTitle);
-  BlockRead(F, VirtScr^, 64000);
+  { GUARDED HERE AND AT 119d:0438, BUT NOT AT 119d:0263. The first showing of
+    the title image reads it unconditionally; the second and third test the
+    keyboard first, and the original says so -- 119d:0358 is CALLF KeyPressed /
+    OR AL,AL / JNZ, nine bytes, sitting between the Seek and the BlockRead in
+    both later copies and absent from the first. Six near-copies of one
+    sequence, hand written, and they are not all the same. Ours had one guard
+    where the original has three, and those eighteen bytes were the whole of
+    this unit's remaining shortfall. }
+  if not KeyPressed then BlockRead(F, VirtScr^, 64000);
   if not KeyPressed then CopyScreen(VirtScrSeg, $A000);
   ClearScreen(VirtScrSeg, 0);
   for I := 1 to FadeSteps do FadeIn;
@@ -353,7 +404,15 @@ begin
 
   { ---- ShowFlat(ImgTitle) at 119d:0438 ---- }
   Seek(F, ImgTitle);
-  BlockRead(F, VirtScr^, 64000);
+  { GUARDED HERE AND AT 119d:0438, BUT NOT AT 119d:0263. The first showing of
+    the title image reads it unconditionally; the second and third test the
+    keyboard first, and the original says so -- 119d:0358 is CALLF KeyPressed /
+    OR AL,AL / JNZ, nine bytes, sitting between the Seek and the BlockRead in
+    both later copies and absent from the first. Six near-copies of one
+    sequence, hand written, and they are not all the same. Ours had one guard
+    where the original has three, and those eighteen bytes were the whole of
+    this unit's remaining shortfall. }
+  if not KeyPressed then BlockRead(F, VirtScr^, 64000);
   if not KeyPressed then CopyScreen(VirtScrSeg, $A000);
   ClearScreen(VirtScrSeg, 0);
   for I := 1 to FadeSteps do FadeIn;
