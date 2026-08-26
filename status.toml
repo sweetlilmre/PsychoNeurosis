@@ -230,6 +230,18 @@ matched = 32
 [routine."VGA.WaitRetrace"]
 matched = 14
 
+[observation."NEUR1"]
+harness = "NEUR1"
+tier = "part"
+outcome = "matches"
+achieved = "R3"
+observer = "maintainer"
+date = "2026-08-27"
+confirmed_at = "e53b804cb643"
+fingerprint = "7cf38c2e001f3d58"
+against = "work/split/NEUROSIS_001.exe"
+note = "Watched RUNPART 1 on 27 Aug 2026, the FIRST EVER RUN of part 001 as a real program rather than through TPART1 and the P1Intro driver unit. The maintainer reports it looking good. This run covers the whole of that conversion: the five scene units gaining their empty initialisation sections so the unit-init chain is twelve calls rather than seven, the program gaining $G+ and losing its explicit Halt(0), VirtScrAlloc moving BEFORE SetMode13h, SetRGB(7,0,0,0) replacing SetRGB(0,0,0,7), P1S3's Load being defined first and reading VirtScr^, P1S2's ShowWord becoming a for..downto that runs 99 frames instead of 98, and two changes with visible consequences: P1S1 gained CopyScreen(VirtScrSeg,$A000) before BounceRun, so the logo now appears before the bouncers rather than when the first bounce frame happened to blit it, and the P1S1 bouncer updates became plain assignments. Part 001 walks at 21,264 of 21,264 with every segment the original's exact size. ONE BYTE REMAINS and it is not visible on screen: P1S4's code is one byte long, which shows only in the program segment's two references into it -- investigation part1-p1s4-one-byte."
+
 [observation."NEUR2"]
 harness = "NEUR2"
 tier = "part"

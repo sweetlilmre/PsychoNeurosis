@@ -277,7 +277,18 @@ end;
   DS:$0002 is initialised data, so it already holds $50 when the table is
   first built; a scene that wants a different width stores its own value and
   calls BuildRowTable again, which is what Demo_Scene1 does through SetModeX. }
+{ THE INITIALISATION ONLY CALLS BuildRowTable. It used to store $50 into
+  LogicalWidth first, which is redundant -- LogicalWidth is a TYPED CONSTANT
+  declared `: Byte = $50`, so the value is already in the initialised data image
+  before a single instruction runs -- and the original does not do it. 107c:00e1
+  is PUSH BP / MOV BP,SP / PUSH CS / CALL BuildRowTable / LEAVE / RETF and
+  nothing else; ours had MOV BYTE PTR [$0002],$50 in the middle of it, five
+  bytes re-storing a byte that was already correct.
+
+  IT WAS INVISIBLE TO THE COVERAGE WALK, which stops reading each segment when
+  fewer than ANCHOR bytes remain and so never examines the last nine -- exactly
+  where an initialisation section sits. Found by comparing the segment tails
+  directly. }
 begin
-  LogicalWidth := $50;
   BuildRowTable;
 end.

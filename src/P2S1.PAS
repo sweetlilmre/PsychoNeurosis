@@ -657,4 +657,16 @@ begin
   Run;
 end;
 
+{ AN EMPTY INITIALISATION SECTION, AND IT WAS MISSING. 1008:073b is
+  PUSH BP / MOV BP,SP / LEAVE / RETF -- five bytes doing nothing -- and the main
+  body's init chain calls one per unit. Without the `begin` below TP7 emits no
+  section and the chain skips this unit.
+
+  IT HID IN THE ONE PLACE THE COVERAGE WALK CANNOT LOOK. spans.py reads each
+  segment in windows and stops when fewer than ANCHOR bytes remain, so the last
+  nine bytes of every segment are never examined -- neither counted as matched
+  nor reported as a gap. That is exactly where a unit's initialisation section
+  sits. The part read 100.0% with this missing, and what found it was comparing
+  the segment tails directly. }
+begin
 end.
