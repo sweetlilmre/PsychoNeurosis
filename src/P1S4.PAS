@@ -603,6 +603,10 @@ procedure SortOutp(var Arr : TOutArr);
     I := Lo;  J := Hi;
     P := Arr[(Lo + Hi) div 2].D;
     repeat
+      { The operand order was tried BOTH ways here and measures identically --
+        `while P < Arr[I].D` emits the same bytes as this. So the 3 bytes at
+        1107:02ea are not an operand-order difference, and the natural spelling
+        stays. }
       while Arr[I].D > P do Inc(I);
       while Arr[J].D < P do Dec(J);
       if I <= J then
