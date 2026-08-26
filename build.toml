@@ -37,6 +37,19 @@ binpath = "C:\\TP\\BIN"
 # CD 3x emulator interrupts, but that is a POST-BUILD PATCH rather than a
 # compile option, and dropping $E risks an unhandled INT 34h on any path the
 # RTL does not patch.
+# /GD MAKES TPC WRITE A MAP, AND IT ANSWERS WHAT WE HAD BEEN INFERRING. Every
+# layout hunt here read our own code and data addresses out of the disassembly
+# -- which is how one of them mis-decoded a runtime call operand as an `rcr`
+# instruction, and another produced four contradictory shift deltas from a
+# single build. The compiler knows the answers. /GD writes build/*.MAP with
+# every segment's start, stop and length and every public symbol's address:
+# P1Star's routines come out at 02C7:0000, 00C0 and 00F1, which are the
+# original's 12b2 offsets exactly.
+#
+# It does NOT change the EXE -- all 32 targets and all seven walks are
+# identical with it on -- and build/ is git-ignored, so the maps cost nothing.
+# CODE publics only, not unit variables, so a data hunt works from segment
+# LENGTHS rather than symbol names.
 switches = "/ED: /UD:;C:\\TP\\UNITS /ID:;D:\\GEN /$S- /GD"
 
 [compiler.tp6]
