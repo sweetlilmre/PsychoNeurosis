@@ -1012,31 +1012,6 @@ end;
 { --------------------------------------------------------------------------
   Morph_InitScene (1139:02fe)
   -------------------------------------------------------------------------- }
-{ HAND ASSEMBLER, and the frame is what proves it. 1139:0334 is a bare `C3`:
-  no LEAVE, no POP BP, and therefore no prologue either. Turbo Pascal emits a
-  frame for EVERY Pascal procedure whatever its contents -- measured in
-  probe/ZEROSTOR.PAS, where a procedure with no parameters and no locals still
-  gets one, near or far, under $G- (`55 89E5 ... 5D`) and under $G+
-  (`... C9`). An `assembler` procedure with neither is the only shape that has
-  none.
-
-  IT ALSO EXPLAINS THE ZERO STORES. 1139:0310, 031c and 0322 write zero as
-  `MOV WORD PTR [x],0`, six bytes, where Pascal writes `XOR AX,AX / MOV [x],AX`,
-  five. The probe eliminated every source-level explanation for that -- the
-  compiler version, Word against Integer, a named `= 0` constant, interleaving
-  with non-zero stores, the LongInt high-word case, and an array element or
-  record field as the target. Hand-written asm needs none of them: the author
-  wrote the store and BASM assembled it.
-
-  AND IT DOES NOT CALL BindShapes. The original's first instruction is the
-  LogicalWidth store; there is no call ahead of it, and there is no BindShapes
-  in this unit any more either.
-
-  FOR REFERENCE ONLY, the equivalent Pascal -- not what the binary does:
-    LogicalWidth := 80;  SetModeX;  Set400Lines;  ModeX.BuildRowTable;
-    MorphStep := 0;  MorphSteps := 45;  XCentre := 0;  YCentre := 0;
-    ProjScale := 256;  ViewDist := 2500; }
-
 { --------------------------------------------------------------------------
   Demo_Scene3 (1139:03b4) -- HAND ASSEMBLER, and the whole procedure is.
 
@@ -1253,36 +1228,6 @@ asm
         JNE     @@L8                    { 0581                                }
 @@Done:                                 { 0583 is the RETF Turbo Pascal adds  }
 end;
-
-{ --------------------------------------------------------------------------
-  Morph_CheckKey (1139:02e0) -- ASSEMBLER, AND IT RETURNS IN DX.
-
-  The scene tests for a key through its own routine and not through Crt's
-  KeyPressed directly: 1139:040a is a NEAR call and CALLF never appears in the
-  eight loops. So there is a routine of this unit's own in between.
-
-  TWO THINGS ABOUT IT ARE NOT PASCAL, and both were visible for weeks.
-
-  IT HAS NO STACK FRAME. 1139:02e0 is the far call itself -- no PUSH BP, no
-  MOV BP,SP, and a bare RET at 02f1 with no LEAVE. A compiled procedure gets
-  the frame whether or not it has locals; only `assembler` omits it.
-
-  AND IT ANSWERS IN DX. Turbo Pascal returns a Boolean in AL, a word in AX, a
-  LongInt or a pointer in DX:AX -- and nothing at all in DX alone. The
-  MOV DX,0 / MOV DX,1 pair here, and the OR DX,DX that Scene3 tests it with,
-  appear EXACTLY ONCE in the whole demo: this routine and its callers. Every
-  part carries the runtime's own AL form of the same shape, which is what made
-  the DX form look like a decoding mistake rather than a finding.
-
-  So it is the author's own calling convention, and the callers are asm because
-  nothing else can read it. That is why this and Scene3 had to change together:
-  making this `assembler` on its own leaves the callers testing AL, and the
-  measurement gets WORSE rather than better.
-
-  The declared result type stays Boolean because that is what the routine
-  MEANS; nothing reads AL, so nothing depends on Turbo Pascal's idea of where
-  the answer goes.
-  -------------------------------------------------------------------------- }
 
 { --------------------------------------------------------------------------
   Morph_CheckKey (1139:02e0) -- ASSEMBLER, AND IT RETURNS IN DX.

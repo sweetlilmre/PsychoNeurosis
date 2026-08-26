@@ -151,10 +151,6 @@ begin
     SetRGB(I + 100, I, 0, 0);
 end;
 
-{ --------------------------------------------------------------------------
-  1095:0578 -- the sixteen paths, and two fans of lines behind them.
-  -------------------------------------------------------------------------- }
-
 { NO LOCAL. The frame is ENTER $04 -- two bytes for the function result and
   two for the FPU status word the comparisons spill -- so there is no room
   for a variable, and assigning the function name directly is what fits.
@@ -165,23 +161,6 @@ begin
   if X < 0.0 then Sign := -1;     { 1095:015b }
   if X = 0.0 then Sign :=  0;     { 1095:0180 }
 end;
-
-{ --------------------------------------------------------------------------
-  1095:01a0 -- walk a line from (X, Y) to (X2, Y2) and record the screen
-  offsets of the points that survive the thinning into lane `Lane`.
-
-  Ordinary Bresenham, except:
-
-  - it is done in six-byte Reals, including Int(Major / 2) for the initial
-    error;
-  - a point is only RECORDED when a running total exceeds 1.0, and the amount
-    added each step starts at 1.3 and loses 0.005 every time a point is
-    recorded, so the spacing widens as the path runs;
-  - the recorded slot is zeroed FIRST and only overwritten if the point is
-    inside the window, so 0 doubles as "nothing here";
-  - it gives up at 200 recorded points, and the window it clips to is not the
-    screen: Y must be above 16, not above 0.
-  -------------------------------------------------------------------------- }
 
 { --------------------------------------------------------------------------
   1095:01a0 -- walk a line from (X, Y) to (X2, Y2) and record the screen
@@ -277,17 +256,6 @@ begin
 end;
 
 { --------------------------------------------------------------------------
-  1095:0614 -- unpack one glyph into the dot table.
-
-  The font is 16 x 16 bytes per character from space onwards. It is written
-  into the dot table TRANSPOSED AND MIRRORED -- lane (16 - Row), position
-  (16 - Col) -- so each lane ends up holding one row of the letter, which is
-  what makes the letter arrive a row at a time.
-
-  Row starts at TWO, not one, so the top row of every glyph is dropped.
-  -------------------------------------------------------------------------- }
-
-{ --------------------------------------------------------------------------
   1095:0578 -- the sixteen paths, and two fans of lines behind them.
   -------------------------------------------------------------------------- }
 procedure DrawFrame;
@@ -328,15 +296,6 @@ begin
     for Col := 1 to 16 do                        { 1095:0622 }
       Dots^[17 - Row, 17 - Col] := Font^[Ch, Row, Col];   { 1095:0649 }
 end;
-
-{ --------------------------------------------------------------------------
-  1095:067d -- stream one string in.
-
-  The plotting loop is HAND ASSEMBLER and the equivalent Pascal is below it.
-  SI is a single running index from 1 to 3200 that walks the path table and
-  the dot table TOGETHER -- it is not reset per lane, and the lane loop only
-  exists to do the shift at the end of each 200.
-  -------------------------------------------------------------------------- }
 
 { --------------------------------------------------------------------------
   1095:067d -- stream one string in.
@@ -469,14 +428,6 @@ begin
     end;
   end;
 end;
-
-{ --------------------------------------------------------------------------
-  1095:000d -- the assets.
-
-  ASSETS  NEUROSIS.DAT $001743E5:
-            15,104 bytes  the font, 59 glyphs of 16 x 16, from space onwards
-            768 bytes     the palette
-  -------------------------------------------------------------------------- }
 
 { 1095:07d4 -- the scene. }
 procedure Scene1;

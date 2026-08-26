@@ -276,14 +276,6 @@ begin
 end;
 
 { --------------------------------------------------------------------------
-  Sprites_FadeStep (125e:047a) -- one step of a 64-step fade IN.
-
-  Waits for retrace, then for all 256 entries reads the current RGB back off
-  the DAC and increments each channel that is still below its target. Called
-  once a frame during the fly-in and 64 times before the closing sweep.
-  -------------------------------------------------------------------------- }
-
-{ --------------------------------------------------------------------------
   Sprites_Load (125e:012e)
 
   ASSETS  NEUROSIS.DAT $11EEC0, 14,862 bytes in six reads:
@@ -486,20 +478,6 @@ asm
 end;
 
 { --------------------------------------------------------------------------
-  Sprites_DrawChar (125e:0000) -- compiled Pascal in the binary, so it is
-  Pascal here.
-
-  Draws a string with the 5x5 font at (X, Y), six pixels of pitch, in colour
-  50. Note that the glyph's ROW index becomes the screen X and its COLUMN
-  index becomes the screen Y -- the font is stored transposed, and the
-  original plots it that way round (125e:0083 and 125e:008f).
-
-  It takes a String even though every call site passes a single character;
-  the compiler's Char-to-String helper at 1000:6fd7 does the conversion into
-  a stack temporary, which is what the ENTER $10A is mostly reserving.
-  -------------------------------------------------------------------------- }
-
-{ --------------------------------------------------------------------------
   Sprites_FadeOut (125e:0406) -- the fade to black after each caption block.
 
   Sixty-four passes over the whole DAC, each one decrementing every channel
@@ -523,38 +501,6 @@ begin
       SetRGB(I, R, G, B);
     end;
 end;
-
-{ --------------------------------------------------------------------------
-  Sprites_Load (125e:012e)
-
-  ASSETS  NEUROSIS.DAT $11EEC0, 14,862 bytes in six reads:
-            assets/part003/font_5x5.bin          1,550 B, the 5x5 bitmap font
-            assets/part003/sprite1.png / .bin    3,136 B = 56x56 portrait
-            assets/part003/sprite2.png / .bin    3,136 B
-            assets/part003/sprite3.png / .bin    3,136 B
-            assets/part003/sprite4.png / .bin    3,136 B
-            assets/part003/sprites_palette.pal     768 B
-          The four 3,136-byte reads sit in a loop in the original; 3136 =
-          56*56 is what fixes the sprite dimensions, and rendering them at
-          that size shows the four Asphyxia members.
-          See docs/13-part3-scene7-sprites.md.
-
-  It then builds both lookup tables and blanks the DAC, so the scene starts
-  from black no matter what the previous one left behind.
-
-  THE 65535 BIAS. The wobble table is built as
-
-      Round(sin(a) * 39.6 + 65535.0) mod 65535
-
-  which looks pointless until you follow a negative value through it. For
-  sin(a) = -1 that is Round(65495.4) = 65495; 65495 mod 65535 is still
-  65495, and storing that LongInt into an Integer keeps the low word --
-  $FFD7, which is -41. The bias and the modulo together are how the original
-  gets a signed result out of Round without ever handing Round a negative:
-  positive values come back unchanged, negative ones wrap round through the
-  word. It is reproduced here as written; it needs range checking off, which
-  is Borland's default.
-  -------------------------------------------------------------------------- }
 
 { --------------------------------------------------------------------------
   Sprites_FadeStep (125e:047a) -- one step of a 64-step fade IN.
@@ -587,15 +533,6 @@ begin
     SetRGB(I, R, G, B);                          { 125e:04f4 }
   end;
 end;
-
-{ --------------------------------------------------------------------------
-  Sprites_FadeOut (125e:0406) -- the fade to black after each caption block.
-
-  Sixty-four passes over the whole DAC, each one decrementing every channel
-  that has not reached zero yet. The retrace wait at 125e:040a is OUTSIDE
-  both loops -- it happens once, not once per pass -- so this is not a
-  timed fade; it runs as fast as the DAC will take it.
-  -------------------------------------------------------------------------- }
 
 { --------------------------------------------------------------------------
   Sprites_Prepare (125e:0550) -- one member's introduction, all three phases.
@@ -684,20 +621,6 @@ begin
   Delay(PostDelay);                              { 125e:0770 }
   FadeOut;                                       { 125e:0775 }
 end;
-
-{ --------------------------------------------------------------------------
-  Sprites_Run (125e:077c)
-
-  The four introductions in turn, then all four portraits at once sweeping
-  down the screen. The four DrawRotated calls are written out longhand in the
-  original rather than looped -- 125e:0838, 0885 and 08d2 hold the literal
-  70, 140 and 210 -- so they are longhand here too.
-
-  X is fixed for the whole sweep and Y is what moves: Sweep runs -20..120 and
-  the position is Sweep*2, so the group travels from Y = -40 to Y = 240,
-  entering off the top and leaving off the bottom. DrawRotated clips to rows
-  1..189, so most of each end of the run is off-screen.
-  -------------------------------------------------------------------------- }
 
 { --------------------------------------------------------------------------
   Sprites_Run (125e:077c)

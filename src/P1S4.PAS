@@ -440,17 +440,6 @@ procedure Project(var X, Y, Z : LongInt);               external; { 1107:1A04 }
   had local copies of both. 1107:052E calls 1483:0099, the ROUNDING one. }
 
 { --------------------------------------------------------------------------
-  1107:0446 -- Transform(Base; A1, A2, A3)
-
-  For entries 1..145: copy the 13-byte record out, rotate it, add the
-  TRANSLATION held in entry 0, project, and write the 7-byte output record.
-
-  Note what is NOT rotated: entry 0. The loop starts at 1, and the add at
-  1107:04bf reads ES:[DI], ES:[DI+4], ES:[DI+8] with DI still pointing at the
-  base of the array -- entry 0. It is the object position, not a point.
-  -------------------------------------------------------------------------- }
-
-{ --------------------------------------------------------------------------
   1107:0025 -- Banner_Load. NEUROSIS.DAT $03A8E0, four reads:
 
       3,776   the font, 59 glyphs of 8 x 8         -> DS:$7233
@@ -536,19 +525,6 @@ begin
 
   SetPalette768(@Pal);                { 1107:0000 }
 end;
-
-{ --------------------------------------------------------------------------
-  1107:0977 -- Demo_Scene4
-
-      Scale := (ScreenWidth / 2) * 10          = 1600.0, into DS:$0018
-      StarInit(8, 9, 10, 1)                    12b2:0000
-      Banner_Load                              1107:0025
-      Banner_BuildPoints                       1107:07a2
-      Banner_Run                               1107:076e
-
-  The two constants are single-precision at CS:$096F = 2.0 and CS:$0973 = 10.0.
-  With Z = 2000 that puts the grid across x 88..224 and y 74..119.
-  -------------------------------------------------------------------------- }
 
 { --------------------------------------------------------------------------
   1107:0446 -- Transform(Base; A1, A2, A3)
@@ -641,13 +617,6 @@ end;
   pointer-typed value emits PUSH [BP+6] / PUSH [BP+4], six. The register-pair
   form is what Turbo Pascal uses for a VAR parameter's address, so the callee
   takes `var Arr : TOutArr` and the caller writes SortOutp(Arr^). }
-
-{ A `var` PARAMETER, NOT A POINTER, and the CALLER's two instructions decide it.
-  1107:03eb is LES DI,[BP+4] / PUSH ES / PUSH DI -- the pointer loaded into a
-  register pair and pushed from there, five bytes -- where passing a
-  pointer-typed value emits PUSH [BP+6] / PUSH [BP+4], six. The register-pair
-  form is what Turbo Pascal uses for a VAR parameter's address, so the callee
-  takes `var Arr : TOutArr` and the caller writes SortOutp(Arr^). }
 procedure SortOutp(var Arr : TOutArr);
 { 1107:03d7 -- A WRAPPER, and DepthSort is NESTED INSIDE IT. Four bytes of
   parameters and no locals: PUSH 1 / PUSH $90 / PUSH BP / CALL 0x287, and that
@@ -696,19 +665,6 @@ end;
   49 bytes each, into the 51-byte blob at DS:$80C4 + I*$33 -- past the (W, H)
   header, which Banner_Load already set to 7, 7.
   -------------------------------------------------------------------------- }
-
-{ --------------------------------------------------------------------------
-  1107:03e7 -- BuildBlobs(Out)
-
-  Sort by depth first (1107:03d7 calls DepthSort(1, 144)), then give every
-  record its sprite according to the flag the sort carried along with it:
-
-      flag <> 0  ->  DS:$5B9B   the lit profile
-      flag  = 0  ->  DS:$5B6A   the unlit profile
-
-  49 bytes each, into the 51-byte blob at DS:$80C4 + I*$33 -- past the (W, H)
-  header, which Banner_Load already set to 7, 7.
-  -------------------------------------------------------------------------- }
 procedure BuildBlobs(Arr : POutArr);
 var
   { ENTER 2, so one Integer -- 1107:03f3 is MOV WORD PTR [BP-2],1. }
@@ -721,21 +677,6 @@ begin
     else
       Move(ProfileA, Blob[I].Pix, BlobPixels);
 end;
-
-{ --------------------------------------------------------------------------
-  12b2:0000 -- StarInit(C0, C1, C2, Speed)
-
-  Demo_Scene4 pushes 8, 9, 10, 1 in that order, so the three colours are 8, 9
-  and 10 and the base speed is 1. Ninety stars, each given a random position
-  and one of three depth bands:
-
-      band 0   colour C0   dx := Speed
-      band 1   colour C1   dx := Speed * 2
-      band 2   colour C2   dx := Speed * 3
-
-  The earlier reconstruction never called this at all, so every star sat at
-  (0,0) in colour 0 and the starfield was invisible.
-  -------------------------------------------------------------------------- }
 
 { --------------------------------------------------------------------------
   12b2:0000 -- StarInit(C0, C1, C2, Speed)
@@ -858,33 +799,6 @@ end;
   Note the row TABLE, not a multiply: our previous transcription computed
   Y * ScrWidth, which is the same address by different code.
   -------------------------------------------------------------------------- }
-
-{ --------------------------------------------------------------------------
-  12b2:00f1 -- StarDraw(Segment). HAND ASSEMBLER, verbatim.
-
-  Every tell is present. There is no ENTER, only PUSH BP / MOV BP,SP, in a
-  segment whose other Pascal routine opens ENTER 6 -- so this one was not
-  compiled from Pascal. `MOV BX,0` is two bytes longer than the XOR the code
-  generator emits for a zeroed register. The loop is `DEC CX / JNE` against a
-  count loaded once with `MOV CX,$5A`, where a Pascal `for` would compare
-  against a limit. And the write is a bare STOSB with ES:DI walked by hand.
-
-  It is FAR: 12b2:011d is RETF 2, one Word of parameter.
-
-  BX carries the byte offset into the star array and advances by 9 -- the
-  record size -- so the three loads are one displacement apart from the array
-  base rather than three subscript computations. DX holds BX across the row
-  lookup, because BX is needed as the table index and there is no spare
-  register.
-
-  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
-
-      for I := 1 to StarCount do
-        Mem[Segment : YOfs[Star[I].Y] + Star[I].X] := Star[I].Colour;
-
-  Note the row TABLE, not a multiply: our previous transcription computed
-  Y * ScrWidth, which is the same address by different code.
-  -------------------------------------------------------------------------- }
 procedure StarDraw(Segment : Word); far; assembler;
 asm
   MOV  AX, Segment              { which screen -- $A000 or the virtual one   }
@@ -915,10 +829,6 @@ end;
   -------------------------------------------------------------------------- }
 { @asm 001 1107:0199 +170 Blit }
 {$I BLITCLIP.INC}
-
-{ [transcribed] 1107:0245 -- blit blobs 1..144. Note 145 is transformed and
-  given a sprite but never drawn; the loop counter is a BYTE ([BP-1], CMP
-  against $90 at 1107:027f) and so is declared one here. }
 
 { [transcribed] 1107:0245 -- blit blobs 1..144. Note 145 is transformed and
   given a sprite but never drawn; the loop counter is a BYTE ([BP-1], CMP
@@ -958,19 +868,6 @@ end;
   The grid is fixed in space; what travels along it is the lit state. That is
   why the message flows through the balls instead of the balls flying.
   -------------------------------------------------------------------------- }
-
-{ --------------------------------------------------------------------------
-  1107:059f -- ShiftTrails
-
-  Moves the FLAG byte only, never the coordinates:
-
-      for Row := 0 to 7 do
-        for J := 2 to 18 do
-          Work.Trail[Row*18 + J - 1].Flag := Work.Trail[Row*18 + J].Flag
-
-  The grid is fixed in space; what travels along it is the lit state. That is
-  why the message flows through the balls instead of the balls flying.
-  -------------------------------------------------------------------------- }
 procedure ShiftTrails(Arr : PTrail1);
 var
   { ENTER 2, so TWO BYTES and no third local. 1107:05a3 is
@@ -984,31 +881,6 @@ begin
     for J := 2 to TrailLen do
       Arr^[Row * TrailLen + J - 1].Flag := Arr^[Row * TrailLen + J].Flag;
 end;
-
-{ --------------------------------------------------------------------------
-  1107:0600 -- ShowString(S)
-
-  For every character, eight steps -- one per column of the 8 x 8 glyph. Each
-  step lights the head of all eight rows from that column of the glyph, shifts
-  every trail along, draws a frame and advances the angle by 6 degrees.
-
-  THE FONT INDEX. The original computes
-
-      Font[Ord(Ch) * 64 + Row * 8 + Step]     base DS:$6A2A
-
-  but Banner_Load reads the glyphs to DS:$7233, which is $809 = 2,057 bytes
-  higher. 2057 = 32*64 + 9, so the effective index is
-
-      (Ord(Ch) - 32) * 64 + (Row - 1) * 8 + (Step - 1)
-
-  -- a clean 8 x 8 glyph with a bias of 32, exactly like the font in scene 2.
-  59 glyphs covers $20..$5A, space through 'Z'. The earlier reconstruction
-  indexed by raw Ord and read 2K past the end of the font for any letter.
-
-  THE TRAIL HEAD is entry Row*18, i.e. the LAST entry of each row -- 1107:0685
-  computes Row * $12 * $D. New columns therefore enter at the right of the grid
-  and march left.
-  -------------------------------------------------------------------------- }
 
 { --------------------------------------------------------------------------
   1107:0600 -- ShowString(S)
@@ -1116,29 +988,6 @@ end;
 
       Work.Trail[0] := (0, 0, 2000)                 1107:094e
   -------------------------------------------------------------------------- }
-
-{ --------------------------------------------------------------------------
-  1107:07a2 -- Banner_BuildPoints
-
-  THE MISSING INITIALISER. Without it every trail coordinate is zero, all 144
-  balls project to the same pixel, and the scene shows one ball.
-
-  Eight row buffers at DS:$6A33 (stride $100) each get a copy of the SAME
-  literal, CS:$078B = 'OOOOOOOOOOOOOOOOOO'. The walk then emits a point for
-  every character equal to '*' (CS:$079E) or 'O' (CS:$07A0) -- and since every
-  character is 'O', all 144 are emitted and the '*' arm never fires. Whatever
-  the strings once spelled, by 1994 they were a plain rectangle.
-
-      Work.Trail[i].X := (Col - 1) * 10 - 90        1107:08c0
-      Work.Trail[i].Y := 32 - (Row - 1) * 8         1107:08dd
-      Work.Trail[i].Z := 0                          1107:08fe
-      Work.Trail[i].Flag := 0                       1107:090d
-
-  giving X over -90..80 in steps of 10 and Y over 32..-24 in steps of 8. The
-  counter stops at $91, and then entry 0 -- the translation -- is set:
-
-      Work.Trail[0] := (0, 0, 2000)                 1107:094e
-  -------------------------------------------------------------------------- }
 procedure BuildPoints;
 { NO DECLARED LOCALS, and the frame is how we know. ENTER $202 is 514 bytes and
   every one of them is a compiler temporary: [BP-2] holds the inner for-loop's
@@ -1200,21 +1049,6 @@ begin
   Work.Trail[0].Y := 0;                             { 1107:0956 }
   Work.Trail[0].Z := IntToFixed(2000);
 end;
-
-{ --------------------------------------------------------------------------
-  1107:0025 -- Banner_Load. NEUROSIS.DAT $03A8E0, four reads:
-
-      3,776   the font, 59 glyphs of 8 x 8         -> DS:$7233
-        768   palette                              -> DS:$672D
-         49   the unlit profile                    -> DS:$5B6A
-         49   the lit profile                      -> DS:$5B9B
-
-  Then blobs 2..144 get a copy of the UNLIT profile and blobs 1..144 get their
-  (W, H) header set to 7, 7 -- which is where the 7 x 7 size comes from.
-
-  1107:00b3..1107:0111 is a pair of loops that read each profile byte and, if
-  non-zero, write it straight back to itself. Dead code; left out.
-  -------------------------------------------------------------------------- }
 
 { --------------------------------------------------------------------------
   1107:0977 -- Demo_Scene4

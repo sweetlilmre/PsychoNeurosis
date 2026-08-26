@@ -766,21 +766,11 @@ end;
   100e:04e6 -- scene 1's own row table. The VGA unit has one; this scene does
   not use it, and builds its own at DS:$5dfe.
   -------------------------------------------------------------------------- }
-
-{ --------------------------------------------------------------------------
-  100e:04e6 -- scene 1's own row table. The VGA unit has one; this scene does
-  not use it, and builds its own at DS:$5dfe.
-  -------------------------------------------------------------------------- }
 procedure BuildRowTable;
 var I : Integer;
 begin
   for I := 0 to 199 do RowOfs[I] := I * 320;    { 100e:04f4, IMUL AX,I,$140 }
 end;
-
-{ --------------------------------------------------------------------------
-  100e:050b -- the 32 x 32 grid, centred on the origin and pushed back to
-  Z = 300 so the projection has something to divide by.
-  -------------------------------------------------------------------------- }
 
 { --------------------------------------------------------------------------
   100e:050b -- the 32 x 32 grid, centred on the origin and pushed back to
@@ -797,15 +787,6 @@ begin
     Grid[I].Z := RestZ;                               { 100e:055e }
   end;
 end;
-
-{ --------------------------------------------------------------------------
-  100e:056d -- turn the height map into Z values at a given threshold.
-
-  Anything at or below the threshold sits on the base plane; anything above it
-  is pulled TOWARDS the viewer by however far it clears the threshold. So
-  lowering the threshold raises more of the landscape, and that is the whole
-  animation.
-  -------------------------------------------------------------------------- }
 
 { --------------------------------------------------------------------------
   100e:056d -- turn the height map into Z values at a given threshold.
@@ -1014,13 +995,6 @@ begin
   end;
 end;
 
-{ --------------------------------------------------------------------------
-  100e:07a4 -- the scene.
-
-  ASSETS  NEUROSIS.DAT $00153DE5, three 1024-byte greyscale height maps read
-          back to back, each 32 x 32.
-  -------------------------------------------------------------------------- }
-
 { 100e:073c -- colours 1..45 get a blue ramp from 20 to 64. }
 procedure BuildRamp;
 var I : Byte;
@@ -1040,12 +1014,6 @@ begin
     Delay($32);
   end;
 end;
-
-{ --------------------------------------------------------------------------
-  100e:06ae -- sweep the threshold down from A to B and back up again,
-  redrawing the mesh at every step. Both loops are guarded, so an inverted
-  pair simply does nothing.
-  -------------------------------------------------------------------------- }
 
 { --------------------------------------------------------------------------
   100e:07a4 -- the scene.

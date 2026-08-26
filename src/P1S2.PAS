@@ -367,11 +367,6 @@ end;
   the routine names, so Row and Src were never variables -- both are expressions
   the compiler evaluates in place, and declaring them cost four bytes of frame
   and a store apiece. }
-
-{ ONE LOCAL, NOT THREE. 1082:0200 opens ENTER $02 and [BP-$02] is the only slot
-  the routine names, so Row and Src were never variables -- both are expressions
-  the compiler evaluates in place, and declaring them cost four bytes of frame
-  and a store apiece. }
 procedure DrawChar(Ch : Char; Phase, Index : Integer);
 var
   C : Integer;                     { [BP-$02], the whole frame }

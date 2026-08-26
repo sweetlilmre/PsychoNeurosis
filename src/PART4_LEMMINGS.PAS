@@ -535,10 +535,6 @@ end;
 { --------------------------------------------------------------------------
   1005:00a6 -- everything off NEUROSIS.DAT, and the title sequence.
   -------------------------------------------------------------------------- }
-
-{ --------------------------------------------------------------------------
-  1005:00a6 -- everything off NEUROSIS.DAT, and the title sequence.
-  -------------------------------------------------------------------------- }
 procedure LoadAssets;
 var
   { ENTER $686 -- 1,670 bytes -- and this routine declared 898. The arithmetic
@@ -832,26 +828,6 @@ end;
   The state handlers
   ========================================================================== }
 
-{ --------------------------------------------------------------------------
-  1005:14d6 -- state 1, walking.
-
-    1. look one row down, seven columns wide, for something to stand on
-         colour 3        -> DeathA
-         colour $12      -> state 9, FOR WHICH THERE IS NO HANDLER
-         colour $20..$29 -> DeathB
-         in Ground       -> stop looking, we are standing
-         nothing at all  -> Faller
-    2. rows Y-9..Y-4, three columns ahead: anything in Wall turns it round
-    3. rows Y-4..Y,   two columns ahead: anything in Wall is a step, and the
-       lemming climbs to just above it
-    4. move one pixel, and advance the animation every second tick
-
-  STATE 9 IS A DEAD END and it is the original's. UpdateAll's dispatch has no
-  arm for it, so a lemming that walks onto colour $12 stops being simulated
-  and stands there being drawn by whatever DrawSprite does with an unknown
-  state -- which is nothing. It is left in.
-  -------------------------------------------------------------------------- }
-
 { 1005:06c8 -- free every slot. }
 procedure InitAll;
 var
@@ -940,14 +916,6 @@ end;
   small negative offsets are. States 1 and 2 add FOUR to the frame index when
   facing left, so their banks hold the same animation twice, mirrored.
   -------------------------------------------------------------------------- }
-{ IT TAKES THE LEMMING, NOT ITS INDEX, and it has no locals at all. 1005:03b9
-  opens PUSH BP / MOV BP,SP with no ENTER, and every field access is
-  `LES DI, [BP+$04]` followed by `ES:[DI+n]` -- so the parameter is a four-byte
-  reference to the record and the routine reads through it. There is no F
-  either: 1005:03C7 is `IMUL DI, ES:[DI+$06], $78`, the frame read straight out
-  of the record at the point of use. A local F and an Integer index between them
-  accounted for twelve of this part's unaligned spans. }
-
 { 1005:07d8 -- free one, and only count it down if it was live. }
 procedure Remove(N : Integer);
 begin
@@ -1108,19 +1076,6 @@ end;
   the same six-frame bank read in opposite directions, and rotates the
   eight-entry colour cycle that DAC entries $80..$87 take.
   -------------------------------------------------------------------------- }
-
-{ --------------------------------------------------------------------------
-  1005:08ad -- one frame of the scroller.
-
-  The column counter advances by TWO because the bitmap slides two pixels a
-  frame, so every other column of each glyph is simply never written. The
-  message is therefore drawn at half its horizontal resolution -- which is
-  the original's behaviour, not a transcription slip.
-
-  It also runs the two 14 x 10 animations either side of the message, from
-  the same six-frame bank read in opposite directions, and rotates the
-  eight-entry colour cycle that DAC entries $80..$87 take.
-  -------------------------------------------------------------------------- }
 procedure ScrollStep;
 var
   { ONE BYTE, AND IT DOES BOTH JOBS. 1005:08ad opens ENTER $02 and the only slot
@@ -1249,18 +1204,6 @@ begin
 end;
 
 { --------------------------------------------------------------------------
-  1005:06e7 -- put one lemming in the first free slot.
-
-  The four `if Spawned = ...` arms are the choreography: at the 3rd, 5th,
-  65th and 80th lemming a SPECIFIC slot is given a trigger, so that when
-  whoever is in it reaches that pixel it is forced into a state. Slot 3
-  (DS:$034B) is sent tunnelling and then exploding, slot 1 (DS:$0321) does
-  the same later, and slot 5 (DS:$0375) is set digging.
-
-  That is how the set piece is staged: the lemmings are otherwise autonomous.
-  -------------------------------------------------------------------------- }
-
-{ --------------------------------------------------------------------------
   1005:0b68 -- state 2, falling.
 
   Looks one row down across seven columns. Landing on Ground turns it back
@@ -1338,19 +1281,6 @@ begin
   Lem[N].Frame := (Lem[N].Frame mod 4) + 1;
 end;
 
-
-{ --------------------------------------------------------------------------
-  1005:0df5 -- state 4, the DIAGONAL digger.
-
-  Erases a bite out of the hillside with colour 0 and, every sixth frame,
-  moves two pixels along and one down -- so it cuts a slope. It keeps going
-  only while there is still something in the WALL set in front of it; the
-  moment there is not, it becomes a walker again and the tunnel ends.
-
-  The two facings are not mirror images: leftward uses three DrawLine
-  strokes, rightward five VLines and an HLine. That asymmetry is the
-  original's.
-  -------------------------------------------------------------------------- }
 
 { --------------------------------------------------------------------------
   1005:0d1a -- state 5, building.
@@ -1556,19 +1486,6 @@ begin
 end;
 
 { --------------------------------------------------------------------------
-  1005:0d1a -- state 5, building.
-
-  Every third tick advances the animation, and on the sixth frame it steps up
-  and to the right and lays a five-pixel brick in colour $4D INTO THE
-  HILLSIDE -- so the staircase it builds is real terrain that other lemmings
-  can then walk on.
-
-  It only ever builds to the right: the step is +2 X regardless of facing.
-  After 500 ticks it gives up, becomes a walker and sets a 20-frame timer,
-  which UpdateAll turns into a fuse.
-  -------------------------------------------------------------------------- }
-
-{ --------------------------------------------------------------------------
   1005:14d6 -- state 1, walking.
 
     1. look one row down, seven columns wide, for something to stand on
@@ -1699,18 +1616,6 @@ Move:
     Lem[N].Frame := (Lem[N].Frame mod 4) + 1;
 end;
 
-{ --------------------------------------------------------------------------
-  1005:0b68 -- state 2, falling.
-
-  Looks one row down across seven columns. Landing on Ground turns it back
-  into a walker unless it has fallen 11 pixels or more, in which case the
-  SECOND such landing splats it -- the first is survived and counted.
-  Landing on the $20..$29 hazard stripe is always fatal.
-
-  While it has nothing under it, it drifts one pixel in its facing direction
-  for the first two rows of the fall only, then drops straight.
-  -------------------------------------------------------------------------- }
-
 { 1005:17ff -- state 8. On the fourth frame it stamps the last splat picture
   PERMANENTLY into the hillside and removes itself, so the mark stays. }
 procedure Splat(N : Integer);
@@ -1772,19 +1677,6 @@ begin
     if Lem[N].Frame > 5 then SetState(N, StExplode);
   end;
 end;
-
-{ --------------------------------------------------------------------------
-  1005:1954 -- state 11, the explosion.
-
-  While the fireball is in its first nine frames it runs five passes bumping
-  DAC entries $E0..$E9 one step up toward the scene palette. LoadAssets
-  deliberately BLACKED those ten entries after loading, so this is what
-  lights the explosion: the picture is already on screen in colours nobody
-  can see until the flash brings them up.
-
-  Past frame 15 it sets the timer to -60 and holds the frame, and UpdateAll
-  counts that back up to -1 and removes the lemming.
-  -------------------------------------------------------------------------- }
 
 { --------------------------------------------------------------------------
   1005:1954 -- state 11, the explosion.
@@ -1876,14 +1768,6 @@ end;
   handler runs, so a lemming is drawn in the state it was in at the start of
   the frame and moves afterwards.
   -------------------------------------------------------------------------- }
-
-{ --------------------------------------------------------------------------
-  1005:1a4c -- one pass over every slot.
-
-  The trigger test, the timer and the draw all happen BEFORE the state
-  handler runs, so a lemming is drawn in the state it was in at the start of
-  the frame and moves afterwards.
-  -------------------------------------------------------------------------- }
 procedure UpdateAll;
 var
   N : Integer;
@@ -1933,12 +1817,6 @@ begin
     end;
   end;
 end;
-
-{ --------------------------------------------------------------------------
-  1005:0a4f -- the hillside's own animation, three frames of 43 x 24 at
-  (113, 50), stepping every fourth tick. Nothing to do with the lemmings; it
-  just shares the frame loop.
-  -------------------------------------------------------------------------- }
 
 { --------------------------------------------------------------------------
   1005:1bbb -- the frame loop.
@@ -2012,17 +1890,6 @@ begin
   FillChar(ScrollBuf^, ScrollSize, 0);
   WorkSeg := Seg(WorkScr^);
 end;
-
-{ --------------------------------------------------------------------------
-  1005:1bbb -- the frame loop.
-
-  IT DOES NOT EXIT ON A KEY. A keypress -- or the last lemming dying -- only
-  starts the ending: from then on every frame fades the palette one step and
-  drops the tracker volume TWICE, and the loop ends when the volume reaches
-  zero. So how long the scene runs past the keypress depends on how loud the
-  music was, and with no tracker resident GetVolume returns 0 and it stops on
-  the first frame.
-  -------------------------------------------------------------------------- }
 
 { --------------------------------------------------------------------------
   1005:1cd6 -- Demo_Main.

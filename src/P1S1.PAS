@@ -536,13 +536,6 @@ const
   `assembler`, Turbo Pascal drops the frame for a routine with no parameters
   and no locals, and the transcription then differs from the binary at both
   ends while being identical in between. }
-
-{ NOT `assembler`. The original opens PUSH BP / MOV BP,SP and closes LEAVE,
-  a stack frame it neither needs nor uses -- which is what a plain Pascal
-  procedure whose body happens to be one asm block compiles to. Declared
-  `assembler`, Turbo Pascal drops the frame for a routine with no parameters
-  and no locals, and the transcription then differs from the binary at both
-  ends while being identical in between. }
 procedure ScrollLeft;
 begin
 asm
@@ -572,19 +565,6 @@ end;
                                                ASPHYXIA logo with reflection
           See docs/14-part001-intro.md.
   -------------------------------------------------------------------------- }
-{ --------------------------------------------------------------------------
-  1012:03e3 -- Bounce_Run.
-
-  ITS FRAME IS ENTER $54 AND THAT IS THE WHOLE DECLARATION LIST: 2 + 4 * 20 is
-  82, and 84 with the two bytes of padding. So the file record and the frame
-  counter that used to share this routine cannot be here -- the file work
-  belongs to Scene1 below, and Frame is a unit-level var.
-
-  The offsets give the order, first declared nearest BP. Which array is which
-  came from the BOUNDS TESTS rather than any name: the one checked against 299
-  is X and the one checked against 179 is Y.
-  -------------------------------------------------------------------------- }
-
 { --------------------------------------------------------------------------
   1012:03e3 -- Bounce_Run.
 
@@ -701,10 +681,6 @@ begin
     if Frame > ScrollFrom then ScrollLeft;    { 1012:05a7 }
   end;                                        { 1012:05b1 }
 end;
-
-{ --------------------------------------------------------------------------
-  The scene: load, draw the frame, then hand over to BounceRun.
-  -------------------------------------------------------------------------- }
 
 { TWO PARAMETERS, NEITHER OF WHICH THE BODY READS, and ENTER $482 is what
   found them. 1012:065a closes with RET 8, so eight bytes of arguments; the

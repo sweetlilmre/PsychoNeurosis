@@ -270,12 +270,6 @@ asm
   LOOP @@Next                { 1015:0049                                 }
 end;
 
-{ --------------------------------------------------------------------------
-  Tunnel_RotateBandsFine (1015:017f)
-  Rotates each 15-colour band left by one, independently, in all three tables.
-  Unrolled in the original -- fifteen explicit moves per band.
-  -------------------------------------------------------------------------- }
-
 { UNROLLED PER TABLE, and no nested procedure and no Move. The original is
   three groups of three loops -- save the last band, shift everything up by one
   band, put the saved band at the front -- written out once for each table.
@@ -323,27 +317,6 @@ end;
   pixels share a byte address across the planes) and fine pan via Attribute
   Controller register $13. Together they give single-pixel smooth scrolling.
   -------------------------------------------------------------------------- }
-{ HAND ASSEMBLER, transcribed verbatim. The tell is the CRTC pair: the
-  original loads Addr into BX ONCE and writes both halves as 16-bit OUT
-  DX,AX -- index in AL, data in AH -- reusing BH then BL. Turbo Pascal has
-  no way to say that: PortW with `$0C or (Hi(Addr) shl 8)` does emit the
-  16-bit OUT, and then builds the word as MOV AL / XOR AH,AH / SHL AX,8 /
-  OR AX,$000C -- eleven bytes where the original spends four. Measured.
-  The attribute-controller tail is the same story: AND BL,3 / SHL BL,1 /
-  MOV AL,BL rather than working in AL throughout.
-
-  The frame is ENTER 4 for three bytes of declarations, so [BP-4] is the
-  compiler's padding. Dummy is never stored -- the $3DA read at 1015:06e1
-  discards AL -- but it is declared, because it is what puts Addr at [BP-2].
-
-  FOR REFERENCE ONLY, the equivalent Pascal -- not what the binary does:
-    Addr := LogicalWidth * Y * 2 + (X shr 2);
-    Port[$3D4] := $0C; Port[$3D5] := Hi(Addr);
-    Port[$3D4] := $0D; Port[$3D5] := Lo(Addr);
-    Dummy := Port[$3DA];  Port[$3C0] := $13;
-    Port[$3C0] := (X and 3) shl 1;  Port[$3C0] := $20;
-}
-
 { --------------------------------------------------------------------------
   Tunnel_RotateBandsFine (1015:017f)
   Rotates each 15-colour band left by one, independently, in all three tables.
@@ -421,19 +394,6 @@ end;
   Rotates the whole 225-entry table right by one complete band: the last 15
   entries are saved, everything shifts up by 15, the saved block goes to front.
   -------------------------------------------------------------------------- }
-{ UNROLLED PER TABLE, and no nested procedure and no Move. The original is
-  three groups of three loops -- save the last band, shift everything up by one
-  band, put the saved band at the front -- written out once for each table.
-  1015:004d opens ENTER 2, so the ONLY local is the loop counter: a nested
-  RotateWholeTable(var T) would need a frame for the parameter and a Tmp array,
-  and Move would appear as far calls that are not there.
-
-  The loop bounds are read off the compares. 1015:006e tests $0f, so the save
-  runs 1 to 15. 1015:0074 seeds $d2 = 210 and 1015:0079 jumps PAST the DEC, so
-  the shift body runs with I = 210 first and 1015:0091 stops it at 1 -- 210
-  iterations, downto. Same shape as RotateBandsFine, which cost 1,145 bytes of
-  the walk for the same reason before it was unrolled. }
-
 { --------------------------------------------------------------------------
   Tunnel_InitTables (1015:0654)
   -------------------------------------------------------------------------- }
@@ -476,22 +436,6 @@ end;
           centre -- that is a stride artefact, not the artwork.
           See docs/06-part3-scene1-tunnel.md.
   -------------------------------------------------------------------------- }
-{ NO PARAMETER, NO LOOP, AND THE BUFFER IS VGA'S VIRTUAL SCREEN.
-
-  1015:09c0 calls this with nothing pushed, so it takes no argument. The buffer
-  it reads into is the far pointer at DS:$E76C and the segment it copies from is
-  the word at DS:$E770 -- which are VGA's VirtScr and VirtScrSeg, allocated by
-  VirtScrAlloc in the part's main body long before scene 1 runs. So Scene1 needs
-  no GetMem of its own, and it has none: 1015:098d goes straight from ENTER to
-  the LogicalWidth store.
-
-  UNROLLED FOUR TIMES, not a loop. 1015:08d5 pushes 0 and 1015:08ff pushes 1 as
-  separate immediates, with the whole read-and-copy written out for each plane;
-  a `for Plane := 0 to 3` needs a counter and there is no local to hold one.
-
-  And the copy is CopyScreen (12f8:00ad), not a Move: 1015:08fa is a far call
-  into the VGA unit with VirtScrSeg and $A000 pushed. }
-
 { HAND ASSEMBLER, transcribed verbatim. The tell is the CRTC pair: the
   original loads Addr into BX ONCE and writes both halves as 16-bit OUT
   DX,AX -- index in AL, data in AH -- reusing BH then BL. Turbo Pascal has
@@ -562,15 +506,6 @@ begin
     OUT  DX, AL         { 1015:06f5                                      }
   end;
 end;
-
-{ --------------------------------------------------------------------------
-  Tunnel_UpdateMotion (1015:075a)
-
-  The window spirals inward: it turns 3 degrees per frame (a full revolution
-  every 120 frames) while the radius decays 0.1 per frame from 100 down to 1.
-  That is ~990 frames of travel and roughly eight revolutions, so the tunnel
-  mouth appears to swing round and slowly settle to centre.
-  -------------------------------------------------------------------------- }
 
 { --------------------------------------------------------------------------
   Tunnel_UpdateMotion (1015:075a)
