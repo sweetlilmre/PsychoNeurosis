@@ -346,6 +346,20 @@ begin
   end;
   ScrollY := 1;                                  { 100f:05b8 }
   Frame   := 0;                                  { 100f:05be }
+  { CRT'S DirectVideo, TURNED OFF, and the identification came from its other
+    two sites rather than from here. The byte at DS:$986C is written three times
+    in the original and our build already had two of them, because they are
+    Crt's own: 1217:0129 sets it to 1 in that unit's initialisation, alongside
+    the window and text-attribute globals it sets at $986D..$9878, and
+    1217:0460 tests it against 0 inside the character-output loop -- CMP, then
+    JNE to a different routine, with the fall-through doing MOV AL,ES:[DI] /
+    CALL / INC DI / LOOP. A Boolean at the head of Crt's data, set true by its
+    init and read to choose between writing screen memory directly and going
+    through the slow path, is DirectVideo and nothing else.
+
+    Turning it off matters in mode 13h: a Write that goes straight to text
+    memory lands in the middle of the graphics screen. }
+  DirectVideo := False;                          { 100f:05c4 }
 
   AnimSeg := Seg(Anim^);                         { 100f:05c9 }
   DGroup  := DSeg;                               { 100f:05d3 }
