@@ -37,7 +37,7 @@ binpath = "C:\\TP\\BIN"
 # CD 3x emulator interrupts, but that is a POST-BUILD PATCH rather than a
 # compile option, and dropping $E risks an unhandled INT 34h on any path the
 # RTL does not patch.
-switches = "/ED: /UD:;C:\\TP\\UNITS /ID:;D:\\GEN /$S-"
+switches = "/ED: /UD:;C:\\TP\\UNITS /ID:;D:\\GEN /$S- /GD"
 
 [compiler.tp6]
 # For SETTLING a compiler-version question, not for building the demo.
