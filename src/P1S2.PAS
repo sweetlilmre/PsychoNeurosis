@@ -46,7 +46,18 @@ const
   FontBias    = 8209;              { = 32*256 + 17, see DrawChar }
 
 type
-  TWorkBuf   = array[0..5199] of Byte;
+  { TWO-DIMENSIONAL, AND THE FOLDED -$1B IS THE WHOLE ARGUMENT. DrawChar writes
+    it at 1082:0249 and 02a3 as LES DI,[$56CE] / ADD DI,AX / ADD DI,DX /
+    MOV ES:[DI-$1B],$79 -- TWO register terms added to the pointer and the
+    constant folded into the displacement. A one-dimensional array folds
+    nothing, so the -27 has to be computed, which is what ours did: it summed
+    the row term, the column term and -27 into AX before touching DI.
+
+    For array[1..R, 1..26] element (i, j) sits at base + i*26 + j - 27, and
+    27 is exactly 1*26 + 1 -- the two low bounds. 200 rows of 26 is 5,200,
+    which is the size this was declared flat as. The blur does not care: it is
+    assembler and walks the buffer as bytes off LES DI. }
+  TWorkBuf   = array[1..200, 1..26] of Byte;
   { ONE-BASED AND TWO-DIMENSIONAL, and the fold at the blit call says so.
     1082:0396 is IMUL AX,AX,$C30 -- the frame number times 3,120 -- and then
     1082:03a0 is ADD DI,$F3D0, which as a signed word is MINUS 3,120: one
@@ -245,10 +256,10 @@ var
 begin
   for C := 1 to 16 do              { 1082:0204 }
     if FontBuf^[Ch, Phase, C] <> 0 then                        { 1082:022b }
-      WorkBuf^[C + 5 + ((Index - 1) * 17 + Phase + 1) * 26 - 27] := 121;
+      WorkBuf^[(Index - 1) * 17 + Phase + 1, C + 5] := 121;   { 1082:0249 }
   for C := 1 to 16 do
     if FontBuf^[Ch, Phase + 1, C] <> 0 then
-      WorkBuf^[C + 5 + ((Index - 1) * 17 + Phase + 2) * 26 - 27] := 121;
+      WorkBuf^[(Index - 1) * 17 + Phase + 2, C + 5] := 121;   { 1082:02a3 }
 end;
 
 { --------------------------------------------------------------------------
