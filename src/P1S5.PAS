@@ -1091,7 +1091,10 @@ begin
       REP  MOVSB            { and the picture follows, starting at row W/320 }
       POP  DS               { restore our data segment                      }
     end;
-    Inc(W, 640);
+    { LONGHAND: 12c5:0a4e is MOV AX,[BP-4] / ADD AX,$280 / MOV [BP-4],AX --
+      loaded, added in the register, stored back -- where `Inc` on a local emits
+      ADD WORD PTR in place. }
+    W := W + 640;
   until W >= 64000;
 end;
 

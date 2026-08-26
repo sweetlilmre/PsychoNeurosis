@@ -1022,7 +1022,10 @@ begin
         ADD WORD PTR [Angle],$3C, which is five. See the wiki's `Inc is not an
         assignment`. }
       Angle := Angle + BannerStep;               { 1107:06ca }
-      if Angle > AngleWrap then Dec(Angle, AngleWrap);
+      { LONGHAND for the wrap too: 1107:06db is MOV AX,[Angle] / SUB AX,$E10 /
+        MOV [Angle],AX where `Dec` emits SUB WORD PTR in place. The increment
+        just above it is already longhand in both. }
+      if Angle > AngleWrap then Angle := Angle - AngleWrap;
 
       if KeyPressed then Exit;              { 1107:06e4 }
     end;
