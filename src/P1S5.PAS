@@ -282,36 +282,6 @@ begin
 end;
 
 { --------------------------------------------------------------------------
-  12c5:03a2 -- Obj_Translate(Obj, D1, D2, D3)
-
-  Reads straight off the three blocks: D1 goes to object+$4B0 (X), D2 to +$4B4
-  (Y), D3 to +$4B8 (Z), each ADDED, each via IntToFixed. It accumulates.
-  -------------------------------------------------------------------------- }
-procedure ObjTranslate(AObj : PObj; DX_, DY_, DZ_ : Integer);
-var
-  { P IS AT [BP-5], WHICH IS ODD, AND A FOUR-BYTE POINTER DECLARED FIRST WOULD
-    BE AT [BP-4]. So one byte is declared ahead of it and never touched: the
-    frame is ENTER $06 -- 1 + 4 = 5, rounded to 6 -- and 12c5:03ad stores DI at
-    [BP-5] with 12c5:03b0 storing ES at [BP-3]. An earlier note here blamed the
-    odd offset on the unit's A-minus switch; alignment does not shift a pointer to an odd
-    address, it only stops one being padded to an even one. }
-  Spare : Byte;                           { [BP-$1], never touched }
-  P : PPoint3;                            { [BP-$5] }
-begin
-  { 12c5:03a6..03b0 -- the translation's ADDRESS is taken ONCE into a local
-    pointer and all three components go through it. Reaching AObj^.Pos three
-    times is the same arithmetic and reloads the far pointer each time. }
-  P := @AObj^.Pos;
-  { The same assignment form, and here the ORDER of the operands is visible
-    too: 12c5:03b6 calls IntToFixed and then does ADD AX,ES:[DI], so the call
-    is the LEFT operand and the field is added to its result. Written the other
-    way round the compiler loads the field first and the two disagree. }
-  P^.X := IntToFixed(DX_) + P^.X;
-  P^.Y := IntToFixed(DY_) + P^.Y;
-  P^.Z := IntToFixed(DZ_) + P^.Z;
-end;
-
-{ --------------------------------------------------------------------------
   12c5:1b2d -- Project(var X, Y, Z)
 
   Byte-for-byte the same routine as scene 4's 1107:1a04. The divisor is
@@ -479,6 +449,50 @@ begin
 
   for I := 1 to PtCount do
     TransformPoint(AObj^.Pt[I], A1, A2, A3, TX, TY, TZ, I);   { 12c5:0393 }
+end;
+
+{ --------------------------------------------------------------------------
+  12c5:03a2 -- Obj_Translate(Obj, D1, D2, D3)
+
+  Reads straight off the three blocks: D1 goes to object+$4B0 (X), D2 to +$4B4
+  (Y), D3 to +$4B8 (Z), each ADDED, each via IntToFixed. It accumulates.
+  -------------------------------------------------------------------------- }
+procedure ObjTranslate(AObj : PObj; DX_, DY_, DZ_ : Integer);
+var
+  { P IS AT [BP-5], WHICH IS ODD, AND A FOUR-BYTE POINTER DECLARED FIRST WOULD
+    BE AT [BP-4]. So one byte is declared ahead of it and never touched: the
+    frame is ENTER $06 -- 1 + 4 = 5, rounded to 6 -- and 12c5:03ad stores DI at
+    [BP-5] with 12c5:03b0 storing ES at [BP-3]. An earlier note here blamed the
+    odd offset on the unit's A-minus switch; alignment does not shift a pointer to an odd
+    address, it only stops one being padded to an even one. }
+  Spare : Byte;                           { [BP-$1], never touched }
+begin
+  { A `with`, AND NOT A DECLARED POINTER, and two bytes separate them. Both
+    spellings put a four-byte address at [BP-5] and both give ENTER $06, so the
+    frame cannot tell them apart -- the LOAD can. 12c5:03a9 is
+
+        ADD  DI, $4B0        adjust the pointer LES already put in DI
+        MOV  [BP-5], DI      and store DI and ES as they stand
+        MOV  [BP-3], ES
+
+    which is a `with` capturing the record's address in place. `P := @AObj^.Pos`
+    with P a declared pointer has to produce the address as a VALUE, so it
+    emits LEA AX, ES:[DI+$4B0] / MOV DX, ES and stores AX and DX instead --
+    same four bytes at the same offset, two bytes longer, and it was the last
+    difference in this segment.
+
+    The Spare byte above is still needed: a `with` temp alone would sit at
+    [BP-4]. }
+  with AObj^.Pos do
+  begin
+    { The ORDER of the operands is visible here: 12c5:03b6 calls IntToFixed and
+      then does ADD AX,ES:[DI], so the call is the LEFT operand and the field
+      is added to its result. Written the other way round the compiler loads
+      the field first and the two disagree. }
+    X := IntToFixed(DX_) + X;
+    Y := IntToFixed(DY_) + Y;
+    Z := IntToFixed(DZ_) + Z;
+  end;
 end;
 
 { --------------------------------------------------------------------------
