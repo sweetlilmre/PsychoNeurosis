@@ -256,6 +256,22 @@ var
   { DS:$5B6A and DS:$5B9B, 49 bytes each -- 1107:00c6 and 00ed fold them as
     [DI+$5B69] and [DI+$5B9A] with DI = Ord(ch), which is a 1-based byte array
     in each case, and the 49 between the two bases is BlobPixels. }
+  { THE ONE-BYTE FOLD DIFFERENCE HERE HAS SURVIVED TWO ATTEMPTS, both of which
+    measured WORSE, and they are recorded so nobody spends a third.
+
+    The original folds these as [DI+$5B69] and [DI+$5B9A], so its second profile
+    begins at $5B9B -- immediately after a 49-byte first one, on an ODD boundary.
+    Ours emits [DI+$5B9B], one byte high, because Turbo Pascal's default word
+    alignment pads a 49-byte array to 50. Both attempts at that byte:
+
+      byte alignment for the whole unit      21100 -> 21093 aligned (-7)
+      one `array[1..2, 1..BlobPixels]`       21100 -> 21087 aligned (-13)
+
+    The directive is not local to these two names and cost four other places
+    what it gained here. The two-row array reaches the same two folds on paper --
+    row 1 at base-1 = $5B69 and row 2 at base+48 = $5B9A, both exact -- and cost
+    more still, so something about the Move and BlockRead call sites pays for it.
+    One byte, and the two cheap explanations are spent. }
   ProfileA, ProfileB : array[1..BlobPixels] of Byte;
   { DS:$5BD8 -- entry 0 is the translation, 1..144 are the grid. The fold at
     1107:068b is IMUL AX,AX,$12 then IMUL DI,AX,$D -- eighteen columns of
@@ -944,6 +960,14 @@ begin
     if ProfileB[I] <> 0 then ProfileB[I] := ProfileB[I];   { 1107:00ed }
   end;
 
+  { BLOB 1 IS FILLED ON ITS OWN, BEFORE THE LOOP, and the loop then starts at 2.
+    1107:0113 pushes ProfileA and the ABSOLUTE address $80F7 -- not a computed
+    one -- with a count of $31, and only after that call does 1107:0124 set the
+    counter to 2. $80F7 is Blob[1].Pix exactly: Blob begins at $80F5 and Pix is
+    two bytes into the record, past the (W, H) header. So the first blob is
+    written by a statement of its own and blobs 2..144 by the loop, which
+    together is every blob -- redundant, and what ships. }
+  Move(ProfileA, Blob[1].Pix, BlobPixels);       { 1107:0113 }
   for I := 2 to TrailCount do
     Move(ProfileA, Blob[I].Pix, BlobPixels);
   for I := 1 to TrailCount do

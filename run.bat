@@ -1,1 +1,3 @@
-start D:\DOSBox-X\dosbox-x.exe -conf tools\dosbox\interactive.conf
+@ECHO OFF
+@cd D:\DOSBox-X\
+start dosbox-x.exe -conf tools\dosbox\interactive.conf

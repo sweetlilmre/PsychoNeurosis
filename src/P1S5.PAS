@@ -28,7 +28,7 @@ implementation
 
 uses VGA, Crt, DemoVT, FixMath;
 
-{$I gen/P1VECT.INC}      { const VecLogoA, VecGlobe : array[.., 1..3] of Integer }
+{$I gen/P1VECT.INC}      { const VecLogoA, VecGlobe : FLAT array[0..n*3-1] of Integer }
 
 const
   { 100, and it is MEASURED, not chosen. 12c5:031a reaches the object's
@@ -948,23 +948,38 @@ var
     explain a slot that turns out to be a compiler temp. }
   I      : Integer;                       { [BP-$02] }
   W      : Word;                          { [BP-$04] -- the slide-out counter }
+  { A THIRD TWO-BYTE LOCAL, and P's address is what asks for it. 12c5:08a0
+    stores the pointer's offset at [BP-$0A] and its segment at [BP-$08]; with
+    only I and W above it P lands at [BP-$08] instead, and the whole frame
+    below shifts two bytes with it. Nothing reads this slot. }
+  Spare  : Integer;                       { [BP-$06], never read }
   P      : PPoint3;                       { [BP-$0A], the point being filled }
 begin
   { INLINE, both times. 12c5:0874 sets PtCount from an immediate and then runs
     the point loop in Vector_Run's own frame -- there is no call.
 
-    THE LOOP IS ZERO-BASED and both subscripts carry the +1. 12c5:0893 is
-    MOV AX,[BP-2] / INC AX / IMUL DI,AX,0C, so the counter is one less than the
-    point number, and 12c5:08a6 scales the SAME counter by six for the table
-    without the increment -- which is `VecGlobe[I + 1, n]` on a one-based table
-    folding to base + I*6. A `for I := 1 to PtCount` loop needs neither. }
+    THE LOOP IS ZERO-BASED, AND ONLY THE Pt SUBSCRIPT CARRIES THE +1. 12c5:0893
+    is MOV AX,[BP-2] / INC AX / IMUL DI,AX,0C for the destination record, so the
+    counter is one less than the point number there. But 12c5:08a6 scales the
+    SAME counter by six for the source table with NO increment, and 12c5:08b3 is
+    PUSH WORD PTR [DI+$1A8] -- and $01A8 is where VecGlobe BEGINS. A folded
+    displacement equal to the array's own base means the first subscript
+    contributes nothing to the fold, so its LOW BOUND IS ZERO and the source is
+    `VecGlobe[I, n]`.
+
+    This note used to read "both subscripts carry the +1 ... folding to
+    base + I*6", which is arithmetically true of a one-based table and produced
+    the wrong code: `VecGlobe[I + 1, n]` folds to $1A2, one 6-byte element low,
+    and Turbo Pascal pays for the difference with an INC AX on every point. The
+    two spellings reach the same element and only one of them is what shipped.
+    The bound is set in tools/emit_pascal_data2.py, which generates the table. }
   PtCount := GlobePoints;                        { 12c5:0874 }
   for I := 0 to PtCount - 1 do
   begin
     P := @Obj.Pt[I + 1];                         { 12c5:08a0 }
-    P^.X := IntToFixed(VecGlobe[I + 1, 1]);      { 12c5:08b3 }
-    P^.Y := IntToFixed(VecGlobe[I + 1, 2]);
-    P^.Z := IntToFixed(VecGlobe[I + 1, 3]);
+    P^.X := IntToFixed(VecGlobe[I * 3]);      { 12c5:08b3 }
+    P^.Y := IntToFixed(VecGlobe[I * 3 + 1]);
+    P^.Z := IntToFixed(VecGlobe[I * 3 + 2]);
   end;
 
 
@@ -991,9 +1006,9 @@ begin
   for I := 0 to PtCount - 1 do
   begin
     P := @Obj.Pt[I + 1];
-    P^.X := IntToFixed(VecLogoA[I + 1, 1]);
-    P^.Y := IntToFixed(VecLogoA[I + 1, 2]);
-    P^.Z := IntToFixed(VecLogoA[I + 1, 3]);
+    P^.X := IntToFixed(VecLogoA[I * 3]);
+    P^.Y := IntToFixed(VecLogoA[I * 3 + 1]);
+    P^.Z := IntToFixed(VecLogoA[I * 3 + 2]);
   end;
   OrbitAngle := 17;                            { 12c5:0a15 }
   Animate;

@@ -101,7 +101,25 @@ def emit_p001():
         for i in range(n):
             vals.extend(struct.unpack_from("<hhh", raw, base + off + i * 6))
         out.append(f"  {{ DS:${off:04X} -- {n} points, {note} }}")
-        out.append(fmt(name, f"array[1..{n}, 1..3] of Integer", vals, 9, group=3))
+        # THE FIRST DIMENSION IS ZERO-BASED, and the loader's fold displacement
+        # says so exactly. VecGlobe sits at DS:$01A8 and 12c5:08b3 is
+        # PUSH WORD PTR [DI+$1A8] with DI = I * 6 -- the folded displacement IS
+        # the base, so the first subscript contributes nothing to it and its low
+        # bound is 0. Emitted as array[1..n] the fold came out $1A2, one 6-byte
+        # element low, and the loader carried an INC AX per point to compensate.
+        # FLAT AND ZERO-BASED, and the ORDER OF THE TWO MULTIPLIES says so. The
+        # loader scales its counter by six either way, but 12c5:08a6 does it as
+        # MOV SI,AX / SHL AX,1 / ADD AX,SI -- times THREE -- and only then
+        # MOV DI,AX / SHL DI,1, times two. A two-dimensional [I, 1] subscript
+        # emits the halves the other way round (times two, then three), because
+        # it scales by the element size and the element is three Integers. Times
+        # three then two is an INDEX of I * 3 into a one-dimensional Integer
+        # array, with the trailing SHL being the Integer stride.
+        # The fold confirms it: VecGlobe is at DS:$01A8 and the displacement is
+        # $1A8, $1AA, $1AC for the three components -- base plus 0, 2, 4, which
+        # is `[I * 3]`, `[I * 3 + 1]`, `[I * 3 + 2]` with the constant folded in.
+        # Same shape as the Vert* arrays emitted further down.
+        out.append(fmt(name, f"array[0..{n * 3 - 1}] of Integer", vals, 9))
         total += len(vals)
     OUT.joinpath("P1VECT.INC").write_text("\n".join(out) + "\n", encoding="ascii")
     return total
