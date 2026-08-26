@@ -101,6 +101,60 @@ var
   if/else chain. That is how the original is written and it is why the routine
   loads and compares the same value three times.
   -------------------------------------------------------------------------- }
+{ --------------------------------------------------------------------------
+  1095:000d -- the assets.
+
+  ASSETS  NEUROSIS.DAT $001743E5:
+            15,104 bytes  the font, 59 glyphs of 16 x 16, from space onwards
+            768 bytes     the palette
+  -------------------------------------------------------------------------- }
+procedure Setup;
+var
+  { IN THE ORDER THE FRAME GIVES, and it closes to the byte: 128 + 2 + 4 + 768
+    is 902, which is the ENTER $386 this routine opens with. Declared the other
+    way round -- Pal first -- it put the palette nearest BP and everything else
+    behind it, and the routine's frame references are 128 bytes of an unread
+    local away from the original's.
+
+    THE 128 BYTES NEAREST BP ARE NEVER REFERENCED. Every frame reference in
+    1095:000d..1095:01a0 is to [BP-$82], [BP-$84], [BP-$86] or [BP-$386] --
+    nothing touches [BP-$80] upward. A file record is exactly 128 bytes and
+    this routine does open a file, but it opens the UNIT's F at DS:$738A, which
+    1095:00c3 pushes by address. So the original very likely had a local file
+    record here once and kept the declaration after moving to the global. That
+    it is 128 bytes and unread is measured; what it was for is not. }
+  Unread : file;                  { [BP-$80]..[BP-1], never referenced }
+  I      : Integer;               { [BP-$82] }
+  Dummy  : LongInt;               { [BP-$86] }
+  Pal    : TPal768;               { [BP-$386] }
+begin
+  Assign(F, 'neurosis.dat');                     { 1095:001b }
+  Reset(F, 1);
+  Seek(F, DataOfs);
+  { 1095:003b and 1095:00d8 -- both results go into a local that nothing ever
+    reads. Dead in the original; kept because it is there. }
+  Dummy := MemAvail;
+
+  GetMem(Path, PathSize);                        { 1095:004b }
+  GetMem(Dots, DotSize);                         { 1095:005a }
+  FillChar(Path^, PathSize, 0);                  { 1095:0071 }
+  FillChar(Dots^, DotSize, 0);                   { 1095:0081 }
+  GetMem(Font, FontSize);                        { 1095:0089 }
+
+  BlockRead(F, Font^, FontSize);                 { 1095:00a7 }
+  BlockRead(F, Pal, SizeOf(Pal));                { 1095:00be }
+  Close(F);                                      { 1095:00c8 }
+  SetPalette768(@Pal);                           { 1095:00d3 }
+
+  Dummy := MemAvail;                             { 1095:00d8 }
+  for I := 0 to $3F do                           { 1095:00ed }
+    SetRGB(I + 100, I, 0, 0);
+end;
+
+{ --------------------------------------------------------------------------
+  1095:0578 -- the sixteen paths, and two fans of lines behind them.
+  -------------------------------------------------------------------------- }
+
 { NO LOCAL. The frame is ENTER $04 -- two bytes for the function result and
   two for the FPU status word the comparisons spill -- so there is no room
   for a variable, and assigning the function name directly is what fits.
@@ -111,6 +165,23 @@ begin
   if X < 0.0 then Sign := -1;     { 1095:015b }
   if X = 0.0 then Sign :=  0;     { 1095:0180 }
 end;
+
+{ --------------------------------------------------------------------------
+  1095:01a0 -- walk a line from (X, Y) to (X2, Y2) and record the screen
+  offsets of the points that survive the thinning into lane `Lane`.
+
+  Ordinary Bresenham, except:
+
+  - it is done in six-byte Reals, including Int(Major / 2) for the initial
+    error;
+  - a point is only RECORDED when a running total exceeds 1.0, and the amount
+    added each step starts at 1.3 and loses 0.005 every time a point is
+    recorded, so the spacing widens as the path runs;
+  - the recorded slot is zeroed FIRST and only overwritten if the point is
+    inside the window, so 0 doubles as "nothing here";
+  - it gives up at 200 recorded points, and the window it clips to is not the
+    screen: Y must be above 16, not above 0.
+  -------------------------------------------------------------------------- }
 
 { --------------------------------------------------------------------------
   1095:01a0 -- walk a line from (X, Y) to (X2, Y2) and record the screen
@@ -215,6 +286,41 @@ end;
 
   Row starts at TWO, not one, so the top row of every glyph is dropped.
   -------------------------------------------------------------------------- }
+
+{ --------------------------------------------------------------------------
+  1095:0578 -- the sixteen paths, and two fans of lines behind them.
+  -------------------------------------------------------------------------- }
+procedure DrawFrame;
+var
+  I      : Integer;               { [BP-$02], 18 references }
+  Unread : Integer;               { [BP-$04], never touched -- 1095:0578 opens
+                                    ENTER $04 and [BP-$02] is the only slot the
+                                    routine names, so the second word is either
+                                    a declaration nothing reads or a temporary
+                                    the compiler did not need. Declaring it is
+                                    what closes the frame either way. }
+begin
+  for I := 1 to Lanes do                         { 1095:057c }
+    BuildPath(320 - I * 2, 0, 0, 199 - I * 6, I);
+
+  for I := 1 to $3F do                           { 1095:05b6 }
+    DrawLine($120 - I, 0, 0, $67 - I, I + $63, VGASeg);
+  for I := 1 to $3F do                           { 1095:05e7 }
+    DrawLine(I, $C7, $13F, I, I + $63, VGASeg);
+end;
+
+{ 1095:07d4 -- the scene. }
+
+{ --------------------------------------------------------------------------
+  1095:0614 -- unpack one glyph into the dot table.
+
+  The font is 16 x 16 bytes per character from space onwards. It is written
+  into the dot table TRANSPOSED AND MIRRORED -- lane (16 - Row), position
+  (16 - Col) -- so each lane ends up holding one row of the letter, which is
+  what makes the letter arrive a row at a time.
+
+  Row starts at TWO, not one, so the top row of every glyph is dropped.
+  -------------------------------------------------------------------------- }
 procedure LoadGlyph(Ch : Byte);
 var Row, Col : Integer;
 begin
@@ -222,6 +328,15 @@ begin
     for Col := 1 to 16 do                        { 1095:0622 }
       Dots^[17 - Row, 17 - Col] := Font^[Ch, Row, Col];   { 1095:0649 }
 end;
+
+{ --------------------------------------------------------------------------
+  1095:067d -- stream one string in.
+
+  The plotting loop is HAND ASSEMBLER and the equivalent Pascal is below it.
+  SI is a single running index from 1 to 3200 that walks the path table and
+  the dot table TOGETHER -- it is not reset per lane, and the lane loop only
+  exists to do the shift at the end of each 200.
+  -------------------------------------------------------------------------- }
 
 { --------------------------------------------------------------------------
   1095:067d -- stream one string in.
@@ -362,70 +477,6 @@ end;
             15,104 bytes  the font, 59 glyphs of 16 x 16, from space onwards
             768 bytes     the palette
   -------------------------------------------------------------------------- }
-procedure Setup;
-var
-  { IN THE ORDER THE FRAME GIVES, and it closes to the byte: 128 + 2 + 4 + 768
-    is 902, which is the ENTER $386 this routine opens with. Declared the other
-    way round -- Pal first -- it put the palette nearest BP and everything else
-    behind it, and the routine's frame references are 128 bytes of an unread
-    local away from the original's.
-
-    THE 128 BYTES NEAREST BP ARE NEVER REFERENCED. Every frame reference in
-    1095:000d..1095:01a0 is to [BP-$82], [BP-$84], [BP-$86] or [BP-$386] --
-    nothing touches [BP-$80] upward. A file record is exactly 128 bytes and
-    this routine does open a file, but it opens the UNIT's F at DS:$738A, which
-    1095:00c3 pushes by address. So the original very likely had a local file
-    record here once and kept the declaration after moving to the global. That
-    it is 128 bytes and unread is measured; what it was for is not. }
-  Unread : file;                  { [BP-$80]..[BP-1], never referenced }
-  I      : Integer;               { [BP-$82] }
-  Dummy  : LongInt;               { [BP-$86] }
-  Pal    : TPal768;               { [BP-$386] }
-begin
-  Assign(F, 'neurosis.dat');                     { 1095:001b }
-  Reset(F, 1);
-  Seek(F, DataOfs);
-  { 1095:003b and 1095:00d8 -- both results go into a local that nothing ever
-    reads. Dead in the original; kept because it is there. }
-  Dummy := MemAvail;
-
-  GetMem(Path, PathSize);                        { 1095:004b }
-  GetMem(Dots, DotSize);                         { 1095:005a }
-  FillChar(Path^, PathSize, 0);                  { 1095:0071 }
-  FillChar(Dots^, DotSize, 0);                   { 1095:0081 }
-  GetMem(Font, FontSize);                        { 1095:0089 }
-
-  BlockRead(F, Font^, FontSize);                 { 1095:00a7 }
-  BlockRead(F, Pal, SizeOf(Pal));                { 1095:00be }
-  Close(F);                                      { 1095:00c8 }
-  SetPalette768(@Pal);                           { 1095:00d3 }
-
-  Dummy := MemAvail;                             { 1095:00d8 }
-  for I := 0 to $3F do                           { 1095:00ed }
-    SetRGB(I + 100, I, 0, 0);
-end;
-
-{ --------------------------------------------------------------------------
-  1095:0578 -- the sixteen paths, and two fans of lines behind them.
-  -------------------------------------------------------------------------- }
-procedure DrawFrame;
-var
-  I      : Integer;               { [BP-$02], 18 references }
-  Unread : Integer;               { [BP-$04], never touched -- 1095:0578 opens
-                                    ENTER $04 and [BP-$02] is the only slot the
-                                    routine names, so the second word is either
-                                    a declaration nothing reads or a temporary
-                                    the compiler did not need. Declaring it is
-                                    what closes the frame either way. }
-begin
-  for I := 1 to Lanes do                         { 1095:057c }
-    BuildPath(320 - I * 2, 0, 0, 199 - I * 6, I);
-
-  for I := 1 to $3F do                           { 1095:05b6 }
-    DrawLine($120 - I, 0, 0, $67 - I, I + $63, VGASeg);
-  for I := 1 to $3F do                           { 1095:05e7 }
-    DrawLine(I, $C7, $13F, I, I + $63, VGASeg);
-end;
 
 { 1095:07d4 -- the scene. }
 procedure Scene1;
@@ -441,5 +492,6 @@ begin
 end;
 
 { 1095:0829 -- the unit's initialisation is empty. }
+
 begin
 end.

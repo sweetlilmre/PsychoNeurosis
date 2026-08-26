@@ -434,6 +434,197 @@ procedure Remove(N : Integer); forward;
         Inc(D, 320);
       end;
   -------------------------------------------------------------------------- }
+{ @asm 004 1005:0029 }
+procedure ColumnSlideIn;
+{ --------------------------------------------------------------------------
+  EQUIVALENT PASCAL -- REFERENCE ONLY, not what is compiled.
+
+    for C := 200 downto 1 do
+    begin
+      Ofs := ColOfs[C];
+      if Ofs < 1 then
+      begin
+        Src := C + 60;  Dst := Src;
+        while (Ofs < 0) and (Src <= 64000) do
+        begin Inc(Ofs); Inc(Src, 320) end;
+        if Ofs = 0 then
+          while Src <= 64000 do
+          begin
+            Mem[$A000 : Dst] := Mem[VirtScrSeg : Src];
+            Inc(Dst, 320); Inc(Src, 320);
+          end;
+      end;
+      Inc(ColOfs[C]);
+    end;
+
+  That reads the same but does not RUN the same, and the difference is the
+  whole point of the routine being hand written. Pascal's Mem[Seg:Ofs] reloads
+  a segment register for every byte; the original loads ES and DS ONCE per
+  column and then runs a MOVSB loop, so the title screen assembles at the
+  speed the demo was timed for rather than a crawl.
+  -------------------------------------------------------------------------- }
+var
+  { TEN BYTES, NOT SIX. 1005:0000 opens ENTER $A and its slots are [BP-$02] four
+    times, [BP-$04] three times and [BP-$0A] twice -- and SrcSeg, which the asm
+    block reads and writes once each, is the pair at $0A. So the four bytes
+    between [BP-$04] and [BP-$0A] are a declaration nothing reads. }
+  C, Pass : Integer;              { [BP-$02], [BP-$04] }
+  Unread  : LongInt;              { [BP-$08], four bytes, never read }
+  SrcSeg  : Word;                 { [BP-$0A] }
+begin
+  { 1005:0004 -- this part IS compiled Pascal in the original: it calls
+    Random, so it has to be. }
+  for C := 0 to 200 do
+    ColOfs[C] := Random(200) - 400;              { 1005:000E }
+
+  { 1005:0029 to 1005:0097, transcribed instruction for instruction. }
+  asm
+        MOV     AX, VirtScrSeg  { 1005:0029  the assembled title screen      }
+        MOV     SrcSeg, AX      { 1005:002C                                  }
+        MOV     Pass, 1         { 1005:002F  first of four hundred passes    }
+        JMP     @@PassTop       { 1005:0034                                  }
+    @@NextPass:
+        INC     Pass            { 1005:0036                                  }
+    @@PassTop:
+        MOV     SI, OFFSET ColOfs
+                                { 1005:0039                                  }
+        ADD     SI, 400         { 1005:003C  one past the last entry         }
+        MOV     DX, SI          { 1005:0040  DX walks the table DOWNWARDS    }
+        MOV     CX, 200         { 1005:0042  and doubles as the column index }
+    @@Column:
+        PUSH    DS              { 1005:0045  DS is about to stop being DGROUP}
+        MOV     SI, DX          { 1005:0046                                  }
+        MOV     AX, [SI]        { 1005:0048  this column's offset            }
+        MOV     BX, 0A000h      { 1005:004A                                  }
+        MOV     ES, BX          { 1005:004D  ES is the DISPLAY               }
+        MOV     BX, SrcSeg      { 1005:004F                                  }
+        MOV     DS, BX          { 1005:0052  DS is the picture               }
+        MOV     SI, CX          { 1005:0054                                  }
+        ADD     SI, 3Ch         { 1005:0056  column CX, sixty bytes in       }
+        MOV     DI, SI          { 1005:0059  the column arrives at the TOP   }
+        CMP     AX, 1           { 1005:005B                                  }
+        JGE     @@Done          { 1005:005E  offset reached 1: it is home    }
+    @@Walk:
+        CMP     AX, 0           { 1005:0060                                  }
+        JZ      @@Copy          { 1005:0063  offset is zero: copy it now     }
+        INC     AX              { 1005:0065  still counting up to zero       }
+        ADD     SI, 140h        { 1005:0066  walk the SOURCE down a row --   }
+        CMP     SI, 0FA00h      { 1005:006A    the destination stays put,    }
+        JA      @@Done          { 1005:006E    which is what makes the strip }
+        JMP     @@Walk          { 1005:0070    look like it slides in        }
+    @@Copy:
+        MOVSB                   { 1005:0072  one pixel, ES:DI <- DS:SI       }
+        ADD     DI, 13Fh        { 1005:0073  MOVSB already added one, so     }
+        ADD     SI, 13Fh        { 1005:0077    both steps are 320            }
+        CMP     SI, 0FA00h      { 1005:007B                                  }
+        JA      @@Done          { 1005:007F  off the bottom of the picture   }
+        JMP     @@Copy          { 1005:0081                                  }
+    @@Done:
+        POP     DS              { 1005:0083  DGROUP again                    }
+        MOV     SI, DX          { 1005:0084                                  }
+        MOV     AX, [SI]        { 1005:0086                                  }
+        INC     AX              { 1005:0088  every column, arrived or not,   }
+        MOV     [SI], AX        { 1005:0089    is one step closer            }
+        SUB     DX, 2           { 1005:008B  the previous entry              }
+        LOOP    @@Column        { 1005:008E  200 columns per pass            }
+        CMP     Pass, 190h      { 1005:0090                                  }
+        JNZ     @@NextPass      { 1005:0095                                  }
+  end;
+end;
+
+{ --------------------------------------------------------------------------
+  1005:00a6 -- everything off NEUROSIS.DAT, and the title sequence.
+  -------------------------------------------------------------------------- }
+
+{ --------------------------------------------------------------------------
+  1005:00a6 -- everything off NEUROSIS.DAT, and the title sequence.
+  -------------------------------------------------------------------------- }
+procedure LoadAssets;
+var
+  { ENTER $686 -- 1,670 bytes -- and this routine declared 898. The arithmetic
+    picks the missing item out on its own: 128 for the file record plus 768 for
+    a palette is 896, and the original's two scalar slots are at [BP-$681] and
+    [BP-$683], so everything above $681 is buffers. 128 + 768 + 768 is 1,664,
+    which fills BP-1 down to BP-$680 exactly -- there is a SECOND 768-byte
+    palette. Nothing in the routine reads it, and a local is allocated whether
+    or not it is read. }
+  { ENTER $686 -- 1,670 bytes -- AND ONLY TWO SLOTS ARE EVER TOUCHED:
+    [BP-$683] seven times and [BP-$681] five. The whole layout follows from
+    those two addresses and the total.
+
+    [BP-$681] is the palette buffer -- 1005:0109 is LEA DI,[BP-$681] / PUSH SS
+    in front of a 768-byte BlockRead -- so it occupies BP-$681 up to BP-$382.
+    That leaves 897 bytes ABOVE it and five below, and the five are [BP-$683]
+    for the loop counter plus one more slot and Turbo Pascal's rounding of an
+    odd total up to even.
+
+    THE 897 ABOVE IS TOUCHED BY NOTHING, and 768 + 128 + 1 is exactly 897 --
+    a second palette, a file record, and a byte. The file record is the one
+    worth naming: the routine's real file is the unit-level global at DS:$CF07
+    now, so these 128 bytes are a SECOND record that is never opened. That is
+    the seventh routine in this target to reserve storage it never uses.
+
+    ORDER IS THE WHOLE POINT HERE. These same six declarations in the order
+    F, Pal, Pal2, Spare, I, Spare2 also sum to $686, and the frame matched
+    while the palette sat at [BP-$380] instead of [BP-$681] -- so every
+    reference to it was four bytes of displacement different from the
+    original's. A frame that matches says nothing about where inside it
+    anything is. }
+  Pal2   : TPal768;               { [BP-$300], never read }
+  Unread : file;                  { [BP-$380], never opened }
+  Spare  : Byte;                  { [BP-$381] }
+  Pal    : TPal768;               { [BP-$681] }
+  I      : Integer;               { [BP-$683] }
+  Spare2 : Integer;               { [BP-$685] -- and BP-$686 is the pad }
+begin
+  Assign(F, 'neurosis.dat');
+  Reset(F, 1);
+  Seek(F, DataOfs);
+
+  GetMem(Font, SizeOf(TFont));                   { 1005:00BE }
+  BlockRead(F, Font^, SizeOf(TFont));
+
+  ClearScreen($A000, 0);
+  BlockRead(F, Pal, SizeOf(Pal));
+  SetPalette768(@Pal);
+  BlockRead(F, Mem[VirtScrSeg : 0], 64000);      { the title screen }
+
+  ColumnSlideIn;                                 { 1005:0116 }
+  Delay($514);                                   { 1300 }
+  GetPalette768(@Pal);
+  for I := 1 to $40 do FadeStep;                 { 1005:0132 }
+
+  ClearScreen($A000, 0);
+  BlockRead(F, Mem[VirtScrSeg : 0], 64000);      { the hillside }
+  BlockRead(F, Pal, SizeOf(Pal));
+  BlockRead(F, ScenePal, SizeOf(ScenePal));      { DS:$CC07 }
+
+  BlockRead(F, WalkBank,  SizeOf(WalkBank));
+  BlockRead(F, TumbleBk,  SizeOf(TumbleBk));
+  BlockRead(F, SplatBank, SizeOf(SplatBank));
+  BlockRead(F, DigBank,   SizeOf(DigBank));
+  BlockRead(F, TunnelBk,  SizeOf(TunnelBk));
+  BlockRead(F, DeathBBk,  SizeOf(DeathBBk));
+  BlockRead(F, HillAnim,  SizeOf(HillAnim));
+  BlockRead(F, DeathABk,  SizeOf(DeathABk));
+  BlockRead(F, BuildBank, SizeOf(BuildBank));
+  BlockRead(F, DeathAPic, SizeOf(DeathAPic));
+  BlockRead(F, IntroAnim, SizeOf(IntroAnim));
+  BlockRead(F, SideAnim,  SizeOf(SideAnim));
+  BlockRead(F, Explosion, SizeOf(Explosion));
+  BlockRead(F, FuseBank,  SizeOf(FuseBank));
+  Close(F);
+
+  SetPalette768(@Pal);                           { 1005:0304 }
+  { 1005:030F -- black out the ten entries the explosion will light. }
+  for I := $E0 to $E9 do SetRGB(I, 0, 0, 0);
+end;
+
+{ --------------------------------------------------------------------------
+  1005:0a86 -- blank the DAC, put the hillside up, fade it in, then run a
+  seven-frame animation BACKWARDS at (5, 50) and start the music.
+  -------------------------------------------------------------------------- }
+
 { @asm 004 1005:0328 }
 procedure VLine(X, YTop, YBottom : Integer;
                 Colour : Byte; Segment : Word); assembler;
@@ -470,6 +661,8 @@ end;
 
       FillChar(Mem[Segment : YOfs[Y] + X1], X2 - X1 + 1, Colour);
   -------------------------------------------------------------------------- }
+{ @asm 004 1005:0354 }
+
 { @asm 004 1005:0354 }
 procedure HLine(X1, X2, Y : Integer;
                 Colour : Byte; Segment : Word); assembler;
@@ -517,6 +710,8 @@ end;
       end;
   -------------------------------------------------------------------------- }
 { @asm 004 1005:037a }
+
+{ @asm 004 1005:037a }
 procedure Blit(Src : Pointer; X, Y, W, H : Integer;
                Segment : Word); assembler;
 asm
@@ -562,183 +757,101 @@ end;
       Move(Mem[SrcSeg : 0], Mem[DestSeg : 0], 64000);
   -------------------------------------------------------------------------- }
 { @asm 004 1005:0835 }
-procedure CopyScreen(SrcSeg, DestSeg : Word); assembler;
-asm
-  PUSH DS               { DS becomes the source segment below               }
-  MOV  AX, DestSeg      { the second declared parameter                     }
-  MOV  ES, AX           { ES: is the destination                            }
-  MOV  AX, SrcSeg       { the first                                         }
-  MOV  DS, AX           { DS: is the source                                 }
-  MOV  SI, 0            { both start at offset 0 -- whole screens           }
-  MOV  DI, 0            {                                                   }
-  MOV  CX, $7D00        { 32,000 words = 64,000 bytes                       }
-  REP  MOVSW            { the blit, one instruction                         }
-  POP  DS               { restore our data segment                          }
-end;
 
-{ --------------------------------------------------------------------------
-  1005:07f9 -- show the scroller and shift it. HAND ASSEMBLER, verbatim.
-  No parameters at all; it works entirely off two globals.
-
-  The buffer is 18 rows of 341 bytes. Only the first 320 of each row are
-  visible; the remaining 21 are the run-up that ScrollChar writes into. Each
-  call copies the visible part to the work screen, then slides the WHOLE
-  6,138 bytes left by two.
-
-  That shift is LINEAR, not per row -- one REP MOVSW straight across the
-  buffer -- so the two bytes that fall off the left of a row reappear at the
-  right of the row above. With the run-up being blank most of the time that
-  is invisible, and it is what the original does.
-
-  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
-
-      P := ScrollBuf;
-      for Row := 0 to 17 do
+{ IT TAKES THE LEMMING, NOT ITS INDEX, and it has no locals at all. 1005:03b9
+  opens PUSH BP / MOV BP,SP with no ENTER, and every field access is
+  `LES DI, [BP+$04]` followed by `ES:[DI+n]` -- so the parameter is a four-byte
+  reference to the record and the routine reads through it. There is no F
+  either: 1005:03C7 is `IMUL DI, ES:[DI+$06], $78`, the frame read straight out
+  of the record at the point of use. A local F and an Integer index between them
+  accounted for twelve of this part's unaligned spans. }
+procedure DrawSprite(var L : TLem);
+begin
+  case L.State of
+    StSplat:
+      Blit(@SplatBank[L.Frame], L.X - 4, L.Y - 8, 12, 10, WorkSeg);
+    StBuilder:
+      Blit(@BuildBank[L.Frame], L.X - 4, L.Y - 8, 12, 10, WorkSeg);
+    StFaller:
+      if L.FallDist < 4 then
       begin
-        Move(P^, Mem[WorkSeg : Row * 320], 320);
-        Inc(LongInt(P), 341);
+        if L.Dir < 1 then
+          Blit(@WalkBank[L.Frame + 4], L.X - 3, L.Y - 8, 6, 9, WorkSeg)
+        else
+        begin
+          Blit(@WalkBank[L.Frame], L.X - 3, L.Y - 8, 6, 9, WorkSeg);
+          { 1005:0467 -- the only place DrawSprite changes state, and it
+            steps TWICE: MOV AX,Frame / INC AX / DIV 4 / INC AX. }
+          L.Frame := ((L.Frame + 1) mod 4) + 1;
+        end;
+      end
+      else
+        Blit(@TumbleBk[L.Frame], L.X - 3, L.Y - 10, 10, 10, WorkSeg);
+    StWalker:
+      { THE BARE-FRAME ARM COMES FIRST, and the order of the two branches is
+        what says so rather than the condition. 1005:050e ends the first arm
+        and JMPs over the second, and the second -- at 1005:0513 -- is the one
+        that does MOV AX,ES:[DI+6] / ADD AX,4 before the IMUL, so `Frame + 4`
+        is the ELSE. Written `if Dir < 1 then <+4> else <bare>` the two arms
+        come out the other way round; the test is the same either way. }
+      if L.Dir >= 1 then
+        Blit(@WalkBank[L.Frame], L.X - 3, L.Y - 8, 6, 9, WorkSeg)
+      else
+        Blit(@WalkBank[L.Frame + 4], L.X - 3, L.Y - 8, 6, 9, WorkSeg);
+    StTunneller:
+      Blit(@TunnelBk[L.Frame], L.X - 8, L.Y - 9, 14, 10, WorkSeg);
+    StDeathB:
+      Blit(@DeathBBk[L.Frame], L.X - 5, L.Y - 8, 16, 10, WorkSeg);
+    StDigger:
+      Blit(@DigBank[L.Frame], L.X - 8, L.Y - 12, 17, 13, WorkSeg);
+    StFuse:
+      Blit(@FuseBank[L.Frame], L.X - 4, L.Y - 9, 15, 10, WorkSeg);
+    StExplode:
+      { 1005:05d1 -- frames 1..9 all show the first picture; only from 10
+        does it start stepping the bank. }
+      if L.Frame < 10 then
+        Blit(@Explosion[1], L.X - $1F, L.Y - $30, 63, 55, WorkSeg)
+      else
+        Blit(@Explosion[L.Frame - 8], L.X - $1F, L.Y - $30,
+             63, 55, WorkSeg);
+    StDeathA:
+      begin
+        { 1005:068a -- on the first frame only, a picture at a FIXED place:
+          the storm cloud with a lightning bolt coming out of it, 60 wide by
+          53 tall at (95, 50). It lands just under the drifting cloud that
+          BackdropAnim animates at (113, 50), which is the point of it. The
+          four immediates are PUSH $5F, $32, $3C, $35 in that order, and Blit
+          takes them as X, Y, W, H. }
+        if L.Frame = 1 then
+          Blit(@DeathAPic, $5F, $32, 60, 53, WorkSeg);
+        Blit(@DeathABk[L.Frame], L.X - 4, L.Y - $B, 9, 12, WorkSeg);
       end;
-      for Row := 0 to 17 do
-        Mem[Seg(ScrollBuf^) : Row * 341] := 0;
-      Move(Mem[Seg(ScrollBuf^) : 2], Mem[Seg(ScrollBuf^) : 0], 6136);
-  -------------------------------------------------------------------------- }
-{ @asm 004 1005:07f9 }
-procedure ScrollRender; assembler;
-asm
-  PUSH DS               { DS is about to point at the scroll buffer         }
-  MOV  AX, [WorkSeg]    { DS:$030D -- the frame being composed              }
-  MOV  ES, AX           { ES:DI is the destination                          }
-  XOR  DI, DI           { the scroller sits at the TOP of the screen        }
-  LDS  SI, ScrollBuf    { DS:SI := the 341 x 18 bitmap                      }
-  MOV  AX, 18           { 18 rows to show                                   }
-@@Row:                  { <- once per row                                   }
-  MOV  CX, $A0          { 160 words = 320 bytes, the visible part           }
-  REP  MOVSW            { copy the row out                                  }
-  ADD  SI, $15          { skip the 21-byte run-up to the next row           }
-  DEC  AX               { one row done                                      }
-  JNZ  @@Row            { round again                                       }
-
-  MOV  BX, 18           { now blank the first byte of every row...          }
-  XOR  SI, SI           { ...starting at the top of the buffer              }
-  XOR  CL, CL           { the value: black                                  }
-@@Clear:                { <- once per row                                   }
-  MOV  [SI], CL         { clear it                                          }
-  ADD  SI, $155         { down one 341-byte row                             }
-  DEC  BX               { one row done                                      }
-  JNZ  @@Clear          { round again                                       }
-
-  MOV  AX, DS           { source and destination are the same buffer        }
-  MOV  ES, AX           {                                                   }
-  XOR  DI, DI           { write from offset 0                               }
-  XOR  SI, SI           { read from...                                      }
-  ADD  SI, 2            {   ...offset 2 -- a two-pixel shift                }
-  MOV  CX, $BFC         { 3,068 words = 6,136 of the 6,138 bytes            }
-  REP  MOVSW            { slide the whole bitmap left                       }
-  POP  DS               { restore our data segment                          }
-end;
-
-{ ==========================================================================
-  The scroller
-  ========================================================================== }
-
-{ --------------------------------------------------------------------------
-  1005:0853 -- write ONE column of one glyph into the buffer's run-up.
-
-  The font is 62 glyphs from space upward, each 378 bytes = 21 columns of 18
-  rows stored column-major, so a column is 18 consecutive bytes. Each call
-  drops one such column into buffer column 320 -- the right-hand edge, just
-  off screen -- and ScrollRender then slides it into view.
-
-  RET 4: Ch at BP+6, Col at BP+4. The original's index is
-  Ch * 378 + Col * 18 + Row + 1 - 12115, and 12115 is 32 * 378 + 18 + 1, so
-  the character is 32-based and the column one-based.
-  -------------------------------------------------------------------------- }
-procedure ScrollChar(Ch, Col : Byte);
-var
-  { SIX BYTES AND ONE OF THEM IS THE ONLY VARIABLE THAT MATTERS. 1005:0853
-    opens ENTER $06 and touches [BP-$02], the row, and [BP-$06], which is
-    assigned $140 at 1005:0857 and never read again. Nothing reaches [BP-$04].
-    There is no pointer local either: 1005:0889 reads the font byte straight
-    into DL. }
-  Row    : Integer;               { [BP-$02] }
-  Unread : Integer;               { [BP-$04], never touched }
-  Edge   : Integer;               { [BP-$06], assigned and never read }
-begin
-  Edge := ScrollEdge;                            { 1005:0857 }
-  for Row := 0 to ScrollRows - 1 do
-    { AND THE DESTINATION CARRIES NO Ofs(). 1005:088E does LES DI / MOV AX,ES
-      and uses only the SEGMENT of ScrollBuf; the offset is the arithmetic
-      below and nothing else. }
-    Mem[Seg(ScrollBuf^) : Row * ScrollPitch + ScrollEdge] :=
-      Font^[Ch, Col, Row + 1];
-end;
-
-{ --------------------------------------------------------------------------
-  1005:08ad -- one frame of the scroller.
-
-  The column counter advances by TWO because the bitmap slides two pixels a
-  frame, so every other column of each glyph is simply never written. The
-  message is therefore drawn at half its horizontal resolution -- which is
-  the original's behaviour, not a transcription slip.
-
-  It also runs the two 14 x 10 animations either side of the message, from
-  the same six-frame bank read in opposite directions, and rotates the
-  eight-entry colour cycle that DAC entries $80..$87 take.
-  -------------------------------------------------------------------------- }
-procedure ScrollStep;
-var
-  { ONE BYTE, AND IT DOES BOTH JOBS. 1005:08ad opens ENTER $02 and the only slot
-    it touches is [BP-$01]: 1005:0950 stores the palette entry it is about to
-    overwrite, and 1005:0974 sets the same byte to zero and 1005:097A increments
-    it -- the `for` counter. There is no Pass either, because the rotation is
-    written out TWICE rather than looped; a Pass counter and a separate index
-    put the frame at $06. }
-  Last : Byte;                    { [BP-$01], then the colour index }
-begin
-  Inc(ScrollCol, 2);                             { 1005:08b1 }
-  if ScrollCol > GlyphCols then
-  begin
-    ScrollCol := 1;
-    Inc(ScrollIdx);
   end;
-
-  { THE SPACE ARM COMES FIRST. 1005:08CC is CMP/JBE, which jumps to the message
-    arm and falls through to the space, so the test is `ScrollIdx > TextLen - 1`
-    with the space as the THEN. }
-  if ScrollIdx > TextLen then                   { 1005:08C7 -- CMP AL,$EC }
-    ScrollChar(Ord(' '), ScrollCol)
-  else
-    ScrollChar(Ord(Message[ScrollIdx]), ScrollCol);
-
-  ScrollRender;                                  { 1005:08f4 }
-
-  { 1005:08f7 -- the two side animations, three frames each shown four ticks
-    apart, one counting up and the other down so they mirror. }
-  SideTick := (SideTick mod 11) + 1;
-  Blit(@SideAnim[4 - ((SideTick shr 2) + 1)], $116, $1B, 14, 10, WorkSeg);
-  Blit(@SideAnim[(SideTick shr 2) + 4],       $1E,  $1B, 14, 10, WorkSeg);
-
-  { 1005:093f -- rotate the eight-entry cycle and show it. The original does
-    the whole thing TWICE per frame, so the colours run at double speed. }
-  Last := ScrollPal[24];                       { 1005:094D }
-  Move(ScrollPal[1], ScrollPal[4], 21);    { 1005:0953 }
-  FillChar(ScrollPal[1], 3, Last);            { 1005:0964 }
-  for Last := 0 to 7 do                          { 1005:0974 -- the same byte }
-    SetRGB($80 + Last, ScrollPal[Last * 3 + 1],
-           ScrollPal[Last * 3 + 1 + 1], ScrollPal[Last * 3 + 1 + 1 + 1]);
-
-  { and again, written out rather than looped }
-  Last := ScrollPal[24];
-  Move(ScrollPal[1], ScrollPal[4], 21);
-  FillChar(ScrollPal[1], 3, Last);
-  for Last := 0 to 7 do
-    SetRGB($80 + Last, ScrollPal[Last * 3 + 1],
-           ScrollPal[Last * 3 + 1 + 1], ScrollPal[Last * 3 + 1 + 1 + 1]);
 end;
 
 { ==========================================================================
-  The lemmings
+  The state handlers
   ========================================================================== }
+
+{ --------------------------------------------------------------------------
+  1005:14d6 -- state 1, walking.
+
+    1. look one row down, seven columns wide, for something to stand on
+         colour 3        -> DeathA
+         colour $12      -> state 9, FOR WHICH THERE IS NO HANDLER
+         colour $20..$29 -> DeathB
+         in Ground       -> stop looking, we are standing
+         nothing at all  -> Faller
+    2. rows Y-9..Y-4, three columns ahead: anything in Wall turns it round
+    3. rows Y-4..Y,   two columns ahead: anything in Wall is a step, and the
+       lemming climbs to just above it
+    4. move one pixel, and advance the animation every second tick
+
+  STATE 9 IS A DEAD END and it is the original's. UpdateAll's dispatch has no
+  arm for it, so a lemming that walks onto colour $12 stops being simulated
+  and stands there being drawn by whatever DrawSprite does with an unknown
+  state -- which is nothing. It is left in.
+  -------------------------------------------------------------------------- }
 
 { 1005:06c8 -- free every slot. }
 procedure InitAll;
@@ -750,33 +863,6 @@ begin
 end;
 
 { 1005:07d8 -- free one, and only count it down if it was live. }
-procedure Remove(N : Integer);
-begin
-  { A GUARD CLAUSE, NOT A WRAPPING `if`, and the branch pair says which.
-    1005:07e4 is JNE over a JMP -- two jumps, four bytes -- where a wrapping
-    `if Active <> 0 then begin ... end` emits one short JE, two bytes. The
-    conditional-over-unconditional shape is what `if cond then Exit` gives:
-    the JNE skips the JMP, and the JMP goes to 1005:07f5, which is the LEAVE.
-    `Dec(LiveCount)` is right as it stands -- 1005:07f1 is DEC WORD PTR [$51E],
-    the short form, because LiveCount is a plain variable and not an indexed
-    field like the Frame and Tick increments in the state routines. }
-  if Lem[N].Active = 0 then Exit;                { 1005:07e4 }
-  Lem[N].Active := 0;
-  Dec(LiveCount);
-end;
-
-{ 1005:0b22 -- change state, and restart the animation. }
-{ THE LEMMING COMES FIRST. 1005:0b22 reads the state byte from [BP+$04] and the
-  index from [BP+$06], and parameters are pushed left to right, so the one
-  nearest BP is the LAST declared -- which makes N the first parameter and the
-  state the second. Every call site had them the other way round, and that is
-  two differing instructions per call across nine routines. }
-procedure SetState(N : Integer; S : Byte);
-begin
-  Lem[N].State := S;
-  Lem[N].Frame := 1;
-  Lem[N].Tick  := 0;
-end;
 
 { --------------------------------------------------------------------------
   1005:06e7 -- put one lemming in the first free slot.
@@ -857,73 +943,630 @@ end;
   either: 1005:03C7 is `IMUL DI, ES:[DI+$06], $78`, the frame read straight out
   of the record at the point of use. A local F and an Integer index between them
   accounted for twelve of this part's unaligned spans. }
-procedure DrawSprite(var L : TLem);
+
+{ 1005:07d8 -- free one, and only count it down if it was live. }
+procedure Remove(N : Integer);
 begin
-  case L.State of
-    StSplat:
-      Blit(@SplatBank[L.Frame], L.X - 4, L.Y - 8, 12, 10, WorkSeg);
-    StBuilder:
-      Blit(@BuildBank[L.Frame], L.X - 4, L.Y - 8, 12, 10, WorkSeg);
-    StFaller:
-      if L.FallDist < 4 then
-      begin
-        if L.Dir < 1 then
-          Blit(@WalkBank[L.Frame + 4], L.X - 3, L.Y - 8, 6, 9, WorkSeg)
-        else
-        begin
-          Blit(@WalkBank[L.Frame], L.X - 3, L.Y - 8, 6, 9, WorkSeg);
-          { 1005:0467 -- the only place DrawSprite changes state, and it
-            steps TWICE: MOV AX,Frame / INC AX / DIV 4 / INC AX. }
-          L.Frame := ((L.Frame + 1) mod 4) + 1;
-        end;
-      end
-      else
-        Blit(@TumbleBk[L.Frame], L.X - 3, L.Y - 10, 10, 10, WorkSeg);
-    StWalker:
-      { THE BARE-FRAME ARM COMES FIRST, and the order of the two branches is
-        what says so rather than the condition. 1005:050e ends the first arm
-        and JMPs over the second, and the second -- at 1005:0513 -- is the one
-        that does MOV AX,ES:[DI+6] / ADD AX,4 before the IMUL, so `Frame + 4`
-        is the ELSE. Written `if Dir < 1 then <+4> else <bare>` the two arms
-        come out the other way round; the test is the same either way. }
-      if L.Dir >= 1 then
-        Blit(@WalkBank[L.Frame], L.X - 3, L.Y - 8, 6, 9, WorkSeg)
-      else
-        Blit(@WalkBank[L.Frame + 4], L.X - 3, L.Y - 8, 6, 9, WorkSeg);
-    StTunneller:
-      Blit(@TunnelBk[L.Frame], L.X - 8, L.Y - 9, 14, 10, WorkSeg);
-    StDeathB:
-      Blit(@DeathBBk[L.Frame], L.X - 5, L.Y - 8, 16, 10, WorkSeg);
-    StDigger:
-      Blit(@DigBank[L.Frame], L.X - 8, L.Y - 12, 17, 13, WorkSeg);
-    StFuse:
-      Blit(@FuseBank[L.Frame], L.X - 4, L.Y - 9, 15, 10, WorkSeg);
-    StExplode:
-      { 1005:05d1 -- frames 1..9 all show the first picture; only from 10
-        does it start stepping the bank. }
-      if L.Frame < 10 then
-        Blit(@Explosion[1], L.X - $1F, L.Y - $30, 63, 55, WorkSeg)
-      else
-        Blit(@Explosion[L.Frame - 8], L.X - $1F, L.Y - $30,
-             63, 55, WorkSeg);
-    StDeathA:
-      begin
-        { 1005:068a -- on the first frame only, a picture at a FIXED place:
-          the storm cloud with a lightning bolt coming out of it, 60 wide by
-          53 tall at (95, 50). It lands just under the drifting cloud that
-          BackdropAnim animates at (113, 50), which is the point of it. The
-          four immediates are PUSH $5F, $32, $3C, $35 in that order, and Blit
-          takes them as X, Y, W, H. }
-        if L.Frame = 1 then
-          Blit(@DeathAPic, $5F, $32, 60, 53, WorkSeg);
-        Blit(@DeathABk[L.Frame], L.X - 4, L.Y - $B, 9, 12, WorkSeg);
-      end;
-  end;
+  { A GUARD CLAUSE, NOT A WRAPPING `if`, and the branch pair says which.
+    1005:07e4 is JNE over a JMP -- two jumps, four bytes -- where a wrapping
+    `if Active <> 0 then begin ... end` emits one short JE, two bytes. The
+    conditional-over-unconditional shape is what `if cond then Exit` gives:
+    the JNE skips the JMP, and the JMP goes to 1005:07f5, which is the LEAVE.
+    `Dec(LiveCount)` is right as it stands -- 1005:07f1 is DEC WORD PTR [$51E],
+    the short form, because LiveCount is a plain variable and not an indexed
+    field like the Frame and Tick increments in the state routines. }
+  if Lem[N].Active = 0 then Exit;                { 1005:07e4 }
+  Lem[N].Active := 0;
+  Dec(LiveCount);
+end;
+
+{ 1005:0b22 -- change state, and restart the animation. }
+{ THE LEMMING COMES FIRST. 1005:0b22 reads the state byte from [BP+$04] and the
+  index from [BP+$06], and parameters are pushed left to right, so the one
+  nearest BP is the LAST declared -- which makes N the first parameter and the
+  state the second. Every call site had them the other way round, and that is
+  two differing instructions per call across nine routines. }
+
+{ @asm 004 1005:07f9 }
+procedure ScrollRender; assembler;
+asm
+  PUSH DS               { DS is about to point at the scroll buffer         }
+  MOV  AX, [WorkSeg]    { DS:$030D -- the frame being composed              }
+  MOV  ES, AX           { ES:DI is the destination                          }
+  XOR  DI, DI           { the scroller sits at the TOP of the screen        }
+  LDS  SI, ScrollBuf    { DS:SI := the 341 x 18 bitmap                      }
+  MOV  AX, 18           { 18 rows to show                                   }
+@@Row:                  { <- once per row                                   }
+  MOV  CX, $A0          { 160 words = 320 bytes, the visible part           }
+  REP  MOVSW            { copy the row out                                  }
+  ADD  SI, $15          { skip the 21-byte run-up to the next row           }
+  DEC  AX               { one row done                                      }
+  JNZ  @@Row            { round again                                       }
+
+  MOV  BX, 18           { now blank the first byte of every row...          }
+  XOR  SI, SI           { ...starting at the top of the buffer              }
+  XOR  CL, CL           { the value: black                                  }
+@@Clear:                { <- once per row                                   }
+  MOV  [SI], CL         { clear it                                          }
+  ADD  SI, $155         { down one 341-byte row                             }
+  DEC  BX               { one row done                                      }
+  JNZ  @@Clear          { round again                                       }
+
+  MOV  AX, DS           { source and destination are the same buffer        }
+  MOV  ES, AX           {                                                   }
+  XOR  DI, DI           { write from offset 0                               }
+  XOR  SI, SI           { read from...                                      }
+  ADD  SI, 2            {   ...offset 2 -- a two-pixel shift                }
+  MOV  CX, $BFC         { 3,068 words = 6,136 of the 6,138 bytes            }
+  REP  MOVSW            { slide the whole bitmap left                       }
+  POP  DS               { restore our data segment                          }
 end;
 
 { ==========================================================================
-  The state handlers
+  The scroller
   ========================================================================== }
+
+{ --------------------------------------------------------------------------
+  1005:0853 -- write ONE column of one glyph into the buffer's run-up.
+
+  The font is 62 glyphs from space upward, each 378 bytes = 21 columns of 18
+  rows stored column-major, so a column is 18 consecutive bytes. Each call
+  drops one such column into buffer column 320 -- the right-hand edge, just
+  off screen -- and ScrollRender then slides it into view.
+
+  RET 4: Ch at BP+6, Col at BP+4. The original's index is
+  Ch * 378 + Col * 18 + Row + 1 - 12115, and 12115 is 32 * 378 + 18 + 1, so
+  the character is 32-based and the column one-based.
+  -------------------------------------------------------------------------- }
+
+{ @asm 004 1005:0835 }
+procedure CopyScreen(SrcSeg, DestSeg : Word); assembler;
+asm
+  PUSH DS               { DS becomes the source segment below               }
+  MOV  AX, DestSeg      { the second declared parameter                     }
+  MOV  ES, AX           { ES: is the destination                            }
+  MOV  AX, SrcSeg       { the first                                         }
+  MOV  DS, AX           { DS: is the source                                 }
+  MOV  SI, 0            { both start at offset 0 -- whole screens           }
+  MOV  DI, 0            {                                                   }
+  MOV  CX, $7D00        { 32,000 words = 64,000 bytes                       }
+  REP  MOVSW            { the blit, one instruction                         }
+  POP  DS               { restore our data segment                          }
+end;
+
+{ --------------------------------------------------------------------------
+  1005:07f9 -- show the scroller and shift it. HAND ASSEMBLER, verbatim.
+  No parameters at all; it works entirely off two globals.
+
+  The buffer is 18 rows of 341 bytes. Only the first 320 of each row are
+  visible; the remaining 21 are the run-up that ScrollChar writes into. Each
+  call copies the visible part to the work screen, then slides the WHOLE
+  6,138 bytes left by two.
+
+  That shift is LINEAR, not per row -- one REP MOVSW straight across the
+  buffer -- so the two bytes that fall off the left of a row reappear at the
+  right of the row above. With the run-up being blank most of the time that
+  is invisible, and it is what the original does.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      P := ScrollBuf;
+      for Row := 0 to 17 do
+      begin
+        Move(P^, Mem[WorkSeg : Row * 320], 320);
+        Inc(LongInt(P), 341);
+      end;
+      for Row := 0 to 17 do
+        Mem[Seg(ScrollBuf^) : Row * 341] := 0;
+      Move(Mem[Seg(ScrollBuf^) : 2], Mem[Seg(ScrollBuf^) : 0], 6136);
+  -------------------------------------------------------------------------- }
+{ @asm 004 1005:07f9 }
+
+{ --------------------------------------------------------------------------
+  1005:0853 -- write ONE column of one glyph into the buffer's run-up.
+
+  The font is 62 glyphs from space upward, each 378 bytes = 21 columns of 18
+  rows stored column-major, so a column is 18 consecutive bytes. Each call
+  drops one such column into buffer column 320 -- the right-hand edge, just
+  off screen -- and ScrollRender then slides it into view.
+
+  RET 4: Ch at BP+6, Col at BP+4. The original's index is
+  Ch * 378 + Col * 18 + Row + 1 - 12115, and 12115 is 32 * 378 + 18 + 1, so
+  the character is 32-based and the column one-based.
+  -------------------------------------------------------------------------- }
+procedure ScrollChar(Ch, Col : Byte);
+var
+  { SIX BYTES AND ONE OF THEM IS THE ONLY VARIABLE THAT MATTERS. 1005:0853
+    opens ENTER $06 and touches [BP-$02], the row, and [BP-$06], which is
+    assigned $140 at 1005:0857 and never read again. Nothing reaches [BP-$04].
+    There is no pointer local either: 1005:0889 reads the font byte straight
+    into DL. }
+  Row    : Integer;               { [BP-$02] }
+  Unread : Integer;               { [BP-$04], never touched }
+  Edge   : Integer;               { [BP-$06], assigned and never read }
+begin
+  Edge := ScrollEdge;                            { 1005:0857 }
+  for Row := 0 to ScrollRows - 1 do
+    { AND THE DESTINATION CARRIES NO Ofs(). 1005:088E does LES DI / MOV AX,ES
+      and uses only the SEGMENT of ScrollBuf; the offset is the arithmetic
+      below and nothing else. }
+    Mem[Seg(ScrollBuf^) : Row * ScrollPitch + ScrollEdge] :=
+      Font^[Ch, Col, Row + 1];
+end;
+
+{ --------------------------------------------------------------------------
+  1005:08ad -- one frame of the scroller.
+
+  The column counter advances by TWO because the bitmap slides two pixels a
+  frame, so every other column of each glyph is simply never written. The
+  message is therefore drawn at half its horizontal resolution -- which is
+  the original's behaviour, not a transcription slip.
+
+  It also runs the two 14 x 10 animations either side of the message, from
+  the same six-frame bank read in opposite directions, and rotates the
+  eight-entry colour cycle that DAC entries $80..$87 take.
+  -------------------------------------------------------------------------- }
+
+{ --------------------------------------------------------------------------
+  1005:08ad -- one frame of the scroller.
+
+  The column counter advances by TWO because the bitmap slides two pixels a
+  frame, so every other column of each glyph is simply never written. The
+  message is therefore drawn at half its horizontal resolution -- which is
+  the original's behaviour, not a transcription slip.
+
+  It also runs the two 14 x 10 animations either side of the message, from
+  the same six-frame bank read in opposite directions, and rotates the
+  eight-entry colour cycle that DAC entries $80..$87 take.
+  -------------------------------------------------------------------------- }
+procedure ScrollStep;
+var
+  { ONE BYTE, AND IT DOES BOTH JOBS. 1005:08ad opens ENTER $02 and the only slot
+    it touches is [BP-$01]: 1005:0950 stores the palette entry it is about to
+    overwrite, and 1005:0974 sets the same byte to zero and 1005:097A increments
+    it -- the `for` counter. There is no Pass either, because the rotation is
+    written out TWICE rather than looped; a Pass counter and a separate index
+    put the frame at $06. }
+  Last : Byte;                    { [BP-$01], then the colour index }
+begin
+  Inc(ScrollCol, 2);                             { 1005:08b1 }
+  if ScrollCol > GlyphCols then
+  begin
+    ScrollCol := 1;
+    Inc(ScrollIdx);
+  end;
+
+  { THE SPACE ARM COMES FIRST. 1005:08CC is CMP/JBE, which jumps to the message
+    arm and falls through to the space, so the test is `ScrollIdx > TextLen - 1`
+    with the space as the THEN. }
+  if ScrollIdx > TextLen then                   { 1005:08C7 -- CMP AL,$EC }
+    ScrollChar(Ord(' '), ScrollCol)
+  else
+    ScrollChar(Ord(Message[ScrollIdx]), ScrollCol);
+
+  ScrollRender;                                  { 1005:08f4 }
+
+  { 1005:08f7 -- the two side animations, three frames each shown four ticks
+    apart, one counting up and the other down so they mirror. }
+  SideTick := (SideTick mod 11) + 1;
+  Blit(@SideAnim[4 - ((SideTick shr 2) + 1)], $116, $1B, 14, 10, WorkSeg);
+  Blit(@SideAnim[(SideTick shr 2) + 4],       $1E,  $1B, 14, 10, WorkSeg);
+
+  { 1005:093f -- rotate the eight-entry cycle and show it. The original does
+    the whole thing TWICE per frame, so the colours run at double speed. }
+  Last := ScrollPal[24];                       { 1005:094D }
+  Move(ScrollPal[1], ScrollPal[4], 21);    { 1005:0953 }
+  FillChar(ScrollPal[1], 3, Last);            { 1005:0964 }
+  for Last := 0 to 7 do                          { 1005:0974 -- the same byte }
+    SetRGB($80 + Last, ScrollPal[Last * 3 + 1],
+           ScrollPal[Last * 3 + 1 + 1], ScrollPal[Last * 3 + 1 + 1 + 1]);
+
+  { and again, written out rather than looped }
+  Last := ScrollPal[24];
+  Move(ScrollPal[1], ScrollPal[4], 21);
+  FillChar(ScrollPal[1], 3, Last);
+  for Last := 0 to 7 do
+    SetRGB($80 + Last, ScrollPal[Last * 3 + 1],
+           ScrollPal[Last * 3 + 1 + 1], ScrollPal[Last * 3 + 1 + 1 + 1]);
+end;
+
+{ ==========================================================================
+  The lemmings
+  ========================================================================== }
+
+{ 1005:06c8 -- free every slot. }
+
+{ --------------------------------------------------------------------------
+  1005:0a4f -- the hillside's own animation, three frames of 43 x 24 at
+  (113, 50), stepping every fourth tick. Nothing to do with the lemmings; it
+  just shares the frame loop.
+  -------------------------------------------------------------------------- }
+procedure BackdropAnim;
+begin
+  HillTick := (HillTick mod 11) + 1;
+  Blit(@HillAnim[(HillTick shr 2) + 1], $71, $32, 43, 24, WorkSeg);
+end;
+
+{ ==========================================================================
+  The scene
+  ========================================================================== }
+
+{ --------------------------------------------------------------------------
+  1005:0000 -- the title screen slides in one column at a time.
+
+  Every column of the screen gets a random head start of Random(200) - 400,
+  so they all begin off the top by different amounts. Each of 400 passes
+  walks the 200 columns and, for any whose offset has reached zero, copies
+  that column down the screen; the rest just count up. The result is 200
+  vertical strips arriving at staggered times.
+  -------------------------------------------------------------------------- }
+{ @asm 004 1005:0029 }
+
+{ --------------------------------------------------------------------------
+  1005:0a86 -- blank the DAC, put the hillside up, fade it in, then run a
+  seven-frame animation BACKWARDS at (5, 50) and start the music.
+  -------------------------------------------------------------------------- }
+procedure Intro;
+var
+  { I IS DECLARED FIRST, and the difference is a byte of displacement on every
+    one of its nine references. 1005:0a8a passes LEA DI,[BP-$302] to
+    GetPalette768 and 0a97 writes the counter at [BP-$02]; first declared is
+    nearest BP, so the counter comes first and the 768-byte buffer sits below
+    it. Ours had them the other way round, which put the counter at [BP-$302]
+    -- a 16-bit displacement where the original has an 8-bit one, two bytes
+    longer at every reference and everything after them out of step. }
+  I   : Integer;                  { [BP-$02] }
+  Pal : TPal768;                  { [BP-$302] }
+begin
+  GetPalette768(@Pal);                           { 1005:0A8A }
+  for I := 0 to 255 do SetRGB(I, 0, 0, 0);
+  CopyScreen(VirtScrSeg, $A000);
+  PaletteFadeUp(@Pal, 0);                        { 1005:0AB6 }
+
+  for I := 6 downto 1 do                         { 1005:0ABF }
+  begin
+    FillRect(5, $32, $46, $4A, 0, VirtScrSeg);
+    Blit(@IntroAnim[I], 5, $32, 65, 24, VirtScrSeg);
+    CopyScreen(VirtScrSeg, $A000);
+    Delay($96);                                  { 150 }
+  end;
+
+  MusicStart;                                    { 1005:0B1D }
+end;
+
+{ 1005:1c9a -- the two heap blocks the scene needs beyond the virtual screen. }
+
+{ THE LEMMING COMES FIRST. 1005:0b22 reads the state byte from [BP+$04] and the
+  index from [BP+$06], and parameters are pushed left to right, so the one
+  nearest BP is the LAST declared -- which makes N the first parameter and the
+  state the second. Every call site had them the other way round, and that is
+  two differing instructions per call across nine routines. }
+procedure SetState(N : Integer; S : Byte);
+begin
+  Lem[N].State := S;
+  Lem[N].Frame := 1;
+  Lem[N].Tick  := 0;
+end;
+
+{ --------------------------------------------------------------------------
+  1005:06e7 -- put one lemming in the first free slot.
+
+  The four `if Spawned = ...` arms are the choreography: at the 3rd, 5th,
+  65th and 80th lemming a SPECIFIC slot is given a trigger, so that when
+  whoever is in it reaches that pixel it is forced into a state. Slot 3
+  (DS:$034B) is sent tunnelling and then exploding, slot 1 (DS:$0321) does
+  the same later, and slot 5 (DS:$0375) is set digging.
+
+  That is how the set piece is staged: the lemmings are otherwise autonomous.
+  -------------------------------------------------------------------------- }
+
+{ --------------------------------------------------------------------------
+  1005:0b68 -- state 2, falling.
+
+  Looks one row down across seven columns. Landing on Ground turns it back
+  into a walker unless it has fallen 11 pixels or more, in which case the
+  SECOND such landing splats it -- the first is survived and counted.
+  Landing on the $20..$29 hazard stripe is always fatal.
+
+  While it has nothing under it, it drifts one pixel in its facing direction
+  for the first two rows of the fall only, then drops straight.
+  -------------------------------------------------------------------------- }
+procedure Faller(N : Integer);
+var
+  { AN OUTER LOOP THAT RUNS EXACTLY ONCE -- `for DY_ := 1 to 1`. Its variable is
+    the Y offset, and it is a VARIABLE rather than the literal 1 this routine
+    once passed: 1005:0B97 reads [BP-$02] and adds it to Lem[N].Y.
+
+    THE BOUND IS THE CONSTANT 1, and the tell is at the bottom. 1005:0CA1 is
+    `CMP [BP-$02],1 / JE / JMP 0B73` -- which is `JNE @inc` written the long way
+    because @inc is 818 bytes back, out of a short branch's reach. That is a for
+    loop's bound test, not an `if DY_ = 1`, so the code at 1005:0CAA is AFTER
+    the loop rather than inside it. Written as a repeat with the increment at
+    the bottom, the increment lands in the wrong place: the original's is at
+    1005:0B73, above the body, which is where a `for` puts it. }
+  DY_ : Integer;                  { [BP-$02] }
+  DX_ : Integer;                  { [BP-$04] }
+  Pix : Byte;                     { [BP-$05] }
+begin
+  for DY_ := 1 to 1 do
+  begin
+    for DX_ := -3 to 3 do
+    begin
+      Pix := GetPixel(Lem[N].X + DX_, Lem[N].Y + DY_, VirtScrSeg);
+      if Pix in Ground then
+      begin
+        { THE HARD-LANDING ARM COMES FIRST. 1005:0BDC is CMP/JBE, which jumps
+          to the survivable branch, so the test is `FallDist > 10` with the
+          bounce as the THEN and not `< 11` with it as the ELSE. }
+        if Lem[N].FallDist > 10 then
+        begin
+          Inc(Lem[N].Bounces);                   { 1005:0BE2 }
+          if Lem[N].Bounces = 2 then
+            SetState(N, StSplat)
+          else
+          begin
+            SetState(N, StWalker);
+            Lem[N].Y := Lem[N].Y + DY_ - 1;
+            Lem[N].FallDist := 0;
+          end;
+        end
+        else
+        begin
+          SetState(N, StWalker);
+          { + DY_ - 1, which is nothing while DY_ is 1 -- transcribed because
+            1005:0bd5 adds it. }
+          Lem[N].Y := Lem[N].Y + DY_ - 1;
+          Lem[N].FallDist := 0;
+        end;
+        Lem[N].Frame := (Lem[N].Frame mod 4) + 1;
+        Exit;
+      end;
+      case Pix of $20..$29 :
+        begin
+          SetState(N, StDeathB);
+          Exit;
+        end;
+      end;
+    end;
+
+  end;
+
+  { 1005:0CAA -- and this is AFTER the loop, reached when nothing was found. }
+  if Lem[N].FallDist < 2 then Inc(Lem[N].X, Lem[N].Dir);
+  Inc(Lem[N].Y);
+  Inc(Lem[N].FallDist);
+  Lem[N].Frame := (Lem[N].Frame mod 4) + 1;
+end;
+
+
+{ --------------------------------------------------------------------------
+  1005:0df5 -- state 4, the DIAGONAL digger.
+
+  Erases a bite out of the hillside with colour 0 and, every sixth frame,
+  moves two pixels along and one down -- so it cuts a slope. It keeps going
+  only while there is still something in the WALL set in front of it; the
+  moment there is not, it becomes a walker again and the tunnel ends.
+
+  The two facings are not mirror images: leftward uses three DrawLine
+  strokes, rightward five VLines and an HLine. That asymmetry is the
+  original's.
+  -------------------------------------------------------------------------- }
+
+{ --------------------------------------------------------------------------
+  1005:0d1a -- state 5, building.
+
+  Every third tick advances the animation, and on the sixth frame it steps up
+  and to the right and lays a five-pixel brick in colour $4D INTO THE
+  HILLSIDE -- so the staircase it builds is real terrain that other lemmings
+  can then walk on.
+
+  It only ever builds to the right: the step is +2 X regardless of facing.
+  After 500 ticks it gives up, becomes a walker and sets a 20-frame timer,
+  which UpdateAll turns into a fuse.
+  -------------------------------------------------------------------------- }
+procedure Builder(N : Integer);
+begin
+      { LONGHAND: the original loads, INCs the register and stores back, and
+        recomputes the subscript's IMUL for each -- 1005:1884 in DeathA is the
+        pattern. `Inc` on an indexed field increments in place and needs a slot
+        for the address, which is what gave these routines a frame the original
+        has none of. NOT every Inc in this unit is wrong: Bounces at 1005:0BE2
+        really is the short form. }
+  Lem[N].Tick := Lem[N].Tick + 1;
+  if Lem[N].Tick mod 3 = 0 then
+  begin
+    Lem[N].Frame := (Lem[N].Frame mod 6) + 1;
+    if Lem[N].Frame = 6 then
+    begin
+      Inc(Lem[N].X, 2);
+      Dec(Lem[N].Y);
+      HLine(Lem[N].X - 2, Lem[N].X + 2, Lem[N].Y + 2,
+            BrickColour, VirtScrSeg);
+    end;
+  end;
+  if Lem[N].Tick = 500 then
+  begin
+    SetState(N, StWalker);
+    Lem[N].Timer := $14;
+  end;
+end;
+
+{ 1005:17ff -- state 8. On the fourth frame it stamps the last splat picture
+  PERMANENTLY into the hillside and removes itself, so the mark stays. }
+
+{ --------------------------------------------------------------------------
+  1005:0df5 -- state 4, the DIAGONAL digger.
+
+  Erases a bite out of the hillside with colour 0 and, every sixth frame,
+  moves two pixels along and one down -- so it cuts a slope. It keeps going
+  only while there is still something in the WALL set in front of it; the
+  moment there is not, it becomes a walker again and the tunnel ends.
+
+  The two facings are not mirror images: leftward uses three DrawLine
+  strokes, rightward five VLines and an HLine. That asymmetry is the
+  original's.
+  -------------------------------------------------------------------------- }
+procedure Digger(N : Integer);
+var
+  { FOUR DECLARED LOCALS AND ONE COMPILER TEMPORARY, in eight bytes. Digger's
+    range contains the WALL set as CS data at 1005:1146, which desynchronises a
+    linear disassembly -- an earlier reading of this frame counted 23 references
+    to [BP-$02] that are in fact Tunneller's, because the walk ran straight
+    through the data and past the next routine's ENTER. Digger itself never
+    touches [BP-$02] at all.
+
+    So: an Integer at [BP-$02] that is never read, the column at [BP-$04], the
+    flag and the pixel as bytes at [BP-$05] and [BP-$06], and [BP-$08] is the
+    upper bound of the `for` -- evaluated once into a temporary, which is why
+    there is no ColTo. }
+  Unread : Integer;               { [BP-$02], never read }
+  Col    : Integer;               { [BP-$04] }
+  Hit    : Boolean;               { [BP-$05] }
+  Pix    : Byte;                  { [BP-$06] }
+begin
+  Hit := False;
+  { THE RIGHTWARD BRANCH COMES FIRST. 1005:0E01 is CMP/JG, which jumps INTO
+    this branch and falls through to the other -- so the source tests
+    `Dir >= 1`, not `Dir < 1`. }
+  if Lem[N].Dir >= 1 then
+  begin
+    for Col := Lem[N].X - 3 to Lem[N].X + 3 + 1 do   { 1005:0E0B }
+    begin
+      Pix := GetPixel(Col, Lem[N].Y + 1, VirtScrSeg);
+      if Pix in Wall then Hit := True;
+    end;
+
+    { EVERY CONSTANT IS WRITTEN THE WAY THE ORIGINAL COMPUTES IT, because Turbo
+      Pascal emits one operation per operator instead of folding first: `+ 3 + 5`
+      is ADD AX,3 / ADD AX,5, `+ 3 + 1 + 1` is ADD AX,3 / INC AX / INC AX, and
+      `- 9 - 0` really does emit SUB AX,0. Collapsing them to + 8 and - 9 is a
+      different instruction stream for the same arithmetic. }
+    VLine(Lem[N].X + 3 + 1,     Lem[N].Y - 9 - 1,     Lem[N].Y,
+          0, VirtScrSeg);                            { 1005:0E6D }
+    VLine(Lem[N].X + 3 + 1 + 1, Lem[N].Y - 9 - 0,     Lem[N].Y - 0,
+          0, VirtScrSeg);                            { 1005:0E98 }
+    VLine(Lem[N].X + 3 + 3,     Lem[N].Y - 9 + 1,     Lem[N].Y - 1,
+          0, VirtScrSeg);                            { 1005:0ECA }
+    VLine(Lem[N].X + 3 + 4,     Lem[N].Y - 9 + 1 + 1, Lem[N].Y - 1 - 1,
+          0, VirtScrSeg);                            { 1005:0EF9 }
+    VLine(Lem[N].X + 3 + 5,     Lem[N].Y - 9 + 3,     Lem[N].Y - 3,
+          0, VirtScrSeg);                            { 1005:0F2A }
+    HLine(Lem[N].X - 3, Lem[N].X + 3 + 1 + 1, Lem[N].Y,
+          0, VirtScrSeg);                            { 1005:0F5D }
+  end
+  else
+  begin
+    for Col := Lem[N].X - 3 to Lem[N].X + 3 do       { 1005:0F8B }
+    begin
+      Pix := GetPixel(Col, Lem[N].Y + 1, VirtScrSeg);
+      if Pix in Wall then Hit := True;
+    end;
+
+    DrawLine(Lem[N].X - 3 + 1,     Lem[N].Y - 9 - 1 - 1,
+             Lem[N].X - 3 + 1,     Lem[N].Y + 1,
+             0, VirtScrSeg);                         { 1005:0FEC }
+    DrawLine(Lem[N].X - 3 + 1 + 1, Lem[N].Y - 9 - 1 - 1,
+             Lem[N].X - 3 + 1 + 1, Lem[N].Y + 1,
+             0, VirtScrSeg);                         { 1005:1029 }
+    DrawLine(Lem[N].X - 3 - 1 - 1, Lem[N].Y + 1,
+             Lem[N].X + 3 + 1 + 1, Lem[N].Y + 1,
+             0, VirtScrSeg);                         { 1005:1068 }
+  end;
+
+  Lem[N].Tick := (Lem[N].Tick mod 3) + 1;            { 1005:10A3 }
+  if Lem[N].Tick mod 3 = 0 then
+  begin
+    Lem[N].Frame := (Lem[N].Frame mod 6) + 1;
+    if Lem[N].Frame mod 6 = 0 then
+    begin
+      Inc(Lem[N].X, Lem[N].Dir * 2);
+      Inc(Lem[N].Y);
+    end;
+  end;
+
+  if not Hit then SetState(N, StWalker);
+end;
+
+
+procedure Tunneller(N : Integer);
+var
+  { FOUR DECLARATIONS AND TWO TEMPORARIES, in ten bytes. 1005:1166 opens
+    ENTER $A and touches [BP-$02], [BP-$04], [BP-$05], [BP-$06], [BP-$08] and
+    [BP-$0A]. The last two are the compiler's: 1005:1189 stores the outer
+    loop's limit into [BP-$08] and 1005:11AD stores the inner loop's into
+    [BP-$0A], recomputed on every outer pass -- so neither ColTo nor RowTo is a
+    variable, and declaring them produced them twice over. }
+  Row  : Integer;                 { [BP-$02] }
+  Col  : Integer;                 { [BP-$04] }
+  Hit  : Boolean;                 { [BP-$05] }
+  Pix  : Byte;                    { [BP-$06] -- the pixel is READ INTO A BYTE
+                                    before it is tested; inside the `in` test
+                                    it stays in a register and loses the slot }
+begin
+  Hit := False;
+  { THE RIGHTWARD BRANCH COMES FIRST: 1005:1172 is CMP/JG, which jumps into it
+    and falls through to the other, so the test is `Dir >= 1`. }
+  if Lem[N].Dir >= 1 then
+  begin
+    for Col := Lem[N].X + 3 + 1 to Lem[N].X + 3 + 1 + 1 do   { 1005:117C }
+      for Row := Lem[N].Y - 9 to Lem[N].Y do                 { 1005:11A5 }
+      begin
+        Pix := GetPixel(Col, Row, VirtScrSeg);
+        if Pix in Wall then Hit := True;
+      end;
+
+    { Every constant is written as the original computes it -- one operation
+      per operator, so `+ 3 + 1 + 1` is ADD AX,3 / INC AX / INC AX and `+ 3 + 0`
+      really does emit ADD AX,0. See the wiki's one-operation-per-operator. }
+    VLine(Lem[N].X + 3 - 1 - 1, Lem[N].Y - 9 - 1,     Lem[N].Y,
+          0, VirtScrSeg);                                    { 1005:1204 }
+    VLine(Lem[N].X + 3 - 1,     Lem[N].Y - 9,         Lem[N].Y - 1,
+          0, VirtScrSeg);                                    { 1005:1230 }
+    VLine(Lem[N].X + 3 + 0,     Lem[N].Y - 9 + 1,     Lem[N].Y - 1 - 1,
+          0, VirtScrSeg);                                    { 1005:125C }
+    VLine(Lem[N].X + 3 + 1,     Lem[N].Y - 9 + 1 + 1, Lem[N].Y - 3,
+          0, VirtScrSeg);                                    { 1005:128C }
+    VLine(Lem[N].X + 3 + 1 + 1, Lem[N].Y - 9 + 3,     Lem[N].Y - 4,
+          0, VirtScrSeg);                                    { 1005:12BC }
+    VLine(Lem[N].X + 3 + 3,     Lem[N].Y - 9 + 4,     Lem[N].Y - 5,
+          0, VirtScrSeg);                                    { 1005:12EE }
+  end
+  else
+  begin
+    for Col := Lem[N].X - 3 - 1 - 1 to Lem[N].X - 3 - 1 do   { 1005:1324 }
+      for Row := Lem[N].Y - 9 to Lem[N].Y do
+      begin
+        Pix := GetPixel(Col, Row, VirtScrSeg);
+        if Pix in Wall then Hit := True;
+      end;
+
+    VLine(Lem[N].X - 3 - 1,     Lem[N].Y - 9,         Lem[N].Y,
+          0, VirtScrSeg);                                    { 1005:13A6 }
+    VLine(Lem[N].X - 3 - 1 - 1, Lem[N].Y - 9 + 1 + 1, Lem[N].Y - 1 - 1,
+          0, VirtScrSeg);                                    { 1005:13D0 }
+    VLine(Lem[N].X - 3 - 3,     Lem[N].Y - 9 + 3,     Lem[N].Y - 3,
+          0, VirtScrSeg);                                    { 1005:1400 }
+  end;
+
+  Lem[N].Frame := (Lem[N].Frame mod 3) + 1;
+  if Lem[N].Frame mod 3 = 0 then
+    Inc(Lem[N].X, Lem[N].Dir);
+
+  if not Hit then SetState(N, StWalker);
+end;
+
+{ --------------------------------------------------------------------------
+  1005:0d1a -- state 5, building.
+
+  Every third tick advances the animation, and on the sixth frame it steps up
+  and to the right and lays a five-pixel brick in colour $4D INTO THE
+  HILLSIDE -- so the staircase it builds is real terrain that other lemmings
+  can then walk on.
+
+  It only ever builds to the right: the step is +2 X regardless of facing.
+  After 500 ticks it gives up, becomes a walker and sets a 20-frame timer,
+  which UpdateAll turns into a fuse.
+  -------------------------------------------------------------------------- }
 
 { --------------------------------------------------------------------------
   1005:14d6 -- state 1, walking.
@@ -1067,272 +1710,6 @@ end;
   While it has nothing under it, it drifts one pixel in its facing direction
   for the first two rows of the fall only, then drops straight.
   -------------------------------------------------------------------------- }
-procedure Faller(N : Integer);
-var
-  { AN OUTER LOOP THAT RUNS EXACTLY ONCE -- `for DY_ := 1 to 1`. Its variable is
-    the Y offset, and it is a VARIABLE rather than the literal 1 this routine
-    once passed: 1005:0B97 reads [BP-$02] and adds it to Lem[N].Y.
-
-    THE BOUND IS THE CONSTANT 1, and the tell is at the bottom. 1005:0CA1 is
-    `CMP [BP-$02],1 / JE / JMP 0B73` -- which is `JNE @inc` written the long way
-    because @inc is 818 bytes back, out of a short branch's reach. That is a for
-    loop's bound test, not an `if DY_ = 1`, so the code at 1005:0CAA is AFTER
-    the loop rather than inside it. Written as a repeat with the increment at
-    the bottom, the increment lands in the wrong place: the original's is at
-    1005:0B73, above the body, which is where a `for` puts it. }
-  DY_ : Integer;                  { [BP-$02] }
-  DX_ : Integer;                  { [BP-$04] }
-  Pix : Byte;                     { [BP-$05] }
-begin
-  for DY_ := 1 to 1 do
-  begin
-    for DX_ := -3 to 3 do
-    begin
-      Pix := GetPixel(Lem[N].X + DX_, Lem[N].Y + DY_, VirtScrSeg);
-      if Pix in Ground then
-      begin
-        { THE HARD-LANDING ARM COMES FIRST. 1005:0BDC is CMP/JBE, which jumps
-          to the survivable branch, so the test is `FallDist > 10` with the
-          bounce as the THEN and not `< 11` with it as the ELSE. }
-        if Lem[N].FallDist > 10 then
-        begin
-          Inc(Lem[N].Bounces);                   { 1005:0BE2 }
-          if Lem[N].Bounces = 2 then
-            SetState(N, StSplat)
-          else
-          begin
-            SetState(N, StWalker);
-            Lem[N].Y := Lem[N].Y + DY_ - 1;
-            Lem[N].FallDist := 0;
-          end;
-        end
-        else
-        begin
-          SetState(N, StWalker);
-          { + DY_ - 1, which is nothing while DY_ is 1 -- transcribed because
-            1005:0bd5 adds it. }
-          Lem[N].Y := Lem[N].Y + DY_ - 1;
-          Lem[N].FallDist := 0;
-        end;
-        Lem[N].Frame := (Lem[N].Frame mod 4) + 1;
-        Exit;
-      end;
-      case Pix of $20..$29 :
-        begin
-          SetState(N, StDeathB);
-          Exit;
-        end;
-      end;
-    end;
-
-  end;
-
-  { 1005:0CAA -- and this is AFTER the loop, reached when nothing was found. }
-  if Lem[N].FallDist < 2 then Inc(Lem[N].X, Lem[N].Dir);
-  Inc(Lem[N].Y);
-  Inc(Lem[N].FallDist);
-  Lem[N].Frame := (Lem[N].Frame mod 4) + 1;
-end;
-
-
-{ --------------------------------------------------------------------------
-  1005:0df5 -- state 4, the DIAGONAL digger.
-
-  Erases a bite out of the hillside with colour 0 and, every sixth frame,
-  moves two pixels along and one down -- so it cuts a slope. It keeps going
-  only while there is still something in the WALL set in front of it; the
-  moment there is not, it becomes a walker again and the tunnel ends.
-
-  The two facings are not mirror images: leftward uses three DrawLine
-  strokes, rightward five VLines and an HLine. That asymmetry is the
-  original's.
-  -------------------------------------------------------------------------- }
-procedure Digger(N : Integer);
-var
-  { FOUR DECLARED LOCALS AND ONE COMPILER TEMPORARY, in eight bytes. Digger's
-    range contains the WALL set as CS data at 1005:1146, which desynchronises a
-    linear disassembly -- an earlier reading of this frame counted 23 references
-    to [BP-$02] that are in fact Tunneller's, because the walk ran straight
-    through the data and past the next routine's ENTER. Digger itself never
-    touches [BP-$02] at all.
-
-    So: an Integer at [BP-$02] that is never read, the column at [BP-$04], the
-    flag and the pixel as bytes at [BP-$05] and [BP-$06], and [BP-$08] is the
-    upper bound of the `for` -- evaluated once into a temporary, which is why
-    there is no ColTo. }
-  Unread : Integer;               { [BP-$02], never read }
-  Col    : Integer;               { [BP-$04] }
-  Hit    : Boolean;               { [BP-$05] }
-  Pix    : Byte;                  { [BP-$06] }
-begin
-  Hit := False;
-  { THE RIGHTWARD BRANCH COMES FIRST. 1005:0E01 is CMP/JG, which jumps INTO
-    this branch and falls through to the other -- so the source tests
-    `Dir >= 1`, not `Dir < 1`. }
-  if Lem[N].Dir >= 1 then
-  begin
-    for Col := Lem[N].X - 3 to Lem[N].X + 3 + 1 do   { 1005:0E0B }
-    begin
-      Pix := GetPixel(Col, Lem[N].Y + 1, VirtScrSeg);
-      if Pix in Wall then Hit := True;
-    end;
-
-    { EVERY CONSTANT IS WRITTEN THE WAY THE ORIGINAL COMPUTES IT, because Turbo
-      Pascal emits one operation per operator instead of folding first: `+ 3 + 5`
-      is ADD AX,3 / ADD AX,5, `+ 3 + 1 + 1` is ADD AX,3 / INC AX / INC AX, and
-      `- 9 - 0` really does emit SUB AX,0. Collapsing them to + 8 and - 9 is a
-      different instruction stream for the same arithmetic. }
-    VLine(Lem[N].X + 3 + 1,     Lem[N].Y - 9 - 1,     Lem[N].Y,
-          0, VirtScrSeg);                            { 1005:0E6D }
-    VLine(Lem[N].X + 3 + 1 + 1, Lem[N].Y - 9 - 0,     Lem[N].Y - 0,
-          0, VirtScrSeg);                            { 1005:0E98 }
-    VLine(Lem[N].X + 3 + 3,     Lem[N].Y - 9 + 1,     Lem[N].Y - 1,
-          0, VirtScrSeg);                            { 1005:0ECA }
-    VLine(Lem[N].X + 3 + 4,     Lem[N].Y - 9 + 1 + 1, Lem[N].Y - 1 - 1,
-          0, VirtScrSeg);                            { 1005:0EF9 }
-    VLine(Lem[N].X + 3 + 5,     Lem[N].Y - 9 + 3,     Lem[N].Y - 3,
-          0, VirtScrSeg);                            { 1005:0F2A }
-    HLine(Lem[N].X - 3, Lem[N].X + 3 + 1 + 1, Lem[N].Y,
-          0, VirtScrSeg);                            { 1005:0F5D }
-  end
-  else
-  begin
-    for Col := Lem[N].X - 3 to Lem[N].X + 3 do       { 1005:0F8B }
-    begin
-      Pix := GetPixel(Col, Lem[N].Y + 1, VirtScrSeg);
-      if Pix in Wall then Hit := True;
-    end;
-
-    DrawLine(Lem[N].X - 3 + 1,     Lem[N].Y - 9 - 1 - 1,
-             Lem[N].X - 3 + 1,     Lem[N].Y + 1,
-             0, VirtScrSeg);                         { 1005:0FEC }
-    DrawLine(Lem[N].X - 3 + 1 + 1, Lem[N].Y - 9 - 1 - 1,
-             Lem[N].X - 3 + 1 + 1, Lem[N].Y + 1,
-             0, VirtScrSeg);                         { 1005:1029 }
-    DrawLine(Lem[N].X - 3 - 1 - 1, Lem[N].Y + 1,
-             Lem[N].X + 3 + 1 + 1, Lem[N].Y + 1,
-             0, VirtScrSeg);                         { 1005:1068 }
-  end;
-
-  Lem[N].Tick := (Lem[N].Tick mod 3) + 1;            { 1005:10A3 }
-  if Lem[N].Tick mod 3 = 0 then
-  begin
-    Lem[N].Frame := (Lem[N].Frame mod 6) + 1;
-    if Lem[N].Frame mod 6 = 0 then
-    begin
-      Inc(Lem[N].X, Lem[N].Dir * 2);
-      Inc(Lem[N].Y);
-    end;
-  end;
-
-  if not Hit then SetState(N, StWalker);
-end;
-
-procedure Tunneller(N : Integer);
-var
-  { FOUR DECLARATIONS AND TWO TEMPORARIES, in ten bytes. 1005:1166 opens
-    ENTER $A and touches [BP-$02], [BP-$04], [BP-$05], [BP-$06], [BP-$08] and
-    [BP-$0A]. The last two are the compiler's: 1005:1189 stores the outer
-    loop's limit into [BP-$08] and 1005:11AD stores the inner loop's into
-    [BP-$0A], recomputed on every outer pass -- so neither ColTo nor RowTo is a
-    variable, and declaring them produced them twice over. }
-  Row  : Integer;                 { [BP-$02] }
-  Col  : Integer;                 { [BP-$04] }
-  Hit  : Boolean;                 { [BP-$05] }
-  Pix  : Byte;                    { [BP-$06] -- the pixel is READ INTO A BYTE
-                                    before it is tested; inside the `in` test
-                                    it stays in a register and loses the slot }
-begin
-  Hit := False;
-  { THE RIGHTWARD BRANCH COMES FIRST: 1005:1172 is CMP/JG, which jumps into it
-    and falls through to the other, so the test is `Dir >= 1`. }
-  if Lem[N].Dir >= 1 then
-  begin
-    for Col := Lem[N].X + 3 + 1 to Lem[N].X + 3 + 1 + 1 do   { 1005:117C }
-      for Row := Lem[N].Y - 9 to Lem[N].Y do                 { 1005:11A5 }
-      begin
-        Pix := GetPixel(Col, Row, VirtScrSeg);
-        if Pix in Wall then Hit := True;
-      end;
-
-    { Every constant is written as the original computes it -- one operation
-      per operator, so `+ 3 + 1 + 1` is ADD AX,3 / INC AX / INC AX and `+ 3 + 0`
-      really does emit ADD AX,0. See the wiki's one-operation-per-operator. }
-    VLine(Lem[N].X + 3 - 1 - 1, Lem[N].Y - 9 - 1,     Lem[N].Y,
-          0, VirtScrSeg);                                    { 1005:1204 }
-    VLine(Lem[N].X + 3 - 1,     Lem[N].Y - 9,         Lem[N].Y - 1,
-          0, VirtScrSeg);                                    { 1005:1230 }
-    VLine(Lem[N].X + 3 + 0,     Lem[N].Y - 9 + 1,     Lem[N].Y - 1 - 1,
-          0, VirtScrSeg);                                    { 1005:125C }
-    VLine(Lem[N].X + 3 + 1,     Lem[N].Y - 9 + 1 + 1, Lem[N].Y - 3,
-          0, VirtScrSeg);                                    { 1005:128C }
-    VLine(Lem[N].X + 3 + 1 + 1, Lem[N].Y - 9 + 3,     Lem[N].Y - 4,
-          0, VirtScrSeg);                                    { 1005:12BC }
-    VLine(Lem[N].X + 3 + 3,     Lem[N].Y - 9 + 4,     Lem[N].Y - 5,
-          0, VirtScrSeg);                                    { 1005:12EE }
-  end
-  else
-  begin
-    for Col := Lem[N].X - 3 - 1 - 1 to Lem[N].X - 3 - 1 do   { 1005:1324 }
-      for Row := Lem[N].Y - 9 to Lem[N].Y do
-      begin
-        Pix := GetPixel(Col, Row, VirtScrSeg);
-        if Pix in Wall then Hit := True;
-      end;
-
-    VLine(Lem[N].X - 3 - 1,     Lem[N].Y - 9,         Lem[N].Y,
-          0, VirtScrSeg);                                    { 1005:13A6 }
-    VLine(Lem[N].X - 3 - 1 - 1, Lem[N].Y - 9 + 1 + 1, Lem[N].Y - 1 - 1,
-          0, VirtScrSeg);                                    { 1005:13D0 }
-    VLine(Lem[N].X - 3 - 3,     Lem[N].Y - 9 + 3,     Lem[N].Y - 3,
-          0, VirtScrSeg);                                    { 1005:1400 }
-  end;
-
-  Lem[N].Frame := (Lem[N].Frame mod 3) + 1;
-  if Lem[N].Frame mod 3 = 0 then
-    Inc(Lem[N].X, Lem[N].Dir);
-
-  if not Hit then SetState(N, StWalker);
-end;
-
-{ --------------------------------------------------------------------------
-  1005:0d1a -- state 5, building.
-
-  Every third tick advances the animation, and on the sixth frame it steps up
-  and to the right and lays a five-pixel brick in colour $4D INTO THE
-  HILLSIDE -- so the staircase it builds is real terrain that other lemmings
-  can then walk on.
-
-  It only ever builds to the right: the step is +2 X regardless of facing.
-  After 500 ticks it gives up, becomes a walker and sets a 20-frame timer,
-  which UpdateAll turns into a fuse.
-  -------------------------------------------------------------------------- }
-procedure Builder(N : Integer);
-begin
-      { LONGHAND: the original loads, INCs the register and stores back, and
-        recomputes the subscript's IMUL for each -- 1005:1884 in DeathA is the
-        pattern. `Inc` on an indexed field increments in place and needs a slot
-        for the address, which is what gave these routines a frame the original
-        has none of. NOT every Inc in this unit is wrong: Bounces at 1005:0BE2
-        really is the short form. }
-  Lem[N].Tick := Lem[N].Tick + 1;
-  if Lem[N].Tick mod 3 = 0 then
-  begin
-    Lem[N].Frame := (Lem[N].Frame mod 6) + 1;
-    if Lem[N].Frame = 6 then
-    begin
-      Inc(Lem[N].X, 2);
-      Dec(Lem[N].Y);
-      HLine(Lem[N].X - 2, Lem[N].X + 2, Lem[N].Y + 2,
-            BrickColour, VirtScrSeg);
-    end;
-  end;
-  if Lem[N].Tick = 500 then
-  begin
-    SetState(N, StWalker);
-    Lem[N].Timer := $14;
-  end;
-end;
 
 { 1005:17ff -- state 8. On the fourth frame it stamps the last splat picture
   PERMANENTLY into the hillside and removes itself, so the mark stays. }
@@ -1358,6 +1735,8 @@ begin
 end;
 
 { 1005:1850 -- state 6. Six frames, one every fifth tick, then gone. }
+
+{ 1005:1850 -- state 6. Six frames, one every fifth tick, then gone. }
 procedure DeathA(N : Integer);
 begin
   Lem[N].Tick := (Lem[N].Tick mod 5) + 1;
@@ -1367,6 +1746,8 @@ begin
     if Lem[N].Frame > 6 then Remove(N);
   end;
 end;
+
+{ 1005:18a6 -- state 7. Five frames, one every third tick, then gone. }
 
 { 1005:18a6 -- state 7. Five frames, one every third tick, then gone. }
 procedure DeathB(N : Integer);
@@ -1380,6 +1761,8 @@ begin
 end;
 
 { 1005:18fc -- state 3, the lit fuse. Five frames, then it explodes. }
+
+{ 1005:18fc -- state 3, the lit fuse. Five frames, then it explodes. }
 procedure Fuse(N : Integer);
 begin
   Lem[N].Tick := (Lem[N].Tick mod 3) + 1;
@@ -1389,6 +1772,19 @@ begin
     if Lem[N].Frame > 5 then SetState(N, StExplode);
   end;
 end;
+
+{ --------------------------------------------------------------------------
+  1005:1954 -- state 11, the explosion.
+
+  While the fireball is in its first nine frames it runs five passes bumping
+  DAC entries $E0..$E9 one step up toward the scene palette. LoadAssets
+  deliberately BLACKED those ten entries after loading, so this is what
+  lights the explosion: the picture is already on screen in colours nobody
+  can see until the flash brings them up.
+
+  Past frame 15 it sets the timer to -60 and holds the frame, and UpdateAll
+  counts that back up to -1 and removes the lemming.
+  -------------------------------------------------------------------------- }
 
 { --------------------------------------------------------------------------
   1005:1954 -- state 11, the explosion.
@@ -1480,6 +1876,14 @@ end;
   handler runs, so a lemming is drawn in the state it was in at the start of
   the frame and moves afterwards.
   -------------------------------------------------------------------------- }
+
+{ --------------------------------------------------------------------------
+  1005:1a4c -- one pass over every slot.
+
+  The trigger test, the timer and the draw all happen BEFORE the state
+  handler runs, so a lemming is drawn in the state it was in at the start of
+  the frame and moves afterwards.
+  -------------------------------------------------------------------------- }
 procedure UpdateAll;
 var
   N : Integer;
@@ -1535,247 +1939,6 @@ end;
   (113, 50), stepping every fourth tick. Nothing to do with the lemmings; it
   just shares the frame loop.
   -------------------------------------------------------------------------- }
-procedure BackdropAnim;
-begin
-  HillTick := (HillTick mod 11) + 1;
-  Blit(@HillAnim[(HillTick shr 2) + 1], $71, $32, 43, 24, WorkSeg);
-end;
-
-{ ==========================================================================
-  The scene
-  ========================================================================== }
-
-{ --------------------------------------------------------------------------
-  1005:0000 -- the title screen slides in one column at a time.
-
-  Every column of the screen gets a random head start of Random(200) - 400,
-  so they all begin off the top by different amounts. Each of 400 passes
-  walks the 200 columns and, for any whose offset has reached zero, copies
-  that column down the screen; the rest just count up. The result is 200
-  vertical strips arriving at staggered times.
-  -------------------------------------------------------------------------- }
-{ @asm 004 1005:0029 }
-procedure ColumnSlideIn;
-{ --------------------------------------------------------------------------
-  EQUIVALENT PASCAL -- REFERENCE ONLY, not what is compiled.
-
-    for C := 200 downto 1 do
-    begin
-      Ofs := ColOfs[C];
-      if Ofs < 1 then
-      begin
-        Src := C + 60;  Dst := Src;
-        while (Ofs < 0) and (Src <= 64000) do
-        begin Inc(Ofs); Inc(Src, 320) end;
-        if Ofs = 0 then
-          while Src <= 64000 do
-          begin
-            Mem[$A000 : Dst] := Mem[VirtScrSeg : Src];
-            Inc(Dst, 320); Inc(Src, 320);
-          end;
-      end;
-      Inc(ColOfs[C]);
-    end;
-
-  That reads the same but does not RUN the same, and the difference is the
-  whole point of the routine being hand written. Pascal's Mem[Seg:Ofs] reloads
-  a segment register for every byte; the original loads ES and DS ONCE per
-  column and then runs a MOVSB loop, so the title screen assembles at the
-  speed the demo was timed for rather than a crawl.
-  -------------------------------------------------------------------------- }
-var
-  { TEN BYTES, NOT SIX. 1005:0000 opens ENTER $A and its slots are [BP-$02] four
-    times, [BP-$04] three times and [BP-$0A] twice -- and SrcSeg, which the asm
-    block reads and writes once each, is the pair at $0A. So the four bytes
-    between [BP-$04] and [BP-$0A] are a declaration nothing reads. }
-  C, Pass : Integer;              { [BP-$02], [BP-$04] }
-  Unread  : LongInt;              { [BP-$08], four bytes, never read }
-  SrcSeg  : Word;                 { [BP-$0A] }
-begin
-  { 1005:0004 -- this part IS compiled Pascal in the original: it calls
-    Random, so it has to be. }
-  for C := 0 to 200 do
-    ColOfs[C] := Random(200) - 400;              { 1005:000E }
-
-  { 1005:0029 to 1005:0097, transcribed instruction for instruction. }
-  asm
-        MOV     AX, VirtScrSeg  { 1005:0029  the assembled title screen      }
-        MOV     SrcSeg, AX      { 1005:002C                                  }
-        MOV     Pass, 1         { 1005:002F  first of four hundred passes    }
-        JMP     @@PassTop       { 1005:0034                                  }
-    @@NextPass:
-        INC     Pass            { 1005:0036                                  }
-    @@PassTop:
-        MOV     SI, OFFSET ColOfs
-                                { 1005:0039                                  }
-        ADD     SI, 400         { 1005:003C  one past the last entry         }
-        MOV     DX, SI          { 1005:0040  DX walks the table DOWNWARDS    }
-        MOV     CX, 200         { 1005:0042  and doubles as the column index }
-    @@Column:
-        PUSH    DS              { 1005:0045  DS is about to stop being DGROUP}
-        MOV     SI, DX          { 1005:0046                                  }
-        MOV     AX, [SI]        { 1005:0048  this column's offset            }
-        MOV     BX, 0A000h      { 1005:004A                                  }
-        MOV     ES, BX          { 1005:004D  ES is the DISPLAY               }
-        MOV     BX, SrcSeg      { 1005:004F                                  }
-        MOV     DS, BX          { 1005:0052  DS is the picture               }
-        MOV     SI, CX          { 1005:0054                                  }
-        ADD     SI, 3Ch         { 1005:0056  column CX, sixty bytes in       }
-        MOV     DI, SI          { 1005:0059  the column arrives at the TOP   }
-        CMP     AX, 1           { 1005:005B                                  }
-        JGE     @@Done          { 1005:005E  offset reached 1: it is home    }
-    @@Walk:
-        CMP     AX, 0           { 1005:0060                                  }
-        JZ      @@Copy          { 1005:0063  offset is zero: copy it now     }
-        INC     AX              { 1005:0065  still counting up to zero       }
-        ADD     SI, 140h        { 1005:0066  walk the SOURCE down a row --   }
-        CMP     SI, 0FA00h      { 1005:006A    the destination stays put,    }
-        JA      @@Done          { 1005:006E    which is what makes the strip }
-        JMP     @@Walk          { 1005:0070    look like it slides in        }
-    @@Copy:
-        MOVSB                   { 1005:0072  one pixel, ES:DI <- DS:SI       }
-        ADD     DI, 13Fh        { 1005:0073  MOVSB already added one, so     }
-        ADD     SI, 13Fh        { 1005:0077    both steps are 320            }
-        CMP     SI, 0FA00h      { 1005:007B                                  }
-        JA      @@Done          { 1005:007F  off the bottom of the picture   }
-        JMP     @@Copy          { 1005:0081                                  }
-    @@Done:
-        POP     DS              { 1005:0083  DGROUP again                    }
-        MOV     SI, DX          { 1005:0084                                  }
-        MOV     AX, [SI]        { 1005:0086                                  }
-        INC     AX              { 1005:0088  every column, arrived or not,   }
-        MOV     [SI], AX        { 1005:0089    is one step closer            }
-        SUB     DX, 2           { 1005:008B  the previous entry              }
-        LOOP    @@Column        { 1005:008E  200 columns per pass            }
-        CMP     Pass, 190h      { 1005:0090                                  }
-        JNZ     @@NextPass      { 1005:0095                                  }
-  end;
-end;
-
-{ --------------------------------------------------------------------------
-  1005:00a6 -- everything off NEUROSIS.DAT, and the title sequence.
-  -------------------------------------------------------------------------- }
-procedure LoadAssets;
-var
-  { ENTER $686 -- 1,670 bytes -- and this routine declared 898. The arithmetic
-    picks the missing item out on its own: 128 for the file record plus 768 for
-    a palette is 896, and the original's two scalar slots are at [BP-$681] and
-    [BP-$683], so everything above $681 is buffers. 128 + 768 + 768 is 1,664,
-    which fills BP-1 down to BP-$680 exactly -- there is a SECOND 768-byte
-    palette. Nothing in the routine reads it, and a local is allocated whether
-    or not it is read. }
-  { ENTER $686 -- 1,670 bytes -- AND ONLY TWO SLOTS ARE EVER TOUCHED:
-    [BP-$683] seven times and [BP-$681] five. The whole layout follows from
-    those two addresses and the total.
-
-    [BP-$681] is the palette buffer -- 1005:0109 is LEA DI,[BP-$681] / PUSH SS
-    in front of a 768-byte BlockRead -- so it occupies BP-$681 up to BP-$382.
-    That leaves 897 bytes ABOVE it and five below, and the five are [BP-$683]
-    for the loop counter plus one more slot and Turbo Pascal's rounding of an
-    odd total up to even.
-
-    THE 897 ABOVE IS TOUCHED BY NOTHING, and 768 + 128 + 1 is exactly 897 --
-    a second palette, a file record, and a byte. The file record is the one
-    worth naming: the routine's real file is the unit-level global at DS:$CF07
-    now, so these 128 bytes are a SECOND record that is never opened. That is
-    the seventh routine in this target to reserve storage it never uses.
-
-    ORDER IS THE WHOLE POINT HERE. These same six declarations in the order
-    F, Pal, Pal2, Spare, I, Spare2 also sum to $686, and the frame matched
-    while the palette sat at [BP-$380] instead of [BP-$681] -- so every
-    reference to it was four bytes of displacement different from the
-    original's. A frame that matches says nothing about where inside it
-    anything is. }
-  Pal2   : TPal768;               { [BP-$300], never read }
-  Unread : file;                  { [BP-$380], never opened }
-  Spare  : Byte;                  { [BP-$381] }
-  Pal    : TPal768;               { [BP-$681] }
-  I      : Integer;               { [BP-$683] }
-  Spare2 : Integer;               { [BP-$685] -- and BP-$686 is the pad }
-begin
-  Assign(F, 'neurosis.dat');
-  Reset(F, 1);
-  Seek(F, DataOfs);
-
-  GetMem(Font, SizeOf(TFont));                   { 1005:00BE }
-  BlockRead(F, Font^, SizeOf(TFont));
-
-  ClearScreen($A000, 0);
-  BlockRead(F, Pal, SizeOf(Pal));
-  SetPalette768(@Pal);
-  BlockRead(F, Mem[VirtScrSeg : 0], 64000);      { the title screen }
-
-  ColumnSlideIn;                                 { 1005:0116 }
-  Delay($514);                                   { 1300 }
-  GetPalette768(@Pal);
-  for I := 1 to $40 do FadeStep;                 { 1005:0132 }
-
-  ClearScreen($A000, 0);
-  BlockRead(F, Mem[VirtScrSeg : 0], 64000);      { the hillside }
-  BlockRead(F, Pal, SizeOf(Pal));
-  BlockRead(F, ScenePal, SizeOf(ScenePal));      { DS:$CC07 }
-
-  BlockRead(F, WalkBank,  SizeOf(WalkBank));
-  BlockRead(F, TumbleBk,  SizeOf(TumbleBk));
-  BlockRead(F, SplatBank, SizeOf(SplatBank));
-  BlockRead(F, DigBank,   SizeOf(DigBank));
-  BlockRead(F, TunnelBk,  SizeOf(TunnelBk));
-  BlockRead(F, DeathBBk,  SizeOf(DeathBBk));
-  BlockRead(F, HillAnim,  SizeOf(HillAnim));
-  BlockRead(F, DeathABk,  SizeOf(DeathABk));
-  BlockRead(F, BuildBank, SizeOf(BuildBank));
-  BlockRead(F, DeathAPic, SizeOf(DeathAPic));
-  BlockRead(F, IntroAnim, SizeOf(IntroAnim));
-  BlockRead(F, SideAnim,  SizeOf(SideAnim));
-  BlockRead(F, Explosion, SizeOf(Explosion));
-  BlockRead(F, FuseBank,  SizeOf(FuseBank));
-  Close(F);
-
-  SetPalette768(@Pal);                           { 1005:0304 }
-  { 1005:030F -- black out the ten entries the explosion will light. }
-  for I := $E0 to $E9 do SetRGB(I, 0, 0, 0);
-end;
-
-{ --------------------------------------------------------------------------
-  1005:0a86 -- blank the DAC, put the hillside up, fade it in, then run a
-  seven-frame animation BACKWARDS at (5, 50) and start the music.
-  -------------------------------------------------------------------------- }
-procedure Intro;
-var
-  { I IS DECLARED FIRST, and the difference is a byte of displacement on every
-    one of its nine references. 1005:0a8a passes LEA DI,[BP-$302] to
-    GetPalette768 and 0a97 writes the counter at [BP-$02]; first declared is
-    nearest BP, so the counter comes first and the 768-byte buffer sits below
-    it. Ours had them the other way round, which put the counter at [BP-$302]
-    -- a 16-bit displacement where the original has an 8-bit one, two bytes
-    longer at every reference and everything after them out of step. }
-  I   : Integer;                  { [BP-$02] }
-  Pal : TPal768;                  { [BP-$302] }
-begin
-  GetPalette768(@Pal);                           { 1005:0A8A }
-  for I := 0 to 255 do SetRGB(I, 0, 0, 0);
-  CopyScreen(VirtScrSeg, $A000);
-  PaletteFadeUp(@Pal, 0);                        { 1005:0AB6 }
-
-  for I := 6 downto 1 do                         { 1005:0ABF }
-  begin
-    FillRect(5, $32, $46, $4A, 0, VirtScrSeg);
-    Blit(@IntroAnim[I], 5, $32, 65, 24, VirtScrSeg);
-    CopyScreen(VirtScrSeg, $A000);
-    Delay($96);                                  { 150 }
-  end;
-
-  MusicStart;                                    { 1005:0B1D }
-end;
-
-{ 1005:1c9a -- the two heap blocks the scene needs beyond the virtual screen. }
-procedure Setup;
-begin
-  GetMem(WorkScr, 64000);
-  GetMem(ScrollBuf, ScrollSize);
-  FillChar(ScrollBuf^, ScrollSize, 0);
-  WorkSeg := Seg(WorkScr^);
-end;
 
 { --------------------------------------------------------------------------
   1005:1bbb -- the frame loop.
@@ -1840,6 +2003,30 @@ end;
 { --------------------------------------------------------------------------
   1005:1cd6 -- Demo_Main.
   -------------------------------------------------------------------------- }
+
+{ 1005:1c9a -- the two heap blocks the scene needs beyond the virtual screen. }
+procedure Setup;
+begin
+  GetMem(WorkScr, 64000);
+  GetMem(ScrollBuf, ScrollSize);
+  FillChar(ScrollBuf^, ScrollSize, 0);
+  WorkSeg := Seg(WorkScr^);
+end;
+
+{ --------------------------------------------------------------------------
+  1005:1bbb -- the frame loop.
+
+  IT DOES NOT EXIT ON A KEY. A keypress -- or the last lemming dying -- only
+  starts the ending: from then on every frame fades the palette one step and
+  drops the tracker volume TWICE, and the loop ends when the volume reaches
+  zero. So how long the scene runs past the keypress depends on how loud the
+  music was, and with no tracker resident GetVolume returns 0 and it stops on
+  the first frame.
+  -------------------------------------------------------------------------- }
+
+{ --------------------------------------------------------------------------
+  1005:1cd6 -- Demo_Main.
+  -------------------------------------------------------------------------- }
 procedure RunPart4;
 begin
   MusicDetect;                                   { 11d9:0000 }
@@ -1866,5 +2053,6 @@ begin
 end;
 
 { 1005:1d3a -- the unit's initialisation body is empty. }
+
 begin
 end.
