@@ -284,13 +284,18 @@ begin
     for I := 1 to GridCols do
       for J := 1 to 8 do
         if CellShape[A, I, J] <> 0 then
-          { THE PARENTHESES ARE NOT COSMETIC. 100f:04d9 computes A*8 into AX,
-            moves it to DX, computes J + $1E in AX and only then adds DX back --
-            which is what `left + right` compiles to when the RIGHT operand is a
-            compound expression and needs the accumulator itself. Written
-            A * 8 + J + 30 it parses as ((A*8) + J) + 30, every right operand is
-            a simple one, and the whole sum stays in AX. }
-          Cells^[A * 8 + (J + 30), I] := CellShape[A, I, J];
+          { THE ORDER IS NOT COSMETIC, AND IT IS THIS WAY ROUND. 100f:04d9
+            computes A*8 into AX, moves it to DX, computes J + $1E in AX and
+            only then adds DX back. Borland evaluates the RIGHT operand first
+            and parks it, so the term it parks -- A*8 -- is the one written
+            SECOND, and the sum reads `(J + 30) + A * 8`. Spelled the other way
+            round, A * 8 + (J + 30), the compiler parks J+30 instead and the
+            two loads come out swapped; that is what this line used to say, on
+            a correct reading of the original and a backwards reading of the
+            rule. Dropping the parentheses is worse again: A * 8 + J + 30
+            parses as ((A*8) + J) + 30, every right operand is simple, and the
+            whole sum stays in AX with no DX at all. }
+          Cells^[(J + 30) + A * 8, I] := CellShape[A, I, J];
 
   BlockRead(F, Pal, SizeOf(Pal));                { 100f:0524 }
   for I := 0 to 255 do                           { 100f:0529 }

@@ -594,7 +594,14 @@ begin
     CometPos := CometPos + 2.0;
 
     Dec(Count);
-  until KeyPressed or (Count = -18);
+
+    { 1082:050c -- the KeyPressed test has TWO destinations: the `je` falls
+      through to the Count test, the `jmp` goes to 1082:054c, which is PAST
+      the 100-frame outro below. An `or` in the `until` would send both exits
+      to the same place, so this is not one condition -- it is an Exit, and a
+      key pressed during the word therefore skips the fade entirely. }
+    if KeyPressed then Exit;
+  until Count = -18;
 
   { --------------------------------------------------------------------
     The outro, 1082:051a..054a -- 100 frames, and it REDRAWS every one:

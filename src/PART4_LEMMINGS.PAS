@@ -1116,7 +1116,7 @@ begin
   FillChar(ScrollPal[1], 3, Last);            { 1005:0964 }
   for Last := 0 to 7 do                          { 1005:0974 -- the same byte }
     SetRGB($80 + Last, ScrollPal[Last * 3 + 1],
-           ScrollPal[Last * 3 + 1 + 1], ScrollPal[Last * 3 + 1 + 1 + 1]);
+           ScrollPal[Last * 3 + 2], ScrollPal[Last * 3 + 3]);
 
   { and again, written out rather than looped }
   Last := ScrollPal[24];
@@ -1124,7 +1124,7 @@ begin
   FillChar(ScrollPal[1], 3, Last);
   for Last := 0 to 7 do
     SetRGB($80 + Last, ScrollPal[Last * 3 + 1],
-           ScrollPal[Last * 3 + 1 + 1], ScrollPal[Last * 3 + 1 + 1 + 1]);
+           ScrollPal[Last * 3 + 2], ScrollPal[Last * 3 + 3]);
 end;
 
 { ==========================================================================
