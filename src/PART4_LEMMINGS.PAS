@@ -924,8 +924,13 @@ begin
                      Lem[1].TrigState := StBuilder end;
       end;
 
-      Inc(LiveCount);
-      Exit;                                      { one per call }
+      { THE LOOP IS BROKEN BY ASSIGNING ITS LIMIT, not by Exit, and the ORDER
+        is measured too: 1005:07c4 is MOV WORD PTR [BP-2],$19 and only then
+        1005:07c9 is INC WORD PTR [$51E]. Falling out of the loop and off the
+        end of the routine is the same thing as returning, since nothing
+        follows. }
+      N := MaxLem;                               { 1005:07c4 }
+      Inc(LiveCount);                            { 1005:07c9 }
     end;
 end;
 
