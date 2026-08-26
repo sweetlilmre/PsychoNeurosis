@@ -233,9 +233,6 @@ var
     walk stores a word and advances its byte index by 2 each time. }
   Span : array[0..2 * Rows + 1] of Integer;
 
-  { the two typed messages -- Pascal strings at DS:$046E and DS:$056E }
-  Msg1 : String;
-  Msg2 : String;
 
 { --------------------------------------------------------------------------
   108b:0a09 -- RowOfs[I] := I * 80, for I = 0..$EF.
@@ -254,6 +251,18 @@ const
     120 and not the 100 a 320x200 assumption would give. }
   MViewW : Word = 320;
   MViewH : Word = 240;
+
+  { INITIALISED CONSTANTS, NOT VARIABLES ASSIGNED AT STARTUP, and dgimage is
+    the instrument that says so. These two sit in the original's INITIALISED
+    data at DS:$046E and DS:$056E -- 256 bytes apart, so each is a full
+    String[255] -- with their length bytes $3B and $35 already in the image.
+    Declared as plain `var` and assigned in the unit's initialisation section,
+    they land in the UNINITIALISED block instead and 512 bytes vanish from the
+    data image; part 002's was 3,408 bytes against our 2,864, and this is most
+    of the difference. Immediately after MViewH is where the addresses put
+    them. }
+  Msg1 : String = 'CAPTAINS LOG, STARDATE 426987.2, SUPPLIMENTAL  :           ';
+  Msg2 : String = '     PICTURE IT,   SICILY,   1942 ....               ';
 
 {$L DEMOMATH.OBJ}
 
@@ -2451,7 +2460,4 @@ begin
 end;
 
 begin
-  { The two messages are Pascal strings in DGROUP at DS:$046E and DS:$056E. }
-  Msg1 := 'CAPTAINS LOG, STARDATE 426987.2, SUPPLIMENTAL  :           ';
-  Msg2 := '     PICTURE IT,   SICILY,   1942 ....               ';
 end.
