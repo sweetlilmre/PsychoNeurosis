@@ -170,16 +170,12 @@ PARTS = [
     ("TPART1", "P1Intro", "RunIntro",
      "DemoVT, Crt, VGA",
      "part 001 -- all five scenes, through the driver at 1000:003c"),
-    # ModeX is NOT named here on purpose. Naming it makes the program visit it
-    # directly, so it finishes early and lands sixth in code; the original has
-    # it SECOND, immediately after P2S1, which is where a reverse DFS
-    # post-order puts it when P2S1 is the only thing that reaches it. With this
-    # clause and P2Main's own `... DemoVT, P2S2, ModeX, P2S1`, the order comes
-    # out P2S1, ModeX, P2S2, DemoVT, P2View, FixMath, VGA, Crt -- the 1994
-    # file's exactly.
-    ("TPART2", "P2Main", "RunPart2",
-     "Crt, VGA, FixMath, P2View, DemoVT",
-     "part 002 -- both scenes, through the driver at 1000:0032"),
+    # PART 002 HAS NO HARNESS ANY MORE. src/NEUR2.PAS is the real program and
+    # its segment matches the original's 128 bytes exactly. The walk did not
+    # move, and that was PREDICTED before the work rather than discovered after:
+    # our P2S1 is 32 bytes small and P2S2 112 large, a net +80 that displaces
+    # the runtime whatever the program does. Part 002's 11 bytes are downstream
+    # of those two, not of the harness.
     # PART 003 HAS NO HARNESS ANY MORE. src/NEUR3.PAS is the real program, and
     # its segment now matches the original's 336 bytes exactly -- but the walk
     # did not move, because our P3Tunnel is 144 bytes LARGER than the original's

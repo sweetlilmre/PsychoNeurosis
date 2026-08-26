@@ -131,7 +131,7 @@ list = [
   "P2VIEW.PAS",
   "P2S1.PAS",
   "P2S2.PAS",
-  "P2MAIN.PAS",
+  "NEUR2.PAS",
   "PART3_TUNNEL.PAS",
   "PART3_STARS.PAS",
   "PART3_MORPH.PAS",
@@ -201,7 +201,7 @@ alongside = ["*.BAT"]
 "P2VIEW.PAS" = ["P2VIEW.PAS", "P2View", "P2View"]
 "P2S1.PAS" = ["P2S1.PAS", "P2S1", "P2S1"]
 "P2S2.PAS" = ["P2S2.PAS", "P2S2", "P2S2"]
-"P2MAIN.PAS" = ["P2MAIN.PAS", "P2Main", "P2Main"]
+"NEUR2.PAS" = ["NEUR2.PAS", "Neur2", "Neur2"]
 "PART3_TUNNEL.PAS" = ["P3TUNNEL.PAS", "Part3Tunnel", "P3Tunnel"]
 "PART3_STARS.PAS" = ["P3STARS.PAS", "Part3Stars", "P3Stars"]
 "PART3_MORPH.PAS" = ["P3MORPH.PAS", "Part3Morph", "P3Morph"]
