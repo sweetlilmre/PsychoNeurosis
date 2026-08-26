@@ -308,76 +308,6 @@ asm
 end;
 
 { --------------------------------------------------------------------------
-  1008:0246 -- Palette_BrightenStep
-
-  For every colour 0..255: GetRGB, then THREE rounds of "if the channel is
-  below $3F, bump it" on each of R, G and B, then SetRGB. So +3 per call,
-  clamped at $3F. The three rounds are written out longhand in the original
-  (1008:026c through 1008:02ba) rather than looped.
-  -------------------------------------------------------------------------- }
-procedure PaletteBrightenStep;
-var
-  { NO K, and the note above already said so: the three rounds are written out
-    longhand in the original, 1008:026c through 1008:02ba. With a `for K` loop
-    the frame came out ENTER $0A against the original's $08 -- Col and the three
-    channel bytes are five, rounded to six, plus two bytes of temporary. }
-  Col     : Integer;
-  R, G, B : Byte;
-  { TWO MORE BYTES, declared and never read. Col plus the three channel bytes
-    are five, which rounds to six, and the original opens ENTER $08. }
-  Spare   : Integer;
-begin
-  for Col := 0 to 255 do
-  begin
-    GetRGB(Col, R, G, B);
-    if R < $3F then Inc(R);                    { 1008:026c }
-    if G < $3F then Inc(G);
-    if B < $3F then Inc(B);
-    if R < $3F then Inc(R);
-    if G < $3F then Inc(G);
-    if B < $3F then Inc(B);
-    if R < $3F then Inc(R);
-    if G < $3F then Inc(G);
-    if B < $3F then Inc(B);                    { 1008:02ba }
-    SetRGB(Col, R, G, B);
-  end;
-end;
-
-{ --------------------------------------------------------------------------
-  1008:02de -- Palette_FadeOut. This is the SCENE's own fade, not VGA's
-  PaletteFadeOut (1491:0330) -- it steps five per channel per pass and takes
-  no delay parameter. Named SceneFadeOut here so the two do not collide.
-
-      for Pass := 1 to $40 do
-        WaitRetrace
-        for Col := 0 to $FF do
-          GetRGB; five rounds of "if above zero, drop by one"; SetRGB
-
-  64 passes of -5 per channel.
-  -------------------------------------------------------------------------- }
-procedure SceneFadeOut;
-var
-  Pass, Col, K : Integer;
-  R, G, B      : Byte;
-begin
-  for Pass := 1 to $40 do
-  begin
-    WaitRetrace;
-    for Col := 0 to 255 do
-    begin
-      GetRGB(Col, R, G, B);
-      for K := 1 to 5 do
-      begin
-        if R > 0 then Dec(R);
-        if G > 0 then Dec(G);
-        if B > 0 then Dec(B);
-      end;
-      SetRGB(Col, R, G, B);
-    end;
-  end;
-end;
-
-{ --------------------------------------------------------------------------
   1008:00b9 -- Scene1_LoadFrames
 
   NEUROSIS.DAT from $0003BE36:
@@ -455,6 +385,86 @@ begin
   Door.H := DoorH;
 end;
 
+{ PaletteBrightenStep AND SceneFadeOut ARE DEFINED HERE, AFTER Init, AND NOT
+  BEFORE LoadFrames. Definition order is segment order, and the address map at
+  the top of this file gives the original's: LoadFrames 1008:00b9, Init 01c7,
+  then Palette_BrightenStep 0246 and Palette_FadeOut 02de. Defined earlier the
+  four routines came out 152, 145, 270, 127 bytes where the original has 270,
+  127, 152, 132 -- the same routines, two of them swapped, and the coverage walk
+  scored every one of them aligned because it locates each by content wherever
+  it sits. The map was already written down; nothing had checked the build
+  against it. }
+
+{ --------------------------------------------------------------------------
+  1008:0246 -- Palette_BrightenStep
+
+  For every colour 0..255: GetRGB, then THREE rounds of "if the channel is
+  below $3F, bump it" on each of R, G and B, then SetRGB. So +3 per call,
+  clamped at $3F. The three rounds are written out longhand in the original
+  (1008:026c through 1008:02ba) rather than looped.
+  -------------------------------------------------------------------------- }
+procedure PaletteBrightenStep;
+var
+  { NO K, and the note above already said so: the three rounds are written out
+    longhand in the original, 1008:026c through 1008:02ba. With a `for K` loop
+    the frame came out ENTER $0A against the original's $08 -- Col and the three
+    channel bytes are five, rounded to six, plus two bytes of temporary. }
+  Col     : Integer;
+  R, G, B : Byte;
+  { TWO MORE BYTES, declared and never read. Col plus the three channel bytes
+    are five, which rounds to six, and the original opens ENTER $08. }
+  Spare   : Integer;
+begin
+  for Col := 0 to 255 do
+  begin
+    GetRGB(Col, R, G, B);
+    if R < $3F then Inc(R);                    { 1008:026c }
+    if G < $3F then Inc(G);
+    if B < $3F then Inc(B);
+    if R < $3F then Inc(R);
+    if G < $3F then Inc(G);
+    if B < $3F then Inc(B);
+    if R < $3F then Inc(R);
+    if G < $3F then Inc(G);
+    if B < $3F then Inc(B);                    { 1008:02ba }
+    SetRGB(Col, R, G, B);
+  end;
+end;
+
+{ --------------------------------------------------------------------------
+  1008:02de -- Palette_FadeOut. This is the SCENE's own fade, not VGA's
+  PaletteFadeOut (1491:0330) -- it steps five per channel per pass and takes
+  no delay parameter. Named SceneFadeOut here so the two do not collide.
+
+      for Pass := 1 to $40 do
+        WaitRetrace
+        for Col := 0 to $FF do
+          GetRGB; five rounds of "if above zero, drop by one"; SetRGB
+
+  64 passes of -5 per channel.
+  -------------------------------------------------------------------------- }
+procedure SceneFadeOut;
+var
+  Pass, Col, K : Integer;
+  R, G, B      : Byte;
+begin
+  for Pass := 1 to $40 do
+  begin
+    WaitRetrace;
+    for Col := 0 to 255 do
+    begin
+      GetRGB(Col, R, G, B);
+      for K := 1 to 5 do
+      begin
+        if R > 0 then Dec(R);
+        if G > 0 then Dec(G);
+        if B > 0 then Dec(B);
+      end;
+      SetRGB(Col, R, G, B);
+    end;
+  end;
+end;
+
 { --------------------------------------------------------------------------
   1008:0362 -- Scene1_DoorLoop
 
@@ -510,7 +520,14 @@ begin
     { DriftStars, inline }
     for I := 1 to NumStars do
     begin
-      Inc(Star[I].X);
+      { LONGHAND, TWICE, AND FOR THE REASON THIS PROJECT HAS NOW MET SIX TIMES
+        ELSEWHERE: Inc on an array element compiles to one in-place INC WORD
+        PTR [mem], four bytes. The original loads the field into AX, increments
+        the register, RELOADS the index from [BP-$08] and recomputes the whole
+        subscript, then stores back -- 1008:0478 and 1008:05c8, twenty bytes
+        each. Written as Inc these two sites cost thirty-two bytes between them
+        and the coverage walk still scored the routine aligned. }
+      Star[I].X := Star[I].X + 1;
       if Star[I].X > StarMaxX then Star[I].X := 1;
     end;
   end;
@@ -530,7 +547,14 @@ begin
     { DriftStars, inline }
     for I := 1 to NumStars do
     begin
-      Inc(Star[I].X);
+      { LONGHAND, TWICE, AND FOR THE REASON THIS PROJECT HAS NOW MET SIX TIMES
+        ELSEWHERE: Inc on an array element compiles to one in-place INC WORD
+        PTR [mem], four bytes. The original loads the field into AX, increments
+        the register, RELOADS the index from [BP-$08] and recomputes the whole
+        subscript, then stores back -- 1008:0478 and 1008:05c8, twenty bytes
+        each. Written as Inc these two sites cost thirty-two bytes between them
+        and the coverage walk still scored the routine aligned. }
+      Star[I].X := Star[I].X + 1;
       if Star[I].X > StarMaxX then Star[I].X := 1;
     end;
     PaletteBrightenStep;
