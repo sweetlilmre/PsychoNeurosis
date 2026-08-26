@@ -196,23 +196,6 @@ var
 
 
 
-  { DS:$CC07 -- the scene palette, which Explode fades entries $E0..$E9 up
-    towards. TWO-DIMENSIONAL, entry by channel: Explode addresses its three
-    channels as three consecutive displacements off one index of C*3, which is
-    a constant second subscript. A flat array[0..767] adds the channel at run
-    time. Same 768 bytes either way. }
-  ScenePal   : array[0..255, 0..2] of Byte;
-  { DS:$CF07 -- A GLOBAL, and LoadAssets had it as a local. 1005:00b1 is
-    MOV DI,$CF07 / PUSH DS / PUSH DI into Assign, and every Reset, Seek,
-    BlockRead and Close in the routine passes the same absolute address; a
-    frame slot would be LEA DI,[BP-n] / PUSH SS. Three bytes against four, at
-    twenty-two call sites, which is why the whole routine was out of step.
-
-    AND THE ADDRESS TILES, which is what makes the placement here rather than
-    anywhere else. ScenePal ends at $CF07 and VGA's VirtScr begins at $CF88 --
-    129 bytes further on, which is this record plus one byte of padding. So it
-    is the LAST variable this unit declares. }
-  F          : file;                                  { DS:$CF07 }
 
 { --------------------------------------------------------------------------
   THE ASSETS.  Lemmings_LoadAssets (1005:00a6) seeks $001228CE and reads
@@ -255,9 +238,28 @@ type
                     1..GlyphPitch div ScrollRows,
                     1..ScrollRows] of Byte;                    { DS:$CC03 }
 var
-  Font      : ^TFont;
   WalkBank  : array[1..8]  of array[0..53]   of Byte;   { DS:$0522 }
   TumbleBk  : array[1..4]  of array[0..99]   of Byte;   { DS:$06D2 }
+  { --------------------------------------------------------------------------
+    TWO THOUSAND SIX HUNDRED AND FORTY-SIX BYTES THAT THIS UNIT DOES NOT
+    IDENTIFY, and the size is measured while the contents are not. TumbleBk
+    begins at $06D2 and is 400 bytes, so it ends at $0862; SplatBank is at
+    $12B8. The gap is $A56, which is 2,646.
+
+    It is not a guess that something is there. Before this block existed every
+    absolute reference from SplatBank upwards carried the difference, and
+    dsmap paired FIFTY of them at exactly -2646 with every other reference in
+    the part at +0 -- a bounded run of one shift, which is the signature of a
+    misplaced or missing block rather than a wrong size somewhere.
+
+    WHAT IT PROBABLY IS: 2,646 is 7 x 378, and 378 is this part's glyph stride
+    -- the same number the font type folds with. Seven somethings of 378 bytes,
+    or six of 441; LoadAssets reads TWENTY blocks and this unit names about
+    fifteen, so several assets are still unaccounted for. Identifying it means
+    reading the seeks in LoadAssets against NEUROSIS.DAT, which is a separate
+    job from getting the layout right.
+    -------------------------------------------------------------------------- }
+  Unknown   : array[1..7]  of array[0..377]  of Byte;   { DS:$0862, 2,646 }
   SplatBank : array[1..4]  of array[0..119]  of Byte;   { DS:$12B8 }
   DigBank   : array[1..6]  of array[0..220]  of Byte;   { DS:$1498 }
   TunnelBk  : array[1..3]  of array[0..139]  of Byte;   { DS:$19C6 }
@@ -265,12 +267,48 @@ var
   DeathABk  : array[1..6]  of array[0..107]  of Byte;   { DS:$1E8A }
   BuildBank : array[1..6]  of array[0..119]  of Byte;   { DS:$2112 }
   FuseBank  : array[1..5]  of array[0..149]  of Byte;   { DS:$23E2 }
-  DeathAPic : array[0..3179] of Byte;    { DS:$BF97 -- 60 x 53, the storm
-                                           cloud and its lightning bolt }
   Explosion : array[1..7]  of array[0..3464] of Byte;   { DS:$26D0 }
   HillAnim  : array[1..3]  of array[0..1031] of Byte;   { DS:$858F }
   IntroAnim : array[1..7]  of array[0..1559] of Byte;   { DS:$91A7 }
   SideAnim  : array[1..6]  of array[0..139]  of Byte;   { DS:$BC4F }
+
+  { --------------------------------------------------------------------------
+    AND THESE FOUR ARE LAST, in this order, because the addresses tile from
+    SideAnim to the next unit's first variable with nothing left over:
+
+        SideAnim   $BC4F   840
+        DeathAPic  $BF97  3180
+        Font       $CC03     4   -- a POINTER, which is why the gap is four
+        ScenePal   $CC07   768
+        F          $CF07   128   -> ends $CF87, and VGA's VirtScr is $CF88
+
+    Declared at the FRONT of this block, as ScenePal, F and Font were, they put
+    900 bytes ahead of WalkBank -- 768 + 128 + 4 -- and every sprite bank's
+    folded displacement carried it: 1005:043c reaches WalkBank[Frame] with
+    ADD DI,$4EC where ours emitted ADD DI,$870, and $870 - $4EC is exactly 900.
+    DeathAPic sat between FuseBank and Explosion for the same kind of reason
+    and moved the four banks after it.
+    -------------------------------------------------------------------------- }
+  DeathAPic : array[0..3179] of Byte;    { DS:$BF97 -- 60 x 53, the storm
+                                           cloud and its lightning bolt }
+  Font      : ^TFont;                                   { DS:$CC03 }
+  { DS:$CC07 -- the scene palette, which Explode fades entries $E0..$E9 up
+    towards. TWO-DIMENSIONAL, entry by channel: Explode addresses its three
+    channels as three consecutive displacements off one index of C*3, which is
+    a constant second subscript. A flat array[0..767] adds the channel at run
+    time. Same 768 bytes either way. }
+  ScenePal   : array[0..255, 0..2] of Byte;
+  { DS:$CF07 -- A GLOBAL, and LoadAssets had it as a local. 1005:00b1 is
+    MOV DI,$CF07 / PUSH DS / PUSH DI into Assign, and every Reset, Seek,
+    BlockRead and Close in the routine passes the same absolute address; a
+    frame slot would be LEA DI,[BP-n] / PUSH SS. Three bytes against four, at
+    twenty-two call sites, which is why the whole routine was out of step.
+
+    AND THE ADDRESS TILES, which is what makes the placement here rather than
+    anywhere else. ScenePal ends at $CF07 and VGA's VirtScr begins at $CF88 --
+    129 bytes further on, which is this record plus one byte of padding. So it
+    is the LAST variable this unit declares. }
+  F          : file;                                  { DS:$CF07 }
 
 { --------------------------------------------------------------------------
   THE TWO TERRAIN SETS, read out of the code segment at 1005:0B48 / 1005:1496
@@ -714,11 +752,17 @@ end;
 { 1005:07d8 -- free one, and only count it down if it was live. }
 procedure Remove(N : Integer);
 begin
-  if Lem[N].Active <> 0 then
-  begin
-    Lem[N].Active := 0;
-    Dec(LiveCount);
-  end;
+  { A GUARD CLAUSE, NOT A WRAPPING `if`, and the branch pair says which.
+    1005:07e4 is JNE over a JMP -- two jumps, four bytes -- where a wrapping
+    `if Active <> 0 then begin ... end` emits one short JE, two bytes. The
+    conditional-over-unconditional shape is what `if cond then Exit` gives:
+    the JNE skips the JMP, and the JMP goes to 1005:07f5, which is the LEAVE.
+    `Dec(LiveCount)` is right as it stands -- 1005:07f1 is DEC WORD PTR [$51E],
+    the short form, because LiveCount is a plain variable and not an indexed
+    field like the Frame and Tick increments in the state routines. }
+  if Lem[N].Active = 0 then Exit;                { 1005:07e4 }
+  Lem[N].Active := 0;
+  Dec(LiveCount);
 end;
 
 { 1005:0b22 -- change state, and restart the animation. }
@@ -1259,7 +1303,13 @@ end;
   -------------------------------------------------------------------------- }
 procedure Builder(N : Integer);
 begin
-  Inc(Lem[N].Tick);
+      { LONGHAND: the original loads, INCs the register and stores back, and
+        recomputes the subscript's IMUL for each -- 1005:1884 in DeathA is the
+        pattern. `Inc` on an indexed field increments in place and needs a slot
+        for the address, which is what gave these routines a frame the original
+        has none of. NOT every Inc in this unit is wrong: Bounces at 1005:0BE2
+        really is the short form. }
+  Lem[N].Tick := Lem[N].Tick + 1;
   if Lem[N].Tick mod 3 = 0 then
   begin
     Lem[N].Frame := (Lem[N].Frame mod 6) + 1;
@@ -1282,7 +1332,18 @@ end;
   PERMANENTLY into the hillside and removes itself, so the mark stays. }
 procedure Splat(N : Integer);
 begin
-  Inc(Lem[N].Frame);
+  { LONGHAND, NOT `Inc`, and the original's prologue is how the difference was
+    found rather than the statement. 1005:17ff is PUSH BP / MOV BP,SP with NO
+    ENTER -- no frame at all -- where ours opened ENTER $08, and a routine with
+    no declared locals that still wants eight bytes is holding temporaries.
+
+    1005:1802 is IMUL DI,[BP+4],$15 / MOV AX,[DI+$302] / INC AX / IMUL again /
+    MOV [DI+$302],AX -- the value loaded into a register, incremented there and
+    stored back, with the subscript's multiply done TWICE. `Inc` on an indexed
+    field emits an increment in place and needs somewhere to keep the address.
+    The original recomputes IMUL DI,[BP+4],$15 five times in this routine and
+    keeps nothing, which is what leaves it with no frame. }
+  Lem[N].Frame := Lem[N].Frame + 1;                { 1005:1802 }
   if Lem[N].Frame = 4 then
   begin
     Blit(@SplatBank[4], Lem[N].X - 4, Lem[N].Y - 9, 12, 10, VirtScrSeg);
@@ -1296,7 +1357,7 @@ begin
   Lem[N].Tick := (Lem[N].Tick mod 5) + 1;
   if Lem[N].Tick mod 5 = 0 then
   begin
-    Inc(Lem[N].Frame);
+    Lem[N].Frame := Lem[N].Frame + 1;
     if Lem[N].Frame > 6 then Remove(N);
   end;
 end;
@@ -1307,7 +1368,7 @@ begin
   Lem[N].Tick := (Lem[N].Tick mod 3) + 1;
   if Lem[N].Tick mod 3 = 0 then
   begin
-    Inc(Lem[N].Frame);
+    Lem[N].Frame := Lem[N].Frame + 1;
     if Lem[N].Frame > 5 then Remove(N);
   end;
 end;
@@ -1318,7 +1379,7 @@ begin
   Lem[N].Tick := (Lem[N].Tick mod 3) + 1;
   if Lem[N].Tick mod 3 = 0 then
   begin
-    Inc(Lem[N].Frame);
+    Lem[N].Frame := Lem[N].Frame + 1;
     if Lem[N].Frame > 5 then SetState(N, StExplode);
   end;
 end;
