@@ -544,8 +544,16 @@ procedure ShowWord(S : String);
   and the initial Real48 values in the frame are CometPos = -48.0, Frame = 1.0,
   Phase = 1.0. Nothing here is fixed point -- this really is the FP scene. }
 var
-  CometPos, Frame, Phase : Real;
-  Count, CharIdx       : Integer;
+  { COUNT COMES FIRST, ahead of the three Reals, and the counter's own offset
+    says so. 1082:0510 is CMP WORD PTR [BP-$102],-$12 -- the slot immediately
+    below the 256-byte string parameter, so Count is the first local declared --
+    where ours had it last and emitted [BP-$114]. Every Real moved two bytes
+    with it: the original sets them at [BP-$10E] and [BP-$108] and ours at
+    [BP-$10C] and [BP-$106]. The frame total is the same either way, ENTER $118,
+    which is why prologue.py reads this routine as matching. }
+  Count                  : Integer;   { [BP-$102] }
+  CometPos, Frame, Phase : Real;      { [BP-$108], [BP-$10E], [BP-$114] }
+  CharIdx                : Integer;   { [BP-$116] }
 begin
   CometPos := -48.0;
   Frame   :=   1.0;
