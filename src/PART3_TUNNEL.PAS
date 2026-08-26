@@ -205,138 +205,6 @@ var
     four. A declaration that exists to make a total come out is a declaration to
     re-examine the moment anything under it moves. }
 
-{ --------------------------------------------------------------------------
-  VGA_SetMode (1192:002a) -- mode 13h, then unchain into Mode-X.
-  -------------------------------------------------------------------------- }
-procedure SetModeX;
-var
-  Dummy : Byte;
-begin
-  asm mov ax,0013h; int 10h end;             { start from mode 13h }
-
-  PortW[$3C4] := $0604;                      { Seq 4: chain-4 off, ext mem on }
-  Port[$3CE] := 5;  Port[$3CF] := Port[$3CF] and $EF;   { GC 5: odd/even off }
-  Port[$3CE] := 6;  Port[$3CF] := Port[$3CF] and $FD;   { GC 6: chain o/e off }
-
-  PortW[$3C4] := $0F02;                      { Map Mask: all four planes }
-  { All 256K at once -- Map Mask $0F means one write hits all four planes.
-    Split in two because FillChar's count is a Word and 65536 will not
-    fit in one. }
-  FillChar(Mem[$A000 : 0],     32768, 0);
-  FillChar(Mem[$A000 : 32768], 32768, 0);
-
-  Port[$3D4] := $14; Port[$3D5] := Port[$3D5] and $BF; { CRTC 14: dword off }
-  Port[$3D4] := $17; Port[$3D5] := Port[$3D5] or  $40; { CRTC 17: byte mode }
-  Port[$3D4] := $13; Port[$3D5] := CrtcOffset;         { CRTC 13: 640 wide }
-end;
-
-{ SelectPlane IS NOT DECLARED HERE. 1015:08d7 is a FAR call to 1192:0087 --
-  ModeX's SelectPlane -- and a local copy made it a near call, which is three
-  bytes shorter and never matches. ModeX is in the uses clause, so the calls
-  below resolve to it. }
-
-{ --------------------------------------------------------------------------
-  Tunnel_InitTables (1015:0654)
-  -------------------------------------------------------------------------- }
-procedure InitTables;
-var
-  I : Word;      { [BP-2] }
-  P : Byte;      { [BP-3] -- a BYTE, and the widening is the proof: 1015:0685
-                   reads it with MOV AL / XOR AH,AH / MOV DX,AX before the
-                   shift count reaches CX, and 1015:069a..06a3 increments and
-                   compares it with the byte forms INC BYTE PTR / CMP BYTE PTR
-                   / MOV BYTE PTR. A Word here loads straight into CX and
-                   costs three instructions less, which is what ours did. }
-begin
-  for I := 0 to 799 do
-    YOffset[I] := I * BytesPerRow;
-
-  P := 0;
-  for I := 0 to LogWidth - 1 do
-  begin
-    PlaneOf[I] := 1 shl P;
-    Inc(P);
-    if P = 4 then P := 0;
-  end;
-end;
-
-{ --------------------------------------------------------------------------
-  Tunnel_LoadTexture (1015:08a7)
-
-  Reads the four planes straight into VGA memory -- one BlockRead into a
-  staging buffer per plane, then a 32000-word copy to A000:0000.
-
-  ASSETS  NEUROSIS.DAT $081A76, four consecutive 64000-byte planes:
-            assets/part003/tunnel_plane0.raw   plane 0  (x mod 4 = 0)
-            assets/part003/tunnel_plane1.raw   plane 1
-            assets/part003/tunnel_plane2.raw   plane 2
-            assets/part003/tunnel_plane3.raw   plane 3
-          De-interleaved, these are one 640x400 image:
-            assets/part003/tunnel_640x400.png
-          A single plane viewed at 320 wide shows a phantom second ring
-          centre -- that is a stride artefact, not the artwork.
-          See docs/06-part3-scene1-tunnel.md.
-  -------------------------------------------------------------------------- }
-{ NO PARAMETER, NO LOOP, AND THE BUFFER IS VGA'S VIRTUAL SCREEN.
-
-  1015:09c0 calls this with nothing pushed, so it takes no argument. The buffer
-  it reads into is the far pointer at DS:$E76C and the segment it copies from is
-  the word at DS:$E770 -- which are VGA's VirtScr and VirtScrSeg, allocated by
-  VirtScrAlloc in the part's main body long before scene 1 runs. So Scene1 needs
-  no GetMem of its own, and it has none: 1015:098d goes straight from ENTER to
-  the LogicalWidth store.
-
-  UNROLLED FOUR TIMES, not a loop. 1015:08d5 pushes 0 and 1015:08ff pushes 1 as
-  separate immediates, with the whole read-and-copy written out for each plane;
-  a `for Plane := 0 to 3` needs a counter and there is no local to hold one.
-
-  And the copy is CopyScreen (12f8:00ad), not a Move: 1015:08fa is a far call
-  into the VGA unit with VirtScrSeg and $A000 pushed. }
-procedure LoadTexture;
-var
-  { 512 BYTES OF FRAME AND NOT ONE REFERENCE TO THEM. 1015:08a7 opens
-    ENTER $200 and the routine touches no BP-relative slot at all -- every
-    address it uses is absolute: the file record is the unit's own global at
-    DS:$A7FF, the read goes through the far pointer at DS:$E76C and the copy
-    reads the segment word at DS:$E770. So half a kilobyte is declared here
-    and abandoned.
-
-    THE SIZE IS MEASURED, THE SHAPE IS NOT. 512 is a buffer, two Strings, or
-    four file records; nothing in the code distinguishes them because nothing
-    in the code reads them. Written as one array because that is the least
-    that can be claimed. It is the sixth routine in this target to declare
-    storage it never uses, and the largest by a long way -- an earlier draft
-    of this routine that read into its own buffer would explain it. }
-  Spare : array[1..512] of Byte;
-begin
-  Assign(F, 'neurosis.dat');                  { 1015:08b5 }
-  Reset(F, 1);                                { 1015:08c1 }
-  Seek(F, TextureOfs);                        { 1015:08d0 }
-
-  SelectPlane(0);                             { 1015:08d7 }
-  BlockRead(F, VirtScr^, PlaneSize);          { 1015:08ee }
-  CopyScreen(VirtScrSeg, $A000);              { 1015:08fa }
-
-  SelectPlane(1);                             { 1015:0901 }
-  BlockRead(F, VirtScr^, PlaneSize);
-  CopyScreen(VirtScrSeg, $A000);
-
-  SelectPlane(2);
-  BlockRead(F, VirtScr^, PlaneSize);
-  CopyScreen(VirtScrSeg, $A000);
-
-  SelectPlane(3);
-  BlockRead(F, VirtScr^, PlaneSize);
-  CopyScreen(VirtScrSeg, $A000);              { 1015:0978 }
-
-  Close(F);                                   { 1015:0982 }
-end;
-
-{ --------------------------------------------------------------------------
-  Tunnel_UploadPalette (1015:0000)
-  225 colours from index 1 up. Note R, G and B come from three separate
-  arrays -- the rotations below are what make this worth re-uploading.
-  -------------------------------------------------------------------------- }
 { HAND ASSEMBLER, transcribed verbatim. Three signals, each of which Turbo
   Pascal's code generator does not produce: LOOP at 1015:0049, the 8-bit
   pointer arithmetic ADD BL,Ctr / ADC BH,0 -- adding a byte index into the
@@ -357,6 +225,12 @@ end;
       Port[$3C9] := Blue[I + 1];
     end;
 }
+{ SetModeX IS NOT IN THIS SEGMENT IN THE ORIGINAL. Its first routine is
+  UploadPalette at 1015:0000, so SetModeX is either inlined into Scene1 or
+  lives in another unit; declared first here it took the address UploadPalette
+  should have. Moved past Scene1 with a forward until that is settled. }
+procedure SetModeX; forward;
+
 procedure UploadPalette; assembler;
 var
   Pad1 : Byte;    { [BP-1]  -- declared, NEVER READ }
@@ -395,6 +269,80 @@ asm
   ADD  Ctr, 1                { 1015:0045  ADD, not INC                   }
   LOOP @@Next                { 1015:0049                                 }
 end;
+
+{ --------------------------------------------------------------------------
+  Tunnel_RotateBandsFine (1015:017f)
+  Rotates each 15-colour band left by one, independently, in all three tables.
+  Unrolled in the original -- fifteen explicit moves per band.
+  -------------------------------------------------------------------------- }
+
+{ UNROLLED PER TABLE, and no nested procedure and no Move. The original is
+  three groups of three loops -- save the last band, shift everything up by one
+  band, put the saved band at the front -- written out once for each table.
+  1015:004d opens ENTER 2, so the ONLY local is the loop counter: a nested
+  RotateWholeTable(var T) would need a frame for the parameter and a Tmp array,
+  and Move would appear as far calls that are not there.
+
+  The loop bounds are read off the compares. 1015:006e tests $0f, so the save
+  runs 1 to 15. 1015:0074 seeds $d2 = 210 and 1015:0079 jumps PAST the DEC, so
+  the shift body runs with I = 210 first and 1015:0091 stops it at 1 -- 210
+  iterations, downto. Same shape as RotateBandsFine, which cost 1,145 bytes of
+  the walk for the same reason before it was unrolled. }
+procedure RotateBandsCoarse;
+var
+  I : Integer;                    { [BP-2] -- the only local }
+begin
+  { Red -- DS:$0002 }
+  for I := 1 to BandSize do
+    RotTmp[I] := Red[I + (NumColours - BandSize)];    { 1015:005b }
+  for I := NumColours - BandSize downto 1 do
+    Red[I + BandSize] := Red[I];                      { 1015:007e }
+  for I := 1 to BandSize do
+    Red[I] := RotTmp[I];                              { 1015:0097 }
+
+  { Green -- DS:$00E3 }
+  for I := 1 to BandSize do
+    RotTmp[I] := Green[I + (NumColours - BandSize)];
+  for I := NumColours - BandSize downto 1 do
+    Green[I + BandSize] := Green[I];
+  for I := 1 to BandSize do
+    Green[I] := RotTmp[I];
+
+  { Blue -- DS:$01C4 }
+  for I := 1 to BandSize do
+    RotTmp[I] := Blue[I + (NumColours - BandSize)];
+  for I := NumColours - BandSize downto 1 do
+    Blue[I + BandSize] := Blue[I];
+  for I := 1 to BandSize do
+    Blue[I] := RotTmp[I];
+end;
+
+{ --------------------------------------------------------------------------
+  VGA_SetDisplayStart (1015:06b0)
+  Coarse pan via the CRTC start address (4-pixel granularity, because four
+  pixels share a byte address across the planes) and fine pan via Attribute
+  Controller register $13. Together they give single-pixel smooth scrolling.
+  -------------------------------------------------------------------------- }
+{ HAND ASSEMBLER, transcribed verbatim. The tell is the CRTC pair: the
+  original loads Addr into BX ONCE and writes both halves as 16-bit OUT
+  DX,AX -- index in AL, data in AH -- reusing BH then BL. Turbo Pascal has
+  no way to say that: PortW with `$0C or (Hi(Addr) shl 8)` does emit the
+  16-bit OUT, and then builds the word as MOV AL / XOR AH,AH / SHL AX,8 /
+  OR AX,$000C -- eleven bytes where the original spends four. Measured.
+  The attribute-controller tail is the same story: AND BL,3 / SHL BL,1 /
+  MOV AL,BL rather than working in AL throughout.
+
+  The frame is ENTER 4 for three bytes of declarations, so [BP-4] is the
+  compiler's padding. Dummy is never stored -- the $3DA read at 1015:06e1
+  discards AL -- but it is declared, because it is what puts Addr at [BP-2].
+
+  FOR REFERENCE ONLY, the equivalent Pascal -- not what the binary does:
+    Addr := LogicalWidth * Y * 2 + (X shr 2);
+    Port[$3D4] := $0C; Port[$3D5] := Hi(Addr);
+    Port[$3D4] := $0D; Port[$3D5] := Lo(Addr);
+    Dummy := Port[$3DA];  Port[$3C0] := $13;
+    Port[$3C0] := (X and 3) shl 1;  Port[$3C0] := $20;
+}
 
 { --------------------------------------------------------------------------
   Tunnel_RotateBandsFine (1015:017f)
@@ -485,41 +433,65 @@ end;
   the shift body runs with I = 210 first and 1015:0091 stops it at 1 -- 210
   iterations, downto. Same shape as RotateBandsFine, which cost 1,145 bytes of
   the walk for the same reason before it was unrolled. }
-procedure RotateBandsCoarse;
+
+{ --------------------------------------------------------------------------
+  Tunnel_InitTables (1015:0654)
+  -------------------------------------------------------------------------- }
+procedure InitTables;
 var
-  I : Integer;                    { [BP-2] -- the only local }
+  I : Word;      { [BP-2] }
+  P : Byte;      { [BP-3] -- a BYTE, and the widening is the proof: 1015:0685
+                   reads it with MOV AL / XOR AH,AH / MOV DX,AX before the
+                   shift count reaches CX, and 1015:069a..06a3 increments and
+                   compares it with the byte forms INC BYTE PTR / CMP BYTE PTR
+                   / MOV BYTE PTR. A Word here loads straight into CX and
+                   costs three instructions less, which is what ours did. }
 begin
-  { Red -- DS:$0002 }
-  for I := 1 to BandSize do
-    RotTmp[I] := Red[I + (NumColours - BandSize)];    { 1015:005b }
-  for I := NumColours - BandSize downto 1 do
-    Red[I + BandSize] := Red[I];                      { 1015:007e }
-  for I := 1 to BandSize do
-    Red[I] := RotTmp[I];                              { 1015:0097 }
+  for I := 0 to 799 do
+    YOffset[I] := I * BytesPerRow;
 
-  { Green -- DS:$00E3 }
-  for I := 1 to BandSize do
-    RotTmp[I] := Green[I + (NumColours - BandSize)];
-  for I := NumColours - BandSize downto 1 do
-    Green[I + BandSize] := Green[I];
-  for I := 1 to BandSize do
-    Green[I] := RotTmp[I];
-
-  { Blue -- DS:$01C4 }
-  for I := 1 to BandSize do
-    RotTmp[I] := Blue[I + (NumColours - BandSize)];
-  for I := NumColours - BandSize downto 1 do
-    Blue[I + BandSize] := Blue[I];
-  for I := 1 to BandSize do
-    Blue[I] := RotTmp[I];
+  P := 0;
+  for I := 0 to LogWidth - 1 do
+  begin
+    PlaneOf[I] := 1 shl P;
+    Inc(P);
+    if P = 4 then P := 0;
+  end;
 end;
 
 { --------------------------------------------------------------------------
-  VGA_SetDisplayStart (1015:06b0)
-  Coarse pan via the CRTC start address (4-pixel granularity, because four
-  pixels share a byte address across the planes) and fine pan via Attribute
-  Controller register $13. Together they give single-pixel smooth scrolling.
+  Tunnel_LoadTexture (1015:08a7)
+
+  Reads the four planes straight into VGA memory -- one BlockRead into a
+  staging buffer per plane, then a 32000-word copy to A000:0000.
+
+  ASSETS  NEUROSIS.DAT $081A76, four consecutive 64000-byte planes:
+            assets/part003/tunnel_plane0.raw   plane 0  (x mod 4 = 0)
+            assets/part003/tunnel_plane1.raw   plane 1
+            assets/part003/tunnel_plane2.raw   plane 2
+            assets/part003/tunnel_plane3.raw   plane 3
+          De-interleaved, these are one 640x400 image:
+            assets/part003/tunnel_640x400.png
+          A single plane viewed at 320 wide shows a phantom second ring
+          centre -- that is a stride artefact, not the artwork.
+          See docs/06-part3-scene1-tunnel.md.
   -------------------------------------------------------------------------- }
+{ NO PARAMETER, NO LOOP, AND THE BUFFER IS VGA'S VIRTUAL SCREEN.
+
+  1015:09c0 calls this with nothing pushed, so it takes no argument. The buffer
+  it reads into is the far pointer at DS:$E76C and the segment it copies from is
+  the word at DS:$E770 -- which are VGA's VirtScr and VirtScrSeg, allocated by
+  VirtScrAlloc in the part's main body long before scene 1 runs. So Scene1 needs
+  no GetMem of its own, and it has none: 1015:098d goes straight from ENTER to
+  the LogicalWidth store.
+
+  UNROLLED FOUR TIMES, not a loop. 1015:08d5 pushes 0 and 1015:08ff pushes 1 as
+  separate immediates, with the whole read-and-copy written out for each plane;
+  a `for Plane := 0 to 3` needs a counter and there is no local to hold one.
+
+  And the copy is CopyScreen (12f8:00ad), not a Move: 1015:08fa is a far call
+  into the VGA unit with VirtScrSeg and $A000 pushed. }
+
 { HAND ASSEMBLER, transcribed verbatim. The tell is the CRTC pair: the
   original loads Addr into BX ONCE and writes both halves as 16-bit OUT
   DX,AX -- index in AL, data in AH -- reusing BH then BL. Turbo Pascal has
@@ -599,6 +571,15 @@ end;
   That is ~990 frames of travel and roughly eight revolutions, so the tunnel
   mouth appears to swing round and slowly settle to centre.
   -------------------------------------------------------------------------- }
+
+{ --------------------------------------------------------------------------
+  Tunnel_UpdateMotion (1015:075a)
+
+  The window spirals inward: it turns 3 degrees per frame (a full revolution
+  every 120 frames) while the radius decays 0.1 per frame from 100 down to 1.
+  That is ~990 frames of travel and roughly eight revolutions, so the tunnel
+  mouth appears to swing round and slowly settle to centre.
+  -------------------------------------------------------------------------- }
 procedure UpdateMotion;
 
   { 1015:0708 -- a NESTED function, and it has to be one. Each call site
@@ -630,6 +611,91 @@ begin
 
   SetDisplayStart(PanX, PanY);
 end;
+
+{ --------------------------------------------------------------------------
+  Demo_Scene1 (1015:098d)
+  -------------------------------------------------------------------------- }
+
+{ NO PARAMETER, NO LOOP, AND THE BUFFER IS VGA'S VIRTUAL SCREEN.
+
+  1015:09c0 calls this with nothing pushed, so it takes no argument. The buffer
+  it reads into is the far pointer at DS:$E76C and the segment it copies from is
+  the word at DS:$E770 -- which are VGA's VirtScr and VirtScrSeg, allocated by
+  VirtScrAlloc in the part's main body long before scene 1 runs. So Scene1 needs
+  no GetMem of its own, and it has none: 1015:098d goes straight from ENTER to
+  the LogicalWidth store.
+
+  UNROLLED FOUR TIMES, not a loop. 1015:08d5 pushes 0 and 1015:08ff pushes 1 as
+  separate immediates, with the whole read-and-copy written out for each plane;
+  a `for Plane := 0 to 3` needs a counter and there is no local to hold one.
+
+  And the copy is CopyScreen (12f8:00ad), not a Move: 1015:08fa is a far call
+  into the VGA unit with VirtScrSeg and $A000 pushed. }
+procedure LoadTexture;
+var
+  { 512 BYTES OF FRAME AND NOT ONE REFERENCE TO THEM. 1015:08a7 opens
+    ENTER $200 and the routine touches no BP-relative slot at all -- every
+    address it uses is absolute: the file record is the unit's own global at
+    DS:$A7FF, the read goes through the far pointer at DS:$E76C and the copy
+    reads the segment word at DS:$E770. So half a kilobyte is declared here
+    and abandoned.
+
+    THE SIZE IS MEASURED, THE SHAPE IS NOT. 512 is a buffer, two Strings, or
+    four file records; nothing in the code distinguishes them because nothing
+    in the code reads them. Written as one array because that is the least
+    that can be claimed. It is the sixth routine in this target to declare
+    storage it never uses, and the largest by a long way -- an earlier draft
+    of this routine that read into its own buffer would explain it. }
+  Spare : array[1..512] of Byte;
+begin
+  Assign(F, 'neurosis.dat');                  { 1015:08b5 }
+  Reset(F, 1);                                { 1015:08c1 }
+  Seek(F, TextureOfs);                        { 1015:08d0 }
+
+  SelectPlane(0);                             { 1015:08d7 }
+  BlockRead(F, VirtScr^, PlaneSize);          { 1015:08ee }
+  CopyScreen(VirtScrSeg, $A000);              { 1015:08fa }
+
+  SelectPlane(1);                             { 1015:0901 }
+  BlockRead(F, VirtScr^, PlaneSize);
+  CopyScreen(VirtScrSeg, $A000);
+
+  SelectPlane(2);
+  BlockRead(F, VirtScr^, PlaneSize);
+  CopyScreen(VirtScrSeg, $A000);
+
+  SelectPlane(3);
+  BlockRead(F, VirtScr^, PlaneSize);
+  CopyScreen(VirtScrSeg, $A000);              { 1015:0978 }
+
+  Close(F);                                   { 1015:0982 }
+end;
+
+{ --------------------------------------------------------------------------
+  Tunnel_UploadPalette (1015:0000)
+  225 colours from index 1 up. Note R, G and B come from three separate
+  arrays -- the rotations below are what make this worth re-uploading.
+  -------------------------------------------------------------------------- }
+{ HAND ASSEMBLER, transcribed verbatim. Three signals, each of which Turbo
+  Pascal's code generator does not produce: LOOP at 1015:0049, the 8-bit
+  pointer arithmetic ADD BL,Ctr / ADC BH,0 -- adding a byte index into the
+  low half of an offset and carrying by hand -- and the three table
+  addresses held in locals rather than folded into each reference.
+
+  THE FRAME IS ENTER $0A AND THE SLOTS ARE ODD: a byte at [BP-2] and words
+  at [BP-5], [BP-7] and [BP-9], which leaves [BP-1], [BP-3] and [BP-10]
+  untouched. Three bytes the original declared and never read, so they are
+  declared here too -- omitting them puts every slot after them at the
+  wrong offset. WHAT they were is not recoverable from the binary; that
+  they exist, and exactly where, is.
+
+  FOR REFERENCE ONLY, the equivalent Pascal -- not what the binary does:
+    Port[$3C8] := 1;
+    for I := 0 to NumColours - 1 do begin
+      Port[$3C9] := Red[I + 1];  Port[$3C9] := Green[I + 1];
+      Port[$3C9] := Blue[I + 1];
+    end;
+}
 
 { --------------------------------------------------------------------------
   Demo_Scene1 (1015:098d)
@@ -673,6 +739,41 @@ end;
   starts. Each stub is five bytes, PUSH BP / MOV BP,SP / LEAVE / RETF, and
   it sits at the END of the unit's own segment. Without a `begin` here
   Turbo Pascal emits neither the stub nor the chain entry. }
+
+{ --------------------------------------------------------------------------
+  VGA_SetMode (1192:002a) -- mode 13h, then unchain into Mode-X.
+  -------------------------------------------------------------------------- }
+procedure SetModeX;
+var
+  Dummy : Byte;
+begin
+  asm mov ax,0013h; int 10h end;             { start from mode 13h }
+
+  PortW[$3C4] := $0604;                      { Seq 4: chain-4 off, ext mem on }
+  Port[$3CE] := 5;  Port[$3CF] := Port[$3CF] and $EF;   { GC 5: odd/even off }
+  Port[$3CE] := 6;  Port[$3CF] := Port[$3CF] and $FD;   { GC 6: chain o/e off }
+
+  PortW[$3C4] := $0F02;                      { Map Mask: all four planes }
+  { All 256K at once -- Map Mask $0F means one write hits all four planes.
+    Split in two because FillChar's count is a Word and 65536 will not
+    fit in one. }
+  FillChar(Mem[$A000 : 0],     32768, 0);
+  FillChar(Mem[$A000 : 32768], 32768, 0);
+
+  Port[$3D4] := $14; Port[$3D5] := Port[$3D5] and $BF; { CRTC 14: dword off }
+  Port[$3D4] := $17; Port[$3D5] := Port[$3D5] or  $40; { CRTC 17: byte mode }
+  Port[$3D4] := $13; Port[$3D5] := CrtcOffset;         { CRTC 13: 640 wide }
+end;
+
+{ SelectPlane IS NOT DECLARED HERE. 1015:08d7 is a FAR call to 1192:0087 --
+  ModeX's SelectPlane -- and a local copy made it a near call, which is three
+  bytes shorter and never matches. ModeX is in the uses clause, so the calls
+  below resolve to it. }
+
+{ --------------------------------------------------------------------------
+  Tunnel_InitTables (1015:0654)
+  -------------------------------------------------------------------------- }
+
 begin
 end.
 

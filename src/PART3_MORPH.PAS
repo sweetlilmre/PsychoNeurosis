@@ -192,119 +192,6 @@ var
       Port[$3C7] := 0;
       for I := 0 to 767 do B[I] := Port[$3C9];
   -------------------------------------------------------------------------- }
-{ @asm 003 1139:034d }
-procedure GetPalette768(var P); assembler;
-asm
-  LES  DI, P            { ES:DI := the caller's 768-byte buffer, from [BP+4] }
-  MOV  DX, $3C7         { $3C7 is the DAC READ index register                }
-  MOV  AL, 0            { start at colour 0                                  }
-  OUT  DX, AL           { select it; the DAC now auto-increments             }
-  ADD  DX, 2            { DX := $3C9, the DAC data register                  }
-  MOV  CX, $300         { 768 bytes: 256 colours x 3 components              }
-  REP  INSB             { read them all straight into ES:DI                  }
-end;
-
-{ --------------------------------------------------------------------------
-  1139:0335 -- SetPalette768(var P)
-
-  The write side, likewise a single REP OUTSB. Note there is NO retrace wait
-  in the original -- the Pascal version used to add one, which is a change in
-  behaviour, not a tidy-up.
-
-  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
-
-      Port[$3C8] := 0;
-      for I := 0 to 767 do Port[$3C9] := B[I];
-  -------------------------------------------------------------------------- }
-{ @asm 003 1139:0335 }
-procedure SetPalette768(var P); assembler;
-asm
-  PUSH DS               { OUTSB sources from DS:SI, so DS must be restored   }
-  LDS  SI, P            { DS:SI := the caller's 768-byte buffer, from [BP+4] }
-  MOV  DX, $3C8         { $3C8 is the DAC WRITE index register               }
-  MOV  AL, 0            { start at colour 0                                  }
-  OUT  DX, AL           { select it                                          }
-  INC  DX               { DX := $3C9, the DAC data register                  }
-  MOV  CX, $300         { 768 bytes                                          }
-  REP  OUTSB            { write them all out from DS:SI                      }
-  POP  DS               { restore the data segment                           }
-end;
-
-
-  { RowOfs is the Mode-X unit's own table (1192:0000 fills it), not this
-    scene's -- see MODEX.PAS. It is imported, not declared here. }
-
-{ --------------------------------------------------------------------------
-  VGA_Set400Lines (1139:02f2)
-  CRTC register 9, low five bits cleared: maximum scan line = 0, i.e. no
-  double scanning. That turns the 320x200 Mode-X screen into 320x400.
-  -------------------------------------------------------------------------- }
-{ --------------------------------------------------------------------------
-  1192:0000 -- the Mode-X row table
-
-      for I := 0 to $31F do
-        RowOfs[I] := (LogicalWidth * I) shl 1
-
-  LogicalWidth is the byte at DS:$76B6, which InitScene sets to 80, so the
-  stride is 160 bytes per row -- one plane of a 640-pixel logical line.
-
-  THIS IS NOT VGA.BuildRowTable. That one fills VGA's own YOfs with y * 320
-  for the 200 rows of mode 13h, and it is what InitScene used to call: the
-  table below stayed all zeros, every dot landed on row 0, and the scene drew
-  nothing. The two tables coexist and must not be conflated -- the note at the
-  bottom of VGA.PAS says exactly that.
-
-  The code lives in segment 1192 with the rest of the VGA unit, but the table
-  it fills is at DS:$BEC6, in this scene's own data, which is why it is here.
-  -------------------------------------------------------------------------- }
-
-{ --------------------------------------------------------------------------
-  VGA_Set400Lines (1139:02f2)
-
-  CRTC register 9 is Maximum Scan Line. Its low five bits say how many times
-  each character row is repeated; mode 13h leaves them at 1, which is what
-  double-scans 200 lines into 400. Clearing them turns the double scan off,
-  so the 320x200 Mode-X screen becomes 320x400 with no other change.
-
-  The top three bits of register 9 are not ours to touch -- bit 7 is the
-  200-line double word mode flag and bits 5-6 are the start row of the text
-  cursor -- so the write is read-modify-write with AND $E0, not a plain MOV.
-
-  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
-
-      Port[$3D4] := 9;
-      Port[$3D5] := Port[$3D5] and $E0;
-
-  That Pascal is genuinely equivalent here. It is written in assembler
-  because the original is, not because Pascal could not express it.
-  -------------------------------------------------------------------------- }
-{ @asm 003 1139:02f2 }
-procedure Set400Lines; assembler;
-asm
-  MOV  DX, $3D4     { $3D4 is the CRTC index register                        }
-  MOV  AL, 9        { register 9 -- Maximum Scan Line                        }
-  OUT  DX, AL       { select it                                              }
-  INC  DX           { DX := $3D5, the CRTC data register                     }
-  IN   AL, DX       { read what is in register 9 now                         }
-  AND  AL, $E0      { keep bits 5-7, clear the repeat count in bits 0-4      }
-  OUT  DX, AL       { write it back -- no double scan, so 400 lines          }
-end;
-
-{ --------------------------------------------------------------------------
-  1139:0000 -- SetAngles.  AngX in BX, AngY in CX, AngZ in DX.
-
-  Hand assembler, reached by a plain CALL from StepAngles with the angles
-  already in registers. One table serves both functions: cos(a) is sin(a+90),
-  so the cosine lookup is the same table 90 entries -- 180 bytes -- further
-  along. That is why the original quotes two base addresses, $02A8 and $035C,
-  for one table. No trig call anywhere in the frame path.
-
-  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
-
-      SinX := SinTab[AngX];  CosX := SinTab[AngX + 90];
-      SinY := SinTab[AngY];  CosY := SinTab[AngY + 90];
-      SinZ := SinTab[AngZ];  CosZ := SinTab[AngZ + 90];
-  -------------------------------------------------------------------------- }
 { @asm 003 1139:0000 ? }
 procedure SetAngles; assembler;
 asm
@@ -343,6 +230,8 @@ end;
       AngZ := Wrap(AngZ + StepZ);
       SetAngles(AngX, AngY, AngZ);
   -------------------------------------------------------------------------- }
+{ @asm 003 1139:0035 }
+
 { @asm 003 1139:0035 }
 procedure StepAngles; assembler;
 asm
@@ -446,6 +335,8 @@ var
     the original, so globals here; making them locals changes the frame size
     and every displacement in the routine with it. }
   T1, T2 : Integer;
+
+{ @asm 003 1139:0096 ? }
 
 { @asm 003 1139:0096 ? }
 procedure TransformPoint; assembler;
@@ -596,6 +487,8 @@ end;
       end;
   -------------------------------------------------------------------------- }
 { @asm 003 1139:01bb }
+
+{ @asm 003 1139:01bb }
 procedure PlotPixel; assembler;
 asm
   CMP  DI, 0            { X off the left?                                    }
@@ -644,82 +537,7 @@ end;
       end;
   -------------------------------------------------------------------------- }
 { @asm 003 1139:02a2 }
-procedure ClearPage; assembler;
-asm
-  MOV  DI, [PageOfs]    { DI := 0 or 80 -- which half of the row to clear    }
-  MOV  AX, $A000        { video memory                                       }
-  MOV  ES, AX           { ES := video; the pages live in VRAM, not the heap  }
-  MOV  DX, $3C4         { Sequencer address register                         }
-  MOV  AX, $0F02        { register 2 (Map Mask) := $0F, all four planes      }
-  OUT  DX, AX           { so one STOSW clears four pixels per plane at once  }
-  XOR  AX, AX           { the fill value: black                              }
-  MOV  DX, 399          { $18F rows -- one short of the page, see above      }
-@@Row:                  { <- once per row                                    }
-  MOV  CX, 40           { $28 words = 80 bytes = 320 pixels of this page     }
-  REP  STOSW            { blank the row; DI advances 80                      }
-  ADD  DI, 80           { $50: step over the OTHER page's half of the row    }
-  DEC  DX               { one row done                                       }
-  JNZ  @@Row            { round again until all 399 are clear                }
-end;
 
-{ --------------------------------------------------------------------------
-  ModeX_FlipPage (1139:02c3)
-  Show the page we just drew, then make the other one current.
-  -------------------------------------------------------------------------- }
-{ --------------------------------------------------------------------------
-  1139:02c3 -- FlipPage.  Points the CRTC at the page just drawn, then swaps
-  PageOfs so the next frame draws into the other one.
-
-  The two pages are the left and right halves of a 640-pixel logical line, so
-  "flipping" is just moving the display start 80 bytes along the row.
-
-  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
-
-      Port[$3D4] := $0C;  Port[$3D5] := Hi(PageOfs);
-      Port[$3D4] := $0D;  Port[$3D5] := Lo(PageOfs);
-      PageOfs := 80 - PageOfs;
-  -------------------------------------------------------------------------- }
-{ @asm 003 1139:02c3 }
-procedure FlipPage; assembler;
-asm
-  MOV  BX, [PageOfs]    { BX := the offset of the page just drawn            }
-  MOV  AH, BH           { high byte of the start address                     }
-  MOV  AL, $0C          { CRTC register $0C: start address HIGH              }
-  MOV  DX, $3D4         { CRTC address register                              }
-  OUT  DX, AX           { write index and value in one 16-bit OUT            }
-  MOV  AH, BL           { low byte of the start address                      }
-  MOV  AL, $0D          { CRTC register $0D: start address LOW               }
-  MOV  DX, $3D4         { CRTC address register again                        }
-  OUT  DX, AX           { and the second half of the start address           }
-  MOV  AX, 80           { $50 -- the other page                              }
-  SUB  AX, BX           { 80 - PageOfs toggles between 0 and 80              }
-  MOV  [PageOfs], AX    { next frame draws into whichever was just shown     }
-end;
-
-{ --------------------------------------------------------------------------
-  Morph_DrawShape (1139:01f9) -- draw one shape straight.
-
-  ASSETS  The shapes are compiled into the EXE, not in NEUROSIS.DAT.
-          Extracted from DGROUP to:
-            assets/part003/shape_sphere.bin / .png    DS:$0636
-            assets/part003/shape_cube.bin   / .png    DS:$5136
-            assets/part003/shape_grid.bin   / .png    DS:$63F6
-          765 points x 6 bytes, three signed words (X, Y, Z).
-          The .png files are previews rendered with the constants below.
-          See docs/08-part3-scene3-morph.md.
-  -------------------------------------------------------------------------- }
-{ --------------------------------------------------------------------------
-  1139:01f9 -- DrawShape.  Reads CurShape, walks 765 points six bytes at a
-  time and hands each to TransformPoint in BX, CX, DX, whose results go
-  straight on to PlotPixel in DI and BX. Assembler in the original; the
-  register hand-off between the three is the whole reason.
-
-  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
-
-      S := Ptr(DSeg, CurShape);
-      for I := 1 to 765 do
-        PlotPixel(TransformPoint(S^[I,1], S^[I,2], S^[I,3]));
-  -------------------------------------------------------------------------- }
 { @asm 003 1139:01f9 }
 procedure DrawShape; assembler;
 asm
@@ -760,6 +578,8 @@ end;
           for k = 1, 2, 3));
       Inc(MorphStep);
   -------------------------------------------------------------------------- }
+{ @asm 003 1139:021d ? }
+
 { @asm 003 1139:021d ? }
 procedure DrawMorph; assembler;
 asm
@@ -820,6 +640,318 @@ asm
   INC  WORD PTR [MorphStep]        { one step further along the blend        }
 @@Done:                            { <- both cases return from here          }
 end;
+
+{ --------------------------------------------------------------------------
+  Morph_FadeStep (1139:0365)
+  Read the whole DAC back, decrement every non-zero component by one, wait
+  for retrace and write it out again -- a one-step fade toward black, called
+  once per frame during the closing segment.
+  -------------------------------------------------------------------------- }
+
+{ @asm 003 1139:02a2 }
+procedure ClearPage; assembler;
+asm
+  MOV  DI, [PageOfs]    { DI := 0 or 80 -- which half of the row to clear    }
+  MOV  AX, $A000        { video memory                                       }
+  MOV  ES, AX           { ES := video; the pages live in VRAM, not the heap  }
+  MOV  DX, $3C4         { Sequencer address register                         }
+  MOV  AX, $0F02        { register 2 (Map Mask) := $0F, all four planes      }
+  OUT  DX, AX           { so one STOSW clears four pixels per plane at once  }
+  XOR  AX, AX           { the fill value: black                              }
+  MOV  DX, 399          { $18F rows -- one short of the page, see above      }
+@@Row:                  { <- once per row                                    }
+  MOV  CX, 40           { $28 words = 80 bytes = 320 pixels of this page     }
+  REP  STOSW            { blank the row; DI advances 80                      }
+  ADD  DI, 80           { $50: step over the OTHER page's half of the row    }
+  DEC  DX               { one row done                                       }
+  JNZ  @@Row            { round again until all 399 are clear                }
+end;
+
+{ --------------------------------------------------------------------------
+  ModeX_FlipPage (1139:02c3)
+  Show the page we just drew, then make the other one current.
+  -------------------------------------------------------------------------- }
+{ --------------------------------------------------------------------------
+  1139:02c3 -- FlipPage.  Points the CRTC at the page just drawn, then swaps
+  PageOfs so the next frame draws into the other one.
+
+  The two pages are the left and right halves of a 640-pixel logical line, so
+  "flipping" is just moving the display start 80 bytes along the row.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      Port[$3D4] := $0C;  Port[$3D5] := Hi(PageOfs);
+      Port[$3D4] := $0D;  Port[$3D5] := Lo(PageOfs);
+      PageOfs := 80 - PageOfs;
+  -------------------------------------------------------------------------- }
+{ @asm 003 1139:02c3 }
+
+{ @asm 003 1139:02c3 }
+procedure FlipPage; assembler;
+asm
+  MOV  BX, [PageOfs]    { BX := the offset of the page just drawn            }
+  MOV  AH, BH           { high byte of the start address                     }
+  MOV  AL, $0C          { CRTC register $0C: start address HIGH              }
+  MOV  DX, $3D4         { CRTC address register                              }
+  OUT  DX, AX           { write index and value in one 16-bit OUT            }
+  MOV  AH, BL           { low byte of the start address                      }
+  MOV  AL, $0D          { CRTC register $0D: start address LOW               }
+  MOV  DX, $3D4         { CRTC address register again                        }
+  OUT  DX, AX           { and the second half of the start address           }
+  MOV  AX, 80           { $50 -- the other page                              }
+  SUB  AX, BX           { 80 - PageOfs toggles between 0 and 80              }
+  MOV  [PageOfs], AX    { next frame draws into whichever was just shown     }
+end;
+
+{ --------------------------------------------------------------------------
+  Morph_DrawShape (1139:01f9) -- draw one shape straight.
+
+  ASSETS  The shapes are compiled into the EXE, not in NEUROSIS.DAT.
+          Extracted from DGROUP to:
+            assets/part003/shape_sphere.bin / .png    DS:$0636
+            assets/part003/shape_cube.bin   / .png    DS:$5136
+            assets/part003/shape_grid.bin   / .png    DS:$63F6
+          765 points x 6 bytes, three signed words (X, Y, Z).
+          The .png files are previews rendered with the constants below.
+          See docs/08-part3-scene3-morph.md.
+  -------------------------------------------------------------------------- }
+{ --------------------------------------------------------------------------
+  1139:01f9 -- DrawShape.  Reads CurShape, walks 765 points six bytes at a
+  time and hands each to TransformPoint in BX, CX, DX, whose results go
+  straight on to PlotPixel in DI and BX. Assembler in the original; the
+  register hand-off between the three is the whole reason.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      S := Ptr(DSeg, CurShape);
+      for I := 1 to 765 do
+        PlotPixel(TransformPoint(S^[I,1], S^[I,2], S^[I,3]));
+  -------------------------------------------------------------------------- }
+{ @asm 003 1139:01f9 }
+
+{ @asm 003 1139:02f2 }
+procedure Set400Lines; assembler;
+asm
+  MOV  DX, $3D4     { $3D4 is the CRTC index register                        }
+  MOV  AL, 9        { register 9 -- Maximum Scan Line                        }
+  OUT  DX, AL       { select it                                              }
+  INC  DX           { DX := $3D5, the CRTC data register                     }
+  IN   AL, DX       { read what is in register 9 now                         }
+  AND  AL, $E0      { keep bits 5-7, clear the repeat count in bits 0-4      }
+  OUT  DX, AL       { write it back -- no double scan, so 400 lines          }
+end;
+
+{ --------------------------------------------------------------------------
+  1139:0000 -- SetAngles.  AngX in BX, AngY in CX, AngZ in DX.
+
+  Hand assembler, reached by a plain CALL from StepAngles with the angles
+  already in registers. One table serves both functions: cos(a) is sin(a+90),
+  so the cosine lookup is the same table 90 entries -- 180 bytes -- further
+  along. That is why the original quotes two base addresses, $02A8 and $035C,
+  for one table. No trig call anywhere in the frame path.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      SinX := SinTab[AngX];  CosX := SinTab[AngX + 90];
+      SinY := SinTab[AngY];  CosY := SinTab[AngY + 90];
+      SinZ := SinTab[AngZ];  CosZ := SinTab[AngZ + 90];
+  -------------------------------------------------------------------------- }
+{ @asm 003 1139:0000 ? }
+
+{ HAND ASSEMBLER, and the frame is what proves it. 1139:0334 is a bare `C3`:
+  no LEAVE, no POP BP, and therefore no prologue either. Turbo Pascal emits a
+  frame for EVERY Pascal procedure whatever its contents -- measured in
+  probe/ZEROSTOR.PAS, where a procedure with no parameters and no locals still
+  gets one, near or far, under $G- (`55 89E5 ... 5D`) and under $G+
+  (`... C9`). An `assembler` procedure with neither is the only shape that has
+  none.
+
+  IT ALSO EXPLAINS THE ZERO STORES. 1139:0310, 031c and 0322 write zero as
+  `MOV WORD PTR [x],0`, six bytes, where Pascal writes `XOR AX,AX / MOV [x],AX`,
+  five. The probe eliminated every source-level explanation for that -- the
+  compiler version, Word against Integer, a named `= 0` constant, interleaving
+  with non-zero stores, the LongInt high-word case, and an array element or
+  record field as the target. Hand-written asm needs none of them: the author
+  wrote the store and BASM assembled it.
+
+  AND IT DOES NOT CALL BindShapes. The original's first instruction is the
+  LogicalWidth store; there is no call ahead of it, and there is no BindShapes
+  in this unit any more either.
+
+  FOR REFERENCE ONLY, the equivalent Pascal -- not what the binary does:
+    LogicalWidth := 80;  SetModeX;  Set400Lines;  ModeX.BuildRowTable;
+    MorphStep := 0;  MorphSteps := 45;  XCentre := 0;  YCentre := 0;
+    ProjScale := 256;  ViewDist := 2500; }
+procedure InitScene; assembler;
+asm
+  MOV  LogicalWidth, 80          { 1139:02fe  640 logical pixels per row }
+  CALL SetModeX                  { 1139:0303  1192:002a, mode 13h -> Mode-X }
+  CALL Set400Lines               { 1139:0308  near, and now 320x400 }
+  CALL ModeX.BuildRowTable       { 1139:030b  1192:0000, NOT VGA's }
+  MOV  WORD PTR MorphStep,  0    { 1139:0310 }
+  MOV  WORD PTR MorphSteps, 45   { 1139:0316 }
+  MOV  WORD PTR XCentre,    0    { 1139:031c }
+  MOV  WORD PTR YCentre,    0    { 1139:0322 }
+  MOV  WORD PTR ProjScale,  256  { 1139:0328 }
+  MOV  WORD PTR ViewDist,   2500 { 1139:032e }
+end;
+
+{ --------------------------------------------------------------------------
+  Demo_Scene3 (1139:03b4)
+
+  Eight scripted segments of 45 frames (63 for the last). Odd segments hold a
+  shape, even segments morph to the next one. The closing segment also fades.
+  -------------------------------------------------------------------------- }
+{ AND IT IS DECLARED AFTER Scene3, at 1139:0670, which is why only a forward
+  declaration can go here. Placing the body before Scene3 puts Scene3 at the
+  wrong offset and every one of its eight blocks with it -- 476 bytes, the
+  largest single span in this target, and all of it downstream of one
+  declaration's position. }
+function CheckKey : Boolean; forward;
+
+{ --------------------------------------------------------------------------
+  Demo_Scene3 (1139:03b4) -- HAND ASSEMBLER, and the whole procedure is.
+
+  THREE MEASUREMENTS SAY SO, and two of them had been made and disbelieved.
+
+  1. NO PROLOGUE AND NO EPILOGUE. 1139:03b4 goes straight into a CALL and the
+     routine ends at 0583 with a bare RETF. A compiled Turbo Pascal procedure
+     opens PUSH BP / MOV BP,SP and closes LEAVE / RETF even with no locals at
+     all -- probe/DECLOOP.PAS has seven such procedures and every one of them
+     carries the frame. Only `assembler` omits it.
+
+  2. DEC FOLLOWED STRAIGHT BY JNE. 1139:0414 is DEC WORD PTR [Frames] / JNE,
+     six bytes. Turbo Pascal re-reads the variable: DEC, then CMP ...,0, then
+     JNE -- five bytes more, at each of eight loops. probe/DECLOOP.PAS tries
+     seven spellings of "count down and stop at zero" -- Dec then `until = 0`,
+     with a call in the body, `until <= 0`, an assignment instead of Dec, Word,
+     Byte, and a while -- across Turbo Pascal 7, 6.0 and 6.1. EVERY ONE emits
+     the CMP. There is no such peephole in any dialect.
+
+  3. OR DX,DX. Turbo Pascal returns a Boolean in AL, a word in AX, a LongInt or
+     a pointer in DX:AX, and NOTHING in DX alone. The DX form appears exactly
+     once in the whole demo -- here -- while every part carries the runtime's AL
+     form. CheckKey below is an assembler function returning DX by the author's
+     own convention, and only asm can test it.
+
+  AND THE JUMPS OUT PROVE IT TWICE OVER, which is the detail that settles any
+  doubt about extent. Eight loops test the key and leave the scene; the first
+  five write JE over a JMP and the last three write a plain JNE. A compiler is
+  consistent. A PERSON writes `JNE @@Done` every time, and inverts it only where
+  the assembler complains that the target is out of a short branch's reach --
+  which is exactly the first five, whose exits are $1A3 down to $109 bytes away,
+  and exactly not the last three, at $6D, $43 and $06. The inconsistency is the
+  signature.
+
+  So it is transcribed verbatim below, per the standing rule for this target.
+  THE EQUIVALENT PASCAL, which is what was here before and is behaviourally the
+  same thing:
+
+      InitScene;  PageOfs := PageOfsB;
+      CurShape := ShapeSphere; MorphFrom := ShapeSphere; MorphTo := ShapeCube;
+      StepX := SpinX; StepY := SpinY; StepZ := SpinZ;
+      AngX := 0; AngY := 0; AngZ := 0;
+      Frames := SegFrames;
+      repeat ClearPage; DrawShape; FlipPage; WaitRetrace; StepAngles;
+             if CheckKey then Exit; Dec(Frames) until Frames = 0;
+
+  and seven more of those, alternating DrawShape and DrawMorph, with MorphFrom
+  and MorphTo walking sphere -> cube -> grid -> cube -> sphere and the last one
+  fading the palette out as it morphs.
+
+  A key abandons the WHOLE scene rather than one segment of it -- every test
+  jumps to the procedure's own RETF.
+  -------------------------------------------------------------------------- }
+
+{ @asm 003 1139:0335 }
+procedure SetPalette768(var P); assembler;
+asm
+  PUSH DS               { OUTSB sources from DS:SI, so DS must be restored   }
+  LDS  SI, P            { DS:SI := the caller's 768-byte buffer, from [BP+4] }
+  MOV  DX, $3C8         { $3C8 is the DAC WRITE index register               }
+  MOV  AL, 0            { start at colour 0                                  }
+  OUT  DX, AL           { select it                                          }
+  INC  DX               { DX := $3C9, the DAC data register                  }
+  MOV  CX, $300         { 768 bytes                                          }
+  REP  OUTSB            { write them all out from DS:SI                      }
+  POP  DS               { restore the data segment                           }
+end;
+
+
+  { RowOfs is the Mode-X unit's own table (1192:0000 fills it), not this
+    scene's -- see MODEX.PAS. It is imported, not declared here. }
+
+{ --------------------------------------------------------------------------
+  VGA_Set400Lines (1139:02f2)
+  CRTC register 9, low five bits cleared: maximum scan line = 0, i.e. no
+  double scanning. That turns the 320x200 Mode-X screen into 320x400.
+  -------------------------------------------------------------------------- }
+{ --------------------------------------------------------------------------
+  1192:0000 -- the Mode-X row table
+
+      for I := 0 to $31F do
+        RowOfs[I] := (LogicalWidth * I) shl 1
+
+  LogicalWidth is the byte at DS:$76B6, which InitScene sets to 80, so the
+  stride is 160 bytes per row -- one plane of a 640-pixel logical line.
+
+  THIS IS NOT VGA.BuildRowTable. That one fills VGA's own YOfs with y * 320
+  for the 200 rows of mode 13h, and it is what InitScene used to call: the
+  table below stayed all zeros, every dot landed on row 0, and the scene drew
+  nothing. The two tables coexist and must not be conflated -- the note at the
+  bottom of VGA.PAS says exactly that.
+
+  The code lives in segment 1192 with the rest of the VGA unit, but the table
+  it fills is at DS:$BEC6, in this scene's own data, which is why it is here.
+  -------------------------------------------------------------------------- }
+
+{ --------------------------------------------------------------------------
+  VGA_Set400Lines (1139:02f2)
+
+  CRTC register 9 is Maximum Scan Line. Its low five bits say how many times
+  each character row is repeated; mode 13h leaves them at 1, which is what
+  double-scans 200 lines into 400. Clearing them turns the double scan off,
+  so the 320x200 Mode-X screen becomes 320x400 with no other change.
+
+  The top three bits of register 9 are not ours to touch -- bit 7 is the
+  200-line double word mode flag and bits 5-6 are the start row of the text
+  cursor -- so the write is read-modify-write with AND $E0, not a plain MOV.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      Port[$3D4] := 9;
+      Port[$3D5] := Port[$3D5] and $E0;
+
+  That Pascal is genuinely equivalent here. It is written in assembler
+  because the original is, not because Pascal could not express it.
+  -------------------------------------------------------------------------- }
+{ @asm 003 1139:02f2 }
+
+{ @asm 003 1139:034d }
+procedure GetPalette768(var P); assembler;
+asm
+  LES  DI, P            { ES:DI := the caller's 768-byte buffer, from [BP+4] }
+  MOV  DX, $3C7         { $3C7 is the DAC READ index register                }
+  MOV  AL, 0            { start at colour 0                                  }
+  OUT  DX, AL           { select it; the DAC now auto-increments             }
+  ADD  DX, 2            { DX := $3C9, the DAC data register                  }
+  MOV  CX, $300         { 768 bytes: 256 colours x 3 components              }
+  REP  INSB             { read them all straight into ES:DI                  }
+end;
+
+{ --------------------------------------------------------------------------
+  1139:0335 -- SetPalette768(var P)
+
+  The write side, likewise a single REP OUTSB. Note there is NO retrace wait
+  in the original -- the Pascal version used to add one, which is a change in
+  behaviour, not a tidy-up.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      Port[$3C8] := 0;
+      for I := 0 to 767 do Port[$3C9] := B[I];
+  -------------------------------------------------------------------------- }
+{ @asm 003 1139:0335 }
 
 { --------------------------------------------------------------------------
   Morph_FadeStep (1139:0365)
@@ -911,32 +1043,6 @@ end;
     LogicalWidth := 80;  SetModeX;  Set400Lines;  ModeX.BuildRowTable;
     MorphStep := 0;  MorphSteps := 45;  XCentre := 0;  YCentre := 0;
     ProjScale := 256;  ViewDist := 2500; }
-procedure InitScene; assembler;
-asm
-  MOV  LogicalWidth, 80          { 1139:02fe  640 logical pixels per row }
-  CALL SetModeX                  { 1139:0303  1192:002a, mode 13h -> Mode-X }
-  CALL Set400Lines               { 1139:0308  near, and now 320x400 }
-  CALL ModeX.BuildRowTable       { 1139:030b  1192:0000, NOT VGA's }
-  MOV  WORD PTR MorphStep,  0    { 1139:0310 }
-  MOV  WORD PTR MorphSteps, 45   { 1139:0316 }
-  MOV  WORD PTR XCentre,    0    { 1139:031c }
-  MOV  WORD PTR YCentre,    0    { 1139:0322 }
-  MOV  WORD PTR ProjScale,  256  { 1139:0328 }
-  MOV  WORD PTR ViewDist,   2500 { 1139:032e }
-end;
-
-{ --------------------------------------------------------------------------
-  Demo_Scene3 (1139:03b4)
-
-  Eight scripted segments of 45 frames (63 for the last). Odd segments hold a
-  shape, even segments morph to the next one. The closing segment also fades.
-  -------------------------------------------------------------------------- }
-{ AND IT IS DECLARED AFTER Scene3, at 1139:0670, which is why only a forward
-  declaration can go here. Placing the body before Scene3 puts Scene3 at the
-  wrong offset and every one of its eight blocks with it -- 476 bytes, the
-  largest single span in this target, and all of it downstream of one
-  declaration's position. }
-function CheckKey : Boolean; forward;
 
 { --------------------------------------------------------------------------
   Demo_Scene3 (1139:03b4) -- HAND ASSEMBLER, and the whole procedure is.
@@ -1184,6 +1290,36 @@ end;
   MEANS; nothing reads AL, so nothing depends on Turbo Pascal's idea of where
   the answer goes.
   -------------------------------------------------------------------------- }
+
+{ --------------------------------------------------------------------------
+  Morph_CheckKey (1139:02e0) -- ASSEMBLER, AND IT RETURNS IN DX.
+
+  The scene tests for a key through its own routine and not through Crt's
+  KeyPressed directly: 1139:040a is a NEAR call and CALLF never appears in the
+  eight loops. So there is a routine of this unit's own in between.
+
+  TWO THINGS ABOUT IT ARE NOT PASCAL, and both were visible for weeks.
+
+  IT HAS NO STACK FRAME. 1139:02e0 is the far call itself -- no PUSH BP, no
+  MOV BP,SP, and a bare RET at 02f1 with no LEAVE. A compiled procedure gets
+  the frame whether or not it has locals; only `assembler` omits it.
+
+  AND IT ANSWERS IN DX. Turbo Pascal returns a Boolean in AL, a word in AX, a
+  LongInt or a pointer in DX:AX -- and nothing at all in DX alone. The
+  MOV DX,0 / MOV DX,1 pair here, and the OR DX,DX that Scene3 tests it with,
+  appear EXACTLY ONCE in the whole demo: this routine and its callers. Every
+  part carries the runtime's own AL form of the same shape, which is what made
+  the DX form look like a decoding mistake rather than a finding.
+
+  So it is the author's own calling convention, and the callers are asm because
+  nothing else can read it. That is why this and Scene3 had to change together:
+  making this `assembler` on its own leaves the callers testing AL, and the
+  measurement gets WORSE rather than better.
+
+  The declared result type stays Boolean because that is what the routine
+  MEANS; nothing reads AL, so nothing depends on Turbo Pascal's idea of where
+  the answer goes.
+  -------------------------------------------------------------------------- }
 function CheckKey : Boolean; assembler;
 asm
         CALL    KeyPressed              { 1139:02e0 -- far, into Crt          }
@@ -1201,6 +1337,7 @@ end;
   starts. Each stub is five bytes, PUSH BP / MOV BP,SP / LEAVE / RETF, and
   it sits at the END of the unit's own segment. Without a `begin` here
   Turbo Pascal emits neither the stub nor the chain entry. }
+
 begin
 end.
 

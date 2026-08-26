@@ -247,82 +247,6 @@ var
     There is no frame traffic in the inner loop whatsoever, and the whole
     thing is eleven instructions per pixel in the common case.
   -------------------------------------------------------------------------- }
-{ @asm 003 125e:0388 }
-procedure DrawRotated(Ang, SinA, CosA, X, Y : Integer; Src : Pointer);
-  assembler;
-var
-  FixX, FixY : Integer;        { [BP-2] and [BP-4] }
-asm
-  PUSH DS                  { the source segment goes in DS, so save ours    }
-
-  MOV  AX, X               { the left edge, in whole pixels                 }
-  SHL  AX, 6               { -> 6-bit fixed point                           }
-  MOV  FixX, AX            { [BP-2] := X shl 6, the row's starting U        }
-  MOV  AX, Y               { the top edge                                   }
-  SHL  AX, 6               { -> 6-bit fixed point                           }
-  MOV  FixY, AX            { [BP-4] := Y shl 6, the row's starting V        }
-
-  MOV  AX, [VirtScrSeg]    { DS:$E770 -- the virtual screen                 }
-  MOV  ES, AX              { ES: is the destination for every store below   }
-  LDS  SI, Src             { DS:SI := the sprite                            }
-  XOR  SI, SI              { GetMem normalises, so the offset was 0 anyway; }
-                           {   SI is now the source pixel index             }
-
-  MOV  BH, 56              { BH counts output rows                          }
-
-@@Row:                     { <- once per output row                         }
-  MOV  CX, FixX            { CX := U, this row's fixed-point X              }
-  MOV  AX, FixY            { AX := V, this row's fixed-point Y              }
-  MOV  BL, 56              { BL counts output columns                       }
-
-@@Col:                     { <- once per output pixel                       }
-  INC  SI                  { assume the pixel is skipped: advance the index }
-  CMP  AX, $2F80           { V >= 190.0 ?  (190 * 64)                       }
-  JGE  @@Skip              {   below the screen -- drop it                  }
-  CMP  AX, $3F             { V <= 0.98 ?                                    }
-  JLE  @@Skip              {   above the screen -- drop it                  }
-  CMP  CX, $3F             { U <= 0.98 ?                                    }
-  JLE  @@Skip              {   off the left edge -- drop it                 }
-
-  DEC  SI                  { drawing after all: back onto this pixel        }
-  MOV  DX, AX              { DX := V                                        }
-  MOV  DI, CX              { DI := U                                        }
-  SHR  DI, 6               { DI := whole-pixel X                            }
-  AND  DX, $FFC0           { DX := V with the fraction masked off           }
-  ADD  DI, DX              { DI := X + V'                                   }
-  SHL  DX, 2               { DX := V' * 4                                   }
-  ADD  DI, DX              { DI := X + V' * 5  =  X + row * 320             }
-
-  CMP  Ang, SwapAngle      { past the half turn?                            }
-  JLE  @@Even              {   no -- the straight word store                }
-  INC  DI                  {   yes: start one pixel to the right            }
-  MOVSB                    { ES:[DI]   := Src[SI]   (the sampled pixel)     }
-  SUB  DI, 2               { step back two -- SI advanced, DI must not      }
-  MOVSB                    { ES:[DI-1] := Src[SI+1] (the filler, on the     }
-                           {              left this time)                   }
-  JMP  @@Next              { the pair is written -- rejoin                  }
-@@Even:                    { <- at or below the half turn                   }
-  MOVSW                    { ES:[DI] := Src[SI], ES:[DI+1] := Src[SI+1]     }
-@@Next:                    { <- both stores rejoin here                     }
-  DEC  SI                  { MOVSB/MOVSW left SI two on; net advance is one }
-
-@@Skip:                    { <- clipped pixels join here, SI already on     }
-  ADD  CX, SinA            { U += sin -- step along the output row          }
-  ADD  AX, CosA            { V += cos                                       }
-  DEC  BL                  { one column done                                }
-  JNZ  @@Col               { round again until the row is finished          }
-
-  MOV  DX, CosA            { the column direction's X component             }
-  ADD  FixX, DX            { next row starts cos further along X            }
-  MOV  DX, SinA            { and its Y component                            }
-  SUB  FixY, DX            { and sin back up Y -- (cos, -sin) is the        }
-                           {   column direction of the rotation matrix      }
-  DEC  BH                  { one row done                                   }
-  JNZ  @@Row               { round again until all 56 rows are done         }
-
-  POP  DS                  { restore our data segment                       }
-end;
-
 { --------------------------------------------------------------------------
   Sprites_DrawChar (125e:0000) -- compiled Pascal in the binary, so it is
   Pascal here.
@@ -358,55 +282,6 @@ end;
   the DAC and increments each channel that is still below its target. Called
   once a frame during the fly-in and 64 times before the closing sweep.
   -------------------------------------------------------------------------- }
-procedure FadeStep;
-var
-  { EIGHT BYTES, NOT SIX, and the same shape as part 003's two other fade
-    steps: 125e:047a's slots are [BP-$02] never touched, [BP-$04] eight times,
-    [BP-$06] four times and [BP-$08] never touched, with the lowest touched
-    byte at [BP-$07]. So an unread word is declared first, the counter is the
-    word at $04, the three colour bytes are $05..$07, and an unread byte
-    follows them. Three routines in this part share the template and all three
-    declare the same two locals without reading either. }
-  Unread  : Word;                 { [BP-$02], never read }
-  I       : Integer;              { [BP-$04] }
-  R, G, B : Byte;                 { [BP-$05], [BP-$06], [BP-$07] }
-  Spare   : Byte;                 { [BP-$08], never read }
-begin
-  WaitRetrace;                                   { 125e:047e }
-  for I := 0 to 255 do
-  begin
-    GetRGB(I, R, G, B);                          { 125e:04a0 }
-    if R < TargetPal[I, 0] then Inc(R);          { 125e:04b1 -- unsigned }
-    if G < TargetPal[I, 1] then Inc(G);
-    if B < TargetPal[I, 2] then Inc(B);
-    SetRGB(I, R, G, B);                          { 125e:04f4 }
-  end;
-end;
-
-{ --------------------------------------------------------------------------
-  Sprites_FadeOut (125e:0406) -- the fade to black after each caption block.
-
-  Sixty-four passes over the whole DAC, each one decrementing every channel
-  that has not reached zero yet. The retrace wait at 125e:040a is OUTSIDE
-  both loops -- it happens once, not once per pass -- so this is not a
-  timed fade; it runs as fast as the DAC will take it.
-  -------------------------------------------------------------------------- }
-procedure FadeOut;
-var
-  I, J    : Integer;
-  R, G, B : Byte;
-begin
-  WaitRetrace;                                   { 125e:040a -- once only }
-  for J := 1 to FadeSteps do
-    for I := 0 to 255 do
-    begin
-      GetRGB(I, R, G, B);
-      if R > 0 then Dec(R);                      { 125e:043b -- unsigned }
-      if G > 0 then Dec(G);
-      if B > 0 then Dec(B);
-      SetRGB(I, R, G, B);
-    end;
-end;
 
 { --------------------------------------------------------------------------
   Sprites_Load (125e:012e)
@@ -533,6 +408,217 @@ end;
   consumed, so Run's remaining Prepare calls fall straight through too and
   the scene ends.
   -------------------------------------------------------------------------- }
+
+{ @asm 003 125e:0388 }
+procedure DrawRotated(Ang, SinA, CosA, X, Y : Integer; Src : Pointer);
+  assembler;
+var
+  FixX, FixY : Integer;        { [BP-2] and [BP-4] }
+asm
+  PUSH DS                  { the source segment goes in DS, so save ours    }
+
+  MOV  AX, X               { the left edge, in whole pixels                 }
+  SHL  AX, 6               { -> 6-bit fixed point                           }
+  MOV  FixX, AX            { [BP-2] := X shl 6, the row's starting U        }
+  MOV  AX, Y               { the top edge                                   }
+  SHL  AX, 6               { -> 6-bit fixed point                           }
+  MOV  FixY, AX            { [BP-4] := Y shl 6, the row's starting V        }
+
+  MOV  AX, [VirtScrSeg]    { DS:$E770 -- the virtual screen                 }
+  MOV  ES, AX              { ES: is the destination for every store below   }
+  LDS  SI, Src             { DS:SI := the sprite                            }
+  XOR  SI, SI              { GetMem normalises, so the offset was 0 anyway; }
+                           {   SI is now the source pixel index             }
+
+  MOV  BH, 56              { BH counts output rows                          }
+
+@@Row:                     { <- once per output row                         }
+  MOV  CX, FixX            { CX := U, this row's fixed-point X              }
+  MOV  AX, FixY            { AX := V, this row's fixed-point Y              }
+  MOV  BL, 56              { BL counts output columns                       }
+
+@@Col:                     { <- once per output pixel                       }
+  INC  SI                  { assume the pixel is skipped: advance the index }
+  CMP  AX, $2F80           { V >= 190.0 ?  (190 * 64)                       }
+  JGE  @@Skip              {   below the screen -- drop it                  }
+  CMP  AX, $3F             { V <= 0.98 ?                                    }
+  JLE  @@Skip              {   above the screen -- drop it                  }
+  CMP  CX, $3F             { U <= 0.98 ?                                    }
+  JLE  @@Skip              {   off the left edge -- drop it                 }
+
+  DEC  SI                  { drawing after all: back onto this pixel        }
+  MOV  DX, AX              { DX := V                                        }
+  MOV  DI, CX              { DI := U                                        }
+  SHR  DI, 6               { DI := whole-pixel X                            }
+  AND  DX, $FFC0           { DX := V with the fraction masked off           }
+  ADD  DI, DX              { DI := X + V'                                   }
+  SHL  DX, 2               { DX := V' * 4                                   }
+  ADD  DI, DX              { DI := X + V' * 5  =  X + row * 320             }
+
+  CMP  Ang, SwapAngle      { past the half turn?                            }
+  JLE  @@Even              {   no -- the straight word store                }
+  INC  DI                  {   yes: start one pixel to the right            }
+  MOVSB                    { ES:[DI]   := Src[SI]   (the sampled pixel)     }
+  SUB  DI, 2               { step back two -- SI advanced, DI must not      }
+  MOVSB                    { ES:[DI-1] := Src[SI+1] (the filler, on the     }
+                           {              left this time)                   }
+  JMP  @@Next              { the pair is written -- rejoin                  }
+@@Even:                    { <- at or below the half turn                   }
+  MOVSW                    { ES:[DI] := Src[SI], ES:[DI+1] := Src[SI+1]     }
+@@Next:                    { <- both stores rejoin here                     }
+  DEC  SI                  { MOVSB/MOVSW left SI two on; net advance is one }
+
+@@Skip:                    { <- clipped pixels join here, SI already on     }
+  ADD  CX, SinA            { U += sin -- step along the output row          }
+  ADD  AX, CosA            { V += cos                                       }
+  DEC  BL                  { one column done                                }
+  JNZ  @@Col               { round again until the row is finished          }
+
+  MOV  DX, CosA            { the column direction's X component             }
+  ADD  FixX, DX            { next row starts cos further along X            }
+  MOV  DX, SinA            { and its Y component                            }
+  SUB  FixY, DX            { and sin back up Y -- (cos, -sin) is the        }
+                           {   column direction of the rotation matrix      }
+  DEC  BH                  { one row done                                   }
+  JNZ  @@Row               { round again until all 56 rows are done         }
+
+  POP  DS                  { restore our data segment                       }
+end;
+
+{ --------------------------------------------------------------------------
+  Sprites_DrawChar (125e:0000) -- compiled Pascal in the binary, so it is
+  Pascal here.
+
+  Draws a string with the 5x5 font at (X, Y), six pixels of pitch, in colour
+  50. Note that the glyph's ROW index becomes the screen X and its COLUMN
+  index becomes the screen Y -- the font is stored transposed, and the
+  original plots it that way round (125e:0083 and 125e:008f).
+
+  It takes a String even though every call site passes a single character;
+  the compiler's Char-to-String helper at 1000:6fd7 does the conversion into
+  a stack temporary, which is what the ENTER $10A is mostly reserving.
+  -------------------------------------------------------------------------- }
+
+{ --------------------------------------------------------------------------
+  Sprites_FadeOut (125e:0406) -- the fade to black after each caption block.
+
+  Sixty-four passes over the whole DAC, each one decrementing every channel
+  that has not reached zero yet. The retrace wait at 125e:040a is OUTSIDE
+  both loops -- it happens once, not once per pass -- so this is not a
+  timed fade; it runs as fast as the DAC will take it.
+  -------------------------------------------------------------------------- }
+procedure FadeOut;
+var
+  I, J    : Integer;
+  R, G, B : Byte;
+begin
+  WaitRetrace;                                   { 125e:040a -- once only }
+  for J := 1 to FadeSteps do
+    for I := 0 to 255 do
+    begin
+      GetRGB(I, R, G, B);
+      if R > 0 then Dec(R);                      { 125e:043b -- unsigned }
+      if G > 0 then Dec(G);
+      if B > 0 then Dec(B);
+      SetRGB(I, R, G, B);
+    end;
+end;
+
+{ --------------------------------------------------------------------------
+  Sprites_Load (125e:012e)
+
+  ASSETS  NEUROSIS.DAT $11EEC0, 14,862 bytes in six reads:
+            assets/part003/font_5x5.bin          1,550 B, the 5x5 bitmap font
+            assets/part003/sprite1.png / .bin    3,136 B = 56x56 portrait
+            assets/part003/sprite2.png / .bin    3,136 B
+            assets/part003/sprite3.png / .bin    3,136 B
+            assets/part003/sprite4.png / .bin    3,136 B
+            assets/part003/sprites_palette.pal     768 B
+          The four 3,136-byte reads sit in a loop in the original; 3136 =
+          56*56 is what fixes the sprite dimensions, and rendering them at
+          that size shows the four Asphyxia members.
+          See docs/13-part3-scene7-sprites.md.
+
+  It then builds both lookup tables and blanks the DAC, so the scene starts
+  from black no matter what the previous one left behind.
+
+  THE 65535 BIAS. The wobble table is built as
+
+      Round(sin(a) * 39.6 + 65535.0) mod 65535
+
+  which looks pointless until you follow a negative value through it. For
+  sin(a) = -1 that is Round(65495.4) = 65495; 65495 mod 65535 is still
+  65495, and storing that LongInt into an Integer keeps the low word --
+  $FFD7, which is -41. The bias and the modulo together are how the original
+  gets a signed result out of Round without ever handing Round a negative:
+  positive values come back unchanged, negative ones wrap round through the
+  word. It is reproduced here as written; it needs range checking off, which
+  is Borland's default.
+  -------------------------------------------------------------------------- }
+
+{ --------------------------------------------------------------------------
+  Sprites_FadeStep (125e:047a) -- one step of a 64-step fade IN.
+
+  Waits for retrace, then for all 256 entries reads the current RGB back off
+  the DAC and increments each channel that is still below its target. Called
+  once a frame during the fly-in and 64 times before the closing sweep.
+  -------------------------------------------------------------------------- }
+procedure FadeStep;
+var
+  { EIGHT BYTES, NOT SIX, and the same shape as part 003's two other fade
+    steps: 125e:047a's slots are [BP-$02] never touched, [BP-$04] eight times,
+    [BP-$06] four times and [BP-$08] never touched, with the lowest touched
+    byte at [BP-$07]. So an unread word is declared first, the counter is the
+    word at $04, the three colour bytes are $05..$07, and an unread byte
+    follows them. Three routines in this part share the template and all three
+    declare the same two locals without reading either. }
+  Unread  : Word;                 { [BP-$02], never read }
+  I       : Integer;              { [BP-$04] }
+  R, G, B : Byte;                 { [BP-$05], [BP-$06], [BP-$07] }
+  Spare   : Byte;                 { [BP-$08], never read }
+begin
+  WaitRetrace;                                   { 125e:047e }
+  for I := 0 to 255 do
+  begin
+    GetRGB(I, R, G, B);                          { 125e:04a0 }
+    if R < TargetPal[I, 0] then Inc(R);          { 125e:04b1 -- unsigned }
+    if G < TargetPal[I, 1] then Inc(G);
+    if B < TargetPal[I, 2] then Inc(B);
+    SetRGB(I, R, G, B);                          { 125e:04f4 }
+  end;
+end;
+
+{ --------------------------------------------------------------------------
+  Sprites_FadeOut (125e:0406) -- the fade to black after each caption block.
+
+  Sixty-four passes over the whole DAC, each one decrementing every channel
+  that has not reached zero yet. The retrace wait at 125e:040a is OUTSIDE
+  both loops -- it happens once, not once per pass -- so this is not a
+  timed fade; it runs as fast as the DAC will take it.
+  -------------------------------------------------------------------------- }
+
+{ --------------------------------------------------------------------------
+  Sprites_Prepare (125e:0550) -- one member's introduction, all three phases.
+
+  Not the caption-only routine an earlier pass took it for. The caption is
+  phase 3 of three; phases 1 and 2 are the portrait flying in and orbiting.
+
+  The caption addressing at 125e:0741 is
+
+      DS:$6BB8 + N * $A00 + Row * $100 + Col
+
+  with N = 1..4 and Row = 1..10. That is a flat array of 256-byte String
+  slots: $6BB8 + 11*$100 = $76B8 is member 1's first line, which is exactly
+  where the strings were first found. In Pascal terms it is
+
+      Captions[N, Row][Col]
+
+  and the two addresses agree exactly -- see gen/P3CAPT.INC.
+
+  A keypress abandons the whole introduction at any point. It is never
+  consumed, so Run's remaining Prepare calls fall straight through too and
+  the scene ends.
+  -------------------------------------------------------------------------- }
 procedure Prepare(N : Integer);
 var
   X, Y     : Integer;      { [BP-2], [BP-4] }
@@ -612,6 +698,20 @@ end;
   entering off the top and leaving off the bottom. DrawRotated clips to rows
   1..189, so most of each end of the run is off-screen.
   -------------------------------------------------------------------------- }
+
+{ --------------------------------------------------------------------------
+  Sprites_Run (125e:077c)
+
+  The four introductions in turn, then all four portraits at once sweeping
+  down the screen. The four DrawRotated calls are written out longhand in the
+  original rather than looped -- 125e:0838, 0885 and 08d2 hold the literal
+  70, 140 and 210 -- so they are longhand here too.
+
+  X is fixed for the whole sweep and Y is what moves: Sweep runs -20..120 and
+  the position is Sweep*2, so the group travels from Y = -40 to Y = 240,
+  entering off the top and leaving off the bottom. DrawRotated clips to rows
+  1..189, so most of each end of the run is off-screen.
+  -------------------------------------------------------------------------- }
 procedure Run;
 var
   { THE OFFSETS WERE ONE SLOT OUT AND THE DEAD STORE WAS THE WRONG VARIABLE.
@@ -677,6 +777,10 @@ end;
 { --------------------------------------------------------------------------
   Demo_Scene7 (125e:0958)
   -------------------------------------------------------------------------- }
+
+{ --------------------------------------------------------------------------
+  Demo_Scene7 (125e:0958)
+  -------------------------------------------------------------------------- }
 procedure Scene7;
 begin
   Load;
@@ -691,6 +795,7 @@ end;
   starts. Each stub is five bytes, PUSH BP / MOV BP,SP / LEAVE / RETF, and
   it sits at the END of the unit's own segment. Without a `begin` here
   Turbo Pascal emits neither the stub nor the chain entry. }
+
 begin
 end.
 
