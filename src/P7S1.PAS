@@ -121,6 +121,13 @@ type
 
 var
   Names    : array[1..MaxFlics] of String[127];  { DS:$0206 }
+  { THESE TWO COME FIRST, and their own recorded addresses say so: $01FE and
+    $0202 are the LOWEST in this block, and Turbo Pascal allocates a unit's
+    variables at increasing addresses in declaration order. Declared last they
+    landed after the 128-byte file record instead. }
+  Overhead : LongInt;                            { DS:$01fe }
+  Stamp    : LongInt;                            { DS:$0202 }
+
   Count    : Integer;                            { DS:$3406 }
   PlayIdx  : Integer;                            { DS:$3408 }
   LoopCnt  : Integer;                            { DS:$340a }
@@ -130,9 +137,6 @@ var
   HCopy    : TChunkProc;                         { DS:$3415 }
   HBrun    : TChunkProc;                         { DS:$3419 }
   F        : file;                               { DS:$341d }
-
-  Overhead : LongInt;                            { DS:$01fe }
-  Stamp    : LongInt;                            { DS:$0202 }
 
 { ==========================================================================
   100f:0000 -- FLI_COPY (chunk type 16). The chunk IS the frame.
