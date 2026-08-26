@@ -77,7 +77,20 @@ var
     -- a DS-relative byte read at an offset computed from the bouncer number.
     A heap block cannot be reached that way; it would need the pointer loaded
     into a segment register first. }
-  Under   : TSaveBank;                  { DS:$02EA, 16,410 bytes }
+  { ONE BYTE BEFORE Under, and the whole block's position depends on it. Under's
+    real base is $0953, not the $02EA below -- that is the FOLD of a 1-based
+    first subscript, base minus 1641 -- and $0953 is ODD, so the variable before
+    it ends at $0952. Ours had Under at $0952 and every address in this unit one
+    byte low with it: the file record at $563E against the original's $563F,
+    which is measurable directly since five sites push it.
+
+    That one byte is why the frame counter had to be a global. With F one byte
+    low, F ends at $56BD and a two-byte Frame fills $56BE..$56BF to land P1S2 at
+    $56C0. The original ends F at $56BE, pads the odd $56BF, and reaches $56C0
+    with no Frame at all -- so the counter is the local that 1012:05a7 and 05b1
+    read at [BP-$54]. }
+  Spare0  : Byte;                       { DS:$0952, never read }
+  Under   : TSaveBank;                  { DS:$0953, 16,410 bytes; folds to $02EA }
   { DS:$4304 -- the gather table, built once by BuildLens. AND IT COMES SECOND,
     which the four addresses already in these comments tile out exactly:
     Under at $02EA plus 16,410 is $4304, plus LensTab's 3,282 is $4FD6, plus
@@ -490,30 +503,6 @@ const
   ScrollFrom   = 140;      { $8C  -- 1012:05a7, after which it slides out }
   ScrollStep   = 2;        { pixels per frame }
 
-
-var
-  { THE COUNTER IS HERE AND IT PROBABLY SHOULD NOT BE, AND THE REASON IT STAYS
-    IS SMART LINKING. 1012:05a7 and 05b1 both test [BP-$54], so the original's
-    frame counter is a LOCAL, and BounceRun's frame arithmetic leaves exactly
-    two bytes for one. THREE attempts to move it cost 0.6% each:
-
-      counter local, this declaration deleted            98.9 -> 98.3
-      counter local, this renamed to an unread Spare     98.9 -> 98.3
-      counter local as a `for` variable, ditto           98.9 -> 98.3
-
-    and every one of them moved P1S2's code as well as this unit's data, which
-    is the tell: the two bytes really are reserved in the original's DGROUP.
-    THE THIRD ATTEMPT EXPLAINS THE FIRST TWO. An unreferenced unit-level
-    variable is SMART-LINKED AWAY -- Turbo Pascal drops it -- so "declare a
-    spare global to hold the space" is not a move that exists. The space can
-    only be held by something the code reads, which is what this is.
-
-    So the original has both a two-byte global AND a local counter, and the
-    global is read by something we have not reconstructed yet. Until that turns
-    up, the counter lives here: it measures 0.6% better and the alternative
-    cannot be expressed. }
-  Frame : Integer;
-
 { --------------------------------------------------------------------------
   1012:03bd -- ScrollLeft
 
@@ -660,7 +649,7 @@ var
   BX     : array[1..NumBouncers] of Integer;   { base [BP-$3C] }
   BY     : array[1..NumBouncers] of Integer;   { base [BP-$50] }
   I      : Integer;                            { [BP-$52] }
-  Unread : Integer;                            { [BP-$54] }
+  Frame  : Integer;                            { [BP-$54], the `for` variable }
 begin
   for I := 1 to NumBouncers do
   begin
@@ -682,8 +671,8 @@ begin
     increment between the last statement and the test, which is what a `for`
     loop's top-of-body increment leaves behind. But the counter has to be the
     local for that, and see the note on Frame above for why it cannot be. }
-  Frame := 1;
-  repeat
+  for Frame := 1 to BounceFrames do
+  begin
     for I := 1 to NumBouncers do
     begin
       SaveUnder(BX[I], BY[I], @Under[I], VirtScrSeg);   { 1012:0475 }
@@ -714,8 +703,7 @@ begin
     end;
 
     if Frame > ScrollFrom then ScrollLeft;    { 1012:05a7 }
-    Inc(Frame);
-  until Frame > BounceFrames;                 { 1012:05b1 }
+  end;                                        { 1012:05b1 }
 end;
 
 { --------------------------------------------------------------------------
