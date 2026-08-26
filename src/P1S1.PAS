@@ -432,9 +432,18 @@ var
   Bias    : Byte;                       { [BP-$7] }
   Spare   : Byte;                       { [BP-$8], never read }
 asm
-        IMUL    DI, N, 1641             { 1012:036a  N * $669               }
-        LEA     AX, [DI - 895]          { 036f  ...minus one element        }
-        MOV     SrcBase, AX             { 0373  = Ofs(Under[N])             }
+        IMUL    DI, N, 1641                 { 1012:036a  N * $669           }
+        { SYMBOLIC, AND THE LITERAL -895 WAS A REAL BUG. The original's
+          instruction is LEA AX,[DI-$37F], and -895 is 1641 - 746 where 746 is
+          where ITS Under sits. Transcribing the CONSTANT rather than its
+          MEANING made this routine read from $02EA while our Under is at
+          $02E8 -- two bytes into every saved row -- so every lens gathered
+          its pixels two columns off and the bouncing sprites came out
+          visibly wrong on a watched run while all four instruments passed.
+          A hardcoded address in an asm block is only correct by coincidence;
+          write what the number MEANS and it survives the next reorder. }
+        LEA     AX, [DI + OFFSET Under - 1641]   { 036f  = Ofs(Under[N])     }
+        MOV     SrcBase, AX                 { 0373                          }
         MOV     CX, 1600                { 0376  40 x 40                     }
         DEC     CX                      { 0379    counted from 1599 down    }
         MOV     WORD PTR CellOfs, OFFSET Cell     { 037a  $4FD6             }
