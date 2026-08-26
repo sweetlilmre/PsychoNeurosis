@@ -33,7 +33,7 @@ implementation
   spans.py CANNOT TELL THESE APART -- 16161 against 16159 aligned, two
   bytes of noise -- because it locates each segment by content. Read
   segpair.py and dgimage.py for this, never the walk. }
-uses VGA, Crt, DemoVT, P1S5, P1S4, P1S3, P1S2, P1S1;
+uses VGA, Crt, DemoVT, P1S5, P1STAR, P1S4, P1S3, P1S2, P1S1;
 
 procedure RunIntro;
 var
