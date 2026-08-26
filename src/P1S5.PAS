@@ -442,12 +442,19 @@ end;
 
 procedure ObjTransformAll(AObj : PObj; A1, A2, A3 : Integer);
 var
-  { ENTER $12 is 18 bytes. The counter, three LongInts and the for-loop's own
-    two-byte limit temp account for 16, so two bytes here are declared and
-    never read -- nothing below [BP-$10] is referenced at any width. }
+  { ENTER $12 is 18 bytes and the arithmetic closes WITHOUT a spare, once the
+    `with` below is counted. A `with` on a pointer dereference costs FOUR bytes
+    of frame -- it computes AObj^.Pos once into a hidden far-pointer temp, which
+    is the whole reason 12c5:031a is a single ADD DI,$4B0 -- so the counter, the
+    three LongInts and that temp are 2 + 12 + 4 = 18 exactly.
+
+    This note used to read "the counter, three LongInts and the for-loop's own
+    two-byte limit temp account for 16, so two bytes here are declared and never
+    read", and declared a Spare on that basis. The `with`'s cost was not known
+    when it was written; with it counted there is no room for a spare, and
+    prologue.py read ours as ENTER $14 against the original's $12. }
   I          : Integer;
   TX, TY, TZ : LongInt;
-  Spare      : Integer;
 begin
   { 12c5:02f4 -- SinCos(angle, var C, var S). The FIRST var parameter takes
     the COSINE. }
@@ -757,7 +764,15 @@ var
     temporary is a byte too -- 12c5:067b loads PtCount into [BP-5] and 0683
     compares AL against that slot. ENTER $0A then decomposes as the counter,
     the temporary, and the four bytes a `with` gets for the record's address. }
-  I : Byte;                                       { [BP-$1] }
+  { AND FOUR MORE BYTES THAT NOTHING READS. The note above says ENTER $0A and
+    then accounts for SIX -- one counter, one byte of for-limit temporary, four
+    for the `with` -- which is its own refutation; prologue.py read ours as $06
+    against the original's $0A. Both loops use a `with` and Turbo Pascal reuses
+    the one hidden slot for sequential (non-nested) ones, so the second `with`
+    is not where the four go. Nothing below the address pair at [BP-$9] is
+    referenced at any width. }
+  I     : Byte;                                   { [BP-$1] }
+  Spare : LongInt;                                { never read }
 begin
   SortAll(@Scr);                                  { 12c5:0626 }
 
