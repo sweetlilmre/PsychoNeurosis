@@ -45,6 +45,16 @@ const
   RevealOfs   = 614;               { $266 -- where DrawRevealed lands }
   FontBias    = 8209;              { = 32*256 + 17, see DrawChar }
 
+const
+  { TYPED, so they live in DGROUP where the original reads them from. The four
+    addresses -- DS:$0004, $0006, $0008, $000A -- are the whole argument: an
+    untyped const folds into the instruction and occupies no data at all, and
+    part 001's initialised region opened eight bytes short because of it. }
+  ClipX1 : Integer = 0;      { DS:$0004 }
+  ClipX2 : Integer = 319;    { DS:$0006 }
+  ClipY1 : Integer = 0;      { DS:$0008 }
+  ClipY2 : Integer = 199;    { DS:$000A }
+
 type
   { TWO-DIMENSIONAL, AND THE FOLDED -$1B IS THE WHOLE ARGUMENT. DrawChar writes
     it at 1082:0249 and 02a3 as LES DI,[$56CE] / ADD DI,AX / ADD DI,DX /
@@ -182,14 +192,6 @@ begin
   { Close is the CALLER's, at 1082:05a4, after this routine returns. }
 end;
 
-procedure Unload;
-begin
-  FreeMem(FontBuf,   SizeOf(TFontBuf));
-  FreeMem(CometBank, SizeOf(TCometBank));
-  FreeMem(Backdrop,  64000);
-  FreeMem(WorkBuf,   SizeOf(TWorkBuf));
-end;
-
 { [transcribed] 1082:01d0 -- redraws the characters revealed so far.
 
   A 150-row by 26-column masked blit out of the working buffer at DS:$56CE.
@@ -197,202 +199,6 @@ end;
   so the anti-aliased edges of the glyphs drop out and only the solid core is
   copied. }
 { @asm 001 1082:01d0 +0 DrawRevealed }
-procedure DrawRevealed; assembler;
-asm
-        PUSH    ES                      { 1082:01d0                          }
-        PUSH    DS                      { 01d1                               }
-        MOV     AX, [VirtScrSeg]        { 01d2                               }
-        MOV     ES, AX                  { 01d5  ES:DI is the virtual screen   }
-        MOV     DI, RevealOfs           { 01d7  $266                         }
-        ADD     DI, 320                 { 01da  one row down to start         }
-        LDS     SI, WorkBuf             { 01de  DS:SI is the working buffer   }
-        MOV     BX, 150                 { 01e2  rows                         }
-@@Row:  MOV     CX, 26                  { 01e5  columns, reloaded per row     }
-@@Pixel:
-        MOV     AL, [SI]                { 01e8                               }
-        CMP     AL, 20                  { 01ea  THE MASK IS A THRESHOLD       }
-        JLE     @@Skip                  { 01ec    and not a colour key        }
-        MOV     ES:[DI], AL             { 01ee                               }
-@@Skip: INC     DI                      { 01f1  BOTH advance either way, so   }
-        INC     SI                      { 01f2    the skip is a hole and not  }
-        DEC     CX                      { 01f3    a shift                     }
-        JNE     @@Pixel                 { 01f4                               }
-        ADD     DI, 292                 { 01f6  $124 -- and DI is already 26  }
-        DEC     BX                      { 01fa    further on, so the stride   }
-        JNE     @@Row                   { 01fb    is 318 and the block LEANS  }
-        POP     DS                      { 01fd                               }
-        POP     ES                      { 01fe                               }
-end;
-{ [stub] 1082:0200 -- draws the character currently animating. Phase is
-  Trunc(Phase) from ShowWord: one of 1, 3, 5, 7, 9, 11, 13, 15. }
-{ --------------------------------------------------------------------------
-  1082:0200 -- draw one character into the work buffer.
-
-  It does TWO font rows per call, Phase and Phase + 1, which is what makes the
-  glyph unroll two scanlines at a time as Phase steps 1, 3, 5 .. 15.
-
-  The font is 16 x 16: 256 bytes per glyph, 16 per row -- which is where the
-  15,104-byte read comes from (59 * 256). The work buffer is 26 bytes per row,
-  the same 26 that DrawRevealed blits and BlurBuffer smears.
-
-      if Font[Ord(Ch)*256 + Phase*16 + C - 8209] <> 0 then
-        Work[((Index-1)*17 + Phase + 1) * 26 + C + 5 - 27] := 121
-
-  The -8209 is not decoration: the font holds 59 glyphs, so a raw Ord('A')*256
-  would run 1,500 bytes off the end of the 15,104-byte buffer. 8209 = 32*256
-  + 17, i.e. the table starts at space and each glyph is 17 bytes short of a
-  full 256 -- which is what brings 'A'..'Z' back inside it.
-
-  Every lit pixel is written as colour $79 = 121; there is no shading here,
-  the gradient comes from BlurBuffer afterwards.
-  -------------------------------------------------------------------------- }
-{ ONE LOCAL, NOT THREE. 1082:0200 opens ENTER $02 and [BP-$02] is the only slot
-  the routine names, so Row and Src were never variables -- both are expressions
-  the compiler evaluates in place, and declaring them cost four bytes of frame
-  and a store apiece. }
-procedure DrawChar(Ch : Char; Phase, Index : Integer);
-var
-  C : Integer;                     { [BP-$02], the whole frame }
-begin
-  for C := 1 to 16 do              { 1082:0204 }
-    if FontBuf^[Ch, Phase, C] <> 0 then                        { 1082:022b }
-      WorkBuf^[(Index - 1) * 17 + Phase + 1, C + 5] := 121;   { 1082:0249 }
-  for C := 1 to 16 do
-    if FontBuf^[Ch, Phase + 1, C] <> 0 then
-      WorkBuf^[(Index - 1) * 17 + Phase + 2, C + 5] := 121;   { 1082:02a3 }
-end;
-
-{ --------------------------------------------------------------------------
-  1082:02ba -- NOT an outro. It is a BLUR.
-
-  3,900 iterations of a diagonal four-neighbour average over the working
-  buffer:
-
-      P[0] := (P[-27] + P[-25] + P[+25] + P[+27]) shr 2
-
-  With a row width of 26 those offsets are the four DIAGONAL neighbours, and
-  3,900 is exactly 26 x 150 -- the same buffer DrawRevealed reads. Running it
-  100 times is what dissolves the finished word into a smear rather than
-  cutting away from it.
-
-  The earlier name and body were guesses from the call site alone.
-  -------------------------------------------------------------------------- }
-{ HAND ASSEMBLER, TRANSCRIBED VERBATIM, and three things say so. 1082:02ba goes
-  straight into LES DI with no prologue at all, so the routine has no frame and
-  no locals; the counter is CX and the loop is LOOP; and the store is STOSB,
-  which also advances DI, so the pointer walks itself and there is no index
-  variable anywhere. Compiled Pascal emits none of the three for this shape.
-
-  IT ALSO READS AND WRITES THE SAME BUFFER AS IT GOES. DI starts 27 bytes in and
-  STOSB writes at DI before incrementing it, so the four neighbours are read
-  relative to the byte about to be overwritten -- and the two ABOVE it
-  ([DI-$1B] and [DI-$19]) have already been blurred by earlier iterations. It is
-  a running smear, not a clean convolution, and that is what makes a hundred
-  passes dissolve the word rather than merely soften it.
-
-  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
-
-      for I := 27 to 27 + 3899 do
-        WorkBuf^[I] := (WorkBuf^[I - 27] + WorkBuf^[I - 25] +
-                        WorkBuf^[I + 25] + WorkBuf^[I + 27]) shr 2;
-  -------------------------------------------------------------------------- }
-{ @asm 001 1082:02ba +0 BlurBuffer }
-procedure BlurBuffer; assembler;
-asm
-        LES     DI, WorkBuf             { 1082:02ba  ES:DI := the buffer      }
-        ADD     DI, 27                  { 02be  the first byte with four      }
-                                        {         diagonal neighbours         }
-        MOV     CX, 3900                { 02c1  26 x 150, the whole band      }
-        XOR     AX, AX                  { 02c4                                }
-        XOR     BX, BX                  { 02c6  BH stays zero for the whole   }
-                                        {         loop, so BX is a widened BL }
-@@Pixel:
-        MOV     BL, ES:[DI-27]          { 02c8  up and left                   }
-        MOV     AX, BX                  { 02cc                                }
-        MOV     BL, ES:[DI-25]          { 02ce  up and right                  }
-        ADD     AX, BX                  { 02d2                                }
-        MOV     BL, ES:[DI+25]          { 02d4  down and left                 }
-        ADD     AX, BX                  { 02d8                                }
-        MOV     BL, ES:[DI+27]          { 02da  down and right                }
-        ADD     AX, BX                  { 02de                                }
-        SHR     AX, 2                   { 02e0  the average of the four       }
-        STOSB                           { 02e3  and DI steps on by itself     }
-        LOOP    @@Pixel                 { 02e4                                }
-end;
-
-{ ===========================================================================
-  Scene 2 -- "ASPHYXIA PRESENTS"                  Demo_Scene2  1082:056f
-  =========================================================================== }
-
-
-{ --------------------------------------------------------------------------
-  Sprite_BlitClipped (1082:0128) -- the comet. HAND ASSEMBLER, verbatim.
-
-  A 65 x 48 transparent blit clipped against four bounds in DGROUP:
-
-      DS:$0004  ClipX1 = 0      DS:$0006  ClipX2 = 319
-      DS:$0008  ClipY1 = 0      DS:$000A  ClipY2 = 199
-
-  The clip is done by adjusting the START POINTER and the row and column COUNTS
-  before the copy, never per pixel: a top clip advances the source by
-  (rows * 65) with a MUL, a left clip advances the destination and shortens the
-  row, and both leftovers are added back between rows. Zero bytes are skipped.
-
-  IT IS ASSEMBLER AND THE SIZE CONSTANTS ARE THE FIRST TELL. 1082:0137 is
-  MOV DL,$30 and 1082:013b is MOV CL,$41 -- the height and width as IMMEDIATES
-  into the halves of two registers, with XOR DH,DH and XOR CH,CH to clear the
-  other halves. Compiled Pascal loads a Word constant whole. Add LODSB/STOSB for
-  one byte at a time, DEC CL / JNE for the inner loop, and MUL CX to skip rows,
-  and there is nothing of the code generator left in it. The sister blitters in
-  scene 5 -- DrawPoint and DrawReflection -- are the same routine with the size
-  read from the sprite instead of compiled in.
-
-  TWO LOCALS AND A SPARE. ENTER $06, with [BP-$02] and [BP-$04] both zeroed at
-  the top and written by the horizontal clip; nothing touches [BP-$06]. An
-  `assembler` routine may declare locals and Turbo Pascal frames them, which is
-  why the operand is there at all.
-
-  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
-
-      Rows := CometH;  Cols := CometW;  SkipL := 0;  SkipR := 0;
-      if ClipY1 - Y > 0 then
-      begin
-        if ClipY1 - Y >= Rows then Exit;
-        Dec(Rows, ClipY1 - Y);  Inc(P, (ClipY1 - Y) * CometW);  Y := ClipY1;
-      end;
-      if ClipY2 - Y <= 0 then Exit;
-      if ClipY2 - Y < Rows then Rows := ClipY2 - Y + 1;
-      D := YOfs[Y] + X;
-      if ClipX1 - X > 0 then
-      begin
-        if ClipX1 - X >= Cols then Exit;
-        SkipL := ClipX1 - X;  Inc(D, SkipL);  Dec(Cols, SkipL);
-      end;
-      if ClipX2 - X <= 0 then Exit;
-      if ClipX2 - X < Cols then
-      begin
-        SkipR := Cols - (ClipX2 - X);  Cols := ClipX2 - X;
-      end;
-      for Row := 1 to Rows do
-      begin
-        Inc(P, SkipL);
-        for Col := 1 to Cols do
-        begin
-          if P^ <> 0 then Mem[Segment : D] := P^;
-          Inc(P);  Inc(D);
-        end;
-        Inc(P, SkipR);  Inc(D, 320 - Cols);
-      end;
-  -------------------------------------------------------------------------- }
-const
-  { TYPED, so they live in DGROUP where the original reads them from. The four
-    addresses -- DS:$0004, $0006, $0008, $000A -- are the whole argument: an
-    untyped const folds into the instruction and occupies no data at all, and
-    part 001's initialised region opened eight bytes short because of it. }
-  ClipX1 : Integer = 0;      { DS:$0004 }
-  ClipX2 : Integer = 319;    { DS:$0006 }
-  ClipY1 : Integer = 0;      { DS:$0008 }
-  ClipY2 : Integer = 199;    { DS:$000A }
 
 { @asm 001 1082:0128 +0 BlitClipped }
 procedure BlitClipped(Src : Pointer; X, Y : Integer; Segment : Word); assembler;
@@ -508,6 +314,223 @@ end;
                                       rows at a time by 1082:0200
           A 5,200-byte working buffer is allocated separately.
   -------------------------------------------------------------------------- }
+
+{ @asm 001 1082:01d0 +0 DrawRevealed }
+procedure DrawRevealed; assembler;
+asm
+        PUSH    ES                      { 1082:01d0                          }
+        PUSH    DS                      { 01d1                               }
+        MOV     AX, [VirtScrSeg]        { 01d2                               }
+        MOV     ES, AX                  { 01d5  ES:DI is the virtual screen   }
+        MOV     DI, RevealOfs           { 01d7  $266                         }
+        ADD     DI, 320                 { 01da  one row down to start         }
+        LDS     SI, WorkBuf             { 01de  DS:SI is the working buffer   }
+        MOV     BX, 150                 { 01e2  rows                         }
+@@Row:  MOV     CX, 26                  { 01e5  columns, reloaded per row     }
+@@Pixel:
+        MOV     AL, [SI]                { 01e8                               }
+        CMP     AL, 20                  { 01ea  THE MASK IS A THRESHOLD       }
+        JLE     @@Skip                  { 01ec    and not a colour key        }
+        MOV     ES:[DI], AL             { 01ee                               }
+@@Skip: INC     DI                      { 01f1  BOTH advance either way, so   }
+        INC     SI                      { 01f2    the skip is a hole and not  }
+        DEC     CX                      { 01f3    a shift                     }
+        JNE     @@Pixel                 { 01f4                               }
+        ADD     DI, 292                 { 01f6  $124 -- and DI is already 26  }
+        DEC     BX                      { 01fa    further on, so the stride   }
+        JNE     @@Row                   { 01fb    is 318 and the block LEANS  }
+        POP     DS                      { 01fd                               }
+        POP     ES                      { 01fe                               }
+end;
+{ [stub] 1082:0200 -- draws the character currently animating. Phase is
+  Trunc(Phase) from ShowWord: one of 1, 3, 5, 7, 9, 11, 13, 15. }
+{ --------------------------------------------------------------------------
+  1082:0200 -- draw one character into the work buffer.
+
+  It does TWO font rows per call, Phase and Phase + 1, which is what makes the
+  glyph unroll two scanlines at a time as Phase steps 1, 3, 5 .. 15.
+
+  The font is 16 x 16: 256 bytes per glyph, 16 per row -- which is where the
+  15,104-byte read comes from (59 * 256). The work buffer is 26 bytes per row,
+  the same 26 that DrawRevealed blits and BlurBuffer smears.
+
+      if Font[Ord(Ch)*256 + Phase*16 + C - 8209] <> 0 then
+        Work[((Index-1)*17 + Phase + 1) * 26 + C + 5 - 27] := 121
+
+  The -8209 is not decoration: the font holds 59 glyphs, so a raw Ord('A')*256
+  would run 1,500 bytes off the end of the 15,104-byte buffer. 8209 = 32*256
+  + 17, i.e. the table starts at space and each glyph is 17 bytes short of a
+  full 256 -- which is what brings 'A'..'Z' back inside it.
+
+  Every lit pixel is written as colour $79 = 121; there is no shading here,
+  the gradient comes from BlurBuffer afterwards.
+  -------------------------------------------------------------------------- }
+{ ONE LOCAL, NOT THREE. 1082:0200 opens ENTER $02 and [BP-$02] is the only slot
+  the routine names, so Row and Src were never variables -- both are expressions
+  the compiler evaluates in place, and declaring them cost four bytes of frame
+  and a store apiece. }
+
+{ ONE LOCAL, NOT THREE. 1082:0200 opens ENTER $02 and [BP-$02] is the only slot
+  the routine names, so Row and Src were never variables -- both are expressions
+  the compiler evaluates in place, and declaring them cost four bytes of frame
+  and a store apiece. }
+procedure DrawChar(Ch : Char; Phase, Index : Integer);
+var
+  C : Integer;                     { [BP-$02], the whole frame }
+begin
+  for C := 1 to 16 do              { 1082:0204 }
+    if FontBuf^[Ch, Phase, C] <> 0 then                        { 1082:022b }
+      WorkBuf^[(Index - 1) * 17 + Phase + 1, C + 5] := 121;   { 1082:0249 }
+  for C := 1 to 16 do
+    if FontBuf^[Ch, Phase + 1, C] <> 0 then
+      WorkBuf^[(Index - 1) * 17 + Phase + 2, C + 5] := 121;   { 1082:02a3 }
+end;
+
+{ --------------------------------------------------------------------------
+  1082:02ba -- NOT an outro. It is a BLUR.
+
+  3,900 iterations of a diagonal four-neighbour average over the working
+  buffer:
+
+      P[0] := (P[-27] + P[-25] + P[+25] + P[+27]) shr 2
+
+  With a row width of 26 those offsets are the four DIAGONAL neighbours, and
+  3,900 is exactly 26 x 150 -- the same buffer DrawRevealed reads. Running it
+  100 times is what dissolves the finished word into a smear rather than
+  cutting away from it.
+
+  The earlier name and body were guesses from the call site alone.
+  -------------------------------------------------------------------------- }
+{ HAND ASSEMBLER, TRANSCRIBED VERBATIM, and three things say so. 1082:02ba goes
+  straight into LES DI with no prologue at all, so the routine has no frame and
+  no locals; the counter is CX and the loop is LOOP; and the store is STOSB,
+  which also advances DI, so the pointer walks itself and there is no index
+  variable anywhere. Compiled Pascal emits none of the three for this shape.
+
+  IT ALSO READS AND WRITES THE SAME BUFFER AS IT GOES. DI starts 27 bytes in and
+  STOSB writes at DI before incrementing it, so the four neighbours are read
+  relative to the byte about to be overwritten -- and the two ABOVE it
+  ([DI-$1B] and [DI-$19]) have already been blurred by earlier iterations. It is
+  a running smear, not a clean convolution, and that is what makes a hundred
+  passes dissolve the word rather than merely soften it.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      for I := 27 to 27 + 3899 do
+        WorkBuf^[I] := (WorkBuf^[I - 27] + WorkBuf^[I - 25] +
+                        WorkBuf^[I + 25] + WorkBuf^[I + 27]) shr 2;
+  -------------------------------------------------------------------------- }
+{ @asm 001 1082:02ba +0 BlurBuffer }
+
+{ @asm 001 1082:02ba +0 BlurBuffer }
+procedure BlurBuffer; assembler;
+asm
+        LES     DI, WorkBuf             { 1082:02ba  ES:DI := the buffer      }
+        ADD     DI, 27                  { 02be  the first byte with four      }
+                                        {         diagonal neighbours         }
+        MOV     CX, 3900                { 02c1  26 x 150, the whole band      }
+        XOR     AX, AX                  { 02c4                                }
+        XOR     BX, BX                  { 02c6  BH stays zero for the whole   }
+                                        {         loop, so BX is a widened BL }
+@@Pixel:
+        MOV     BL, ES:[DI-27]          { 02c8  up and left                   }
+        MOV     AX, BX                  { 02cc                                }
+        MOV     BL, ES:[DI-25]          { 02ce  up and right                  }
+        ADD     AX, BX                  { 02d2                                }
+        MOV     BL, ES:[DI+25]          { 02d4  down and left                 }
+        ADD     AX, BX                  { 02d8                                }
+        MOV     BL, ES:[DI+27]          { 02da  down and right                }
+        ADD     AX, BX                  { 02de                                }
+        SHR     AX, 2                   { 02e0  the average of the four       }
+        STOSB                           { 02e3  and DI steps on by itself     }
+        LOOP    @@Pixel                 { 02e4                                }
+end;
+
+{ ===========================================================================
+  Scene 2 -- "ASPHYXIA PRESENTS"                  Demo_Scene2  1082:056f
+  =========================================================================== }
+
+
+{ --------------------------------------------------------------------------
+  Sprite_BlitClipped (1082:0128) -- the comet. HAND ASSEMBLER, verbatim.
+
+  A 65 x 48 transparent blit clipped against four bounds in DGROUP:
+
+      DS:$0004  ClipX1 = 0      DS:$0006  ClipX2 = 319
+      DS:$0008  ClipY1 = 0      DS:$000A  ClipY2 = 199
+
+  The clip is done by adjusting the START POINTER and the row and column COUNTS
+  before the copy, never per pixel: a top clip advances the source by
+  (rows * 65) with a MUL, a left clip advances the destination and shortens the
+  row, and both leftovers are added back between rows. Zero bytes are skipped.
+
+  IT IS ASSEMBLER AND THE SIZE CONSTANTS ARE THE FIRST TELL. 1082:0137 is
+  MOV DL,$30 and 1082:013b is MOV CL,$41 -- the height and width as IMMEDIATES
+  into the halves of two registers, with XOR DH,DH and XOR CH,CH to clear the
+  other halves. Compiled Pascal loads a Word constant whole. Add LODSB/STOSB for
+  one byte at a time, DEC CL / JNE for the inner loop, and MUL CX to skip rows,
+  and there is nothing of the code generator left in it. The sister blitters in
+  scene 5 -- DrawPoint and DrawReflection -- are the same routine with the size
+  read from the sprite instead of compiled in.
+
+  TWO LOCALS AND A SPARE. ENTER $06, with [BP-$02] and [BP-$04] both zeroed at
+  the top and written by the horizontal clip; nothing touches [BP-$06]. An
+  `assembler` routine may declare locals and Turbo Pascal frames them, which is
+  why the operand is there at all.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      Rows := CometH;  Cols := CometW;  SkipL := 0;  SkipR := 0;
+      if ClipY1 - Y > 0 then
+      begin
+        if ClipY1 - Y >= Rows then Exit;
+        Dec(Rows, ClipY1 - Y);  Inc(P, (ClipY1 - Y) * CometW);  Y := ClipY1;
+      end;
+      if ClipY2 - Y <= 0 then Exit;
+      if ClipY2 - Y < Rows then Rows := ClipY2 - Y + 1;
+      D := YOfs[Y] + X;
+      if ClipX1 - X > 0 then
+      begin
+        if ClipX1 - X >= Cols then Exit;
+        SkipL := ClipX1 - X;  Inc(D, SkipL);  Dec(Cols, SkipL);
+      end;
+      if ClipX2 - X <= 0 then Exit;
+      if ClipX2 - X < Cols then
+      begin
+        SkipR := Cols - (ClipX2 - X);  Cols := ClipX2 - X;
+      end;
+      for Row := 1 to Rows do
+      begin
+        Inc(P, SkipL);
+        for Col := 1 to Cols do
+        begin
+          if P^ <> 0 then Mem[Segment : D] := P^;
+          Inc(P);  Inc(D);
+        end;
+        Inc(P, SkipR);  Inc(D, 320 - Cols);
+      end;
+  -------------------------------------------------------------------------- }
+
+{ @asm 001 1082:0128 +0 BlitClipped }
+
+{ --------------------------------------------------------------------------
+  Title_ShowWord (1082:02fd)
+
+  Called twice -- once with 'ASPHYXIA' (1082:$055E) and once with
+  'PRESENTS' (1082:$0567). A counter runs from 80 down to -18 while a comet
+  sprite flies across; as it passes, characters are revealed one at a time.
+  When the counter reaches -18 a 100-frame outro plays.
+
+  ASSETS  NEUROSIS.DAT $00FD00, 111,072 bytes:
+            assets/part001/intro_palette.pal    768 B
+            assets/part001/comet0.png .. comet9.png
+                                      10 frames of 65x48 -- a flaming comet
+            assets/part001/intro_backdrop.png   64,000 B
+            assets/part001/00FD00_03.bin        15,104 B = a 59-character
+                                      16x16 font (59 x 256), drawn two
+                                      rows at a time by 1082:0200
+          A 5,200-byte working buffer is allocated separately.
+  -------------------------------------------------------------------------- }
 procedure ShowWord(S : String);
 { Read instruction by instruction off 1082:02fd. Three of the four state
   variables are Borland Reals held in the stack frame, and the four constants
@@ -601,7 +624,9 @@ begin
 end;
 
 
+
 procedure Scene2;
+
 begin
   { Opened HERE, before Load, which is where the original has it. }
   Assign(F, 'neurosis.dat');              { 1082:057c }
@@ -612,7 +637,16 @@ begin
   ShowWord('ASPHYXIA');                   { 1082:0592 }
   ShowWord('PRESENTS');                   { 1082:059D }
   PaletteFadeOut(FadePause);              { 1082:05BB -- 1491:0330 }
-  Unload;                                 { 1082:05C1, four FreeMems }
+  { THE FOUR FreeMems ARE INLINE, and the segment's arithmetic leaves nowhere
+    else for them. 1082 runs Load 0000, BlitClipped 0128, DrawRevealed 01d0,
+    DrawChar 0200, BlurBuffer 02ba, ShowWord 02fd, Scene2 056f and the
+    initialisation 0602 -- contiguous, with no gap for an Unload routine. And
+    1082:0601 is CB, a FAR return, which is Scene2's own epilogue; ours emitted
+    C3 because a near local Unload ended there instead. }
+  FreeMem(FontBuf,   SizeOf(TFontBuf));   { 1082:05C1 }
+  FreeMem(CometBank, SizeOf(TCometBank));
+  FreeMem(Backdrop,  64000);
+  FreeMem(WorkBuf,   SizeOf(TWorkBuf));
 end;
 
 end.
