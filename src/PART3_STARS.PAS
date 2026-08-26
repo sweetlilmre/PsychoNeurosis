@@ -153,86 +153,18 @@ var
   FUnused      : file;
 
 
-{ --------------------------------------------------------------------------
-  DegToRad (10b8:0487)
-  -------------------------------------------------------------------------- }
-function DegToRad(D : Real) : Real;
-begin
-  DegToRad := D * Pi / 180.0;
-end;
+{ THE IMPLEMENTATION ORDER IS THE ORIGINAL'S, read off its addresses:
+  ProjectAndPlot 10b8:0000, RunScene 0126, DegToRad 0487, InitPalette 04c3,
+  Scene2 0592, Generate 05f2 -- and STARMATH.OBJ's two routines last at 07DB
+  and 07F4, which is where a linked object's code always lands regardless of
+  where the $L sits. Turbo Pascal emits routines in source order, so declaring
+  them DegToRad, Generate, InitPalette, ProjectAndPlot, RunScene, Scene2 put
+  every one of them at another's address. The near calls are what showed it:
+  10b8:05e6 is CALL $4C3 where ours emitted CALL $59.
 
-{ --------------------------------------------------------------------------
-  Stars_Generate (10b8:05f2) -- THE UNIT INITIALISATION SECTION.
-
-  This is not called by Scene2. It is entry 14 in the unit-initialisation
-  chain at 1000:0000, so the point cloud is built once when the program
-  loads, long before the scene runs. RunScene frees both blocks at the end,
-  which is why the scene cannot be run twice.
-
-  The point cloud is NOT loaded from disk. Each point gets a random angle on
-  a circle of radius 40 and a depth equal to minus its index, so the 500
-  points spread evenly from Z=-1 to Z=-500: a tube. A point that rounds to
-  dead centre is thrown away and re-rolled, otherwise it would sit on the
-  vanishing point forever.
-
-  The first point is written out longhand ahead of the loop (10b8:0613, with
-  the field offsets constant-folded), with its Z set FIRST and no rejection
-  test; every other point sets Z last, after the test. Reproduced as written.
-
-  This is the only floating point in the scene.
-  -------------------------------------------------------------------------- }
-procedure Generate;
-{ NO LOCAL COUNTER. 10b8:069d is `MOV WORD PTR [$A88A],2` and 10b8:06a5 is
-  `INC WORD PTR [$A88A]` -- the loop runs on the UNIT-LEVEL Idx, which is
-  already declared at that address and which the var block's own note says is
-  unit-level in the original. A local gave [BP-2] and a frame, and the two
-  never match however the body is written. }
-begin
-  GetMem(Live,   ArraySize);                  { 10b8:05f8 }
-  GetMem(Source, ArraySize);                  { 10b8:0607 }
-
-  Live^[1].Z := -1;                           { 10b8:0617 }
-  Angle := Random(360);                       { 10b8:0620 }
-  Live^[1].X := Round(Cos(DegToRad(Angle)) * TubeRadius);   { RTL_Cos 137b:3257 }
-  Live^[1].Y := Round(Sin(DegToRad(Angle)) * TubeRadius);   { RTL_Sin 137b:3252 }
-  Live^[1].XOfs := CentreX;
-  Live^[1].YOfs := CentreY;
-
-  for Idx := 2 to NumPoints do                  { 10b8:069d }
-  begin
-    repeat
-      Angle := Random(360);
-      Live^[Idx].X := Round(Cos(DegToRad(Angle)) * TubeRadius);
-      Live^[Idx].Y := Round(Sin(DegToRad(Angle)) * TubeRadius);
-      Live^[Idx].XOfs := CentreX;
-      Live^[Idx].YOfs := CentreY;
-    until (Live^[Idx].X <> 0) or (Live^[Idx].Y <> 0);   { 10b8:074e -- re-roll }
-    Live^[Idx].Z := -Idx;                         { 10b8:077b }
-  end;
-
-  { 10b8:079c -- copied a record at a time, not in one 7,000-byte Move.
-    Source is the reset template every recycled point is rebuilt from. }
-  for Idx := 1 to NumPoints do
-    Move(Live^[Idx], Source^[Idx], RecSize);
-end;
-
-{ --------------------------------------------------------------------------
-  Stars_InitPalette (10b8:04c3)
-  A 13-step blue depth ramp: colour 1 brightest, 13 black. Matches the
-  shading term (-Z shr 6) + 1 used by the plotter.
-  -------------------------------------------------------------------------- }
-procedure InitPalette;
-begin
-  PanX := 0;  PanY := 0;  DisplayCount := 0;   { 10b8:04c6 -- before the mode }
-  SetMode13h;                                  { 10b8:04d5 }
-  SetRGB( 1, 0, 0, $3C);   SetRGB( 2, 0, 0, $37);
-  SetRGB( 3, 0, 0, $32);   SetRGB( 4, 0, 0, $2D);
-  SetRGB( 5, 0, 0, $28);   SetRGB( 6, 0, 0, $23);
-  SetRGB( 7, 0, 0, $1E);   SetRGB( 8, 0, 0, $19);
-  SetRGB( 9, 0, 0, $14);   SetRGB(10, 0, 0, $0F);
-  SetRGB(11, 0, 0, $0A);   SetRGB(12, 0, 0, $05);
-  SetRGB(13, 0, 0, $00);
-end;
+  No forward declarations are needed in this order -- Generate calls DegToRad
+  which precedes it, Scene2 calls InitPalette and RunScene which precede it,
+  and the unit initialisation calls Generate, which is last. }
 
 { --------------------------------------------------------------------------
   Stars_ProjectAndPlot (10b8:0000)
@@ -344,7 +276,9 @@ begin
       end;
     end;
 
-    ClearVirtual;                              { 10b8:023c }
+    { ClearScreen here too: 10b8:0236 pushes [$E770] and 0 before the call,
+      the same two arguments as the other site. }
+    ClearScreen(VirtScrSeg, 0);                { 10b8:023c }
     ProjectAndPlot(VirtScrSeg);                { 10b8:0245 }
     CopyScreen(VirtScrSeg, $A000);             { 10b8:024f }
 
@@ -371,7 +305,10 @@ begin
           + DivLong(Live^[Idx].Y shl ProjShift, Live^[Idx].Z);   { 10b8:033e }
     if (SX > 0) and (SX < ScrW) and (SY < ScrH) and (SY > 0) then
     begin
-      Inc(DisplayCount);
+      { LONGHAND: 10b8:0376 is MOV AX,[$BE0C] / INC AX / MOV [$BE0C],AX --
+        loaded into a register, incremented there and stored back, where
+        `Inc` on a unit-level word emits INC WORD PTR in place. }
+      DisplayCount := DisplayCount + 1;
       Display[DisplayCount].X      := SX;
       Display[DisplayCount].Y      := SY;
       Display[DisplayCount].Colour := ((-Live^[Idx].Z) shr 6) + 1;
@@ -468,6 +405,32 @@ begin
 end;
 
 { --------------------------------------------------------------------------
+  DegToRad (10b8:0487)
+  -------------------------------------------------------------------------- }
+function DegToRad(D : Real) : Real;
+begin
+  DegToRad := D * Pi / 180.0;
+end;
+
+{ --------------------------------------------------------------------------
+  Stars_InitPalette (10b8:04c3)
+  A 13-step blue depth ramp: colour 1 brightest, 13 black. Matches the
+  shading term (-Z shr 6) + 1 used by the plotter.
+  -------------------------------------------------------------------------- }
+procedure InitPalette;
+begin
+  PanX := 0;  PanY := 0;  DisplayCount := 0;   { 10b8:04c6 -- before the mode }
+  SetMode13h;                                  { 10b8:04d5 }
+  SetRGB( 1, 0, 0, $3C);   SetRGB( 2, 0, 0, $37);
+  SetRGB( 3, 0, 0, $32);   SetRGB( 4, 0, 0, $2D);
+  SetRGB( 5, 0, 0, $28);   SetRGB( 6, 0, 0, $23);
+  SetRGB( 7, 0, 0, $1E);   SetRGB( 8, 0, 0, $19);
+  SetRGB( 9, 0, 0, $14);   SetRGB(10, 0, 0, $0F);
+  SetRGB(11, 0, 0, $0A);   SetRGB(12, 0, 0, $05);
+  SetRGB(13, 0, 0, $00);
+end;
+
+{ --------------------------------------------------------------------------
   Demo_Scene2 (10b8:0592)
 
   ASSETS  NEUROSIS.DAT $0C0276, 3000 bytes:
@@ -499,6 +462,61 @@ begin
 
   InitPalette;                                 { 10b8:05e6 }
   RunScene;                                    { 10b8:05e9 }
+end;
+
+{ --------------------------------------------------------------------------
+  Stars_Generate (10b8:05f2) -- THE UNIT INITIALISATION SECTION.
+
+  This is not called by Scene2. It is entry 14 in the unit-initialisation
+  chain at 1000:0000, so the point cloud is built once when the program
+  loads, long before the scene runs. RunScene frees both blocks at the end,
+  which is why the scene cannot be run twice.
+
+  The point cloud is NOT loaded from disk. Each point gets a random angle on
+  a circle of radius 40 and a depth equal to minus its index, so the 500
+  points spread evenly from Z=-1 to Z=-500: a tube. A point that rounds to
+  dead centre is thrown away and re-rolled, otherwise it would sit on the
+  vanishing point forever.
+
+  The first point is written out longhand ahead of the loop (10b8:0613, with
+  the field offsets constant-folded), with its Z set FIRST and no rejection
+  test; every other point sets Z last, after the test. Reproduced as written.
+
+  This is the only floating point in the scene.
+  -------------------------------------------------------------------------- }
+procedure Generate;
+{ NO LOCAL COUNTER. 10b8:069d is `MOV WORD PTR [$A88A],2` and 10b8:06a5 is
+  `INC WORD PTR [$A88A]` -- the loop runs on the UNIT-LEVEL Idx, which is
+  already declared at that address and which the var block's own note says is
+  unit-level in the original. A local gave [BP-2] and a frame, and the two
+  never match however the body is written. }
+begin
+  GetMem(Live,   ArraySize);                  { 10b8:05f8 }
+  GetMem(Source, ArraySize);                  { 10b8:0607 }
+
+  Live^[1].Z := -1;                           { 10b8:0617 }
+  Angle := Random(360);                       { 10b8:0620 }
+  Live^[1].X := Round(Cos(DegToRad(Angle)) * TubeRadius);   { RTL_Cos 137b:3257 }
+  Live^[1].Y := Round(Sin(DegToRad(Angle)) * TubeRadius);   { RTL_Sin 137b:3252 }
+  Live^[1].XOfs := CentreX;
+  Live^[1].YOfs := CentreY;
+
+  for Idx := 2 to NumPoints do                  { 10b8:069d }
+  begin
+    repeat
+      Angle := Random(360);
+      Live^[Idx].X := Round(Cos(DegToRad(Angle)) * TubeRadius);
+      Live^[Idx].Y := Round(Sin(DegToRad(Angle)) * TubeRadius);
+      Live^[Idx].XOfs := CentreX;
+      Live^[Idx].YOfs := CentreY;
+    until (Live^[Idx].X <> 0) or (Live^[Idx].Y <> 0);   { 10b8:074e -- re-roll }
+    Live^[Idx].Z := -Idx;                         { 10b8:077b }
+  end;
+
+  { 10b8:079c -- copied a record at a time, not in one 7,000-byte Move.
+    Source is the reset template every recycled point is rebuilt from. }
+  for Idx := 1 to NumPoints do
+    Move(Live^[Idx], Source^[Idx], RecSize);
 end;
 
 begin
