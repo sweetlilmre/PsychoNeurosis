@@ -873,6 +873,13 @@ seen_in = "TPART1"
 state = "resolved"
 resolution = "RESOLVED: part 001 97.1%, from 90.9% at the start of the day. 612 bytes left, the largest spans being 1107:04f3 (109), 1107:04a0 (37) and 12c5:03a6 (29)."
 
+[[plan.investigation]]
+name = "part1-work-record"
+finding = "PART 001 97.1 -> 97.6%: THE TRAIL AND THE OUTPUT LIST ARE ONE RECORD, and an offset settles it to the byte. Transform stores through the pointer it was handed rather than naming the output array -- 1107:0512 is MOV ES:[DI+$763],DX with DI = I * 7 off LES DI,[BP-$13]. A 1-based array folds to its base minus one element, so the base is $763 + 7 = $76A = 1,898 -- AND 146 RECORDS OF THIRTEEN BYTES IS 1,898 EXACTLY. Two adjacent members of one structure, and the routine takes a pointer to the structure. Merging them changed nothing about the layout -- $5BCC plus 1,898 is $6336, where the output list already began -- it only let the source say what the code does, and the 83-byte span went to zero. THE STORE ORDER IS X, Y, D, FLAG, AND D COMES AFTER Project, NOT BEFORE, which is behavioural rather than cosmetic. 1107:0528 pushes the two halves of T.Z to FixedToInt and 1107:0503 has already called Project on that same slot, so the DEPTH KEY IS TAKEN FROM THE PROJECTED Z, not the rotated one. Ours had it the other way round -- a different number in the field the depth sort is keyed on. A WATCHED RUN SHOULD LOOK AT THE BANNER'S DEPTH ORDERING because of that one: the blobs are sorted on a key that now comes from a different stage of the pipeline, so the front-to-back order of the trail can change."
+seen_in = "TPART1"
+state = "resolved"
+resolution = "RESOLVED in the batch that found it: part 001 97.6%, from 90.9% at the start of the day. 507 bytes left, the largest spans being 1107:04a0 (37), 12c5:03a6 (29), 12c5:0ac2 (25) and 12c5:0664 (24) -- nothing above 40 anywhere in the target now."
+
 [plan.row."001 $0284"]
 label = "the 2-byte typed constant holding $A640, still missing"
 investigation = "part1-layout"
@@ -986,6 +993,16 @@ target = "R0"
 [plan.row."001 1107:04f3"]
 label = "109 bytes and now the largest span in the whole target"
 investigation = "part1-loadlogo"
+target = "R0"
+
+[plan.row."001 1107:0512"]
+label = "Trail and Outp are one record, offset $76A = 146 x 13 -- FIXED"
+investigation = "part1-work-record"
+target = "R0"
+
+[plan.row."001 1107:0528"]
+label = "the depth key is the PROJECTED Z, not the rotated one -- BEHAVIOURAL"
+investigation = "part1-work-record"
 target = "R0"
 
 [plan.row."001 1107:0600"]

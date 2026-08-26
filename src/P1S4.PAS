@@ -128,9 +128,23 @@ type
   { The output array is passed by pointer too, and ONE-based: 1107:03fd is
     IMUL AX,[BP-2],7 / LES DI,[BP+4] / ADD DI,AX / CMP BYTE PTR ES:[DI-1] --
     the minus one is the low bound folded into the displacement, so P^[I]
-    lands at P + (I-1)*7 and the caller passes @Outp[1]. }
+    lands at P + (I-1)*7 and the caller passes @Work.Outp[1]. }
   TOutArr = array[1..LastEntry] of TOut;
   POutArr = ^TOutArr;
+
+  { TRAIL AND OUTP ARE ONE RECORD, and the offset settles it to the byte.
+    Transform stores through the pointer it was handed -- 1107:0512 is
+    MOV ES:[DI+$763],DX with DI = I * 7 off LES DI,[BP-$13] -- so the output
+    array is reached at a FIXED OFFSET from the trail's own address and not by
+    name. A 1-based array folds to its base minus one element, so the base is
+    $763 + 7 = $76A = 1,898 -- and 146 records of thirteen bytes is 1,898
+    exactly. The two are adjacent members of one structure and the routine takes
+    a pointer to the structure. }
+  TWork = record
+    Trail : array[0..LastEntry] of TTrail;   { offset 0,    1,898 bytes }
+    Outp  : array[1..LastEntry] of TOut;     { offset $76A, 1,015 bytes }
+  end;
+  PWork = ^TWork;
 
   { 51 bytes in the original ($33): a two-byte (W, H) header the blitter reads
     out of the sprite itself, then 49 pixels. }
@@ -247,18 +261,15 @@ var
     1107:068b is IMUL AX,AX,$12 then IMUL DI,AX,$D -- eighteen columns of
     thirteen-byte records -- and 1107:0912 reaches one directly as
     IMUL DI,[$6A31],$D. }
-  Trail : array[0..LastEntry] of TTrail;            { DS:$5BD8 }
-  { DS:$6336, stride 7. 1107:0268 folds it as [DI+$632F] with DI = index * 7,
-    which is a 1-based array of seven-byte records, so the array itself starts
-    seven bytes further on. And it tiles: $6336 plus 145 * 7 is $672D, which is
-    where the palette begins. }
-  { ONE-BASED, AND THE FOLD IS WHAT SAYS SO -- 1107:0268 is IMUL DI,AX,7 then
-    [DI+$632F], and $632F is SEVEN BELOW the array. A zero-based array folds to
-    its own address and a one-based one folds to the address minus one element,
-    so the base is $6336 either way and only the ELEMENT COUNT differs: ours had
-    an index 0 the original does not have, seven bytes, and every variable from
-    the palette upwards sat seven bytes high because of it. }
-  Outp  : array[1..LastEntry] of TOut;              { DS:$6336 }
+  { DS:$5BCC -- the trail and the output list as ONE record, which is how
+    Transform reaches the second through a pointer to the first. $5BCC plus
+    1,898 is $6336, where the output list begins, so merging them changes
+    nothing about the layout -- it only lets the source say what the code does.
+
+    Outp is ONE-BASED and the fold says so: 1107:0268 is IMUL DI,AX,7 then
+    [DI+$632F], seven BELOW the array. A zero-based array folds to its own
+    address, a one-based one to the address minus an element. }
+  Work  : TWork;                                    { DS:$5BCC }
   { DS:$672D, 768 bytes, ending exactly at Row below. }
   Pal   : array[0..767] of Byte;                    { DS:$672D }
   { DS:$6A2D, $6A2F, $6A31 -- BuildPoints' THREE COUNTERS ARE UNIT-LEVEL, and
@@ -367,7 +378,7 @@ procedure Project(var X, Y, Z : LongInt);               external; { 1107:1A04 }
   1107:04bf reads ES:[DI], ES:[DI+4], ES:[DI+8] with DI still pointing at the
   base of the array -- entry 0. It is the object position, not a point.
   -------------------------------------------------------------------------- }
-procedure Transform(Base : Pointer; A1, A2, A3 : Integer);
+procedure Transform(Base : PWork; A1, A2, A3 : Integer);
 var
   { TWENTY BYTES, AND THE EARLIER READING OF THEM WAS WRONG. It said a Byte
     then three LongInts then three Integers, because every referenced offset
@@ -390,7 +401,7 @@ var
     LongInt locals. That is why there are no X, Y, Z locals to declare. }
   I : Integer;                          { [BP-2] }
   T : TTrail;                           { [BP-$0F], the working copy }
-  P : PTrailArr;                        { [BP-$13], from Base }
+  P : PWork;                            { [BP-$13], from Base }
 begin
   P := Base;                                { 1107:044a }
 
@@ -400,22 +411,28 @@ begin
 
   for I := 1 to LastEntry do
   begin
-    Move(P^[I], T, SizeOf(TTrail));         { 1107:049f, thirteen bytes }
+    Move(P^.Trail[I], T, SizeOf(TTrail));   { 1107:049f, thirteen bytes }
     RotatePoint(T.X, T.Y, T.Z);             { 1107:04b3 }
     { THE TRANSLATION IS READ THROUGH THE POINTER, not from Trail absolutely.
       1107:04bc is LES DI,[BP+0A] -- the parameter again -- and the three adds
       take es:[di], es:[di+4] and es:[di+8], which is element ZERO of whatever
-      was passed. Reading Trail[0] by name is the same value and an absolute
+      was passed. Reading Work.Trail[0] by name is the same value and an absolute
       displacement instead of a register indirection. }
-    T.X := T.X + P^[0].X;                   { 1107:04bf }
-    T.Y := T.Y + P^[0].Y;
-    T.Z := T.Z + P^[0].Z;
-    Outp[I].D := FixedToInt(T.Z);           { 1107:052e }
-    Project(T.X, T.Y, T.Z);
+    T.X := T.X + P^.Trail[0].X;                   { 1107:04bf }
+    T.Y := T.Y + P^.Trail[0].Y;
+    T.Z := T.Z + P^.Trail[0].Z;
+    Project(T.X, T.Y, T.Z);                 { 1107:0503 }
+    { THE ORDER IS X, Y, D, FLAG, AND D COMES AFTER Project, NOT BEFORE.
+      1107:0528 pushes [BP-7] and [BP-5] -- the two halves of T.Z -- to
+      FixedToInt, and 1107:0503 has already called Project on that same slot.
+      So the depth key is taken from the PROJECTED Z, not the rotated one, and
+      this had it the other way round: a different number in the field the
+      depth sort is keyed on, not merely a different instruction order. }
     { both come back zero-extended, so the low word carries the sign }
-    Outp[I].X    := Integer(T.X);
-    Outp[I].Y    := Integer(T.Y);
-    Outp[I].Flag := T.Flag;
+    P^.Outp[I].X    := Integer(T.X);           { 1107:0506 }
+    P^.Outp[I].Y    := Integer(T.Y);           { 1107:0517 }
+    P^.Outp[I].D    := FixedToInt(T.Z);        { 1107:052e }
+    P^.Outp[I].Flag := T.Flag;                 { 1107:0543 }
   end;
 end;
 
@@ -620,15 +637,15 @@ var
   I : Byte;
 begin
   for I := 1 to TrailCount do
-    Blit(@Blob[I], Outp[I].X, Outp[I].Y, VirtScrSeg);
+    Blit(@Blob[I], Work.Outp[I].X, Work.Outp[I].Y, VirtScrSeg);
 end;
 
 { [transcribed] 1107:0562 -- FrameStep(A1, A2, A3). Straight pass-through to
   Transform with the array base DS:$5BCC, then the rest of the frame. }
 procedure FrameStep(A1, A2, A3 : Integer);
 begin
-  Transform(@Trail, A1, A2, A3);    { 1107:0446 }
-  BuildBlobs(@Outp[1]);             { 1107:0576, DS:$6336 = Outp + 7 }
+  Transform(@Work, A1, A2, A3);     { 1107:0446 }
+  BuildBlobs(@Work.Outp[1]);        { 1107:0576, DS:$6336 }
   StarStep;                         { 12b2:00c0 }
   StarDraw(VirtScrSeg);             { 12b2:00f1 }
   DrawBlobs;                        { 1107:0245 }
@@ -642,7 +659,7 @@ end;
 
       for Row := 0 to 7 do
         for J := 2 to 18 do
-          Trail[Row*18 + J - 1].Flag := Trail[Row*18 + J].Flag
+          Work.Trail[Row*18 + J - 1].Flag := Work.Trail[Row*18 + J].Flag
 
   The grid is fixed in space; what travels along it is the lit state. That is
   why the message flows through the balls instead of the balls flying.
@@ -713,11 +730,11 @@ begin
         this routine is called with, since all of them are $20 or above. }
       for Row := 1 to TrailRows do
         if Font[Ord(S[Ch]), Row, Step] <> 0 then
-          Trail[Row * TrailLen].Flag := 1
+          Work.Trail[Row * TrailLen].Flag := 1
         else
-          Trail[Row * TrailLen].Flag := 0;
+          Work.Trail[Row * TrailLen].Flag := 0;
 
-      ShiftTrails(@Trail[1]);               { 1107:06aa, DS:$5BD9 }
+      ShiftTrails(@Work.Trail[1]);               { 1107:06aa, DS:$5BD9 }
       FrameStep(0, Angle, Angle);           { 1107:06bc -- note the ZERO }
       ClearScreen(VirtScrSeg, 0);           { 1107:06c5 }
 
@@ -752,15 +769,15 @@ end;
   character is 'O', all 144 are emitted and the '*' arm never fires. Whatever
   the strings once spelled, by 1994 they were a plain rectangle.
 
-      Trail[i].X := (Col - 1) * 10 - 90        1107:08c0
-      Trail[i].Y := 32 - (Row - 1) * 8         1107:08dd
-      Trail[i].Z := 0                          1107:08fe
-      Trail[i].Flag := 0                       1107:090d
+      Work.Trail[i].X := (Col - 1) * 10 - 90        1107:08c0
+      Work.Trail[i].Y := 32 - (Row - 1) * 8         1107:08dd
+      Work.Trail[i].Z := 0                          1107:08fe
+      Work.Trail[i].Flag := 0                       1107:090d
 
   giving X over -90..80 in steps of 10 and Y over 32..-24 in steps of 8. The
   counter stops at $91, and then entry 0 -- the translation -- is set:
 
-      Trail[0] := (0, 0, 2000)                 1107:094e
+      Work.Trail[0] := (0, 0, 2000)                 1107:094e
   -------------------------------------------------------------------------- }
 procedure BuildPoints;
 { NO DECLARED LOCALS, and the frame is how we know. ENTER $202 is 514 bytes and
@@ -803,10 +820,10 @@ begin
       if (Copy(Rows[Row], Col, 1) = MarkerA)      { 1107:0885 }
       or (Copy(Rows[Row], Col, 1) = MarkerB) then { 1107:08af }
       begin
-        Trail[Idx].X    := IntToFixed((Col - 1) * 10 - 90);
-        Trail[Idx].Y    := IntToFixed(32 - (Row - 1) * 8);
-        Trail[Idx].Z    := 0;                 { 1107:0903, XOR AX,AX }
-        Trail[Idx].Flag := 0;
+        Work.Trail[Idx].X    := IntToFixed((Col - 1) * 10 - 90);
+        Work.Trail[Idx].Y    := IntToFixed(32 - (Row - 1) * 8);
+        Work.Trail[Idx].Z    := 0;                 { 1107:0903, XOR AX,AX }
+        Work.Trail[Idx].Flag := 0;
         Inc(Idx);                                 { 1107:0917 }
         if Idx > TrailCount then                  { 1107:091b, CMP $91 }
         begin
@@ -819,9 +836,9 @@ begin
 
   { 1107:094e is XOR AX,AX then four stores of AX -- both are direct zeros,
     not IntToFixed(0), which would push and call. }
-  Trail[0].X := 0;                             { 1107:0950 }
-  Trail[0].Y := 0;                             { 1107:0956 }
-  Trail[0].Z := IntToFixed(2000);
+  Work.Trail[0].X := 0;                             { 1107:0950 }
+  Work.Trail[0].Y := 0;                             { 1107:0956 }
+  Work.Trail[0].Z := IntToFixed(2000);
 end;
 
 { --------------------------------------------------------------------------
