@@ -500,8 +500,17 @@ begin
       MOV  AX, Segment       { 1118:0942                                     }
       MOV  ES, AX            { 1118:0945                                     }
       XOR  DI, DI            { 1118:0947                                     }
-      MOV  AX, OFFSET Grid   { 1118:0949  the binary has $740A, which is    }
-      ADD  AX, 51h           {   Grid + 81 -- element [1,1]                  }
+      { NO `ADD AX, 51h` HERE, AND THE NOTE THAT USED TO JUSTIFY ONE HAD THE
+        TWO BASES CONFUSED. Grid is a 1-based array[1..100, 1..80] whose
+        STORAGE begins at DS:$740A; the $73B9 in the declaration's note is the
+        FOLDED base the compiler uses for its displacements, which is the
+        storage address minus 81. OFFSET Grid gives the storage address, so it
+        already assembles to $740A -- element [1,1] -- and adding 81 to it
+        added the low bounds a second time. Three bytes, and the loop read a
+        column and a row off for as long as it was there. Same trap as the
+        hardcoded lens base in P1S1: the binary's literal was reproduced by
+        adding a constant the assembler already accounts for. }
+      MOV  AX, OFFSET Grid   { 1118:0949  assembles to $740A, element [1,1]   }
       MOV  SI, AX            { 1118:094c                                     }
       ADD  SI, 50h           { 1118:094e  and on to row 2                    }
       MOV  DX, 0             { 1118:0951  the column within the screen row   }

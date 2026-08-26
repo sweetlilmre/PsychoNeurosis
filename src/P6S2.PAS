@@ -498,17 +498,23 @@ begin
         07c3  e9 28 fe     JMP  06de        back to the top
         07c6  c9 c3        LEAVE / RET
 
-    Both exits converge on 07c6, so this IS a plain `until A or B` and not the
-    Exit that P1S2's ShowWord turned out to be -- there the two jumps went to
-    DIFFERENT places, one of them past a whole loop, and that is the only thing
-    that distinguishes the two shapes. Checked here, they converge.
+    IT IS AN Exit, AND THE ARGUMENT THAT SAID OTHERWISE WAS THE WRONG TEST.
+    That argument ran: both jumps land on 07c6, whereas in P1S2's ShowWord the
+    two went to different places, so convergence proves this is a plain
+    `until A or B`. Convergence proves nothing here. This `until` is the LAST
+    statement of the routine, so `Exit` and falling out of the loop have the
+    SAME destination by construction -- the leave/ret at 07c6 -- and both
+    readings predict exactly what was measured. ShowWord's divergence was
+    positive evidence FOR an Exit; convergence is not evidence against one.
 
-    What differs is only the FORM: the original spends four bytes jumping over a
-    jump where TP7 gives us a single two-byte JNE to the same place. Ours is
-    shorter and does the same thing. Three separate attempts have failed to find
-    a spelling that produces the longer form, and the operand order cannot be it
-    -- 100f:07b0 calls KeyPressed first, which is the order written here. }
-  until KeyPressed or (ScrollY >= $92);          { 100f:07b0, 100f:07bb }
+    WHAT DOES DISTINGUISH THEM IS THE SHAPE, and it always did. TP7's `or` is
+    short-circuit by default, so `until A or B` tests A and jumps STRAIGHT out
+    on true -- one JNE. `if A then Exit` has to jump over the Exit's own JMP,
+    which is JZ +2 / JMP, four bytes. The original has four bytes. Three
+    earlier attempts looked for a spelling of the `or` that produced the longer
+    form; there is none, because the longer form is not an `or`. }
+    if KeyPressed then Exit;                     { 100f:07b0 }
+  until ScrollY >= $92;                          { 100f:07bb }
 end;
 
 { 100f:07d5 -- the scene. }
