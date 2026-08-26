@@ -365,10 +365,66 @@ begin
         X0 := Dots^[I].FromX;                    { 1096:0216 }
         Y1 := Dots^[I].ToY;                      { 1096:0226 }
         Y0 := Dots^[I].FromY;                    { 1096:0236 }
-        X0 := (X1 - X0) * T div Denom + X0;      { 1096:023d }
-        Y0 := (Y1 - Y0) * T div Denom + Y0;      { 1096:0250 }
+      { ----------------------------------------------------------------------
+        THE INTERPOLATION AND THE PIXEL WRITE ARE HAND ASSEMBLER, and a probe
+        settled it rather than an argument. probe/MULSIGN.PAS spells
+        `(X1 - X0) * T div Denom + X0` EIGHT ways -- the addend either end, the
+        multiply's operands swapped, the difference lifted into its own
+        variable, the quotient cast down, and LongInt casts on the left operand,
+        the multiplier and the divisor -- and drives all eight through TP7, TP6
+        and TP6.1. Every spelling that stays 16-bit emits
+
+            MUL <T> / CWD / IDIV <Denom>
+
+        and the two LongInt casts call the runtime instead. NOT ONE of the
+        twenty-four builds emits the original's
+
+            CWD / IMUL <T> / IDIV <Denom>
+
+        which is the wiki's `instruction-the-compiler-never-emits` exactly: a
+        construct no spelling reaches is not a spelling problem.
+
+        AND OURS WAS WRONG, not merely different. MUL leaves the product in
+        DX:AX and the CWD that follows overwrites DX with the sign of AX, so the
+        product's top half is thrown away before IDIV ever sees it. Any dot
+        whose (X1 - X0) * T exceeds 16 bits interpolated from a truncated
+        dividend. The original's CWD is dead -- IMUL overwrites DX immediately --
+        and it is transcribed because it is what ships.
+
+        THE PIXEL WRITE IS THE SAME STORY IN THE OTHER DIRECTION. With YOfs a
+        Word array and X0 an Integer, `YOfs[Y0] + X0` promotes to LONGINT, so
+        ours built the offset in 32 bits -- CWD, a CX:BX pair, XOR DX,DX, ADC --
+        where 1096:027d is ADD BX,BX and 0283 is ADD DI,X0, sixteen bits
+        throughout. ADD BX,BX for a doubling is this target's recorded
+        assembler idiom; the compiler emits SHL.
+        ---------------------------------------------------------------------- }
+      asm
+              MOV     AX, X1                  { 1096:023d                     }
+              SUB     AX, X0                  { 0240                          }
+              CWD                             { 0243  dead -- IMUL rewrites DX }
+              IMUL    T                       { 0244  SIGNED, and 32-bit wide  }
+              IDIV    Denom                   { 0247                          }
+              ADD     AX, X0                  { 024a                          }
+              MOV     X0, AX                  { 024d                          }
+              MOV     AX, Y1                  { 0250                          }
+              SUB     AX, Y0                  { 0253                          }
+              CWD                             { 0256                          }
+              IMUL    T                       { 0257                          }
+              IDIV    Denom                   { 025a                          }
+              ADD     AX, Y0                  { 025d                          }
+              MOV     Y0, AX                  { 0260                          }
+      end;
         Col := GetPixel(X0, Y0, VirtScrSeg);     { 1096:026d }
-        Mem[WorkSeg : YOfs[Y0] + X0] := Col;     { 1096:0289 }
+      asm
+              MOV     AX, WorkSeg             { 1096:0275                     }
+              MOV     ES, AX                  { 0278                          }
+              MOV     BX, Y0                  { 027a                          }
+              ADD     BX, BX                  { 027d  a word index -- ADD      }
+              MOV     DI, [BX + OFFSET YOfs]  { 027f  DI := Y0 * 320           }
+              ADD     DI, X0                  { 0283    + X0, SIXTEEN bits     }
+              MOV     AL, Col                 { 0286                          }
+              MOV     ES:[DI], AL             { 0289                          }
+      end;
       end;
 
       { 1096:0297 -- draw: the dot's own colour at the NEW position, and only
@@ -382,9 +438,32 @@ begin
         Y0 := Dots^[I].FromY;                    { 1096:02fb }
         Dots^[I].Age := Dots^[I].Age + 1;        { 1096:031d }
         Col := Dots^[I].Col;                     { 1096:032a }
-        X0 := (X1 - X0) * T div Denom + X0;      { 1096:0331 }
-        Y0 := (Y1 - Y0) * T div Denom + Y0;      { 1096:0344 }
-        Mem[WorkSeg : YOfs[Y0] + X0] := Col;     { 1096:036b }
+      { the same two shapes as the erase loop above, and here they are CONTIGUOUS
+        -- 1096:0331 through 036d with no call between -- so it is one block. }
+      asm
+              MOV     AX, X1                  { 1096:0331                     }
+              SUB     AX, X0                  { 0334                          }
+              CWD                             { 0337                          }
+              IMUL    T                       { 0338                          }
+              IDIV    Denom                   { 033b                          }
+              ADD     AX, X0                  { 033e                          }
+              MOV     X0, AX                  { 0341                          }
+              MOV     AX, Y1                  { 0344                          }
+              SUB     AX, Y0                  { 0347                          }
+              CWD                             { 034a                          }
+              IMUL    T                       { 034b                          }
+              IDIV    Denom                   { 034e                          }
+              ADD     AX, Y0                  { 0351                          }
+              MOV     Y0, AX                  { 0354                          }
+              MOV     AX, WorkSeg             { 0357                          }
+              MOV     ES, AX                  { 035a                          }
+              MOV     BX, Y0                  { 035c                          }
+              ADD     BX, BX                  { 035f                          }
+              MOV     DI, [BX + OFFSET YOfs]  { 0361                          }
+              ADD     DI, X0                  { 0365                          }
+              MOV     AL, Col                 { 0368                          }
+              MOV     ES:[DI], AL             { 036b                          }
+      end;
       end;
 
       CopyScreen(WorkSeg, $A000);                { 1096:0379 }
@@ -438,7 +517,14 @@ begin
 
   { 1096:04f6 -- and blank the 56 rows past the bottom of it, so a texture
     coordinate that runs off the picture reads black rather than rubbish. }
-  FillChar(Mem[Seg(Texture^) : TexRows * TexWide], $3800, 0);
+  { A `Ptr` CALL, NOT A `Mem` SUBSCRIPT, and the order of evaluation says which.
+    1096:04f6 is MOV AX,$C800 BEFORE the LES that fetches the segment, then
+    MOV DX,ES / MOV DI,AX / MOV ES,DX to shuffle the pair into place -- the
+    OFFSET computed first and parked. `Mem[S : O]` evaluates S then O, which is
+    what ours emitted: LES / MOV AX,ES / PUSH AX / MOV DI,$C800 / POP ES. A
+    two-argument `Ptr` evaluates right to left, so the offset goes first, which
+    is the operand-order rule applied to a call rather than an operator. }
+  FillChar(Ptr(Seg(Texture^), TexRows * TexWide)^, $3800, 0);
 
   { 1096:051a -- the motion tables. The angle is in DEGREES: the divisor at
     CS:$03c9 is the single 180.0 and the multiplicand at CS:$03cd is the

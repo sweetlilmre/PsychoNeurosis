@@ -129,7 +129,12 @@ procedure Project(var X, Y, Z : LongInt);                 external;
   instead was tried and measured 13 bytes WORSE, because the pixel read
   through the parameter had been matching all along. So it is ANGLE that is
   two bytes here, and SinCos takes an Integer anyway. }
-procedure RenderPatch(CX, CY : Integer; Angle : Integer; Seg_ : Word);
+{ THE PARAMETERS ARE PX AND PY, NOT CX AND CY, and the reason is the asm block
+  below: inside BASM `CX` is a REGISTER, so `MOV AX, CX` would assemble as the
+  register move and not the parameter load, silently. The caller's own variables
+  keep their names -- only these two are renamed, and only because they are read
+  from assembler. }
+procedure RenderPatch(PX, PY : Integer; Angle : Integer; Seg_ : Word);
 var
   { IN THE ORDER THE RECORDED OFFSETS GIVE. Locals go downward from BP in
     declaration order, so sorting the offsets ascending recovers the original's
@@ -155,8 +160,13 @@ var
   Col, Row       : Integer;       { [BP-$02], [BP-$04] }
   X, Y, Z        : LongInt;       { [BP-$08], [BP-$0C], [BP-$10] }
   Pixel          : Byte;          { [BP-$11] }
-  SX, SY         : Integer;       { [BP-$13], [BP-$15] }
-  Spare          : array[1..4] of Byte;   { [BP-$19]..[BP-$16], never read }
+  { EIGHT SPARE BYTES, NOT FOUR PLUS SX AND SY. The nine unaccounted bytes were
+    read as "SX and SY live here plus four spare", which is arithmetically the
+    same and wrong about what they are: the clip-and-sample below is HAND
+    ASSEMBLER and holds both coordinates in registers, so there are no such
+    variables. [BP-$12]..[BP-$19] is one dead block and the frame total, the
+    odd offset Size sits at, and every reference below it are all unchanged. }
+  Spare          : array[1..8] of Byte;   { [BP-$19]..[BP-$12], never read }
   Size, Half     : Integer;       { [BP-$1B], [BP-$1D] }
   ScreenX        : Integer;       { [BP-$1F] }
   ScreenY        : Integer;       { [BP-$21] }
@@ -174,12 +184,62 @@ begin
     for Col := 1 to Size do                      { 1102:005c }
     begin
       Pixel := 0;                                { 1102:0075 }
-      SX := CX + Col - Half;                     { 1102:0079 }
-      if (SX <= 319) and (SX >= 0) then          { 1102:0082, 1102:0087 }
-      begin
-        SY := CY + Row - Half;                   { 1102:008c }
-        if (SY <= 199) and (SY >= 0) then        { 1102:0095, 1102:009b }
-          Pixel := Mem[Seg_ : YOfs[SY] + SX];    { 1102:00ad }
+      { ----------------------------------------------------------------------
+        1102:0079..00b2 -- clip the source point and sample it. HAND ASSEMBLER,
+        transcribed verbatim, and THREE tells say so independently:
+
+          * BOTH COORDINATES LIVE IN REGISTERS ACROSS FOUR TESTS WITH NO STORE.
+            AX holds the column sum from 007f to 00a6 and BX the row sum from
+            0092 to 00a2, each compared twice and then USED. Turbo Pascal frames
+            every local, so a Pascal `SX` is written before it is tested and read
+            back for each comparison -- which is what ours did, seven bytes and
+            two dead frame slots' worth.
+          * 1102:00a0 is ADD BX,BX where the compiler emits SHL BX,1. That is
+            this target's recorded assembler idiom for a doubling.
+          * 1102:0087 is 3D 00 00 -- CMP AX,0 in the LONG immediate form -- and
+            1102:009b is 83 FB 00, the SHORT form of the same operation, twenty
+            bytes apart. A code generator picks one rule and keeps it; the
+            INCONSISTENCY is the signature, the same way part 003's morph scene
+            uses JE/JMP five times and then plain JNE three times.
+
+        And ours was wrong in a way that mattered beyond the byte count: with
+        YOfs a Word array and SX an Integer, `YOfs[SY] + SX` promotes to LONGINT,
+        so ours computed the screen offset in 32 bits (CWD, a CX:BX pair) where
+        the original's ADD DI,AX is 16.
+
+        EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+            SX := PX + Col - Half;
+            if (SX <= 319) and (SX >= 0) then
+            begin
+              SY := PY + Row - Half;
+              if (SY <= 199) and (SY >= 0) then
+                Pixel := Mem[Seg_ : YOfs[SY] + SX];
+            end;
+        ---------------------------------------------------------------------- }
+      asm
+              MOV     AX, PX                  { 1102:0079                     }
+              ADD     AX, Col                 { 007c                          }
+              SUB     AX, Half                { 007f  AX := the column, kept  }
+              CMP     AX, 319                 { 0082                          }
+              JG      @@Skip                  { 0085                          }
+              CMP     AX, 0                   { 0087  the LONG form           }
+              JL      @@Skip                  { 008a                          }
+              MOV     BX, PY                  { 008c                          }
+              ADD     BX, Row                 { 008f                          }
+              SUB     BX, Half                { 0092  BX := the row, kept     }
+              CMP     BX, 199                 { 0095                          }
+              JG      @@Skip                  { 0099                          }
+              CMP     BX, 0                   { 009b  and the SHORT form      }
+              JL      @@Skip                  { 009e                          }
+              ADD     BX, BX                  { 00a0  a word index            }
+              MOV     DI, [BX + OFFSET YOfs]  { 00a2  DI := Row * 320         }
+              ADD     DI, AX                  { 00a6    + the column, 16-bit  }
+              MOV     AX, Seg_                { 00a8                          }
+              MOV     ES, AX                  { 00ab                          }
+              MOV     AL, ES:[DI]             { 00ad  the source pixel        }
+              MOV     Pixel, AL               { 00b0                          }
+      @@Skip:                                 { 00b3 is the next statement    }
       end;
 
       X := IntToFixed(Col - Half);               { 1102:00ba }

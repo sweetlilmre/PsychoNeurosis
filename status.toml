@@ -803,7 +803,8 @@ state = "open"
 name = "part5-codegen-two"
 finding = "PART 005's LAST 136 BYTES ARE TWO CODE-GENERATION PUZZLES AND NOTHING ELSE. The layout is exact and the frames are right; what is left is where Turbo Pascal put things. FIRST, AND IT IS BEHAVIOURAL RATHER THAN COSMETIC: the interpolation multiplies UNSIGNED in ours and SIGNED in the original. 1096:0331 is CWD / IMUL WORD PTR [BP-$1B] / IDIV; ours is MUL WORD PTR [BP-$1B] / CWD / IDIV. Same four bytes, different meaning -- and OURS IS ARGUABLY WRONG, because MUL leaves a 32-bit product in DX:AX and the CWD that follows OVERWRITES DX with the sign of AX, throwing the high half away before the divide reads it. Every variable involved is declared Integer, so a signed IMUL is what should be emitted and is not. Four sites, in the erase pass and the draw pass of the dot loop. This one is worth a probe: what makes TP7 choose MUL over IMUL when both operands are Integer? SECOND, at 1102:0079 and 1102:0224: the original computes a value into AX and compares AX TWICE with no store, does the same into BX, and then uses BOTH registers for an address. Ours stores each into a frame slot and reloads. Turbo Pascal has no peephole that keeps the accumulator -- our own build proves it -- and writing the expression out twice would evaluate it twice. Neither spelling is the original's. 68 bytes across the two. IT MAY BE THE SAME PHENOMENON AS PART 006's 100f:0543, where the original builds a palette index in DI and ours goes through AX, and as part 005's own MUL/IMUL choice: all three are the compiler deciding differently about registers and signedness on source that looks identical. Worth ONE probe covering all of them rather than three separate guesses."
 seen_in = "TPART5"
-state = "open"
+state = "resolved"
+resolution = "BOTH RESOLVED, and part 005 is at 100.0%. 1102:0082 was hand assembler (registers held across four tests, ADD BX,BX, and the long CMP AX,0 next to the short CMP BX,0) and 1096:034a was hand assembler proved by probe/MULSIGN.PAS -- eight spellings across three compiler releases, twenty-four builds, no match for CWD/IMUL/IDIV. Ours was also arithmetically WRONG there: MUL then CWD destroys the product's high half before IDIV. See part5-hand-asm-three."
 
 [[plan.investigation]]
 name = "part6-close"
@@ -920,6 +921,10 @@ resolution = "RESOLVED -- THE 99% TARGET IS MET ON ALL TEN PARTS. What remains i
 name = "p1s1-shadowed-file"
 state = "resolved"
 resolution = "FIXED and rebuilt. Scene1's local F is gone with a note on the routine saying why (the original has no ENTER and three DS:$563F file calls); DrawLine's Y arguments are the right way round; and P1S1's DGROUP is Under-LensTab-Cell-F, which its own four addresses tile out exactly. Part 001 holds 99.0% with the single known 19-byte span at 1012:05a8, dgimage identical at 752 bytes, fpusites identical, paslint clean at 67 files, 3 artefacts holding. A WATCHED RUN OF TPART1 IS STILL OWED -- the fix is measured against the original's disassembly, not against a screen, and the screen is the only instrument that saw the defect in the first place."
+
+[[plan.investigation]]
+name = "part5-hand-asm-three"
+state = "open"
 
 [plan.row."001 $0284"]
 label = "the 2-byte typed constant holding $A640, still missing"

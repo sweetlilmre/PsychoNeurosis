@@ -805,6 +805,14 @@ var
   I     : Integer;                { [BP-2] }
   Spare : Integer;                { [BP-4], never referenced }
 begin
+  { A DEAD SELF-ASSIGNMENT OF THE PARAMETER, and it is the first thing the
+    routine does. 100e:0571 is MOV AL,[BP+4] / MOV [BP+4],AL -- a byte loaded
+    from the parameter slot and stored straight back to it. Six bytes that
+    cannot change anything, and another instance of the shape this target keeps
+    finding after part 004's forty-nine conditional self-assignments, part 001's
+    two dead tests and part 003's addition of zero. Transcribed because it is
+    what ships. }
+  Threshold := Threshold;                             { 100e:0571 }
   for I := 0 to GridVerts - 1 do
     if HeightMap[I] > Threshold then                  { 100e:058b, JBE }
       Grid[I].Z := BaseZ - (HeightMap[I] - Threshold)
