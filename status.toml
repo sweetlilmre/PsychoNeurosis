@@ -880,6 +880,13 @@ seen_in = "TPART1"
 state = "resolved"
 resolution = "RESOLVED in the batch that found it: part 001 97.6%, from 90.9% at the start of the day. 507 bytes left, the largest spans being 1107:04a0 (37), 12c5:03a6 (29), 12c5:0ac2 (25) and 12c5:0664 (24) -- nothing above 40 anywhere in the target now."
 
+[[plan.investigation]]
+name = "part1-copy32"
+finding = "PART 001 97.6 -> 98.1%, AND SCENE 5 HAS ITS OWN 386 SCREEN COPY IN AN OBJECT MODULE. 12c5:0AC6 copies sixty-four thousand bytes as SIXTEEN THOUSAND DWORDS in one REP MOVSD -- half the bus cycles of the VGA unit's REP MOVSW, which is why the scene does not call the shared one. It is called twice, at 12c5:0782 and 07a3, where ours called CopyScreen. AND TWO PROLOGUE BYTES SAY TASM RATHER THAN THE COMPILER, which is a cheaper tell than the instruction set and works on 16-bit code too. 12c5:0AC7 is 8B EC for MOV BP,SP where Turbo Pascal's code generator emits 89 E5, and 12c5:0AD5 is 33 FF for XOR DI,DI where the compiler emits 31 FF. Both are the reg,r/m direction an assembler picks by default and the compiler picks the other way. The unit's initialisation stub at 12c5:0AC1 -- five bytes, and Turbo Pascal emits it LAST -- puts this routine after it, which settles the object module independently. src/asm/COPY32.ASM is new and is linked BEFORE DEMOMATH.OBJ because its code lands first. TWO SMALLER ONES IN THE SAME BATCH. Transform's READS go through the parameter and its WRITES through the local copy -- 1107:049f and 04bc load LES DI,[BP+$A] while the four stores load LES DI,[BP-$13] -- so the source names Base^ in one place and P^ in the other, and using either for both is four bytes different at each site. Segment 1107 is now fully aligned. And ObjTranslate declares a BYTE before its pointer: the pointer is at [BP-$5], which is odd, and a four-byte pointer declared first sits at [BP-$4]. An earlier note here blamed the odd offset on the unit's alignment switch; alignment does not move a pointer to an odd address, it only stops one being padded to an even one. MEASURED: 98.1%, initialised image identical, three byte-exact artefacts holding, paslint clean, traps identical opcode for opcode."
+seen_in = "TPART1"
+state = "resolved"
+resolution = "RESOLVED in the batch that found it: part 001 98.1%, from 90.9% at the start of the day -- SEVEN AND A HALF POINTS. 413 bytes left in about a dozen spans, none above 24. Six of the ten parts are at 99% or better and the other four at 98.1% or better."
+
 [plan.row."001 $0284"]
 label = "the 2-byte typed constant holding $A640, still missing"
 investigation = "part1-layout"
@@ -990,6 +997,11 @@ label = "DrawStep, ENTER $14 -- same font subscript as ShowString's"
 investigation = "part1-p1s4-unlocated"
 target = "R0"
 
+[plan.row."001 1107:049f"]
+label = "reads through the parameter, writes through the copy -- FIXED"
+investigation = "part1-copy32"
+target = "R0"
+
 [plan.row."001 1107:04f3"]
 label = "109 bytes and now the largest span in the whole target"
 investigation = "part1-loadlogo"
@@ -1080,6 +1092,11 @@ label = "the point array is at Obj^+0 and MaxPoints is 100, not 64"
 investigation = "part1-object-record"
 target = "R0"
 
+[plan.row."001 12c5:03ad"]
+label = "ObjTranslate declares a byte before its pointer -- FIXED"
+investigation = "part1-copy32"
+target = "R0"
+
 [plan.row."001 12c5:052a"]
 label = "DrawPoint is assembler, and has NO horizontal clip -- FIXED"
 investigation = "part1-blitters"
@@ -1108,6 +1125,11 @@ target = "R0"
 [plan.row."001 12c5:0947"]
 label = "P1S5's MViewW is a Word: the LongInt spill says so"
 investigation = "part1-trap-deficit"
+target = "R0"
+
+[plan.row."001 12c5:0AC6"]
+label = "a 386 REP MOVSD screen copy in its own OBJ -- FIXED"
+investigation = "part1-copy32"
 target = "R0"
 
 [plan.row."001 12c5:0a89"]

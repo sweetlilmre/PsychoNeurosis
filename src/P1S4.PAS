@@ -411,16 +411,22 @@ begin
 
   for I := 1 to LastEntry do
   begin
-    Move(P^.Trail[I], T, SizeOf(TTrail));   { 1107:049f, thirteen bytes }
+    { THROUGH THE PARAMETER, NOT THROUGH THE COPY, and the routine really does
+      use both. 1107:049f's Move and the three adds at 1107:04bc load
+      LES DI,[BP+$A] -- the parameter itself -- while the four stores at
+      1107:050d onwards load LES DI,[BP-$13], the local copy. So the reads name
+      Base^ and the writes name P^; using one for everything is four bytes
+      different at each of the four read sites. }
+    Move(Base^.Trail[I], T, SizeOf(TTrail));  { 1107:049f, thirteen bytes }
     RotatePoint(T.X, T.Y, T.Z);             { 1107:04b3 }
     { THE TRANSLATION IS READ THROUGH THE POINTER, not from Trail absolutely.
       1107:04bc is LES DI,[BP+0A] -- the parameter again -- and the three adds
       take es:[di], es:[di+4] and es:[di+8], which is element ZERO of whatever
       was passed. Reading Work.Trail[0] by name is the same value and an absolute
       displacement instead of a register indirection. }
-    T.X := T.X + P^.Trail[0].X;                   { 1107:04bf }
-    T.Y := T.Y + P^.Trail[0].Y;
-    T.Z := T.Z + P^.Trail[0].Z;
+    T.X := T.X + Base^.Trail[0].X;                   { 1107:04bf }
+    T.Y := T.Y + Base^.Trail[0].Y;
+    T.Z := T.Z + Base^.Trail[0].Z;
     Project(T.X, T.Y, T.Z);                 { 1107:0503 }
     { THE ORDER IS X, Y, D, FLAG, AND D COMES AFTER Project, NOT BEFORE.
       1107:0528 pushes [BP-7] and [BP-5] -- the two halves of T.Z -- to

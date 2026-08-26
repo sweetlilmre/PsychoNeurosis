@@ -237,6 +237,14 @@ const
     because every later byte of the image depends on it. }
   MirrorOfs : Word = ScrWidth * Horizon;            { DS:$0284 = $A640 }
 
+{ 12c5:0AC6 -- the scene's own screen copy, 16,000 DWORDS in one REP MOVSD.
+  386 code, so it cannot be an asm block; and it sits five bytes AFTER the
+  unit's initialisation stub at 12c5:0AC1, which Turbo Pascal emits last, so it
+  cannot have come from the Pascal at all. Linked FIRST of the two objects
+  because its code lands before DEMOMATH's. See src/asm/COPY32.ASM. }
+{$L COPY32.OBJ}
+procedure Copy32(Src, Dest : Word);                       external;
+
 {$L DEMOMATH.OBJ}
 procedure SinCos(A : Integer; var C, S : LongInt);        external; { 12c5:192D }
 procedure RotatePoint(var X, Y, Z : LongInt);             external; { 12c5:19DF }
@@ -281,11 +289,14 @@ end;
   -------------------------------------------------------------------------- }
 procedure ObjTranslate(AObj : PObj; DX_, DY_, DZ_ : Integer);
 var
-  P : PPoint3;                            { [BP-5] -- and the ODD offset is
-                                            this unit's data-alignment switch
-                                            being off: a four-byte pointer
-                                            would sit at [BP-6] with
-                                            alignment on. }
+  { P IS AT [BP-5], WHICH IS ODD, AND A FOUR-BYTE POINTER DECLARED FIRST WOULD
+    BE AT [BP-4]. So one byte is declared ahead of it and never touched: the
+    frame is ENTER $06 -- 1 + 4 = 5, rounded to 6 -- and 12c5:03ad stores DI at
+    [BP-5] with 12c5:03b0 storing ES at [BP-3]. An earlier note here blamed the
+    odd offset on the unit's A-minus switch; alignment does not shift a pointer to an odd
+    address, it only stops one being padded to an even one. }
+  Spare : Byte;                           { [BP-$1], never touched }
+  P : PPoint3;                            { [BP-$5] }
 begin
   { 12c5:03a6..03b0 -- the translation's ADDRESS is taken ONCE into a local
     pointer and all three components go through it. Reaching AObj^.Pos three
@@ -822,10 +833,10 @@ begin
 
   for Frame := 1 to VectorFrames do
   begin
-    CopyScreen(VirtScrSeg, WorkSeg);    { 12c5:0782 -- the clean gradient }
+    Copy32(VirtScrSeg, WorkSeg);        { 12c5:0782 -- the clean gradient }
     ObjTransformAll(@Obj, Angle, Angle, Angle);   { 12c5:0796 }
     RenderObject;                       { 12c5:0799 }
-    CopyScreen(WorkSeg, $A000);         { 12c5:07a3 }
+    Copy32(WorkSeg, $A000);             { 12c5:07a3 }
 
     Inc(Angle, VectorStep);
     if Angle > VectorWrap then Angle := 0;
