@@ -31,10 +31,31 @@ lint    = "kit/tools/pascal/paslint.py"
 # 7.00 over 7.01, and that is what the bytes say.
 default = "tp700"
 
-[compiler.tp7]
+# THE ENTRY NAMES MIRROR THE INSTALL DIRECTORIES -- tp600, tp601, tp700, tp701
+# against C:\TP600, C:\TP601, C:\TP700, C:\TP701 -- because "tp7" meaning 7.01
+# while "tp700" meant 7.00 was a trap waiting to be fallen into. The `dialect`
+# values below are NOT these names: they stay tp6 and tp7, because a dialect
+# selects a source transform and there are only two of those.
+#
+# THE TP6 ENTRIES CARRY NO /U, DELIBERATELY: each of those installs' own
+# BIN\TPC.CFG holds its unit path, and that is where it belongs. The rename left
+# those files pointing at the old directories -- TP600's at C:\TP6, TP601's at
+# C:\TP61 -- and the maintainer is correcting them at the source rather than
+# having this file work around them.
+[compiler.tp701]
 # 7.01. KEPT FOR COMPARISON, NOT FOR BUILDING: its runtime carries the 8086
 # check described above and its System block does not match the original's.
-binpath = "C:\\TP\\BIN"
+# The switch line is tp700's, with only the unit path changed; the notes that
+# explain it live there, on the entry that actually builds the demo.
+dialect  = "tp7"
+binpath  = "C:\\TP701\\BIN"
+switches = "/ED: /UD:;C:\\TP701\\UNITS /ID:;D:\\GEN /$S- /GD"
+
+[compiler.tp700]
+# THE ONE THE DEMO IS BUILT WITH. See the [compiler] note above for the
+# evidence that it is 7.00 and not 7.01.
+dialect = "tp7"
+binpath = "C:\\TP700\\BIN"
 # /E<dir>  where the .EXE goes         /U<dirs> where to LOOK for units
 # /I<dirs> where {$I} includes live    /$S-     STACK CHECKING OFF
 #
@@ -64,29 +85,16 @@ binpath = "C:\\TP\\BIN"
 # identical with it on -- and build/ is git-ignored, so the maps cost nothing.
 # CODE publics only, not unit variables, so a data hunt works from segment
 # LENGTHS rather than symbol names.
-switches = "/ED: /UD:;C:\\TP\\UNITS /ID:;D:\\GEN /$S- /GD"
-
-[compiler.tp700]
-# TP 7.00 against C:\TP's 7.01, to settle which runtime build the 1994
-# binaries were linked against. Our System segment matches the original's to
-# 99.90% below $2F00 and then diverges in the coprocessor block, and one of the
-# six shifts runs BACKWARDS -- which smart-linking cannot do, so the runtime
-# itself differs. The two TURBO.TPL files differ by 32 bytes and our System by
-# a net 33, which is what makes this worth one build.
-#
-# Same dialect and switch line as tp7; only the unit path changes.
-dialect = "tp7"
-binpath = "C:\\TP700\\BIN"
 switches = "/ED: /UD:;C:\\TP700\\UNITS /ID:;D:\\GEN /$S- /GD"
 
-[compiler.tp6]
+[compiler.tp600]
 # For SETTLING a compiler-version question, not for building the demo.
-# TP6's install is FLAT: TPC.EXE sits in C:\TP6, not a BIN
+# TP6's install is FLAT: TPC.EXE sits in C:\TP600, not a BIN
 # subdirectory, and its own TPC.CFG beside it carries the unit path.
 dialect = "tp6"
 switches = "/ED: /ID:;D:\\GEN /$S- /$X+ /$G+"
 
-[compiler.tp61]
+[compiler.tp601]
 dialect = "tp6"
 switches = "/ED: /ID:;D:\\GEN /$S- /$X+ /$G+"
 
