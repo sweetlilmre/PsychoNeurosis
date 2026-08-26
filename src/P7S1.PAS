@@ -430,14 +430,32 @@ end;
   -------------------------------------------------------------------------- }
 procedure FliColor(Hdr, Data : Pointer); far;
 var
-  Base    : Integer;                { [BP-$08] }
+  { DECLARATION ORDER IS THE OFFSETS, READ BACKWARDS. Turbo Pascal gives the
+    first-declared local the address nearest BP, so the original's offsets fix
+    the order exactly: -2, -4, -6, -8, -$a, -$c, -$e, -$10, -$12, -$14. That is
+    TEN words and we declared eight, in an order that put Base at -2 where the
+    binary has Start.
+
+    THE TWO SPARES ARE MEASURED, NOT INVENTED. ENTER $16 is 22 bytes; the
+    for-loop's limit temporary takes the last two at [BP-$15] -- 100f:020d
+    copies Packets there and 100f:0213 compares against it, which is Turbo
+    Pascal evaluating a for limit once into a hidden slot -- leaving exactly 20
+    bytes for declared locals. Nine named ones account for 18, so two words are
+    unaccounted for and their positions are pinned by the gaps at -$c and -$14.
+
+    An earlier note here recorded Packets as "[BP-$0a] / [BP-$15]", one variable
+    with two addresses. It is two objects: the value read from the buffer, and
+    the loop's own copy of it. }
   Start   : Word;                   { [BP-$02] }
-  Cur     : Word;                   { [BP-$06] }
   Sg      : Word;                   { [BP-$04] }
-  Packets : Integer;                { [BP-$0a] / [BP-$15] }
+  Cur     : Word;                   { [BP-$06] }
+  Base    : Integer;                { [BP-$08] }
+  Packets : Integer;                { [BP-$0a] }
+  Spare1  : Integer;                { [BP-$0c], never touched }
   I       : Integer;                { [BP-$0e] }
   Skip    : Integer;                { [BP-$10] }
   Cnt     : Integer;                { [BP-$12] }
+  Spare2  : Integer;                { [BP-$14], never touched }
 begin
   Base  := 0;                                     { 100f:01e0 }
   Sg    := Seg(Data^);                            { 100f:01e8 }

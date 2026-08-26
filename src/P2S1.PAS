@@ -35,6 +35,7 @@
 
 unit P2S1;
 
+
 (* I/O CHECKING OFF. Under the default {$I+} Turbo Pascal emits a far CALL to
    the runtime's check after every I/O operation that can fail, and the
    original has none: 1008:00d3 calls Reset and 1008:00d8 goes straight on to
@@ -566,7 +567,25 @@ end;
   -------------------------------------------------------------------------- }
 procedure Run;
 var
-  X, I : Integer;
+  { ONE COUNTER FOR BOTH LOOPS, AND A SPARE BYTE AHEAD OF IT. ENTER $04 leaves
+    room for three bytes, and 1008:069c puts the counter at the ODD [BP-$03],
+    so one byte is declared first and never touched. That accounts for all four.
+    Two Integers would need six.
+
+    AND THE STAR LOOP REUSES IT: 1008:06c7 is MOV WORD PTR [BP-$03],1 -- the
+    same slot the pan loop counts in at 1008:069c and 06b3. So the original
+    declared a single Integer and spent it twice, which is why the frame has no
+    space for a second.
+
+    THE ODD OFFSET IS NOT REACHABLE AND THAT IS MEASURED. Turbo Pascal
+    word-aligns a DECLARED local after a Byte, so this X lands at [BP-$04] and
+    not the original's [BP-$03]; only the A-minus switch moves it, and that is global
+    rather than per-routine. Setting it on this unit changed not one byte in
+    any of the seven parts. A `with` temp is not aligned that way, which is why
+    P1S5's ObjTranslate reaches [BP-$05] with the same shape. So the frame SIZE
+    and the variable COUNT are right here and the offset is one byte out. }
+  Spare : Byte;                            { [BP-$01], never touched }
+  X     : Integer;                         { [BP-$03], BOTH loops }
 begin
   Init;                                    { 1008:0673 }
   ShowFrame(0, 0);                         { 1008:067a }
@@ -585,11 +604,11 @@ begin
   MusicStart;                              { 1008:06ba -> 13f9:004e }
   Delay($7D0);                             { 1008:06c2 }
 
-  for I := 1 to NumStars do
+  for X := 1 to NumStars do
   begin
-    Star[I].X := Random(StarMaxX) + 1;     { 1008:06d1 }
-    Star[I].Y := Random(StarMaxY) + 1;     { 1008:06eb }
-    Star[I].C := Random(StarCols) + StarCol0;
+    Star[X].X := Random(StarMaxX) + 1;     { 1008:06d1 }
+    Star[X].Y := Random(StarMaxY) + 1;     { 1008:06eb }
+    Star[X].C := Random(StarCols) + StarCol0;
   end;
 
   DoorLoop;                                { 1008:071f }
