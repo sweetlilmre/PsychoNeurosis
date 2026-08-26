@@ -667,6 +667,16 @@ const
   LeftMask4  : array[0..3] of Byte = ($0F, $0E, $0C, $08);
   RightMask4 : array[0..3] of Byte = ($0F, $01, $03, $07);
 
+{ MODELS TWO, THREE AND FOUR GO HERE, and the whole run of initialised data is
+  now measured end to end. The original's DGROUP holds, in order: model one's
+  tables at DS:$000A, MViewW and MViewH at $046A, Msg1 at $046E, Msg2 at
+  $056E, the four clip bounds and the two nibble masks at $066E, and only then
+  models two, three and four. 0, 239, 0, 319 followed by $0F$0E$0C$08 and
+  $0F$01$03$07 is exactly the sixteen bytes above this line. Emitted as one
+  include, all four models sat together and everything behind them was 1,606
+  bytes high. }
+{$I gen/P2OBJ2.INC}
+
 { @asm 002 108b:0461 }
 procedure TriFill(X3, Y3 : Integer; Colour : Byte); assembler;
 var
