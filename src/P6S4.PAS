@@ -204,7 +204,14 @@ begin
     for I := 0 to Chars - 1 do
       for J := 1 to GlyphW do
         if Font^[Ord(CreditText[Line][I + 1]), J, RowIn] <> 0 then
-          Mem[Seg(P^) : FeedAt + I * Pitch + J] :=
+          { THE GLOBAL HERE, NOT THE PARAMETER, and the two are the same value.
+            11bb:01f8 is LES DI,[$9648] -- Buf's own address -- where Seg(P^)
+            emits LES DI,[BP+4]. The caller passes Buf, so this reads the same
+            pointer either way; the original simply named it directly at this
+            one site and through the parameter at the other, which is how the
+            code was written rather than a distinction that matters. Render's
+            own Seg(P^) further down already matches. }
+          Mem[Seg(Buf^) : FeedAt + I * Pitch + J] :=
             Font^[Ord(CreditText[Line][I + 1]), J, RowIn];  { 11bb:021a }
 
   Inc(RowIn);                                     { 11bb:022f }
