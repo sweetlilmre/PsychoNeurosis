@@ -154,89 +154,144 @@ type
     bound of 0 would need a SUB the original does not have. }
   TFont = array[FontBias..FontBias + FontChars - 1, 1..8, 1..8] of Byte;
 
+{ ==========================================================================
+  THIS UNIT'S DGROUP, MEASURED FROM SEGMENT 1107 RATHER THAN INFERRED, and the
+  declaration order below does NOT yet match it. Read this before moving
+  anything.
+
+  Two passes over the segment: every ABSOLUTE `ptr [0xNNNN]` displacement, and
+  every FOLDED `[reg +/- 0xNNNN]` base. The absolute list is short and complete,
+  because everything else in the unit is reached through a fold or a pointer:
+
+      $5B52 $5B56 $5B5A $5B5E $5B62 $5B66     the six maths LongInts
+      $5BCC $5BCE $5BD0 $5BD2 $5BD4 $5BD6     six words, once each
+      $6A2D $6A2F $6A31                       Row, Col, Idx
+      $80F3                                   Angle
+
+  THE FOLDS NAME THE ARRAYS AND THEIR STRIDES:
+
+      $5B69  di = Ord(ch)                 a 1-based BYTE array at $5B6A
+      $5B9A  di = Ord(ch)                 a 1-based BYTE array at $5B9B
+      $5BD8  IMUL AX,AX,$12 / IMUL DI,AX,$D, and IMUL DI,[$6A31],$D elsewhere
+      $632F  IMUL DI,AX,7                 1-based 7-byte records at $6336
+      $6933  MOV DI,[$6A2D] / SHL DI,8    1-based 256-byte elements at $6A33
+      $6A2A  ADD DI,DX / ADD DI,CX        two subscripts whose bounds sum to 9
+      $80C2  IMUL DI,AX,$33               1-based 51-byte records at $80F5
+
+  TWO OF THOSE CLOSE COMPLETELY AND EACH CONFIRMS A RECORDED ADDRESS. $6933
+  plus 256 is $6A33, so `Rows : array[1..TrailRows] of String` really is there.
+  And $80C2 plus 51 is $80F5, so the 51-byte array starts THERE -- which puts
+  Angle's two bytes at $80F3 immediately in front of it, exactly where the
+  absolute list says Angle is. **Blob follows Angle. It does not precede it.**
+  And $5B9B minus $5B6A is 49, which is BlobPixels, so those two byte arrays
+  are ProfileA and ProfileB.
+
+  THE ORDER, AS FAR AS IT IS MEASURED:
+
+      $5B52  MCos1..MSin3      24
+      $5B6A  ProfileA          49
+      $5B9B  ProfileB          49
+      $5BCC  six words         12
+      $5BD8  strides 18 and 13, so 234 bytes an element
+      $6336  seven-byte records
+       ...
+      $6A2D  Row, Col, Idx      6
+      $6A33  Rows             256 an element
+       ...
+      $80F3  Angle              2
+      $80F5  Blob              51 a record
+
+  WHAT IS WRONG WITH THE LIST BELOW: the maths block is declared LAST and
+  belongs FIRST. Ours puts MCos1 at $A0F0 against the original's $5B52 --
+  eighteen thousand bytes -- and that displacement is what makes every absolute
+  reference in this unit and the whole of scene 5's block measure wrong. It is
+  also, on its own, the +4 that dsmap reports from $AAC2 upwards: scene 5's
+  block sits four bytes high because this one ends four bytes late.
+
+  STILL OPEN: what the six words at $5BCC are; what the 234-byte-element array
+  at $5BD8 is (array[.., 1..18, 1..13] is the shape to try, since 18 x 13 is
+  234); what starts at $6336 with seven-byte records; and where the block
+  BEGINS -- P1S2's ends at $5A52 and MCos1 is at $5B52, so 256 bytes precede
+  the maths block, which is either P1S3's whole block, or two 128-byte file
+  records, or one String.
+  ========================================================================== }
 var
-  { DS:$5AD2 -- unit-level, see Load. THIS ADDRESS IS THE MEASUREMENT THAT SAYS
-    part 001 is data-blocked, and it is worth writing down because every span in
-    segment 1107 turns on it. The routine's CODE now matches -- same calls, same
-    order, no I/O check -- and the two operands differ: the original pushes
-    DS:$5AD2 for the file and DS:$5B6A for the buffer, this build $0952 and
-    $354C. The two gaps are 20,864 and 9,758, and their being DIFFERENT rules
-    out a uniform shift: it is the sizes of what comes before, not a single
-    missing block.
-
-    Where it comes from is partly mapped. This part's DGROUP order is right --
-    reverse of P1Intro's uses clause puts P1S5 first, and P1S5's constants are
-    at $001C and $01A8 exactly as recorded. But P1S5's VARIABLES are at
-    $A5B6..$AB58 in the original, and nothing declared in that unit accounts for
-    the distance. The load image is 1,536 bytes BIGGER here than the original's
-    while the BSS is 23,520 bytes SMALLER, so there is initialised data here
-    that belongs in BSS and a large block of variables that is missing
-    altogether. }
-  F : file;
-  { DS:$5BCC -- entry 0 is the translation, 1..144 are the grid. }
-  Trail : array[0..LastEntry] of TTrail;
-  { DS:$632F, stride 7 }
-  Outp  : array[0..LastEntry] of TOut;
-  { DS:$80C2, stride $33 }
-  Blob  : array[1..LastEntry] of TBlob;
-  { DS:$9DDB, stride 9 }
-  Star  : array[1..StarCount] of TStar;
-
-  { DS:$7233, 3,776 bytes = 59 glyphs of 8 x 8, AND IT IS INLINE IN DGROUP,
-    not on the heap. It was declared here as a pointer with New and Dispose
-    around it, which put four bytes where the original has 3,776 and moved
-    every variable after it -- including the whole of P1S5's block, which sits
-    above this one.
-
-    $7233 AND NOT $6A2A, and the difference is worth writing down because this
-    comment said $6A2A for one session and that was wrong. $6A2A is the FOLDED
-    base of ShowString's subscript, not the array's address: ShowString's own
-    note below works it out as $7233 - $809, where $809 is 2,057 = 32 * 64 + 9,
-    the character bias of 32 glyphs plus the nine that array[0..58, 1..8, 1..8]
-    folds for its low bounds. A folded displacement is never an address.
-
-    With $7233 the unit tiles: the row buffers at $6A33 take 2,048 bytes and
-    end exactly here. }
-  Font  : TFont;
-  { DS:$5B6A and DS:$5B9B, 49 bytes each }
-  ProfileA, ProfileB : array[1..BlobPixels] of Byte;
-  { DS:$672D }
-  Pal   : array[0..767] of Byte;
-  { DS:$6A2D, $6A2F, $6A31 -- BuildPoints' THREE COUNTERS ARE UNIT-LEVEL, and
-    that is what leaves the routine with no declared locals at all. The
-    original reads and writes them absolutely: 1107:0848 is
-    MOV DI,[$6A2D] for the row, 1107:087f pushes [$6A2F] for the column, and
-    1107:08d0 is IMUL DI,[$6A31],0D for the trail index.
-
-    They also tile: Pal at $672D is 768 bytes and ends exactly here, and these
-    six bytes end exactly at $6A33 where the row buffers begin. }
-  Row   : Integer;                                { DS:$6A2D }
-  Col   : Integer;                                { DS:$6A2F }
-  Idx   : Integer;                                { DS:$6A31 }
-  { DS:$6A33, stride $100 -- THE EIGHT ROW BUFFERS, and they are UNIT-LEVEL.
-    They were declared as locals inside BuildPoints, which is eight 256-byte
-    strings on the stack and 2,048 bytes of DGROUP the original has and we did
-    not. Two measurements say unit-level: 1107:07ab is MOV DI,$6A33 / PUSH DS,
-    which is a DS address and not a frame one, and BuildPoints opens
-    ENTER $202 -- 514 bytes, which cannot hold them. }
-  Rows  : array[1..TrailRows] of String;            { DS:$6A33 }
+  { DS:$5AD2 -- unit-level, not a local of Load: 1107:007f pushes it as the file
+    for the second BlockRead, a data-segment address where a local would be
+    LEA'd off SS. }
+  F : file;                                         { DS:$5AD2 }
 
 { --------------------------------------------------------------------------
-  THE SHARED 386 MATHS MODULE.
+  THE SHARED 386 MATHS MODULE, AND IT COMES SECOND IN THIS UNIT'S DGROUP.
 
   SinCos, Rotate and Project are 386 code and cannot be written in Turbo
   Pascal's built-in assembler, which stops at the 286. They live in
-  src/asm/DEMOMATH.ASM, are assembled by TASM and linked in here with the $L directive --
-  which is what the original does: 1107:1804, 1107:18B6 and 1107:1A04 are the
-  same code as scene 5's and part 002 scene 2's, once per unit.
+  src/asm/DEMOMATH.ASM, are assembled by TASM and linked in with the $L
+  directive -- which is what the original does: 1107:1804, 1107:18B6 and
+  1107:1A04 are the same code as scene 5's and part 002 scene 2's.
 
-  The nine names below are the module's EXTRNs, so they have to be declared
-  BEFORE the $L directive and spelled exactly this way.
+  THE NINE NAMES HAVE TO BE DECLARED BEFORE THE $L DIRECTIVE, and for a long
+  time that was read as "declare them near it", which put them LAST in the
+  unit -- MCos1 at $A0F0 against the original's $5B52, eighteen thousand bytes
+  out, and every absolute reference in this unit and the whole of scene 5's
+  block wrong with it. The directive only has to come after the names; the
+  names can be anywhere.
   -------------------------------------------------------------------------- }
   { DS:$5B52/$5B56, $5B5A/$5B5E, $5B62/$5B66 -- cos then sin, per axis }
   MCos1, MSin1, MCos2, MSin2, MCos3, MSin3 : LongInt;
-  { DS:$80F3 }
-  Angle : Integer;
+  { DS:$5B6A and DS:$5B9B, 49 bytes each -- 1107:00c6 and 00ed fold them as
+    [DI+$5B69] and [DI+$5B9A] with DI = Ord(ch), which is a 1-based byte array
+    in each case, and the 49 between the two bases is BlobPixels. }
+  ProfileA, ProfileB : array[1..BlobPixels] of Byte;
+  { DS:$5BD8 -- entry 0 is the translation, 1..144 are the grid. The fold at
+    1107:068b is IMUL AX,AX,$12 then IMUL DI,AX,$D -- eighteen columns of
+    thirteen-byte records -- and 1107:0912 reaches one directly as
+    IMUL DI,[$6A31],$D. }
+  Trail : array[0..LastEntry] of TTrail;            { DS:$5BD8 }
+  { DS:$6336, stride 7. 1107:0268 folds it as [DI+$632F] with DI = index * 7,
+    which is a 1-based array of seven-byte records, so the array itself starts
+    seven bytes further on. And it tiles: $6336 plus 145 * 7 is $672D, which is
+    where the palette begins. }
+  Outp  : array[0..LastEntry] of TOut;              { DS:$6336 }
+  { DS:$672D, 768 bytes, ending exactly at Row below. }
+  Pal   : array[0..767] of Byte;                    { DS:$672D }
+  { DS:$6A2D, $6A2F, $6A31 -- BuildPoints' THREE COUNTERS ARE UNIT-LEVEL, and
+    that is what leaves the routine with no declared locals at all. The original
+    reads and writes them absolutely: 1107:0848 is MOV DI,[$6A2D] for the row,
+    1107:087f pushes [$6A2F] for the column, and 1107:08d0 is
+    IMUL DI,[$6A31],$D for the trail index. }
+  Row   : Integer;                                  { DS:$6A2D }
+  Col   : Integer;                                  { DS:$6A2F }
+  Idx   : Integer;                                  { DS:$6A31 }
+  { DS:$6A33, stride $100 -- THE EIGHT ROW BUFFERS, and they are UNIT-LEVEL.
+    They were locals once, which is eight 256-byte strings on the stack and
+    2,048 bytes of DGROUP the original has and we did not. Two measurements say
+    unit-level: 1107:07ab is MOV DI,$6A33 / PUSH DS, a DS address and not a
+    frame one, and BuildPoints opens ENTER $202 -- 514 bytes, which cannot hold
+    them. 1107:084f folds them as MOV DI,[$6A2D] / SHL DI,8 / [DI+$6933], and
+    $6933 plus 256 is $6A33, which is the same number read the other way. }
+  Rows  : array[1..TrailRows] of String;            { DS:$6A33 }
+  { DS:$7233, 3,776 bytes = 59 glyphs of 8 x 8, AND IT IS INLINE IN DGROUP, not
+    on the heap. Declared as a pointer with New and Dispose round it, four bytes
+    sat where the original has 3,776 and every variable after it moved --
+    including the whole of scene 5's block, which sits above this one.
+
+    $7233 AND NOT $6A2A. $6A2A is the FOLDED base of ShowString's subscript, not
+    the array's address: $7233 - $809, where $809 is 2,057 = 32 * 64 + 9, the
+    character bias of 32 glyphs plus the nine that array[0..58, 1..8, 1..8]
+    folds for its low bounds. A folded displacement is never an address. And it
+    tiles: the row buffers at $6A33 take 2,048 bytes and end exactly here. }
+  Font  : TFont;                                    { DS:$7233 }
+  { DS:$80F3, and it comes BEFORE Blob rather than after. $7233 plus 3,776 is
+    $80F3; and 1107:0165 folds Blob as [DI-$7F3E] with DI = index * $33, which
+    is a 1-based array of 51-byte records, so Blob itself starts at $80F5 --
+    two bytes further on, which is exactly this. The source had Blob fourth and
+    Angle last. }
+  Angle : Integer;                                  { DS:$80F3 }
+  { DS:$80F5, stride $33 }
+  Blob  : array[1..LastEntry] of TBlob;             { DS:$80F5 }
+  { DS:$9DDB, stride 9 }
+  Star  : array[1..StarCount] of TStar;             { DS:$9DDB }
 
 const
   { DS:$0014 = 320 and DS:$0016 = 200, initialised data. Project halves both,
