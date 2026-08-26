@@ -908,6 +908,13 @@ seen_in = "TPART1"
 state = "resolved"
 resolution = "RESOLVED, AND PART 001 MEETS THE BAR AT 99.0%. One span of 19 bytes remains, which is the frame-counter question recorded on P1S1's Frame declaration -- three attempts, all costing 0.6%, and the reason is that an unreferenced unit-level variable is smart-linked away so a spare global cannot hold the space. Part 005 at 98.8% is now the only part below the bar."
 
+[[plan.investigation]]
+name = "all-parts-99"
+finding = "EVERY PART IS NOW AT 99% OR BETTER, and the last one turned on a single declaration's TYPE. P5S3's Angle is a WORD, not an Integer, and the widening says so: 1102:022d is XOR DX,DX on [BP-$0A] where 1102:0225 is CWD on [BP-$0C] -- unsigned against signed, in the same expression, two instructions apart. So Angle is a Word and AngStep an Integer, and the `mod` that follows is a 32-bit divide of the mixed sum. One word in one declaration, worth 27 bytes and the last 0.2%. AND THE OPERAND ORDER FALLS OUT OF THE SAME TWO INSTRUCTIONS, which is the day's other rule confirming itself: the Integer is the one PARKED in CX:BX and the Word is left in AX:DX, so the parked one is written SECOND and the source is `Angle + AngStep`. Two independent readings of one expression, agreeing. THE FINAL STANDINGS: 000, 009 and psycho at 100%; 002 at 99.9%; 006 at 99.3%; 003 at 99.1%; 001, 004, 005 and 007 at 99.0%. Six of the seven initialised images are byte-identical -- 002's is 544 bytes short and 1,863 differ, which is the one data-layout job left. Three byte-exact artefacts hold, paslint is clean at 67 files, and every part's emulator traps are identical opcode for opcode. Part 005's dsmap pairs 182 references with 181 at +0. WHAT THE DAY COST AND WHAT IT BOUGHT: part 001 90.9 -> 99.0, part 003 95.6 -> 99.1, part 004 96.5 -> 99.0, part 005 97.4 -> 99.0, part 006 98.6 -> 99.3. Five new wiki observations, and the method that produced all of it is one sentence: disassemble the original's segment and ask what Pascal produces that shape -- never re-read the reconstruction hoping to spot the difference."
+seen_in = "TPART5"
+state = "resolved"
+resolution = "RESOLVED -- THE 99% TARGET IS MET ON ALL TEN PARTS. What remains is a different kind of work and is registered separately: part 002's initialised image (544 bytes short, 1,863 differing) is the one data-layout job left; part 005's 1102:0082 and 1096:034a are the two code-generation puzzles in part5-codegen-two; and FOUR WATCHED RUNS ARE OWED, three of them on parts that changed behaviour today. Nobody may record a run they did not watch."
+
 [plan.row."001 $0284"]
 label = "the 2-byte typed constant holding $A640, still missing"
 investigation = "part1-layout"
@@ -1709,6 +1716,11 @@ target = "R0"
 [plan.row."005 1102:0224"]
 label = "the same, in the frame loop"
 investigation = "part5-codegen-two"
+target = "R0"
+
+[plan.row."005 1102:022d"]
+label = "Angle is a Word: XOR DX,DX against CWD two instructions apart -- FIXED"
+investigation = "all-parts-99"
 target = "R0"
 
 [plan.row."005 bss +384"]

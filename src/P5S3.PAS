@@ -220,7 +220,15 @@ var
     store. That agrees with RenderPatch, whose RET 8 leaves two bytes for it. }
   CX, CY   : Integer;             { [BP-2], [BP-4] }
   DX_, DY_ : Integer;             { [BP-6], [BP-8] }
-  Angle    : Integer;             { [BP-$0A] }
+  { A WORD, NOT AN INTEGER, and the widening says so. 1102:022d is XOR DX,DX on
+    [BP-$0A] where 1102:0225 is CWD on [BP-$0C] -- unsigned against signed, in
+    the same expression, two instructions apart. So Angle is a Word and AngStep
+    an Integer, and the `mod` that follows is a 32-bit divide of the mixed sum.
+
+    THE OPERAND ORDER FOLLOWS FROM IT TOO. The Integer is the one PARKED in
+    CX:BX and the Word is the one left in AX:DX, so the parked one is written
+    SECOND: the source is `Angle + AngStep` and not the other way round. }
+  Angle    : Word;                { [BP-$0A] }
   AngStep  : Integer;             { [BP-$0C] }
   Frame    : Integer;             { [BP-$0E] }
   Running  : Boolean;             { [BP-$0F] }
