@@ -192,4 +192,9 @@ asm
 end;
 
 
+{ AN EMPTY INITIALISATION SECTION, AND THE ORIGINAL HAS ONE. 12b2:0120 is
+  PUSH BP / MOV BP,SP / LEAVE -- a routine with a frame and no body, which is
+  what Turbo Pascal emits for `begin end.` at the foot of a unit. A bare `end.`
+  emits nothing there at all. }
+begin
 end.

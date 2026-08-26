@@ -140,7 +140,6 @@ procedure SetTextMode;
 procedure VirtScrAlloc;
 procedure VirtScrFree;
 procedure ClearVirtual;
-procedure FlushKeys;
 procedure DrawLine(X1, Y1, X2, Y2 : Integer; Colour : Byte; Segment : Word);
 
 { The palette machinery. These are part 001's copy of the unit (segment 1491)
@@ -181,7 +180,7 @@ procedure ClearScreen(Segment : Word; Colour : Byte); far;
 
 implementation
 
-uses Crt;   { FlushKeys needs KeyPressed/ReadKey }
+uses Crt;   { Delay, in the palette fades }
 
 { ROUTINE ORDER IS THE ORIGINAL'S. Turbo Pascal emits a unit's code in
   implementation order, so the order here IS the segment layout, and a
@@ -1007,13 +1006,6 @@ end;
 procedure ClearVirtual;
 begin
   ClearScreen(VirtScrSeg, 0);
-end;
-
-procedure FlushKeys;
-var
-  C : Char;
-begin
-  while KeyPressed do C := ReadKey;
 end;
 
 { Palette transfer. Port $3C8 selects the entry for writing ($3C7 for

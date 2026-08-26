@@ -35,6 +35,18 @@ implementation
   segpair.py and dgimage.py for this, never the walk. }
 uses VGA, Crt, DemoVT, P1S5, P1STAR, P1S4, P1S3, P1S2, P1S1;
 
+{ ITS OWN, NOT VGA'S, AND THE OTHER TWO MAINS ALREADY SAID SO. P2MAIN and
+  P3MAIN each declare this routine; only this file borrowed VGA's copy, and
+  because Turbo Pascal smart-links, VGA's copy was linked into part 001 alone
+  -- landing at 1491:03d9, which is where the original puts VGA's unit
+  INITIALISATION. So the original's VGA has no FlushKeys and this file had one.
+  Declared here, VGA's init returns to 1491:03d9 and the 25 bytes move to
+  P1Intro's own segment, where the other two parts already keep theirs. }
+procedure FlushKeys;
+begin
+  while KeyPressed do ReadKey;
+end;
+
 procedure RunIntro;
 var
   Saved : Byte;
