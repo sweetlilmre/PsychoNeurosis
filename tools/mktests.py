@@ -124,8 +124,10 @@ SCENES = [
     ("TP3S7", "Part3Sprites", "Scene7", VGA_USES, VGA_OPEN, VGA_CLOSE,
      "part 003 scene 7 -- the spinning portraits"),
 
-    ("TPART4", "Part4Lemmings", "RunPart4", P4_USES, P4_OPEN, P4_CLOSE,
-     "part 004 -- the lemmings; single-scene, the harness stands in for the driver"),
+    # PART 004 HAS NO HARNESS ANY MORE. src/NEUR4.PAS is the real program, and
+    # unlike part 007's it is a CALL rather than a body: the original's
+    # Demo_Main sits inside the scene unit at 1005:1cd6 and its segment 1000
+    # holds only the eighty bytes that reach it. 99.4% to 100.0%.
 
     ("TP5S1", "P5S1", "Scene1", P5_USES, P5_OPEN, P5_CLOSE,
      "part 005 scene 1 -- the heightfield mesh"),
@@ -315,7 +317,7 @@ HOOK = """
 # in the same commit that adds it.
 # TPART7 is gone from this set with its harness; NEUR7 is a real program and
 # prints nothing.
-TEXT_RTL = {"TPART0", "TPART4"}
+TEXT_RTL = {"TPART0"}
 
 SAY_PROC = """{ PRINTS WITHOUT THE TEXT RTL, and that is the whole point of it. A single
   WriteLn anywhere in a harness puts a two-byte constant at the END of the

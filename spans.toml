@@ -57,7 +57,8 @@ rtl  = 0x12d9
 segs = [0x100e, 0x1096, 0x1102, 0x124a, 0x1252, 0x1266, 0x12c8]
 
 [part."004"]
-exe  = "TPART4.EXE"
+# The real program: an eighty-byte call, as the original's segment 1000 is.
+exe  = "NEUR4.EXE"
 rtl  = 0x1288
 segs = [0x1005, 0x11d9, 0x11e3, 0x1226]
 
