@@ -154,6 +154,20 @@ var
     part. }
   TargetPal : array[0..255, 0..2] of Byte;
 
+  { DS:$E6EC -- THE FILE RECORD IS A GLOBAL, and BOTH measurements are right.
+    125e:0342 is MOV DI,$E6EC / PUSH DS / PUSH DI as the file for the TargetPal
+    BlockRead -- a data-segment address, where a local would be LEA'd off SS --
+    and TargetPal ends at $E6EC exactly (768 bytes from $E3EC), with VGA's
+    VirtScr at $E76C, 128 further on. dsmap paired FORTY-SIX references to VGA's
+    block at exactly -124 before this existed.
+
+    AND THE 128-BYTE LOCAL IN Load STAYS. Its frame is ENTER $626 = 128 + 2 +
+    1,444, all three measured, so there really are 128 bytes nearest BP there --
+    they are simply not this file. An earlier attempt moved the record to unit
+    level by DELETING that local and cost 338 bytes of alignment, which is what
+    the note beside it records; the local is kept and renamed instead. }
+  F         : file;                                { DS:$E6EC }
+
 
 { --------------------------------------------------------------------------
   Sprite_DrawRotated (125e:0388) -- HAND ASSEMBLER, transcribed verbatim.
@@ -427,13 +441,16 @@ end;
   -------------------------------------------------------------------------- }
 procedure Load;
 var
-  { F IS A LOCAL, and the frame proves it against the DS: address that used to
-    be written beside it. 125e:012e opens ENTER $626 -- 1,574 bytes -- which is
-    128 for this record plus 2 for I plus the 1,444-byte buffer below, and I
-    sits at [BP-$82] = 130 precisely BECAUSE the 128 bytes of file record are
-    nearer BP. Moved to unit level it cost 338 bytes of alignment and the DS:
-    note was simply wrong. }
-  F   : file;                                    { [BP-$80] }
+  { ONE HUNDRED AND TWENTY-EIGHT BYTES NEAREST BP, AND THEY ARE NOT THE FILE.
+    125e:012e opens ENTER $626 -- 1,574 bytes -- which is 128 plus 2 for I plus
+    the 1,444-byte buffer below, and I sits at [BP-$82] = 130 precisely BECAUSE
+    128 bytes are nearer BP. That much was measured and is unchanged. What was
+    wrong was the conclusion that the FILE lives here: 125e:0342 passes DS:$E6EC
+    to BlockRead, so the file is the unit-level record declared above, and this
+    is 128 bytes of something else the routine never reads. Both facts hold at
+    once, which is why deleting this local to make room for the global measured
+    worse -- it removed 128 bytes the frame really has. }
+  Spare : file;                                  { [BP-$80], never opened }
   I   : Integer;                                 { [BP-$82] }
   { ONE ENTRY MORE THAN THE ANGLE RANGE. 125e:012e opens ENTER $626 and the
     lowest slot the routine names is [BP-$82], so the buffer below it is
