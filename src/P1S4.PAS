@@ -131,6 +131,35 @@ const
   ClipLeft   : Integer = 0;        { DS:$0010 }
   ClipRight  : Integer = 319;      { DS:$0012 }
 
+{ FOURTEEN BYTES IN OUR BUILD AND THIRTEEN IN THE ORIGINAL, AND THAT IS A
+  MEASURED FLOOR, NOT AN OVERSIGHT. The default $A+ rounds an odd record up to
+  fourteen, which shows up nowhere in the record's own use and instead one
+  frame away: Transform's pointer local landed at [BP-$14] where
+  1107:044a puts it at [BP-$13], because a 14-byte T pushed it one slot further
+  down.
+
+  NEITHER A SCOPED SWITCH NOR `packed` CAN DO THIS. In TP7 the alignment switch
+  is GLOBAL -- legal only ahead of the declaration part -- so every placement
+  near the type gives Error 17, "invalid compiler directive": inside a var
+  block, inside a type block, and between the type keyword and its first
+  declaration. And `packed record` compiles without complaint and changes
+  nothing: the local stayed at [BP-$14], so TP7 accepts the word and ignores
+  it. The switch at the head of this unit does move it -- 1107:044d closes --
+  but it costs more than it gains, and where it costs is the surprise:
+
+      $A+  1107:044d 4  02ea 3  073c 3  0146 1  04a0 1
+      $A-  1107:02ea 3  073c 3  0146 1  04a0 1   AND
+           1012:06dc 7  1082:036a 4   <-- OTHER UNITS
+
+  $A IS A GLOBAL DIRECTIVE, and in a single compiler run its state carries
+  into the units compiled after the one that sets it. So $A- here silently
+  recompiles P1S1 and P1S2 unaligned too, costing 11 bytes there to save 4
+  here. Net -7, which is exactly what an earlier pass measured and recorded
+  without knowing where the 7 went.
+
+  The way to actually claim this 4 bytes is to make P1S1's and P1S2's own
+  records explicitly even-sized so that $A- is free for them, and only then
+  set it. Until that is done, 1107:044d stays. }
 type
   { 13 bytes in the original: three 16.16 fixed values and a flag byte.
     Entry 0 is not a point -- it is the object's TRANSLATION vector, which is
@@ -518,77 +547,25 @@ begin
 end;
 
 { --------------------------------------------------------------------------
-  1107:0446 -- Transform(Base; A1, A2, A3)
-
-  For entries 1..145: copy the 13-byte record out, rotate it, add the
-  TRANSLATION held in entry 0, project, and write the 7-byte output record.
-
-  Note what is NOT rotated: entry 0. The loop starts at 1, and the add at
-  1107:04bf reads ES:[DI], ES:[DI+4], ES:[DI+8] with DI still pointing at the
-  base of the array -- entry 0. It is the object position, not a point.
+  1107:0199 -- the clipped transparent sprite blit. HAND ASSEMBLER, verbatim,
+  and SHARED SOURCE: the routine is src/asm/BLITCLIP.INC, because part 006
+  scene 2 compiles the same text at 100f:0000 -- byte for byte, our addresses
+  being that unit's plus $199. It sits here, between Banner_Load and
+  DrawBlobs, rather than at the head of a segment of its own, which is how we
+  know the original shared the SOURCE and let each unit compile its own copy.
   -------------------------------------------------------------------------- }
-procedure Transform(Base : PWork; A1, A2, A3 : Integer);
+{ @asm 001 1107:0199 +170 Blit }
+{$I BLITCLIP.INC}
+
+{ [transcribed] 1107:0245 -- blit blobs 1..144. Note 145 is transformed and
+  given a sprite but never drawn; the loop counter is a BYTE ([BP-1], CMP
+  against $90 at 1107:027f) and so is declared one here. }
+procedure DrawBlobs;
 var
-  { TWENTY BYTES, AND THE EARLIER READING OF THEM WAS WRONG. It said a Byte
-    then three LongInts then three Integers, because every referenced offset
-    below the first is odd and a one-byte local is the usual cause. The frame
-    was right and the parts were not: [BP-2] is written with MOV WORD PTR at
-    1107:0483, so the counter is an INTEGER, and the odd offsets come from a
-    THIRTEEN-byte record sitting after it.
-
-    2 + 13 + 4 = 19, rounded to 20:
-
-      [BP-2]     I, an Integer -- MOV WORD PTR [BP-2],1 and INC WORD PTR
-      [BP-$0F]   a TTrail, 13 bytes, copied in whole by Move at 1107:049f.
-                 Its three LongInt fields are at [BP-$0F], [BP-$0B] and
-                 [BP-7], which is exactly what 1107:04a4..04b3 pushes to
-                 RotatePoint, and the Flag byte is the odd [BP-3].
-      [BP-$13]   a four-byte pointer, loaded from the parameter at 1107:044a.
-
-    THE RECORD IS COPIED, NOT READ FIELD BY FIELD. 1107:049f is
-    Move(P^[I], T, 13) -- one call -- where this read three fields into three
-    LongInt locals. That is why there are no X, Y, Z locals to declare. }
-  I : Integer;                          { [BP-2] }
-  T : TTrail;                           { [BP-$0F], the working copy }
-  P : PWork;                            { [BP-$13], from Base }
+  I : Byte;
 begin
-  P := Base;                                { 1107:044a }
-
-  SinCos(A1, MCos1, MSin1);                 { -> DS:$5B52, $5B56 }
-  SinCos(A2, MCos2, MSin2);                 { -> DS:$5B5A, $5B5E }
-  SinCos(A3, MCos3, MSin3);                 { -> DS:$5B62, $5B66 }
-
-  for I := 1 to LastEntry do
-  begin
-    { THROUGH THE PARAMETER, NOT THROUGH THE COPY, and the routine really does
-      use both. 1107:049f's Move and the three adds at 1107:04bc load
-      LES DI,[BP+$A] -- the parameter itself -- while the four stores at
-      1107:050d onwards load LES DI,[BP-$13], the local copy. So the reads name
-      Base^ and the writes name P^; using one for everything is four bytes
-      different at each of the four read sites. }
-    Move(Base^.Trail[I], T, SizeOf(TTrail));  { 1107:049f, thirteen bytes }
-    RotatePoint(T.X, T.Y, T.Z);             { 1107:04b3 }
-    { THE TRANSLATION IS READ THROUGH THE POINTER, not from Trail absolutely.
-      1107:04bc is LES DI,[BP+0A] -- the parameter again -- and the three adds
-      take es:[di], es:[di+4] and es:[di+8], which is element ZERO of whatever
-      was passed. Reading Work.Trail[0] by name is the same value and an absolute
-      displacement instead of a register indirection. }
-    T.X := T.X + Base^.Trail[0].X;                   { 1107:04bf }
-    T.Y := T.Y + Base^.Trail[0].Y;
-    T.Z := T.Z + Base^.Trail[0].Z;
-    Project(T.X, T.Y, T.Z);                 { 1107:0503 }
-    { THE ORDER IS X, Y, D, FLAG, AND D COMES AFTER Project, NOT BEFORE.
-      1107:0528 pushes [BP-7] and [BP-5] -- the two halves of T.Z -- to
-      FixedToInt, and 1107:0503 has already called Project on that same slot.
-      So the depth key is taken from the PROJECTED Z, not the rotated one, and
-      this had it the other way round: a different number in the field the
-      depth sort is keyed on, not merely a different instruction order. }
-    { both come back zero-extended, so the low word carries the sign }
-    P^.Outp[I].X    := Integer(T.X);           { 1107:0506 }
-    P^.Outp[I].Y    := Integer(T.Y);           { 1107:0517 }
-    P^.Outp[I].D    := FixedToInt(T.Z);        { 1107:052e }
-    P^.Outp[I].Flag := T.Flag;                 { 1107:0543 }
-  end;
+  for I := 1 to TrailCount do
+    Blit(@Blob[I], Work.Outp[I].X, Work.Outp[I].Y, VirtScrSeg);
 end;
 
 { --------------------------------------------------------------------------
@@ -670,25 +647,77 @@ begin
 end;
 
 { --------------------------------------------------------------------------
-  1107:0199 -- the clipped transparent sprite blit. HAND ASSEMBLER, verbatim,
-  and SHARED SOURCE: the routine is src/asm/BLITCLIP.INC, because part 006
-  scene 2 compiles the same text at 100f:0000 -- byte for byte, our addresses
-  being that unit's plus $199. It sits here, between Banner_Load and
-  DrawBlobs, rather than at the head of a segment of its own, which is how we
-  know the original shared the SOURCE and let each unit compile its own copy.
-  -------------------------------------------------------------------------- }
-{ @asm 001 1107:0199 +170 Blit }
-{$I BLITCLIP.INC}
+  1107:0446 -- Transform(Base; A1, A2, A3)
 
-{ [transcribed] 1107:0245 -- blit blobs 1..144. Note 145 is transformed and
-  given a sprite but never drawn; the loop counter is a BYTE ([BP-1], CMP
-  against $90 at 1107:027f) and so is declared one here. }
-procedure DrawBlobs;
+  For entries 1..145: copy the 13-byte record out, rotate it, add the
+  TRANSLATION held in entry 0, project, and write the 7-byte output record.
+
+  Note what is NOT rotated: entry 0. The loop starts at 1, and the add at
+  1107:04bf reads ES:[DI], ES:[DI+4], ES:[DI+8] with DI still pointing at the
+  base of the array -- entry 0. It is the object position, not a point.
+  -------------------------------------------------------------------------- }
+procedure Transform(Base : PWork; A1, A2, A3 : Integer);
 var
-  I : Byte;
+  { TWENTY BYTES, AND THE EARLIER READING OF THEM WAS WRONG. It said a Byte
+    then three LongInts then three Integers, because every referenced offset
+    below the first is odd and a one-byte local is the usual cause. The frame
+    was right and the parts were not: [BP-2] is written with MOV WORD PTR at
+    1107:0483, so the counter is an INTEGER, and the odd offsets come from a
+    THIRTEEN-byte record sitting after it.
+
+    2 + 13 + 4 = 19, rounded to 20:
+
+      [BP-2]     I, an Integer -- MOV WORD PTR [BP-2],1 and INC WORD PTR
+      [BP-$0F]   a TTrail, 13 bytes, copied in whole by Move at 1107:049f.
+                 Its three LongInt fields are at [BP-$0F], [BP-$0B] and
+                 [BP-7], which is exactly what 1107:04a4..04b3 pushes to
+                 RotatePoint, and the Flag byte is the odd [BP-3].
+      [BP-$13]   a four-byte pointer, loaded from the parameter at 1107:044a.
+
+    THE RECORD IS COPIED, NOT READ FIELD BY FIELD. 1107:049f is
+    Move(P^[I], T, 13) -- one call -- where this read three fields into three
+    LongInt locals. That is why there are no X, Y, Z locals to declare. }
+  I : Integer;                          { [BP-2] }
+  T : TTrail;                           { [BP-$0F], the working copy }
+  P : PWork;                            { [BP-$13], from Base }
 begin
-  for I := 1 to TrailCount do
-    Blit(@Blob[I], Work.Outp[I].X, Work.Outp[I].Y, VirtScrSeg);
+  P := Base;                                { 1107:044a }
+
+  SinCos(A1, MCos1, MSin1);                 { -> DS:$5B52, $5B56 }
+  SinCos(A2, MCos2, MSin2);                 { -> DS:$5B5A, $5B5E }
+  SinCos(A3, MCos3, MSin3);                 { -> DS:$5B62, $5B66 }
+
+  for I := 1 to LastEntry do
+  begin
+    { THROUGH THE PARAMETER, NOT THROUGH THE COPY, and the routine really does
+      use both. 1107:049f's Move and the three adds at 1107:04bc load
+      LES DI,[BP+$A] -- the parameter itself -- while the four stores at
+      1107:050d onwards load LES DI,[BP-$13], the local copy. So the reads name
+      Base^ and the writes name P^; using one for everything is four bytes
+      different at each of the four read sites. }
+    Move(Base^.Trail[I], T, SizeOf(TTrail));  { 1107:049f, thirteen bytes }
+    RotatePoint(T.X, T.Y, T.Z);             { 1107:04b3 }
+    { THE TRANSLATION IS READ THROUGH THE POINTER, not from Trail absolutely.
+      1107:04bc is LES DI,[BP+0A] -- the parameter again -- and the three adds
+      take es:[di], es:[di+4] and es:[di+8], which is element ZERO of whatever
+      was passed. Reading Work.Trail[0] by name is the same value and an absolute
+      displacement instead of a register indirection. }
+    T.X := T.X + Base^.Trail[0].X;                   { 1107:04bf }
+    T.Y := T.Y + Base^.Trail[0].Y;
+    T.Z := T.Z + Base^.Trail[0].Z;
+    Project(T.X, T.Y, T.Z);                 { 1107:0503 }
+    { THE ORDER IS X, Y, D, FLAG, AND D COMES AFTER Project, NOT BEFORE.
+      1107:0528 pushes [BP-7] and [BP-5] -- the two halves of T.Z -- to
+      FixedToInt, and 1107:0503 has already called Project on that same slot.
+      So the depth key is taken from the PROJECTED Z, not the rotated one, and
+      this had it the other way round: a different number in the field the
+      depth sort is keyed on, not merely a different instruction order. }
+    { both come back zero-extended, so the low word carries the sign }
+    P^.Outp[I].X    := Integer(T.X);           { 1107:0506 }
+    P^.Outp[I].Y    := Integer(T.Y);           { 1107:0517 }
+    P^.Outp[I].D    := FixedToInt(T.Z);        { 1107:052e }
+    P^.Outp[I].Flag := T.Flag;                 { 1107:0543 }
+  end;
 end;
 
 { [transcribed] 1107:0562 -- FrameStep(A1, A2, A3). Straight pass-through to
