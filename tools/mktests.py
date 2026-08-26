@@ -187,13 +187,13 @@ PARTS = [
     ("TPART6", "P6Main", "RunPart6",
      "DemoVT, Crt, VGA",
      "part 006 -- all four scenes, through the main body at 1000:002d"),
-    # VGA is NOT named here on purpose, same reasoning as part 002's ModeX.
-    # The original's order is VGA (100b), P7S1 (100f), Crt (1099), DemoVT
-    # (10fb), so VGA has to FINISH LAST in the post-order walk -- which it can
-    # only do if nothing but P7Main reaches it, and P7Main names it last.
-    ("TPART7", "P7Main", "RunPart7",
-     "DemoVT, Crt",
-     "part 007 -- the animation, through the main body at 1000:001e"),
+    # PART 007 HAS NO HARNESS ANY MORE. src/NEUR7.PAS is the real program --
+    # the main body that P7MAIN.PAS held as a unit -- so the harness program and
+    # the driver unit, neither of which the original has, are gone. That was
+    # worth 10 of part 007's 12 unaligned bytes: 4,100 of 4,112 to 4,110, 99.7%
+    # to 100.0%, because the runtime finally sits on its own paragraph and every
+    # far call into it resolves. run/RUNPART.BAT launches it.
+
 ]
 
 # EVERY harness -- scene and part alike -- must hand the machine back usable.
@@ -313,7 +313,9 @@ HOOK = """
 # 007 keep it for the same reason, and both already rebuild with their data
 # byte-identical. If the real call site turns up, remove the part from this set
 # in the same commit that adds it.
-TEXT_RTL = {"TPART0", "TPART4", "TPART7"}
+# TPART7 is gone from this set with its harness; NEUR7 is a real program and
+# prints nothing.
+TEXT_RTL = {"TPART0", "TPART4"}
 
 SAY_PROC = """{ PRINTS WITHOUT THE TEXT RTL, and that is the whole point of it. A single
   WriteLn anywhere in a harness puts a two-byte constant at the END of the

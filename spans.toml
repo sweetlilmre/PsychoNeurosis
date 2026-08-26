@@ -67,7 +67,11 @@ rtl  = 0x128a
 segs = [0x100f, 0x1095, 0x1118, 0x11bb, 0x11ee, 0x1217, 0x1279]
 
 [part."007"]
-exe  = "TPART7.EXE"
+# THE REAL PROGRAM, NOT A HARNESS. src/NEUR7.PAS carries the main body that
+# P7MAIN.PAS held as a unit, so the two segments the original does not have --
+# the harness program and the driver unit -- are gone and the runtime sits on
+# its own paragraph.
+exe  = "NEUR7.EXE"
 rtl  = 0x110c
 segs = [0x100b, 0x100f, 0x1099, 0x10fb]
 

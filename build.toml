@@ -150,7 +150,7 @@ list = [
   "P6S4.PAS",
   "P6MAIN.PAS",
   "P7S1.PAS",
-  "P7MAIN.PAS",
+  "NEUR7.PAS",
 ]
 
 [stage]
@@ -162,13 +162,19 @@ identity = ["TP*.PAS"]
 # The 386 maths module and its include go in the build ROOT, not GEN: TASM
 # resolves INCLUDE relative to the current directory, and TPC looks for the
 # .OBJ next to the unit that links it.
-alongside = ["src/asm/*.ASM", "src/asm/*.INC"]
+# The external harness rides along too: staged here, installed below.
+alongside = ["src/asm/*.ASM", "src/asm/*.INC", "src/dos/*.BAT"]
 
 [stage.subdirs]
 GEN = "src/gen"
 
 [install]
-alongside = []
+# The external harness. RUNPART.BAT checks NEUROSIS.DAT is present and runs
+# NEURn.EXE -- the job the generated Pascal harness used to do from INSIDE the
+# part, which cost two segments the original does not have and put the runtime
+# on the wrong paragraph. A batch rather than a launcher program because DOS
+# Exec would stay resident while the part runs, and these parts want the memory.
+alongside = ["*.BAT"]
 
 # Reconstruction source -> 8.3 DOS name, unit identifier before and after. The
 # unit name inside a file is independent of the filename, but TP7 finds a unit
@@ -212,4 +218,4 @@ alongside = []
 "P6S4.PAS" = ["P6S4.PAS", "P6S4", "P6S4"]
 "P6MAIN.PAS" = ["P6MAIN.PAS", "P6Main", "P6Main"]
 "P7S1.PAS" = ["P7S1.PAS", "P7S1", "P7S1"]
-"P7MAIN.PAS" = ["P7MAIN.PAS", "P7Main", "P7Main"]
+"NEUR7.PAS" = ["NEUR7.PAS", "Neur7", "Neur7"]

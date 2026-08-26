@@ -1,8 +1,22 @@
 { ===========================================================================
-  Psycho Neurosis (Asphyxia, 1994) -- NEUROSIS.007, the main body.
+  Psycho Neurosis (Asphyxia, 1994) -- NEUROSIS.007, the program itself.
 
-  Segment 1000, offsets $00..$bb. Everything up to 1000:001d is Turbo Pascal's
-  unit initialisation chain; the program starts at 1000:001e.
+  THIS IS THE MAIN BODY, NOT A UNIT CALLED BY A HARNESS. Segment 1000, offsets
+  $00..$bb: everything up to 1000:001d is Turbo Pascal's unit initialisation
+  chain and the program starts at 1000:001e.
+
+  It replaces P7MAIN.PAS, which held the same code as a unit with a RunPart7
+  entry, plus TPART7.PAS, the generated harness that called it. Those two
+  segments have no counterpart in the original -- its main body IS the program
+  -- and their presence is why the runtime sat at a different paragraph and
+  every far call into it differed. That was 10 of part 007's 12 unaligned
+  bytes.
+
+  THE USES CLAUSE IS THE LINK ORDER, REVERSED. Turbo Pascal's link walk is a
+  reverse DFS post-order starting at the PROGRAM, so the last unit to finish
+  comes first in code. The original's segments are VGA (100b), P7S1 (100f),
+  Crt (1099) and DemoVT (10fb), so VGA has to finish last and DemoVT first.
+  Checked against build/NEUR7.MAP, not assumed.
 
   Part 007 is the last part of the demo, and it is the only one that tidies up
   after itself: after going back to text mode it issues INT 10h AH=1 with
@@ -21,30 +35,15 @@
     DS:$0066  the volume as we found it   DS:$0067  the fade's copy of it
   =========================================================================== }
 
-unit P7Main;
+program Neur7;
 
-interface
-
-procedure RunPart7;
-
-implementation
-
-{ THE HARNESS DECIDES THIS, NOT THIS CLAUSE. build/TPART7.MAP has ours as
-  P7S1, DemoVT, VGA, Crt where the original is VGA (100b), P7S1 (100f), Crt
-  (1099), DemoVT (10fb). Reordering here changes NOTHING -- the link walk is a
-  reverse DFS post-order starting at the PROGRAM, and TPART7.PAS names Crt,
-  VGA and DemoVT itself, which pins them before this unit is reached. Fixing
-  part 007's order means changing the harness's clause in tools/mktests.py, the
-  way part 002's was. Measured, not assumed: this clause was reversed and the
-  map came out identical. }
-uses Crt, DemoVT, P7S1, VGA;
+uses DemoVT, Crt, P7S1, VGA;
 
 var
   SavedVol : Byte;                { DS:$0066 }
   V        : Byte;                { DS:$0067 }
 
-{ 1000:001e -- and it ends in Halt(0), exactly as the main body does. }
-procedure RunPart7;
+{ 1000:001e -- and it ends in Halt(0), exactly as the original's does. }
 begin
   SetMode13h;                     { 1000:0021 -> 100b:0000 }
 
@@ -81,7 +80,4 @@ begin
   end;
 
   Halt(0);                        { 1000:009f }
-end;
-
-begin
 end.
