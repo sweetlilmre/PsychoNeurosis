@@ -41,11 +41,21 @@ type
   TCrtcTable = array[0..CrtcCount - 1] of Word;
 
 var
-  { DS:$A696, $A698, $A69A. }
-  PageBase : array[0..1] of Word;
-  WritePage : Word;
   { DS:$A69C -- SetMode400 fills this then hands it to SetMode. }
   Crtc : TCrtcTable;
+
+const
+  { INITIALISED, AND THAT PUTS THEM IN A DIFFERENT PLACE ENTIRELY. The original
+    has 0, $4B00, 0 at DS:$0CE6..$0CEB -- immediately ahead of PageIndex below
+    -- which is PageBase[0], PageBase[1] and WritePage with their compiled-in
+    values. Declared `var` they went to BSS instead and the addresses recorded
+    against them, $A696/$A698/$A69A, were OUR build's, not the original's.
+    Six bytes, and they were the last of part 002's data image that had a
+    cause: dgimage read 3,392 bytes against the original's 3,408 with the
+    first difference at $0CE6. All three are written at run time, which a
+    typed constant permits. }
+  PageBase  : array[0..1] of Word = (0, Page1Base);  { DS:$0CE6, $0CE8 }
+  WritePage : Word = 0;                              { DS:$0CEA }
 
 const
   { DS:$0CEC -- which of the two pages is being drawn into. Initialised data;
