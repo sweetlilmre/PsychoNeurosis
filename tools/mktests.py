@@ -180,9 +180,11 @@ PARTS = [
     ("TPART2", "P2Main", "RunPart2",
      "Crt, VGA, FixMath, P2View, DemoVT",
      "part 002 -- both scenes, through the driver at 1000:0032"),
-    ("TPART3", "P3Main", "RunPart3",
-     "DemoVT, Crt, VGA",
-     "part 003 -- all seven scenes, through the driver at 1000:0041"),
+    # PART 003 HAS NO HARNESS ANY MORE. src/NEUR3.PAS is the real program, and
+    # its segment now matches the original's 336 bytes exactly -- but the walk
+    # did not move, because our P3Tunnel is 144 bytes LARGER than the original's
+    # 2,608 and that moves the runtime just as a harness did. Part 003's 34
+    # far-call bytes are downstream of that, not of the harness.
     ("TPART5", "P5Main", "RunPart5",
      "DemoVT, Crt, VGA",
      "part 005 -- all three scenes, through the main body at 1000:002d"),

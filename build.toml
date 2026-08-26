@@ -139,7 +139,7 @@ list = [
   "PART3_BLOCKS.PAS",
   "PART3_WAVES.PAS",
   "PART3_SPRITES.PAS",
-  "P3MAIN.PAS",
+  "NEUR3.PAS",
   "PART4_LEMMINGS.PAS",
   "NEUR4.PAS",
   "P5S1.PAS",
@@ -209,7 +209,7 @@ alongside = ["*.BAT"]
 "PART3_BLOCKS.PAS" = ["P3BLOCKS.PAS", "Part3Blocks", "P3Blocks"]
 "PART3_WAVES.PAS" = ["P3WAVES.PAS", "Part3Waves", "P3Waves"]
 "PART3_SPRITES.PAS" = ["P3SPRITE.PAS", "Part3Sprites", "P3Sprite"]
-"P3MAIN.PAS" = ["P3MAIN.PAS", "P3Main", "P3Main"]
+"NEUR3.PAS" = ["NEUR3.PAS", "Neur3", "Neur3"]
 "PART4_LEMMINGS.PAS" = ["P4LEMS.PAS", "Part4Lemmings", "P4Lems"]
 "NEUR4.PAS" = ["NEUR4.PAS", "Neur4", "Neur4"]
 "P5S1.PAS" = ["P5S1.PAS", "P5S1", "P5S1"]
