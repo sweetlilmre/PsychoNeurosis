@@ -587,7 +587,12 @@ begin
   ClearScreen($A000, 0);
   BlockRead(F, Pal, SizeOf(Pal));
   SetPalette768(@Pal);
-  BlockRead(F, Mem[VirtScrSeg : 0], 64000);      { the title screen }
+  { THE POINTER VARIABLE, not a Mem subscript. 1005:017a is LES DI,[$CF88] /
+    PUSH ES / PUSH DI -- VGA's VirtScr loaded whole and pushed -- where
+    `Mem[VirtScrSeg : 0]` reads the SEGMENT word at $CF8C and builds a pointer
+    round it: MOV AX,[$CF8C] / PUSH AX / XOR DI,DI / POP ES / PUSH ES / PUSH DI.
+    Same address either way, six bytes more to say it. }
+  BlockRead(F, VirtScr^, 64000);                 { the title screen }
 
   ColumnSlideIn;                                 { 1005:0116 }
   Delay($514);                                   { 1300 }
@@ -595,7 +600,7 @@ begin
   for I := 1 to $40 do FadeStep;                 { 1005:0132 }
 
   ClearScreen($A000, 0);
-  BlockRead(F, Mem[VirtScrSeg : 0], 64000);      { the hillside }
+  BlockRead(F, VirtScr^, 64000);                 { the hillside }
   BlockRead(F, Pal, SizeOf(Pal));
   BlockRead(F, ScenePal, SizeOf(ScenePal));      { DS:$CC07 }
 
