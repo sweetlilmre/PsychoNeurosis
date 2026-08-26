@@ -76,7 +76,26 @@ var
 
 { [transcribed] Scene 1 loads a 768-byte palette then a 320x200 screen
   straight into the virtual screen -- NEUROSIS.DAT $000000, 64,768 bytes. }
-procedure LoadLogo;
+{ TWO PARAMETERS, NEITHER OF WHICH THE BODY READS, and ENTER $482 is what
+  found them. 1012:065a closes with RET 8, so eight bytes of arguments; the
+  caller at 1012:0696 pushes CS and $066B -- a code-segment string constant
+  reading 'asphyxia.cel' -- and then the two words of VirtScr. And 1012:05c8 is
+  the giveaway: LEA DI,[BP-$100] / LDS SI,[BP+8] / LODSB / STOSB / REP MOVSB,
+  which is Turbo Pascal copying a STRING VALUE PARAMETER into the frame. That
+  copy is 256 bytes of the 1,154, and nothing in the routine ever reads it.
+
+  THE FRAME THEN CLOSES EXACTLY: 256 for the string copy, 768 for the palette
+  at [BP-$400], two for the counter at [BP-$402], and 128 below that which
+  nothing touches -- a file record's worth, the ninth in this target. The
+  routine's real file is the global at DS:$563F.
+
+  AND THE PALETTE IS NOT UPLOADED WITH SetPalette768. 1012:060e walks 0..255
+  and calls the VGA unit's per-entry SetRGB three arguments at a time, reading
+  Pal FLAT as I*3, I*3+1 and I*3+2 -- the run-time additions are there in the
+  instructions (1012:0632 and 0645 are INC AX), so this one really is a flat
+  array where the other palettes in this target are two-dimensional. There is
+  no Seek either; the caller's Reset has already left the file at zero. }
+procedure LoadLogo(Name : String; Dest : Pointer);
 var
   { THE PALETTE IS A LOCAL, and it was VGA's global. 1012:05dd is
     LEA DI,[BP-$400] / PUSH SS / PUSH DI / PUSH $300 / BlockRead -- an
@@ -84,16 +103,15 @@ var
 
     That matters beyond this routine: VGA's `Palette` existed ONLY for this
     call, and the original's VGA has no such global -- every palette routine in
-    segment 1491 takes a pointer parameter (1491:01c6 and 1491:01f6 are both
-    LDS SI / LES DI off [BP+6]). Removing it took 768 bytes out of that unit's
-    DGROUP, which is what a data-reference map had been reporting as a +768
-    step between $AB58 and $ACEB. }
-  Pal : array[0..767] of Byte;          { [BP-$400] }
+    segment 1491 takes a pointer parameter. }
+  Pal    : array[0..767] of Byte;       { [BP-$400] }
+  I      : Integer;                     { [BP-$402] }
+  Unread : file;                        { [BP-$482], never opened }
 begin
-  Seek(F, 0);
-  BlockRead(F, Pal, SizeOf(Pal));       { 1012:05ea }
-  SetPalette768(@Pal);
-  BlockRead(F, Mem[VirtScrSeg : 0], 64000);   { 1012:0601 }
+  BlockRead(F, Pal, SizeOf(Pal));            { 1012:05dd }
+  BlockRead(F, VirtScr^, 64000);             { 1012:05f4 }
+  for I := 0 to 255 do                       { 1012:0606 }
+    SetRGB(I, Pal[I * 3], Pal[I * 3 + 1], Pal[I * 3 + 2]);
 end;
 
 { THE SAVE COMES FIRST AND THE BLIT SECOND, and the two were the other way
@@ -611,7 +629,9 @@ begin
   BuildLens;
   Assign(F, 'neurosis.dat');
   Reset(F, 1);
-  LoadLogo;                             { palette + 320x200 screen }
+  { BOTH ARGUMENTS ARE IGNORED INSIDE, and both are passed anyway --
+    1012:0696 pushes the string and 1012:069b the two words of VirtScr. }
+  LoadLogo('asphyxia.cel', VirtScr);    { 1012:06a3 }
   Close(F);
 
   { Two black vertical lines down the right edge -- the artwork evidently

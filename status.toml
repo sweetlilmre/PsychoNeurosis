@@ -846,6 +846,13 @@ seen_in = "TPART1"
 state = "resolved"
 resolution = "RESOLVED in the batch that found it. Part 001 90.9 -> 95.5% over the day, and EVERY PART IS NOW AT OR ABOVE 95%. What is left in 001 is 949 bytes, the largest spans being 1107:04f3 (109), 1012:060b (75) and two of 37."
 
+[[plan.investigation]]
+name = "part1-loadlogo"
+finding = "PART 001 95.5 -> 96.2%, AND LoadLogo TAKES TWO PARAMETERS NEITHER OF WHICH IT READS. ENTER $482 is 1,154 bytes against our $300, and RET 8 says eight bytes of arguments where ours had none. The caller at 1012:0696 pushes CS and $066B -- a code-segment string reading 'asphyxia.cel' -- and then the two words of VirtScr. 1012:05c8 IS THE GIVEAWAY AND IT IS ONE INSTRUCTION SEQUENCE: LEA DI,[BP-$100] / LDS SI,[BP+8] / LODSB / STOSB / REP MOVSB. That is Turbo Pascal copying a STRING VALUE PARAMETER into the frame, 256 bytes of the 1,154 -- and nothing in the routine ever reads the copy. A string value parameter is 256 bytes of frame whether or not it is used, so a frame that is 256 bytes too big with a REP MOVSB at the top is that and nothing else. THE FRAME THEN CLOSES EXACTLY: 256 for the string copy, 768 for the palette at [BP-$400], two for the counter at [BP-$402], and 128 below that which nothing touches -- the NINTH unopened file record in this target. AND THE PALETTE IS NOT UPLOADED WITH SetPalette768. 1012:060e walks 0..255 and calls SetRGB three arguments at a time, reading Pal FLAT as I*3, I*3+1 and I*3+2 -- and the run-time additions are there in the instructions (0632 and 0645 are INC AX), so this one really IS a flat array where every other palette in this target turned out two-dimensional. The fold argument cuts both ways and the instructions decide it. There is no Seek either: the caller's Reset has already left the file at zero. MEASURED: 96.2%, initialised image identical, three byte-exact artefacts holding, paslint clean, traps identical opcode for opcode."
+seen_in = "TPART1"
+state = "resolved"
+resolution = "RESOLVED in the batch that found it. Part 001 90.9 -> 96.2% over the day; it needs about 600 more bytes for 99% and has 812 unaligned. The largest span left ANYWHERE in the target is now 1107:04f3 at 109 bytes."
+
 [plan.row."001 $0284"]
 label = "the 2-byte typed constant holding $A640, still missing"
 investigation = "part1-layout"
@@ -872,8 +879,8 @@ investigation = "part1-asm-two"
 target = "R0"
 
 [plan.row."001 1012:05bd"]
-label = "a String-taking loader we have not written at all"
-investigation = "part1-frame-residue"
+label = "two ignored parameters, a string copy and a ninth dead file -- FIXED"
+investigation = "part1-loadlogo"
 target = "R0"
 
 [plan.row."001 1012:060b"]
@@ -952,8 +959,8 @@ investigation = "part1-p1s4-unlocated"
 target = "R0"
 
 [plan.row."001 1107:04f3"]
-label = "109 bytes, the largest left anywhere"
-investigation = "part1-mosaic"
+label = "109 bytes and now the largest span in the whole target"
+investigation = "part1-loadlogo"
 target = "R0"
 
 [plan.row."001 1107:0600"]
