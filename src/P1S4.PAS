@@ -157,9 +157,36 @@ const
   here. Net -7, which is exactly what an earlier pass measured and recorded
   without knowing where the 7 went.
 
-  The way to actually claim this 4 bytes is to make P1S1's and P1S2's own
-  records explicitly even-sized so that $A- is free for them, and only then
-  set it. Until that is done, 1107:044d stays. }
+  AND THAT ROUTE IS WRONG -- IT IS NOT P1S1'S OR P1S2'S RECORDS. Pinning A-plus
+  explicitly at the head of P1S1, P1S2 and P1S3 changed not one byte, so their
+  spans come from THIS unit's block shrinking and moving what follows.
+
+  WHAT A-MINUS ACTUALLY BUYS, measured: every address in this unit up to Blob
+  becomes exactly right. Work at $5BCC is 2,913 bytes -- Trail 146 x 13 plus
+  Outp 145 x 7 -- and 2,913 is ODD, so the original's Pal lands on the odd
+  $672D with no padding, then Row $6A2D, Rows $6A33, Font $7233, Angle $80F3,
+  Blob $80F5. Every one matches under A-minus and none under the default, and
+  dsmap's +2 group at $5BCE and +3 at $6A2F both vanish. The original was
+  compiled A-minus.
+
+  WHAT IT COSTS IS EXACTLY FOUR BYTES OF DGROUP. The map says it: DATA is
+  0AF62H with the switch off and 0AF5EH with it on. So four bytes of padding
+  have been standing in for four bytes of real data we have never declared,
+  somewhere in this unit after Work.
+
+  AND THE OBVIOUS THREE-WAY CHECK CANNOT BE MADE. Comparing our DGROUP size
+  against the original's needs the original's DATA start, which needs its
+  System segment size -- and that is the one thing known to DIFFER: the runtime
+  offset deltas of +104 say a different amount of runtime is linked. The
+  original's EXE header gives SS=13EF against our 1405, which is a code AND
+  data total and cannot be split without that same number.
+
+  So three ticks have established what A-minus fixes, what it costs to the
+  byte, and that the shortfall is real data rather than a trade-off -- and the
+  four bytes themselves are not findable by arithmetic from here. They need
+  either the original's own map, which does not exist, or a reference from its
+  code to a variable in that range that we do not declare. dsmap pairs nothing
+  between $5BCC and $AAC2, so that reference has not been found yet. }
 type
   { 13 bytes in the original: three 16.16 fixed values and a flag byte.
     Entry 0 is not a point -- it is the object's TRANSLATION vector, which is
