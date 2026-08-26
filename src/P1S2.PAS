@@ -140,7 +140,11 @@ begin
   BlockRead(F, Pal, 768);                         { 1082:004b -> DS:$56D2 }
   BlockRead(F, CometBank^, SizeOf(TCometBank));
   ClearScreen($A000, 0);
-  BlockRead(F, Mem[VirtScrSeg : 0], 64000);
+  { THROUGH THE POINTER, NOT THROUGH THE SEGMENT. 1082:0076 is
+    LES DI,[VirtScr] / PUSH ES / PUSH DI -- the far pointer loaded whole --
+    where Mem[VirtScrSeg : 0] pushes the segment word and a zero offset and is
+    a different instruction, not a different displacement. }
+  BlockRead(F, VirtScr^, 64000);                  { 1082:0076 }
 
   { Blank, show, then fade UP to the palette just loaded. Only after that
     does the red ramp go over entries 1..121.

@@ -712,7 +712,11 @@ begin
       FrameStep(0, Angle, Angle);           { 1107:06bc -- note the ZERO }
       ClearScreen(VirtScrSeg, 0);           { 1107:06c5 }
 
-      Inc(Angle, BannerStep);
+      { AN ASSIGNMENT, NOT Inc. 1107:06ca is MOV AX,[Angle] / ADD AX,$3C /
+        MOV [Angle],AX -- nine bytes through the accumulator -- where Inc emits
+        ADD WORD PTR [Angle],$3C, which is five. See the wiki's `Inc is not an
+        assignment`. }
+      Angle := Angle + BannerStep;               { 1107:06ca }
       if Angle > AngleWrap then Dec(Angle, AngleWrap);
 
       if KeyPressed then Exit;              { 1107:06e4 }
@@ -854,6 +858,22 @@ begin
   BlockRead(F, ProfileA, BlobPixels);
   BlockRead(F, ProfileB, BlobPixels);
   Close(F);
+
+  { A LOOP THAT DOES NOTHING, AND IT IS IN THE ORIGINAL. 1107:00b3 sets the
+    counter to 1 and 1107:010c compares it against $31, which is BlobPixels;
+    inside, 1107:00c6 tests ProfileA[I] against zero and 1107:00d5 and 00e1
+    read the SAME byte and write it straight back. Both halves address
+    [DI+$5B69], so it is ProfileA[I] := ProfileA[I], and the second half of the
+    body does the same to ProfileB.
+
+    Forty-nine iterations of two conditional self-assignments. It changes
+    nothing, it is eighty-three bytes of the original, and leaving it out was
+    the largest single hole left in this segment. }
+  for I := 1 to BlobPixels do                    { 1107:00b3 }
+  begin
+    if ProfileA[I] <> 0 then ProfileA[I] := ProfileA[I];   { 1107:00c6 }
+    if ProfileB[I] <> 0 then ProfileB[I] := ProfileB[I];   { 1107:00ed }
+  end;
 
   for I := 2 to TrailCount do
     Move(ProfileA, Blob[I].Pix, BlobPixels);

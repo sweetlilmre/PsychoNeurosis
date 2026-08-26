@@ -825,6 +825,12 @@ seen_in = "TPART1"
 state = "resolved"
 resolution = "RESOLVED FAR ENOUGH TO CLOSE: part 001's INITIALISED IMAGE IS NOW IDENTICAL -- 752 bytes against 752 with no differing byte -- BOTH maths blocks are at the original's addresses ($5B52 and $AAA6), dsmap pairs 155 references with 140 of them at +0 across 56 distinct offsets, and the walk went 90.9 -> 93.0%. It was 89 paired and 183 unpaired this morning. THREE CHANGES, AND THE THIRD IS THE ONE THAT PAID. P1S4's declaration order was rebuilt from the FOLDS rather than the comments. Outp is ONE-BASED: 1107:0268 folds it as IMUL DI,AX,7 then [DI+$632F], and $632F is seven BELOW the array -- a zero-based array folds to its own address and a one-based one to the address minus an element, so the base is $6336 either way and only the ELEMENT COUNT differs. Ours had an index 0 the original does not have, and every variable from the palette upwards sat seven bytes high. AND THE 2-BYTE TYPED CONSTANT AT DS:$0284 IS $A640 = 320 * 133 -- the screen width times the mirror row, which is the BYTE OFFSET OF THE HORIZON. Read as a DGROUP address it lands inside P1S5's own Scr array at no element boundary; read as arithmetic it is exact. Nothing in the part references it -- there is no absolute displacement of $0284 anywhere in the seven user segments -- so it is a typed constant the original declares and never reads, and it was worth 67 paired references and a whole percent of the walk. TWO GUESSES MEASURED WORSE AND WERE BACKED OUT, both of them the same mistake. Declaring an eighth unopened file record at $5A52 plus six words at $5BCC took the shift from +4 to +144 -- exactly the 140 added. Later, six words at $5BCC plus {$A-} took 93.0% to 92.2% and the shift to +12. THE BLOCK'S TOTAL WAS ALREADY RIGHT BOTH TIMES; adding declarations to explain gaps the ordering already accounts for is how a balanced total gets unbalanced, and the shift map says which of the two it is before you build. WHAT IS LEFT IS THREE SMALL SHIFTS: +3 at $6A2F..$80F3 (five sites -- Col, Idx and Angle, so three bytes appear between Row and Col, which two adjacent Integers cannot produce); +4 at $56CA..$56CC and -14 at $56CE..$56D0, which are P1S2's FontBuf and WorkBuf and are equal and opposite enough to be an ORDER defect between those two."
 
+[[plan.investigation]]
+name = "part1-code"
+finding = "PART 001 93.0 -> 93.4%, AND THE BIGGEST OF THE THREE WAS A LOOP THAT DOES NOTHING. 1107:00b3 sets a counter to 1 and 1107:010c compares it against $31, which is BlobPixels; inside, 1107:00c6 tests ProfileA[I] against zero and 1107:00d5 and 00e1 read the SAME byte and write it straight back -- both halves address [DI+$5B69]. So it is `if ProfileA[I] <> 0 then ProfileA[I] := ProfileA[I]`, and the second half of the body does the same to ProfileB. FORTY-NINE ITERATIONS OF TWO CONDITIONAL SELF-ASSIGNMENTS. It changes nothing and it is 83 bytes of the original, which was the largest single hole left in the segment. A reconstruction will never invent that; only reading the bytes finds it. TWO SMALLER ONES, both already-known shapes. 1107:06ca is MOV AX,[Angle] / ADD AX,$3C / MOV [Angle],AX where ours had Inc(Angle, BannerStep) -- nine bytes through the accumulator against five. And 1082:0076 is LES DI,[VirtScr] / PUSH ES / PUSH DI, so Title_Load reads the backdrop with BlockRead(F, VirtScr^, 64000) and not through Mem[VirtScrSeg : 0]; that is a different INSTRUCTION and not a different displacement, which is why it was worth changing whether or not the layout moved. MEASURED: 93.4%, the initialised image still identical, dsmap unchanged at 138 sites of 153 paired sitting at +0, three byte-exact artefacts holding, paslint clean, traps identical."
+seen_in = "TPART1"
+state = "open"
+
 [plan.row."001 $0284"]
 label = "the 2-byte typed constant holding $A640, still missing"
 investigation = "part1-layout"
@@ -851,8 +857,8 @@ investigation = "part1-frame-residue"
 target = "R0"
 
 [plan.row."001 1082:0076"]
-label = "Title_Load reads VirtScr^, not Mem[VirtScrSeg : 0]"
-investigation = "part1-layout"
+label = "BlockRead through VirtScr^, not Mem[VirtScrSeg:0] -- FIXED"
+investigation = "part1-code"
 target = "R0"
 
 [plan.row."001 1082:0128"]
@@ -900,9 +906,19 @@ label = "Load is 128 bytes of locals short -- likely a path buffer"
 investigation = "part1-p1s4-frames"
 target = "R0"
 
+[plan.row."001 1107:00b3"]
+label = "49 iterations of two conditional self-assignments -- FIXED"
+investigation = "part1-code"
+target = "R0"
+
 [plan.row."001 1107:03d7"]
 label = "no locals at all, so check whether it is assembler"
 investigation = "part1-p1s4-unlocated"
+target = "R0"
+
+[plan.row."001 1107:03ee"]
+label = "BuildBlobs/SortOutp still differ in how the pointer is passed"
+investigation = "part1-code"
 target = "R0"
 
 [plan.row."001 1107:0446"]
@@ -913,6 +929,11 @@ target = "R0"
 [plan.row."001 1107:0600"]
 label = "ours is SIX BYTES TOO BIG, the part's only surplus frame"
 investigation = "part1-p1s4-frames"
+target = "R0"
+
+[plan.row."001 1107:06ca"]
+label = "Angle := Angle + 60, not Inc -- FIXED"
+investigation = "part1-code"
 target = "R0"
 
 [plan.row."001 1107:07a2"]
