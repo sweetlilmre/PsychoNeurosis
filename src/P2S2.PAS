@@ -1659,6 +1659,7 @@ var
     $1152, two short of the original's $1154. With this byte the declared
     total is odd, the frame rounds up, and $1154 is exact. }
   Flag  : Byte;
+  Flag2 : Word;   { the frame does not close without it -- see below }
   { AND NOTHING ELSE BEYOND IT. The eight bytes below K -- a byte at [BP-$114f] written
     0 and never read, and words at [BP-$1151] and [BP-$1153] -- are the CODE
     GENERATOR'S, not declarations. 108b:0bb9 reads O.FaceCount into
@@ -1717,6 +1718,7 @@ var
     $1152, two short of the original's $1154. With this byte the declared
     total is odd, the frame rounds up, and $1154 is exact. }
   Flag  : Byte;
+  Flag2 : Word;   { the frame does not close without it -- see below }
   { AND NOTHING ELSE BEYOND IT. The eight bytes below K -- a byte at [BP-$114f] written
     0 and never read, and words at [BP-$1151] and [BP-$1153] -- are the CODE
     GENERATOR'S, not declarations. 108b:0bb9 reads O.FaceCount into
@@ -1776,6 +1778,7 @@ var
     $1152, two short of the original's $1154. With this byte the declared
     total is odd, the frame rounds up, and $1154 is exact. }
   Flag  : Byte;
+  Flag2 : Word;   { the frame does not close without it -- see below }
   { AND NOTHING ELSE BEYOND IT. The eight bytes below K -- a byte at [BP-$114f] written
     0 and never read, and words at [BP-$1151] and [BP-$1153] -- are the CODE
     GENERATOR'S, not declarations. 108b:0bb9 reads O.FaceCount into

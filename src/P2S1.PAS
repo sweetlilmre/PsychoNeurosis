@@ -316,18 +316,28 @@ end;
   -------------------------------------------------------------------------- }
 procedure PaletteBrightenStep;
 var
-  Col, K  : Integer;
+  { NO K, and the note above already said so: the three rounds are written out
+    longhand in the original, 1008:026c through 1008:02ba. With a `for K` loop
+    the frame came out ENTER $0A against the original's $08 -- Col and the three
+    channel bytes are five, rounded to six, plus two bytes of temporary. }
+  Col     : Integer;
   R, G, B : Byte;
+  { TWO MORE BYTES, declared and never read. Col plus the three channel bytes
+    are five, which rounds to six, and the original opens ENTER $08. }
+  Spare   : Integer;
 begin
   for Col := 0 to 255 do
   begin
     GetRGB(Col, R, G, B);
-    for K := 1 to 3 do
-    begin
-      if R < $3F then Inc(R);
-      if G < $3F then Inc(G);
-      if B < $3F then Inc(B);
-    end;
+    if R < $3F then Inc(R);                    { 1008:026c }
+    if G < $3F then Inc(G);
+    if B < $3F then Inc(B);
+    if R < $3F then Inc(R);
+    if G < $3F then Inc(G);
+    if B < $3F then Inc(B);
+    if R < $3F then Inc(R);
+    if G < $3F then Inc(G);
+    if B < $3F then Inc(B);                    { 1008:02ba }
     SetRGB(Col, R, G, B);
   end;
 end;
