@@ -645,8 +645,12 @@ procedure SortOutp(var Arr : TOutArr);
         `while P < Arr[I].D` emits the same bytes as this. So the 3 bytes at
         1107:02ea are not an operand-order difference, and the natural spelling
         stays. }
-      while Arr[I].D > P do Inc(I);
-      while Arr[J].D < P do Dec(J);
+      { LONGHAND, NOT Inc AND Dec. 1107:02eb is MOV AX,[BP-4] / DEC AX /
+        MOV [BP-4],AX -- loaded, changed in the register, stored back, seven
+        bytes -- where Dec emits a three-byte in-place DEC WORD PTR. Ghidra
+        put the boundary at 02e2 and the sequence is unambiguous. }
+      while Arr[I].D > P do I := I + 1;
+      while Arr[J].D < P do J := J - 1;
       if I <= J then
       begin
         if Arr[I].D <> Arr[J].D then
