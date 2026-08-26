@@ -17,9 +17,23 @@ timeout = 180
 lint    = "kit/tools/pascal/paslint.py"
 
 [compiler]
-default = "tp7"
+# TP 7.00, NOT 7.01, AND IT IS MEASURED. The two installs are told apart by
+# TURBO.TPL, which the Borland patch notes size at 48,432 for 7.00 and 48,464
+# for 7.01: C:\TP700 is the former and C:\TP the latter. Building against 7.00
+# makes the runtime's coprocessor block match the original byte for byte --
+# DS-relative $2FFA onward, where 7.01 inserts PUSH SP / POP DX / CMP DX,SP /
+# JNE, an 8086 check the 1994 binaries do not carry. Part 005 goes to 11,440 of
+# 11,440 with NO unaligned byte at all, part 001 to 21,257 and part 006 to
+# 10,124, and all three byte-identical artefacts still hold.
+#
+# The size identifies the VERSION and NOT the patch state -- an in-place patch
+# need not change it -- so "unpatched" is not claimed here. What is claimed is
+# 7.00 over 7.01, and that is what the bytes say.
+default = "tp700"
 
 [compiler.tp7]
+# 7.01. KEPT FOR COMPARISON, NOT FOR BUILDING: its runtime carries the 8086
+# check described above and its System block does not match the original's.
 binpath = "C:\\TP\\BIN"
 # /E<dir>  where the .EXE goes         /U<dirs> where to LOOK for units
 # /I<dirs> where {$I} includes live    /$S-     STACK CHECKING OFF
@@ -51,6 +65,19 @@ binpath = "C:\\TP\\BIN"
 # CODE publics only, not unit variables, so a data hunt works from segment
 # LENGTHS rather than symbol names.
 switches = "/ED: /UD:;C:\\TP\\UNITS /ID:;D:\\GEN /$S- /GD"
+
+[compiler.tp700]
+# TP 7.00 against C:\TP's 7.01, to settle which runtime build the 1994
+# binaries were linked against. Our System segment matches the original's to
+# 99.90% below $2F00 and then diverges in the coprocessor block, and one of the
+# six shifts runs BACKWARDS -- which smart-linking cannot do, so the runtime
+# itself differs. The two TURBO.TPL files differ by 32 bytes and our System by
+# a net 33, which is what makes this worth one build.
+#
+# Same dialect and switch line as tp7; only the unit path changes.
+dialect = "tp7"
+binpath = "C:\\TP700\\BIN"
+switches = "/ED: /UD:;C:\\TP700\\UNITS /ID:;D:\\GEN /$S- /GD"
 
 [compiler.tp6]
 # For SETTLING a compiler-version question, not for building the demo.
