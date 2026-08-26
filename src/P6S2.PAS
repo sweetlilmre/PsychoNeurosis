@@ -213,12 +213,21 @@ begin
         { 100f:02c9 pushes the X*Sin term and 100f:0307 SUBTRACTS it from the
           Y*Cos term -- that way round. Getting it backwards mirrors the mesh
           about the wrong axis. }
+        { THE TRIG TERM IS WRITTEN FIRST AND THE GRID LOOKUP SECOND, which is
+          the operand-order rule read off the parked register. Borland computes
+          the RIGHT operand first and parks it, so whichever term ends up in
+          CX:BX is the one written second. 100f:029d loads G[I,J] with a 2-D
+          subscript, CWDs the word to 32 bits, and 100f:02a2 is MOV CX,AX /
+          MOV BX,DX -- the GRID term parked. Written `G[I, J].Y * (CosT[A] -
+          Bias)` the compiler parks the trig subtraction instead and the two
+          halves come out in the other order, two bytes at each of eight sites.
+          Multiplication is commutative, so this is spelling, not arithmetic. }
         YTab^[A, I, J] :=                        { 100f:0331 }
-          (G[I, J].Y * (CosT[A] - Bias)) div Bias -
-          (G[I, J].X * (SinT[A] - Bias)) div Bias + 100;
+          ((CosT[A] - Bias) * G[I, J].Y) div Bias -
+          ((SinT[A] - Bias) * G[I, J].X) div Bias + 100;
         XTab^[A, I, J] :=                        { 100f:03d7 }
-          (G[I, J].Y * (SinT[A] - Bias)) div Bias +
-          (G[I, J].X * (CosT[A] - Bias)) div Bias + 160;
+          ((SinT[A] - Bias) * G[I, J].Y) div Bias +
+          ((CosT[A] - Bias) * G[I, J].X) div Bias + 160;
       end;
 end;
 
