@@ -343,6 +343,15 @@ var
   SX, SY, Y, X : Integer;
   S, Scale     : Real;
 begin
+  { THE COLUMN TERM COMES FIRST IN THE SOURCE, and the two DX loads are what
+    say so. 1012:0043 computes (Y + 20) * 40 into AX, moves it to DX, and only
+    then computes (X + 20) -- so the ROW term is evaluated first and parked.
+    Turbo Pascal evaluates the operands of `+` right to left when both need the
+    accumulator, so the term it evaluates FIRST is the one written SECOND: the
+    source is `(X + 20) + (Y + 20) * BounceW` and not the other way round. Ours
+    had the multiply on the left and put (X + 20) in DX instead, which is four
+    bytes different at each of the sixteen index and value expressions in this
+    routine. }
   FillChar(LensTab, SizeOf(LensTab), 0);   { 1012:0008, 3282 bytes }
   for Y := 0 to LensArc do
     for X := 0 to LensArc do
@@ -353,10 +362,10 @@ begin
           not route that through SX and SY. 1012:0043 reads [BP-6] and [BP-8]
           straight into the index arithmetic, so the identity case carries its
           own four stores rather than falling into a shared tail. }
-        LensTab[( Y + 20) * BounceW + ( X + 20)] := ( Y + 20) * BounceW + ( X + 20);
-        LensTab[(-Y + 20) * BounceW + (-X + 20)] := (-Y + 20) * BounceW + (-X + 20);
-        LensTab[(-Y + 20) * BounceW + ( X + 20)] := (-Y + 20) * BounceW + ( X + 20);
-        LensTab[( Y + 20) * BounceW + (-X + 20)] := ( Y + 20) * BounceW + (-X + 20);
+        LensTab[( X + 20) + ( Y + 20) * BounceW] := ( X + 20) + ( Y + 20) * BounceW;
+        LensTab[(-X + 20) + (-Y + 20) * BounceW] := (-X + 20) + (-Y + 20) * BounceW;
+        LensTab[( X + 20) + (-Y + 20) * BounceW] := ( X + 20) + (-Y + 20) * BounceW;
+        LensTab[(-X + 20) + ( Y + 20) * BounceW] := (-X + 20) + ( Y + 20) * BounceW;
       end
       else
       begin
@@ -367,10 +376,10 @@ begin
         Scale := LensR / (LensR + S);
         SX    := Round(Scale * X);
         SY    := Round(Scale * Y);
-        LensTab[( Y + 20) * BounceW + ( X + 20)] := ( SY + 20) * BounceW + ( SX + 20);
-        LensTab[(-Y + 20) * BounceW + (-X + 20)] := (-SY + 20) * BounceW + (-SX + 20);
-        LensTab[(-Y + 20) * BounceW + ( X + 20)] := (-SY + 20) * BounceW + ( SX + 20);
-        LensTab[( Y + 20) * BounceW + (-X + 20)] := ( SY + 20) * BounceW + (-SX + 20);
+        LensTab[( X + 20) + ( Y + 20) * BounceW] := ( SX + 20) + ( SY + 20) * BounceW;
+        LensTab[(-X + 20) + (-Y + 20) * BounceW] := (-SX + 20) + (-SY + 20) * BounceW;
+        LensTab[( X + 20) + (-Y + 20) * BounceW] := ( SX + 20) + (-SY + 20) * BounceW;
+        LensTab[(-X + 20) + ( Y + 20) * BounceW] := (-SX + 20) + ( SY + 20) * BounceW;
       end;
     end;
 end;

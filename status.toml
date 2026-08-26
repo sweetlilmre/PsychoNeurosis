@@ -853,6 +853,13 @@ seen_in = "TPART1"
 state = "resolved"
 resolution = "RESOLVED in the batch that found it. Part 001 90.9 -> 96.2% over the day; it needs about 600 more bytes for 99% and has 812 unaligned. The largest span left ANYWHERE in the target is now 1107:04f3 at 109 bytes."
 
+[[plan.investigation]]
+name = "part1-operand-order"
+finding = "PART 001 96.2 -> 96.9% ON ONE TEXTUAL CHANGE, AND THE RULE BEHIND IT INVERTS THE INTUITION. Turbo Pascal evaluates the two operands of a binary operator RIGHT TO LEFT when both need the accumulator: it computes one, parks it in DX, computes the other into AX and adds. THE ONE IT PARKS IS THE OPERAND WRITTEN SECOND. 1012:0043 puts (Y + 20) * 40 into DX, so the row term is written SECOND and the source is `(X + 20) + (Y + 20) * BounceW` -- which is not how anyone writes a row-major subscript, and is what the bytes say. Ours had the multiply on the left, which is the natural way round and four bytes different at every one of the SIXTEEN index and value expressions in BuildLens: four quadrants of the lens table, index and value each, in both branches. Five separate fifteen-byte spans in the walk, one per quadrant plus the identity case. Rewriting all sixteen closed 163 bytes in one build. IT ONLY BITES ON compound + compound. A simple right operand -- a memory load or a constant -- is added in place with no reordering, so there is nothing to read; and a left-associating chain folds the trailing terms away, leaving only the first `+` to reorder. That is why subscripts and address arithmetic are where this lives. AND IT IS NOT THE ONLY CAUSE OF A REGISTER DIFFERENCE, which is the trap: a flat array where the original's is two-dimensional builds its index differently AND in a different register, and that is a TYPE difference. Check the addressing as well as the register -- a folded displacement against a run-time addition settles it. In the wiki as `The operand it evaluates first is the one written second`."
+seen_in = "TPART1"
+state = "resolved"
+resolution = "RESOLVED in the batch that found it: part 001 96.9%, up from 90.9% at the start of the day. It needs about 450 more bytes for 99% and has 649 unaligned. WORTH CHECKING THE SAME RULE ELSEWHERE: part 005's 1096:0331 MUL/IMUL puzzle and part 006's 100f:0543 were both filed as register-allocation mysteries, and one of those two has already turned out to be a type difference rather than the compiler's freedom."
+
 [plan.row."001 $0284"]
 label = "the 2-byte typed constant holding $A640, still missing"
 investigation = "part1-layout"
@@ -867,6 +874,11 @@ target = "R0"
 label = "BuildLens quadrant walk"
 investigation = "pacing"
 note = "BuildLens (1012:0004, ENTER $1C) was the coverage walk's largest span in part 001 -- the whole 696-byte routine unaligned while routines.py had nothing to say, because nobody had declared it. The frame size read the source's var block and three corrections fell out of it, none visible in the statements: the original WALKS ONE QUADRANT AND MIRRORS, X and Y each 0..20 with four sign-paired stores per iteration and a separate set of four in each branch (the identity branch indexes from X and Y directly at 1012:0043, never through SX/SY); it holds no D2, recomputing X*X+Y*Y at 1012:0116; it names its Sqrt intermediate, so two Real locals; and the lens radius is a typed constant of type WORD read from DS:$0002, not an untyped const -- 1012:012e is MOV AX,[$0002] / MUL WORD PTR [$0002] where a fold would have emitted MOV AX,1600, and 1012:0135/015e widen it with XOR DX,DX, unsigned, which is what forces the two LongInt conversion slots the ENTER counts. The table is therefore 1641 words, not 1600: mirroring reaches index (20+20)*40+(20+20) = 1640, the unit init clears 3282 bytes at 1012:0008, and in the shipped binary Cell at DS:$4FD6 begins exactly $0CD2 after LensTab at DS:$4304. No overrun and no deviation -- the size was measured for. After the fix the routine aligns in full and part 001's coverage walk moved 66.6% -> 68.4%; routines.py unchanged at 74 locked, 0 failing. Generalised as the wiki observation `The frame is bigger than your locals account for`. Init-time only, so this is alignment rather than a per-frame pacing gain: 441 square roots where the reconstruction did 1600."
+
+[plan.row."001 1012:0043"]
+label = "sixteen expressions with the terms the natural way round -- FIXED"
+investigation = "part1-operand-order"
+target = "R0"
 
 [plan.row."001 1012:02bc"]
 label = "the save and the blit were the wrong way round -- FIXED"
