@@ -33,7 +33,7 @@ const
     75, -590, 290, 75, -735, 290
   );
   { 64 faces the loader reads, 376 words in DGROUP -- DS:$0816 }
-  FaceRevolver : array[1..376] of Integer = (
+  FaceRevolver : array[0..375] of Integer = (
     4, 10, 6, 2, 12, 20, 4, 4, 13, 11, 8, 23,
     4, 4, 5, 14, 13, 24, 4, 5, 3, 15, 14, 23,
     4, 3, 9, 16, 15, 21, 4, 1, 17, 16, 9, 20,
@@ -85,7 +85,7 @@ const
     300, 65, 105, 390, 15, 0
   );
   { 21 faces the loader reads, 116 words in DGROUP -- DS:$0BC6 }
-  FaceSailboat : array[1..116] of Integer = (
+  FaceSailboat : array[0..115] of Integer = (
     4, 19, 20, 17, 18, 26, 4, 20, 22, 23, 17, 15,
     4, 22, 21, 24, 23, 20, 4, 21, 19, 18, 24, 22,
     4, 30, 19, 28, 31, 15, 4, 28, 19, 30, 31, 15,
@@ -106,6 +106,6 @@ const
     -100, 100, 0
   );
   { 1 faces the loader reads, 6 words in DGROUP -- DS:$0CC6 }
-  FaceQuad : array[1..6] of Integer = (
+  FaceQuad : array[0..5] of Integer = (
     4, 1, 2, 3, 4, 32
   );

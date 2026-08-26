@@ -48,7 +48,7 @@ const
     50, -25, -100, 80, -25, -100, 80, -25, 0
   );
   { 55 faces the loader reads, 338 words in DGROUP -- DS:$01C6 }
-  FaceEnterprise : array[1..338] of Integer = (
+  FaceEnterprise : array[0..337] of Integer = (
     4, 62, 66, 63, 59, 112, 4, 70, 74, 71, 67, 112,
     4, 66, 65, 64, 63, 112, 4, 73, 72, 71, 74, 112,
     4, 67, 68, 69, 70, 112, 4, 52, 48, 47, 51, 112,

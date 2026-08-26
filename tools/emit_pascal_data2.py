@@ -211,7 +211,15 @@ def emit_p002():
         p = nw
         out.append(f"  {{ {nf} faces the loader reads, {nw} words in DGROUP"
                    f" -- DS:${foff:04X} }}")
-        out.append(fmt(f"Face{name}", f"array[1..{p}] of Integer", faces, 12))
+        # ZERO-BASED, LIKE THE VERTEX ARRAYS ABOVE, and Scene2_Setup's counter
+        # says so: 108b:1d9c is XOR AX,AX / MOV [BP-$06],AX -- the walk index
+        # starts at 0 -- and every read of it is a bare MOV DI,[BP-$06] with no
+        # arithmetic. Emitted as array[1..n] the only way to read the same
+        # element was Face...[P + 1], which cost MOV AX / INC AX / MOV DI,AX at
+        # twelve sites, and starting the counter at 1 instead traded those for a
+        # MOV [BP-$06],1 where the original has the shorter XOR pair. Four
+        # objects, three bytes each.
+        out.append(fmt(f"Face{name}", f"array[0..{p - 1}] of Integer", faces, 12))
         total += len(verts) + len(faces)
         if name == P2_OBJECTS[0][0]:
             first, out = out, ["const"]     # split after the first model

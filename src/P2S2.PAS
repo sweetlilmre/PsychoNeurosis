@@ -65,6 +65,16 @@ procedure Scene2;
 
 implementation
 
+{ THE SetRGB CALLS IN Demo_Scene2 ARE QUALIFIED VGA.SetRGB, AND THEY HAVE TO BE.
+  Both VGA and P2View export a SetRGB, and an unqualified call gets whichever
+  unit is named LAST -- P2View here -- so ours resolved all of them to
+  140c:01af. The original calls 1436:0048, VGA's, at every one.
+  Naming VGA last instead does resolve SetRGB correctly and then breaks
+  FillRect, which both units also export with different signatures: TP7 rejected
+  FillRect(0, 0, ScrWidth, Rows, Page0Base, 0) as Error 76, and the original's
+  own FillRect calls are LCALL 040c:011e -- P2View's. So the two names had to be
+  resolved to different units in the same routine, which only qualification
+  does. The clause below is unchanged. }
 uses Crt, VGA, FixMath, P2View, DemoVT;
 
 {$I gen/P2OBJ.INC}
@@ -2041,6 +2051,22 @@ begin
   FillRect(0, BannerTop, ScrWidth, Rows, WritePage, 0);
   WritePage := PageBase[1];
   FillRect(0, BannerTop, ScrWidth, Rows, WritePage, 0);
+  { THE LAST FIVE LOOPS NEITHER COUNT FRAMES NOR PRESENT, and the original
+    is explicit about both. Ours carried Frame := Frame + 1 in all eleven
+    loops; the 1994 segment has the LongInt increment -- MOV AX,[..] /
+    MOV DX,[..] / ADD AX,1 / ADC DX,0 and two stores, about twenty bytes -- in
+    the first six only. And it calls Present six times in this routine where
+    ours called it eleven: 108b:175e is our CALL $0F66 and the original goes
+    straight from RenderB to the loop test. Together those were the routine's
+    whole 121-byte excess, and the two inverted loop conditions went with them,
+    because a shorter body brings a short JNE back in range where ours needed
+    JE plus JMP.
+
+    SO THESE 81 FRAMES ARE DRAWN AND NEVER FLIPPED, and Frame stops advancing
+    across them. That is a real behaviour difference and it is the original's,
+    not ours -- five loops written from a template that had neither line. It
+    has not been watched yet, and a watched run is the only thing that can say
+    whether the 1994 demo really looks like that. }
 
   for I := 1 to 12 do
   begin
@@ -2050,8 +2076,6 @@ begin
     FillRect(0, 0, ScrWidth, 200, WritePage, 0);
     ObjSortFaces(Obj[1]);
     RenderB(Obj[1]);
-    Frame := Frame + 1;
-    Present;
   end;
   SyncPattern(4, 1);
   for I := 1 to 12 do
@@ -2063,8 +2087,6 @@ begin
     FillRect(0, 0, ScrWidth, 200, WritePage, 0);
     ObjSortFaces(Obj[1]);
     RenderB(Obj[1]);
-    Frame := Frame + 1;
-    Present;
   end;
   for I := 1 to 12 do
   begin
@@ -2075,8 +2097,6 @@ begin
     FillRect(0, 0, ScrWidth, 200, WritePage, 0);
     ObjSortFaces(Obj[1]);
     RenderB(Obj[1]);
-    Frame := Frame + 1;
-    Present;
   end;
   for I := 1 to  5 do
   begin
@@ -2086,8 +2106,6 @@ begin
     FillRect(0, 0, ScrWidth, 200, WritePage, 0);
     ObjSortFaces(Obj[1]);
     RenderB(Obj[1]);
-    Frame := Frame + 1;
-    Present;
   end;
   for I := 1 to 45 do
   begin
@@ -2097,8 +2115,6 @@ begin
     FillRect(0, 0, ScrWidth, 200, WritePage, 0);
     ObjSortFaces(Obj[1]);
     RenderB(Obj[1]);
-    Frame := Frame + 1;
-    Present;
   end;
 
   { 108b:1941 }
@@ -2296,17 +2312,26 @@ begin
     Obj[1].Vert[I].Y := IntToFixed(VertEnterprise[(I - 1) * 3 + 1] div 2);
     Obj[1].Vert[I].Z := IntToFixed(VertEnterprise[(I - 1) * 3 + 1 + 1] div 2);
   end;
+  { P STARTS AT 0 AND THE SUBSCRIPT IS BARE, WHICH MEANS THE Face ARRAYS ARE
+    ZERO-BASED -- see the note in tools/emit_pascal_data2.py, which now emits
+    them that way. Written P := 0 with Face...[P + 1] the twelve reads each came
+    out MOV AX,[BP-$06] / INC AX / MOV DI,AX where the original has one bare
+    MOV DI,[BP-$06]: thirty-six bytes. Starting the counter at 1 against a
+    one-based array reads the same elements and closed those, but then this line
+    became MOV [BP-$06],1 where 108b:1d9c has XOR AX,AX / MOV [BP-$06],AX --
+    three bytes, four times over. Zero-based array and a zero-based counter is
+    the arrangement that costs nothing anywhere. }
   P := 0;
   for I := 1 to Obj[1].FaceCount do
   begin
-    Obj[1].Face[I].Count := FaceEnterprise[P + 1];
+    Obj[1].Face[I].Count := FaceEnterprise[P];
     for K := 1 to Obj[1].Face[I].Count do
     begin
       Inc(P);
-      Obj[1].Face[I].Idx[K] := FaceEnterprise[P + 1] + 1;
+      Obj[1].Face[I].Idx[K] := FaceEnterprise[P] + 1;
     end;
     Inc(P);
-    Obj[1].Face[I].Colour := FaceEnterprise[P + 1] div 2;
+    Obj[1].Face[I].Colour := FaceEnterprise[P] div 2;
     Obj[1].Face[I].Spare1 := 0;
     Obj[1].Face[I].Spare2 := 0;
     Inc(P);
@@ -2337,14 +2362,14 @@ begin
   P := 0;
   for I := 1 to Obj[2].FaceCount do
   begin
-    Obj[2].Face[I].Count := FaceRevolver[P + 1];
+    Obj[2].Face[I].Count := FaceRevolver[P];
     for K := 1 to Obj[2].Face[I].Count do
     begin
       Inc(P);
-      Obj[2].Face[I].Idx[K] := FaceRevolver[P + 1];
+      Obj[2].Face[I].Idx[K] := FaceRevolver[P];
     end;
     Inc(P);
-    Obj[2].Face[I].Colour := FaceRevolver[P + 1];
+    Obj[2].Face[I].Colour := FaceRevolver[P];
     Obj[2].Face[I].Spare1 := 0;
     Obj[2].Face[I].Spare2 := 0;
     Inc(P);
@@ -2375,14 +2400,14 @@ begin
   P := 0;
   for I := 1 to Obj[3].FaceCount do
   begin
-    Obj[3].Face[I].Count := FaceSailboat[P + 1];
+    Obj[3].Face[I].Count := FaceSailboat[P];
     for K := 1 to Obj[3].Face[I].Count do
     begin
       Inc(P);
-      Obj[3].Face[I].Idx[K] := FaceSailboat[P + 1];
+      Obj[3].Face[I].Idx[K] := FaceSailboat[P];
     end;
     Inc(P);
-    Obj[3].Face[I].Colour := FaceSailboat[P + 1];
+    Obj[3].Face[I].Colour := FaceSailboat[P];
     Obj[3].Face[I].Spare1 := 0;
     Obj[3].Face[I].Spare2 := 0;
     Inc(P);
@@ -2413,14 +2438,14 @@ begin
   P := 0;
   for I := 1 to Obj[4].FaceCount do
   begin
-    Obj[4].Face[I].Count := FaceQuad[P + 1];
+    Obj[4].Face[I].Count := FaceQuad[P];
     for K := 1 to Obj[4].Face[I].Count do
     begin
       Inc(P);
-      Obj[4].Face[I].Idx[K] := FaceQuad[P + 1];
+      Obj[4].Face[I].Idx[K] := FaceQuad[P];
     end;
     Inc(P);
-    Obj[4].Face[I].Colour := FaceQuad[P + 1];
+    Obj[4].Face[I].Colour := FaceQuad[P];
     Obj[4].Face[I].Spare1 := 0;
     Obj[4].Face[I].Spare2 := 0;
     Inc(P);
@@ -2485,12 +2510,12 @@ begin
   Close(DatFile);
 
   { 108b:2513 -- six fixed colours before the choreography }
-  SetRGB(1, $3F, $3F, $3F);
-  SetRGB(2, $1B, $1B, $1B);
-  SetRGB(3, $27, $27, $27);
-  SetRGB(4, $03, $33, $03);
-  SetRGB(5, $0F, $27, $0F);
-  SetRGB(6, $16, $16, $16);
+  VGA.SetRGB(1, $3F, $3F, $3F);
+  VGA.SetRGB(2, $1B, $1B, $1B);
+  VGA.SetRGB(3, $27, $27, $27);
+  VGA.SetRGB(4, $03, $33, $03);
+  VGA.SetRGB(5, $0F, $27, $0F);
+  VGA.SetRGB(6, $16, $16, $16);
 
   Choreography;                        { 108b:2561 }
 
