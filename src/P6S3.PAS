@@ -309,7 +309,27 @@ begin
     SetRGB(Flick1, Random($40), 0, 0);           { 1118:051f }
     SetRGB(Flick2, Random($40), 0, 0);           { 1118:0532 }
     SetRGB(Flick3, Random($40), 0, 0);           { 1118:0545 }
-    V := (Round(X / 20.0) div 2) * $3C;          { 1118:054b }
+    { `mod`, NOT `div`, AND THE RUNTIME HELPER'S TAIL PROVES IT. Turbo Pascal
+      uses ONE routine for both operators -- RTL $3633 in this part -- and it
+      returns the QUOTIENT in DX:AX and the REMAINDER in CX:BX:
+
+          mov  ecx, edx          ; ECX := the remainder
+          shld edx, eax, 0x10    ; quotient  -> DX:AX
+          shld ebx, ecx, 0x10    ; remainder -> CX:BX
+
+      1118:0563 is MOV AX,CX / MOV DX,BX immediately after the call, so the
+      original takes the REMAINDER. Ours went straight on with DX:AX and took
+      the quotient. Two bytes at each of four sites, and which operator it is
+      cannot be read from the call alone -- only from what happens to CX:BX
+      afterwards.
+
+      THE VALUE RANGE AGREES, which is the second reading. V is the red channel
+      of SetRGB, valid 0..63. X runs $140 down to $BE, so Round(X / 20.0) is 16
+      down to 10; `div 2` gives 8..5 and times $3C is 300..480, far outside the
+      DAC and truncated to nonsense by the Byte parameter. `mod 2` gives 0 or 1,
+      so V is 0 or 60 -- a clean two-step flicker on the tracker colour, which
+      is what the surrounding SetRGB calls are doing. }
+    V := (Round(X / 20.0) mod 2) * $3C;          { 1118:054b }
     SetRGB(Track, V, 0, 0);                      { 1118:057e }
     Delay(10);                                   { 1118:0585 }
   end;
@@ -325,7 +345,7 @@ begin
     SetRGB(Flick1, Random($40), 0, 0);
     SetRGB(Flick2, Random($40), 0, 0);
     SetRGB(Flick3, Random($40), 0, 0);
-    V := (Round(X / 20.0) div 2) * $3C;
+    V := (Round(X / 20.0) mod 2) * $3C;
     SetRGB(Track, V, 0, 0);
     Delay(10);
     SparkHalf;                         { 1118:0670 }
@@ -342,7 +362,7 @@ begin
     SetRGB(Flick1, 0, 0, Random($40));           { 1118:06ee }
     SetRGB(Flick2, 0, 0, Random($40));
     SetRGB(Flick3, 0, 0, Random($40));
-    V := (Round(X / 40.0) div 2) * $3C;          { 1118:071a }
+    V := (Round(X / 40.0) mod 2) * $3C;          { 1118:071a }
     SetRGB(Track, V, 0, 0);
     Delay(5);                                    { 1118:0754 }
     SparkSlow;                         { 1118:0759 }
@@ -359,7 +379,7 @@ begin
     SetRGB(Flick1, 0, 0, Random($40));
     SetRGB(Flick2, 0, 0, Random($40));
     SetRGB(Flick3, 0, 0, Random($40));
-    V := (Round(X / 40.0) div 2) * $3C;
+    V := (Round(X / 40.0) mod 2) * $3C;
     SetRGB(Track, V, 0, 0);
     SparkSlow;                         { 1118:083b }
   end;

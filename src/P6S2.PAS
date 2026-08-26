@@ -326,7 +326,7 @@ var
     Src at [BP-$13] and Dst at [BP-$15] leave $05..$0F -- eleven bytes -- with
     nothing to put in them. Pix at an ODD offset is the tell: a word does not
     land there unless an odd number of bytes was declared before it. }
-  Unread         : array[1..11] of Byte;   { [BP-$05]..[BP-$0F], never read }
+  Unread         : array[1..10] of Byte;   { [BP-$05]..[BP-$0E], never read }
   Pix            : Word;   { [BP-$11] }
   Src            : Word;   { [BP-$13] }
   Dst            : Word;   { [BP-$15] }
