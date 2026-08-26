@@ -901,6 +901,13 @@ seen_in = "TPART1"
 state = "resolved"
 resolution = "RESOLVED: part 001 98.9%, from 90.9% at the start of the day -- EIGHT POINTS. 231 unaligned bytes and 99% needs 212, so TWENTY BYTES SHORT. The only two spans left are 1012:05a8 (19) and 1107:03dc (17), and either one closes it: the first is the frame-counter question above, the second is that BuildBlobs passes its array pointer with LES DI,[BP+4] / PUSH ES / PUSH DI where ours pushes two words -- which is what `var Arr : TOutArr` and SortOutp(Arr^) would give instead of a pointer parameter."
 
+[[plan.investigation]]
+name = "part1-var-param"
+finding = "PART 001 MEETS THE BAR AT 99.0%, from 90.9% at the start of the day -- EIGHT AND A TENTH POINTS -- and the last change was two instructions' worth of reading. SortOutp TAKES A `var` PARAMETER, NOT A POINTER, and the CALLER decides it. 1107:03eb is LES DI,[BP+4] / PUSH ES / PUSH DI -- the pointer loaded into a register pair and pushed from there, five bytes -- where passing a pointer-typed VALUE emits PUSH [BP+6] / PUSH [BP+4], six. The register-pair form is what Turbo Pascal uses for a VAR parameter's address, so the callee takes `var Arr : TOutArr` and the caller writes SortOutp(Arr^). THAT IS A GENERAL TELL AND IT IS CHEAP: how a pointer argument is PUSHED says whether the callee's parameter is a pointer or a var. Two pushes off the frame is a pointer value; LES into a register pair and pushing that is a var parameter's address. One instruction, and it settles a signature. NINE OF THE TEN PARTS NOW MEET 99% OR BETTER: 000, 009 and psycho at 100%, 002 at 99.9%, 006 at 99.3%, 003 at 99.1%, and 001, 004 and 007 at 99.0%. Only part 005 is below, at 98.8%, and it needs about 23 bytes."
+seen_in = "TPART1"
+state = "resolved"
+resolution = "RESOLVED, AND PART 001 MEETS THE BAR AT 99.0%. One span of 19 bytes remains, which is the frame-counter question recorded on P1S1's Frame declaration -- three attempts, all costing 0.6%, and the reason is that an unreferenced unit-level variable is smart-linked away so a spare global cannot hold the space. Part 005 at 98.8% is now the only part below the bar."
+
 [plan.row."001 $0284"]
 label = "the 2-byte typed constant holding $A640, still missing"
 investigation = "part1-layout"
@@ -1024,6 +1031,11 @@ target = "R0"
 [plan.row."001 1107:03dc"]
 label = "OPEN: BuildBlobs passes its pointer with LES, not two pushes"
 investigation = "part1-inline-sprites"
+target = "R0"
+
+[plan.row."001 1107:03eb"]
+label = "how a pointer is PUSHED says pointer-value or var-parameter -- FIXED"
+investigation = "part1-var-param"
 target = "R0"
 
 [plan.row."001 1107:03ee"]

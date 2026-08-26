@@ -453,7 +453,13 @@ end;
   in index order and the depth cueing was wrong wherever the field folded over
   itself. The records are swapped whole -- three 7-byte Moves via a temporary.
   -------------------------------------------------------------------------- }
-procedure SortOutp(Arr : POutArr);
+{ A `var` PARAMETER, NOT A POINTER, and the CALLER's two instructions decide it.
+  1107:03eb is LES DI,[BP+4] / PUSH ES / PUSH DI -- the pointer loaded into a
+  register pair and pushed from there, five bytes -- where passing a
+  pointer-typed value emits PUSH [BP+6] / PUSH [BP+4], six. The register-pair
+  form is what Turbo Pascal uses for a VAR parameter's address, so the callee
+  takes `var Arr : TOutArr` and the caller writes SortOutp(Arr^). }
+procedure SortOutp(var Arr : TOutArr);
 { 1107:03d7 -- A WRAPPER, and DepthSort is NESTED INSIDE IT. Four bytes of
   parameters and no locals: PUSH 1 / PUSH $90 / PUSH BP / CALL 0x287, and that
   PUSH BP is the STATIC LINK. So the sort reaches the array through this
@@ -469,15 +475,15 @@ procedure SortOutp(Arr : POutArr);
     T    : TOut;
   begin
     I := Lo;  J := Hi;
-    P := Arr^[(Lo + Hi) div 2].D;
+    P := Arr[(Lo + Hi) div 2].D;
     repeat
-      while Arr^[I].D > P do Inc(I);
-      while Arr^[J].D < P do Dec(J);
+      while Arr[I].D > P do Inc(I);
+      while Arr[J].D < P do Dec(J);
       if I <= J then
       begin
-        if Arr^[I].D <> Arr^[J].D then
+        if Arr[I].D <> Arr[J].D then
         begin
-          T := Arr^[I];  Arr^[I] := Arr^[J];  Arr^[J] := T;
+          T := Arr[I];  Arr[I] := Arr[J];  Arr[J] := T;
         end;
         Inc(I);  Dec(J);
       end;
@@ -506,7 +512,7 @@ var
   { ENTER 2, so one Integer -- 1107:03f3 is MOV WORD PTR [BP-2],1. }
   I : Integer;
 begin
-  SortOutp(Arr);                            { 1107:03f0, the SAME pointer }
+  SortOutp(Arr^);                           { 1107:03eb, LES DI / PUSH ES / PUSH DI }
   for I := 1 to LastEntry do
     if Arr^[I].Flag <> 0 then               { 1107:0406 }
       Move(ProfileB, Blob[I].Pix, BlobPixels)
