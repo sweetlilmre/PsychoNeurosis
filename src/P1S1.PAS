@@ -27,6 +27,20 @@ const
   BounceW     = 40;        { 1012:0311 blits 40 rows of 40 bytes }
   BounceH     = 40;
 
+const
+  LensK   = 1.0;       { CS:$0000, added as a single: 1012:014b FADD CS:[0] }
+  LensCut = 300;       { the disc: X*X + Y*Y <= 300 -- 1012:003b CMP AX,$12C }
+  LensOfs = 400;       { the 20*20 term inside the square root }
+  LensArc = 20;        { one quadrant: 1012:02a8 CMP WORD PTR [BP-8],$14 }
+
+const
+  { WORD, not Integer, and the frame size is what proves it. 1012:0135 widens
+    the product with `XOR DX,DX` -- unsigned -- and 1012:015e widens the bare
+    LensR the same way into a LongInt temporary before `FILD DWORD`. An
+    Integer would go to the x87 through `FILD WORD` with no temporary at all,
+    and the frame would be ENTER $18 rather than the ENTER $1C at 1012:0004. }
+  LensR : Word = 40;      { DS:$0002 -- read, never folded; see above }
+
 type
   { THE ROW IS 1641 BYTES, NOT 1600, and it is the same index range as the
     lens table -- which is the point: LensTab[I] is used as a subscript into a
@@ -81,75 +95,148 @@ var
 
 { [transcribed] Scene 1 loads a 768-byte palette then a 320x200 screen
   straight into the virtual screen -- NEUROSIS.DAT $000000, 64,768 bytes. }
-{ TWO PARAMETERS, NEITHER OF WHICH THE BODY READS, and ENTER $482 is what
-  found them. 1012:065a closes with RET 8, so eight bytes of arguments; the
-  caller at 1012:0696 pushes CS and $066B -- a code-segment string constant
-  reading 'asphyxia.cel' -- and then the two words of VirtScr. And 1012:05c8 is
-  the giveaway: LEA DI,[BP-$100] / LDS SI,[BP+8] / LODSB / STOSB / REP MOVSB,
-  which is Turbo Pascal copying a STRING VALUE PARAMETER into the frame. That
-  copy is 256 bytes of the 1,154, and nothing in the routine ever reads it.
+{ --------------------------------------------------------------------------
+  1012:0004 -- build the lens table.
 
-  THE FRAME THEN CLOSES EXACTLY: 256 for the string copy, 768 for the palette
-  at [BP-$400], two for the counter at [BP-$402], and 128 below that which
-  nothing touches -- a file record's worth, the ninth in this target. The
-  routine's real file is the global at DS:$563F.
+  The bouncing objects are NOT sprites. Nothing in this scene loads any sprite
+  data: Logo_Load reads a 768-byte palette and one 320x200 screen and stops.
+  Each bouncer is a MAGNIFYING LENS over whatever it is sitting on.
 
-  AND THE PALETTE IS NOT UPLOADED WITH SetPalette768. 1012:060e walks 0..255
-  and calls the VGA unit's per-entry SetRGB three arguments at a time, reading
-  Pal FLAT as I*3, I*3+1 and I*3+2 -- the run-time additions are there in the
-  instructions (1012:0632 and 0645 are INC AX), so this one really is a flat
-  array where the other palettes in this target are two-dimensional. There is
-  no Seek either; the caller's Reset has already left the file at zero. }
-procedure LoadLogo(Name : String; Dest : Pointer);
+  The table has one word per pixel of the 40 x 40 block, and EVERY pixel gets
+  an entry -- that is the part an earlier reconstruction got wrong, which is
+  why it drew a solid square with a lens inside it.
+
+      X*X + Y*Y >  300   IDENTITY. The gather reads the pixel back from its
+                         own position, the blit writes it straight back, and
+                         the corner is invisible. There is no transparency
+                         test anywhere: the blit is a flat REP MOVSB.
+
+      X*X + Y*Y <= 300   the lens proper. Read off the x87 at 1012:0116:
+
+                             Scale := R / (R + Sqrt(R*R - (X*X + Y*Y - 400)) + K)
+                             SX    := Round(Scale * X)
+                             SY    := Round(Scale * Y)
+
+                         with R = 40 (the word at DS:$0002) and K = 1.0 (the
+                         single at CS:$0000), so
+
+                             Scale = 40 / (41 + Sqrt(2000 - (X*X + Y*Y)))
+
+                         which runs from about 0.467 at the centre to 0.486 at
+                         the rim -- a roughly even 2x magnification with a
+                         slight barrel to it.
+
+  THE ORIGINAL WALKS ONE QUADRANT AND MIRRORS IT. X and Y each run 0 to 20 --
+  twenty-one values, not twenty -- and every iteration writes FOUR entries,
+  one per sign pairing, with SX and SY carrying the same signs as X and Y:
+
+      Lens[( Y+20)*40 + ( X+20)] := ( SY+20)*40 + ( SX+20)   1012:01d8
+      Lens[(-Y+20)*40 + (-X+20)] := (-SY+20)*40 + (-SX+20)   1012:0208
+      Lens[(-Y+20)*40 + ( X+20)] := (-SY+20)*40 + ( SX+20)   1012:0240
+      Lens[( Y+20)*40 + (-X+20)] := ( SY+20)*40 + (-SX+20)   1012:0274
+
+  A previous reconstruction walked -20..19 once instead, on the argument that
+  the formula is symmetric so one full pass is the same thing. For the 1600
+  cells the blit reads it IS the same thing -- but it is not the same code,
+  and it is not the same table: 0..20 mirrored reaches index 1640, which is
+  why the table is 1641 words and why the loop bound above is 20 and not 19.
+  It is also four times less square root: 441 evaluations instead of 1600.
+
+  Two Real locals, not one. The frame is ENTER $1C (1012:0004) = 28 bytes:
+  four Integers, two six-byte Reals, and two LongInt temporaries the compiler
+  needs to reach `fild dword`. S is at [BP-$0E] and Scale at [BP-$14], and S
+  is read exactly once, which is what says it is a variable and not a temp.
+
+  LensR IS READ FROM MEMORY, so it cannot be an untyped constant here.
+  1012:012e is `MOV AX,[$0002]` / `MUL WORD PTR [$0002]` -- had 40 been an
+  untyped constant the compiler would have folded it to `MOV AX,1600`. The
+  word at DS:$0002 in the shipped binary is initialised data and reads 40.
+  Our own DGROUP puts this typed constant at a different offset; the shape
+  matches, the address does not, and that is the whole of the difference.
+  -------------------------------------------------------------------------- }
+
+procedure BuildLens;
 var
-  { THE PALETTE IS A LOCAL, and it was VGA's global. 1012:05dd is
-    LEA DI,[BP-$400] / PUSH SS / PUSH DI / PUSH $300 / BlockRead -- an
-    SS-relative buffer, so 768 bytes of frame and not a unit variable anywhere.
-
-    That matters beyond this routine: VGA's `Palette` existed ONLY for this
-    call, and the original's VGA has no such global -- every palette routine in
-    segment 1491 takes a pointer parameter. }
-  Pal    : array[0..767] of Byte;       { [BP-$400] }
-  I      : Integer;                     { [BP-$402] }
-  Unread : file;                        { [BP-$482], never opened }
+  SX, SY, Y, X : Integer;
+  S, Scale     : Real;
 begin
-  BlockRead(F, Pal, SizeOf(Pal));            { 1012:05dd }
-  BlockRead(F, VirtScr^, 64000);             { 1012:05f4 }
-  for I := 0 to 255 do                       { 1012:0606 }
-    SetRGB(I, Pal[I * 3], Pal[I * 3 + 1], Pal[I * 3 + 2]);
+  { THE COLUMN TERM COMES FIRST IN THE SOURCE, and the two DX loads are what
+    say so. 1012:0043 computes (Y + 20) * 40 into AX, moves it to DX, and only
+    then computes (X + 20) -- so the ROW term is evaluated first and parked.
+    Turbo Pascal evaluates the operands of `+` right to left when both need the
+    accumulator, so the term it evaluates FIRST is the one written SECOND: the
+    source is `(X + 20) + (Y + 20) * BounceW` and not the other way round. Ours
+    had the multiply on the left and put (X + 20) in DX instead, which is four
+    bytes different at each of the sixteen index and value expressions in this
+    routine. }
+  FillChar(LensTab, SizeOf(LensTab), 0);   { 1012:0008, 3282 bytes }
+  for Y := 0 to LensArc do
+    for X := 0 to LensArc do
+    begin
+      if X * X + Y * Y > LensCut then
+      begin
+        { OUTSIDE THE DISC -- the pixel maps to itself, and the original does
+          not route that through SX and SY. 1012:0043 reads [BP-6] and [BP-8]
+          straight into the index arithmetic, so the identity case carries its
+          own four stores rather than falling into a shared tail. }
+        LensTab[( X + 20) + ( Y + 20) * BounceW] := ( X + 20) + ( Y + 20) * BounceW;
+        LensTab[(-X + 20) + (-Y + 20) * BounceW] := (-X + 20) + (-Y + 20) * BounceW;
+        LensTab[( X + 20) + (-Y + 20) * BounceW] := ( X + 20) + (-Y + 20) * BounceW;
+        LensTab[(-X + 20) + ( Y + 20) * BounceW] := (-X + 20) + ( Y + 20) * BounceW;
+      end
+      else
+      begin
+        { the sum is RECOMPUTED here, not held: the frame has room for four
+          Integers and there are four, so the original has no D2 variable.
+          1012:0116 repeats the two MULs the test at 1012:002b already did. }
+        S     := Sqrt(LensR * LensR - (X * X + Y * Y - LensOfs)) + LensK;
+        Scale := LensR / (LensR + S);
+        SX    := Round(Scale * X);
+        SY    := Round(Scale * Y);
+        LensTab[( X + 20) + ( Y + 20) * BounceW] := ( SX + 20) + ( SY + 20) * BounceW;
+        LensTab[(-X + 20) + (-Y + 20) * BounceW] := (-SX + 20) + (-SY + 20) * BounceW;
+        LensTab[( X + 20) + (-Y + 20) * BounceW] := ( SX + 20) + (-SY + 20) * BounceW;
+        LensTab[(-X + 20) + ( Y + 20) * BounceW] := (-SX + 20) + ( SY + 20) * BounceW;
+      end;
+    end;
 end;
 
-{ THE SAVE COMES FIRST AND THE BLIT SECOND, and the two were the other way
-  round here for as long as this file has existed. The direction of the far
-  pointer settles it and takes one instruction to read: 1012:02c0 is
-  LES DI,[BP+6], so at 02bc the POINTER is the destination and the screen the
-  source -- that is the save. 1012:0315 is LDS SI,[BP+6], so at 0311 the
-  pointer is the source and the screen the destination -- that is the blit.
-  Turbo Pascal emits routines in source order, so having them the wrong way
-  round put each one at the other's address and every byte of both measured as
-  different while both were correct. }
 { --------------------------------------------------------------------------
-  1012:02bc -- SaveUnder(X, Y, Dest, Segment). HAND ASSEMBLER, verbatim.
+  1012:0366 -- gather the working cell through the lens table. HAND ASSEMBLER.
 
-  Copies the 40 x 40 block centred on (X, Y) out of Segment into Dest. The
-  matching write is 1012:0311 below; the two are the same routine with the
-  source and destination swapped.
+  THE LOOP COUNTER IS CX AND IT NEVER TOUCHES MEMORY -- 1012:03b3 is DEC CX and
+  03b4 compares it against -1 -- which Turbo Pascal does not do for a `for`
+  variable, ever. And the three table ADDRESSES are kept in frame slots and
+  added to an index each time round, rather than folded into each reference,
+  which is the same idiom this target's other hand-written gathers use.
 
-  The screen offset is built with shifts, not a multiply: BX takes the row
-  shifted up a byte (row * 256) and AX the row shifted left six (row * 64),
-  and the two are added to give row * 320.
+  THE ADDRESSES ALSO TILE, and that is what identifies the frame's four slots:
 
-  RET $A: X at BP+$C, Y at BP+$A, Dest at BP+6, Segment at BP+4.
+      [BP-$4]  IMUL DI,N,$669 then LEA AX,[DI-$37F]  =  Ofs(Under[N])
+               $669 is 1641, a saved cell; N * 1641 - 895 is a ONE-based
+               array whose element 1 sits at $2EA, which is Under
+      [BP-$2]  $4FD6  =  Ofs(Cell)
+      [BP-$6]  $4304  =  Ofs(LensTab), and $4304 - $2EA is 16,410,
+               which is ten rows of 1641 -- so Under has ten of them
+      [BP-$7]  a Byte, zeroed at the top of every iteration
+
+  TWO OF THE THREE TESTS IN THE BODY DO NOTHING, and they are in the original.
+  1012:0391 compares the lens entry against the index and, when they differ,
+  sets the bias byte to zero -- which it already is, because 1012:0384 zeroed
+  it at the top of the same iteration. 1012:0399 compares the entry against
+  1640 and, when it matches, ADDS ZERO to the bias. So the bias is zero at
+  every one of the 1,600 iterations and the ADD AL at 1012:03ae adds nothing.
+  It is the second dead construct found in this part today, after part 004's
+  forty-nine conditional self-assignments, and like that one it is transcribed
+  because it is what ships.
 
   EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
 
-      P := Dest;
-      for Row := 0 to 39 do
-      begin
-        Move(Mem[Segment : (Y - 20 + Row) * 320 + X - 20], P^, 40);
-        Inc(LongInt(P), 40);
-      end;
+      for I := 1599 downto 0 do
+        Cell[I] := Under[N, LensTab[I]];
   -------------------------------------------------------------------------- }
+{ @asm 001 1012:0366 +0 BuildCell }
+
 { @asm 001 1012:02bc }
 procedure SaveUnder(X, Y : Integer; Dest : Pointer; Segment : Word); assembler;
 asm
@@ -226,6 +313,8 @@ end;
         Inc(LongInt(P), 40);
       end;
   -------------------------------------------------------------------------- }
+{ @asm 001 1012:0311 }
+
 { @asm 001 1012:0311 }
 procedure BlitSprite(X, Y : Integer; Src : Pointer; Segment : Word); assembler;
 asm
@@ -329,100 +418,7 @@ end;
   Our own DGROUP puts this typed constant at a different offset; the shape
   matches, the address does not, and that is the whole of the difference.
   -------------------------------------------------------------------------- }
-const
-  LensK   = 1.0;       { CS:$0000, added as a single: 1012:014b FADD CS:[0] }
-  LensCut = 300;       { the disc: X*X + Y*Y <= 300 -- 1012:003b CMP AX,$12C }
-  LensOfs = 400;       { the 20*20 term inside the square root }
-  LensArc = 20;        { one quadrant: 1012:02a8 CMP WORD PTR [BP-8],$14 }
 
-const
-  { WORD, not Integer, and the frame size is what proves it. 1012:0135 widens
-    the product with `XOR DX,DX` -- unsigned -- and 1012:015e widens the bare
-    LensR the same way into a LongInt temporary before `FILD DWORD`. An
-    Integer would go to the x87 through `FILD WORD` with no temporary at all,
-    and the frame would be ENTER $18 rather than the ENTER $1C at 1012:0004. }
-  LensR : Word = 40;      { DS:$0002 -- read, never folded; see above }
-
-procedure BuildLens;
-var
-  SX, SY, Y, X : Integer;
-  S, Scale     : Real;
-begin
-  { THE COLUMN TERM COMES FIRST IN THE SOURCE, and the two DX loads are what
-    say so. 1012:0043 computes (Y + 20) * 40 into AX, moves it to DX, and only
-    then computes (X + 20) -- so the ROW term is evaluated first and parked.
-    Turbo Pascal evaluates the operands of `+` right to left when both need the
-    accumulator, so the term it evaluates FIRST is the one written SECOND: the
-    source is `(X + 20) + (Y + 20) * BounceW` and not the other way round. Ours
-    had the multiply on the left and put (X + 20) in DX instead, which is four
-    bytes different at each of the sixteen index and value expressions in this
-    routine. }
-  FillChar(LensTab, SizeOf(LensTab), 0);   { 1012:0008, 3282 bytes }
-  for Y := 0 to LensArc do
-    for X := 0 to LensArc do
-    begin
-      if X * X + Y * Y > LensCut then
-      begin
-        { OUTSIDE THE DISC -- the pixel maps to itself, and the original does
-          not route that through SX and SY. 1012:0043 reads [BP-6] and [BP-8]
-          straight into the index arithmetic, so the identity case carries its
-          own four stores rather than falling into a shared tail. }
-        LensTab[( X + 20) + ( Y + 20) * BounceW] := ( X + 20) + ( Y + 20) * BounceW;
-        LensTab[(-X + 20) + (-Y + 20) * BounceW] := (-X + 20) + (-Y + 20) * BounceW;
-        LensTab[( X + 20) + (-Y + 20) * BounceW] := ( X + 20) + (-Y + 20) * BounceW;
-        LensTab[(-X + 20) + ( Y + 20) * BounceW] := (-X + 20) + ( Y + 20) * BounceW;
-      end
-      else
-      begin
-        { the sum is RECOMPUTED here, not held: the frame has room for four
-          Integers and there are four, so the original has no D2 variable.
-          1012:0116 repeats the two MULs the test at 1012:002b already did. }
-        S     := Sqrt(LensR * LensR - (X * X + Y * Y - LensOfs)) + LensK;
-        Scale := LensR / (LensR + S);
-        SX    := Round(Scale * X);
-        SY    := Round(Scale * Y);
-        LensTab[( X + 20) + ( Y + 20) * BounceW] := ( SX + 20) + ( SY + 20) * BounceW;
-        LensTab[(-X + 20) + (-Y + 20) * BounceW] := (-SX + 20) + (-SY + 20) * BounceW;
-        LensTab[( X + 20) + (-Y + 20) * BounceW] := ( SX + 20) + (-SY + 20) * BounceW;
-        LensTab[(-X + 20) + ( Y + 20) * BounceW] := (-SX + 20) + ( SY + 20) * BounceW;
-      end;
-    end;
-end;
-
-{ --------------------------------------------------------------------------
-  1012:0366 -- gather the working cell through the lens table. HAND ASSEMBLER.
-
-  THE LOOP COUNTER IS CX AND IT NEVER TOUCHES MEMORY -- 1012:03b3 is DEC CX and
-  03b4 compares it against -1 -- which Turbo Pascal does not do for a `for`
-  variable, ever. And the three table ADDRESSES are kept in frame slots and
-  added to an index each time round, rather than folded into each reference,
-  which is the same idiom this target's other hand-written gathers use.
-
-  THE ADDRESSES ALSO TILE, and that is what identifies the frame's four slots:
-
-      [BP-$4]  IMUL DI,N,$669 then LEA AX,[DI-$37F]  =  Ofs(Under[N])
-               $669 is 1641, a saved cell; N * 1641 - 895 is a ONE-based
-               array whose element 1 sits at $2EA, which is Under
-      [BP-$2]  $4FD6  =  Ofs(Cell)
-      [BP-$6]  $4304  =  Ofs(LensTab), and $4304 - $2EA is 16,410,
-               which is ten rows of 1641 -- so Under has ten of them
-      [BP-$7]  a Byte, zeroed at the top of every iteration
-
-  TWO OF THE THREE TESTS IN THE BODY DO NOTHING, and they are in the original.
-  1012:0391 compares the lens entry against the index and, when they differ,
-  sets the bias byte to zero -- which it already is, because 1012:0384 zeroed
-  it at the top of the same iteration. 1012:0399 compares the entry against
-  1640 and, when it matches, ADDS ZERO to the bias. So the bias is zero at
-  every one of the 1,600 iterations and the ADD AL at 1012:03ae adds nothing.
-  It is the second dead construct found in this part today, after part 004's
-  forty-nine conditional self-assignments, and like that one it is transcribed
-  because it is what ships.
-
-  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
-
-      for I := 1599 downto 0 do
-        Cell[I] := Under[N, LensTab[I]];
-  -------------------------------------------------------------------------- }
 { @asm 001 1012:0366 +0 BuildCell }
 procedure BuildCell(N : Integer); assembler;
 var
@@ -555,6 +551,13 @@ var
   `assembler`, Turbo Pascal drops the frame for a routine with no parameters
   and no locals, and the transcription then differs from the binary at both
   ends while being identical in between. }
+
+{ NOT `assembler`. The original opens PUSH BP / MOV BP,SP and closes LEAVE,
+  a stack frame it neither needs nor uses -- which is what a plain Pascal
+  procedure whose body happens to be one asm block compiles to. Declared
+  `assembler`, Turbo Pascal drops the frame for a routine with no parameters
+  and no locals, and the transcription then differs from the binary at both
+  ends while being identical in between. }
 procedure ScrollLeft;
 begin
 asm
@@ -584,6 +587,19 @@ end;
                                                ASPHYXIA logo with reflection
           See docs/14-part001-intro.md.
   -------------------------------------------------------------------------- }
+{ --------------------------------------------------------------------------
+  1012:03e3 -- Bounce_Run.
+
+  ITS FRAME IS ENTER $54 AND THAT IS THE WHOLE DECLARATION LIST: 2 + 4 * 20 is
+  82, and 84 with the two bytes of padding. So the file record and the frame
+  counter that used to share this routine cannot be here -- the file work
+  belongs to Scene1 below, and Frame is a unit-level var.
+
+  The offsets give the order, first declared nearest BP. Which array is which
+  came from the BOUNDS TESTS rather than any name: the one checked against 299
+  is X and the one checked against 179 is Y.
+  -------------------------------------------------------------------------- }
+
 { --------------------------------------------------------------------------
   1012:03e3 -- Bounce_Run.
 
@@ -654,7 +670,12 @@ begin
     BY[I]  := Random(150) + 30;
   end;
 
-  CopyScreen(VirtScrSeg, $A000);
+  { THE LENS TABLE IS BUILT HERE, and no screen copy precedes the loop.
+    1012:043f is CALL 4 -- a near call to the routine at 1012:0004, whose
+    ENTER $1C is BuildLens's frame -- and 1012:0442 sets the counter to 1
+    immediately after. Ours emitted CopyScreen(VirtScrSeg, $A000) there
+    instead; the loop copies the screen every frame in any case. }
+  BuildLens;                            { 1012:043f }
 
   { A `for` LOOP IS WHAT THE ORIGINAL HAS, and it cannot be written yet. 1012:05b1
     is CMP [BP-$54],$12C / JE to the exit and 05b8 is JMP back -- with NO
@@ -700,6 +721,81 @@ end;
 { --------------------------------------------------------------------------
   The scene: load, draw the frame, then hand over to BounceRun.
   -------------------------------------------------------------------------- }
+
+{ TWO PARAMETERS, NEITHER OF WHICH THE BODY READS, and ENTER $482 is what
+  found them. 1012:065a closes with RET 8, so eight bytes of arguments; the
+  caller at 1012:0696 pushes CS and $066B -- a code-segment string constant
+  reading 'asphyxia.cel' -- and then the two words of VirtScr. And 1012:05c8 is
+  the giveaway: LEA DI,[BP-$100] / LDS SI,[BP+8] / LODSB / STOSB / REP MOVSB,
+  which is Turbo Pascal copying a STRING VALUE PARAMETER into the frame. That
+  copy is 256 bytes of the 1,154, and nothing in the routine ever reads it.
+
+  THE FRAME THEN CLOSES EXACTLY: 256 for the string copy, 768 for the palette
+  at [BP-$400], two for the counter at [BP-$402], and 128 below that which
+  nothing touches -- a file record's worth, the ninth in this target. The
+  routine's real file is the global at DS:$563F.
+
+  AND THE PALETTE IS NOT UPLOADED WITH SetPalette768. 1012:060e walks 0..255
+  and calls the VGA unit's per-entry SetRGB three arguments at a time, reading
+  Pal FLAT as I*3, I*3+1 and I*3+2 -- the run-time additions are there in the
+  instructions (1012:0632 and 0645 are INC AX), so this one really is a flat
+  array where the other palettes in this target are two-dimensional. There is
+  no Seek either; the caller's Reset has already left the file at zero. }
+procedure LoadLogo(Name : String; Dest : Pointer);
+var
+  { THE PALETTE IS A LOCAL, and it was VGA's global. 1012:05dd is
+    LEA DI,[BP-$400] / PUSH SS / PUSH DI / PUSH $300 / BlockRead -- an
+    SS-relative buffer, so 768 bytes of frame and not a unit variable anywhere.
+
+    That matters beyond this routine: VGA's `Palette` existed ONLY for this
+    call, and the original's VGA has no such global -- every palette routine in
+    segment 1491 takes a pointer parameter. }
+  Pal    : array[0..767] of Byte;       { [BP-$400] }
+  I      : Integer;                     { [BP-$402] }
+  Unread : file;                        { [BP-$482], never opened }
+begin
+  BlockRead(F, Pal, SizeOf(Pal));            { 1012:05dd }
+  BlockRead(F, VirtScr^, 64000);             { 1012:05f4 }
+  for I := 0 to 255 do                       { 1012:0606 }
+    SetRGB(I, Pal[I * 3], Pal[I * 3 + 1], Pal[I * 3 + 2]);
+end;
+
+{ THE SAVE COMES FIRST AND THE BLIT SECOND, and the two were the other way
+  round here for as long as this file has existed. The direction of the far
+  pointer settles it and takes one instruction to read: 1012:02c0 is
+  LES DI,[BP+6], so at 02bc the POINTER is the destination and the screen the
+  source -- that is the save. 1012:0315 is LDS SI,[BP+6], so at 0311 the
+  pointer is the source and the screen the destination -- that is the blit.
+  Turbo Pascal emits routines in source order, so having them the wrong way
+  round put each one at the other's address and every byte of both measured as
+  different while both were correct. }
+{ --------------------------------------------------------------------------
+  1012:02bc -- SaveUnder(X, Y, Dest, Segment). HAND ASSEMBLER, verbatim.
+
+  Copies the 40 x 40 block centred on (X, Y) out of Segment into Dest. The
+  matching write is 1012:0311 below; the two are the same routine with the
+  source and destination swapped.
+
+  The screen offset is built with shifts, not a multiply: BX takes the row
+  shifted up a byte (row * 256) and AX the row shifted left six (row * 64),
+  and the two are added to give row * 320.
+
+  RET $A: X at BP+$C, Y at BP+$A, Dest at BP+6, Segment at BP+4.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      P := Dest;
+      for Row := 0 to 39 do
+      begin
+        Move(Mem[Segment : (Y - 20 + Row) * 320 + X - 20], P^, 40);
+        Inc(LongInt(P), 40);
+      end;
+  -------------------------------------------------------------------------- }
+{ @asm 001 1012:02bc }
+
+{ --------------------------------------------------------------------------
+  The scene: load, draw the frame, then hand over to BounceRun.
+  -------------------------------------------------------------------------- }
 procedure Scene1;
 { NO LOCALS AT ALL, and a local `F : file` here is what blanked this scene to a
   flat red screen. 1012:0678 is PUSH BP / MOV BP,SP with no ENTER, and all three
@@ -708,8 +804,12 @@ procedure Scene1;
   opened one file and LoadLogo read another that was never opened; with I/O
   checking off both BlockReads failed silently, so the DAC took 768 bytes of uninitialised
   stack and the virtual screen was never loaded. }
+
 begin
-  BuildLens;
+  { NO BuildLens HERE. 1012:0678 is PUSH BP / MOV BP,SP and then straight to
+    067b, the Assign -- nothing between. The lens table is built by BounceRun
+    instead; 1012:043f is CALL 4, and 1012:0004 opens ENTER $1C, which is
+    BuildLens's frame. }
   Assign(F, 'neurosis.dat');
   Reset(F, 1);
   { BOTH ARGUMENTS ARE IGNORED INSIDE, and both are passed anyway --
