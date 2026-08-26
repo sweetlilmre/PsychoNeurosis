@@ -35,6 +35,42 @@ procedure Scene4;
 
 implementation
 
+{ ==========================================================================
+  THIS UNIT'S ROUTINE ORDER, DERIVED AND NOT YET APPLIED.
+
+  The header carries no address map, so the order was recovered from the
+  original's prologue frames (`prologue.py spans.toml 001 --seg=1107`) matched
+  against the addresses already written in this file's own transcription
+  markers:
+
+      1107:0000  SetPalette768   (assembler, no frame)
+      1107:0025  Load            ENTER $82
+      1107:0199  Blit            <- comes in via the BLITCLIP include
+      1107:0245  DrawBlobs       ENTER $02, the Byte counter at [BP-1]
+      1107:0287  ?               ENTER $0e -- unidentified
+      1107:03d7  SortOutp        no locals
+      1107:03e7  BuildBlobs      ENTER $02
+      1107:0446  Transform       ENTER $14
+      1107:0562  FrameStep       no locals
+      1107:059f  ShiftTrails     ENTER $02
+      1107:0600  ShowString      ENTER $104
+      1107:076e  BannerRun       no locals
+      1107:07a2  BuildPoints     ENTER $202
+      1107:0977  Scene4          no locals
+
+  Ours currently declares Transform third, where the original has it ninth, and
+  prologue.py reads 1107:0446 as "not located" because of it.
+
+  TWO THINGS BLOCK THE REORDER. Blit arrives through an INCLUDE, so the
+  BLITCLIP include line is itself a position in the ordering and has to move
+  with the rest -- a reorder that leaves it behind puts DrawBlobs above the
+  declaration it needs, which is what the compiler said when this was tried.
+  And StarInit, StarStep and StarDraw are declared here but belong to segment
+  12b2: 1107:09a7 is a FAR call to 12b2:0000, so they are another unit's, and
+  they have to leave before the remaining twelve can be placed against the
+  fourteen slots above.
+  ========================================================================== }
+
 uses VGA, Crt, DemoVT, FixMath;
 
 { --------------------------------------------------------------------------
