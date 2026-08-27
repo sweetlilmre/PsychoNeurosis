@@ -176,7 +176,11 @@ GEN = "src/gen"
 # part, which cost two segments the original does not have and put the runtime
 # on the wrong paragraph. A batch rather than a launcher program because DOS
 # Exec would stay resident while the part runs, and these parts want the memory.
-alongside = ["*.BAT"]
+# RUNPART.BAT BY NAME, not "*.BAT". The glob also installed the generated
+# BUILD.BAT, which is the build's own scaffolding and has no business beside
+# the demo -- and it went on installing MKDAT.BAT after that tool became
+# Python, because run/ is not wiped between builds and nothing noticed.
+alongside = ["RUNPART.BAT"]
 
 # Reconstruction source -> 8.3 DOS name, unit identifier before and after. The
 # unit name inside a file is independent of the filename, but TP7 finds a unit
