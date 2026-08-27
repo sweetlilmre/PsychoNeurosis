@@ -7,6 +7,12 @@
   =========================================================================== }
 
 unit P1S1;
+{$A-}   { BYTE ALIGNMENT, AND THE ORIGINAL'S OWN ADDRESSES PROVE IT. Under sits
+          at the ODD $02EA and F at the ODD $563F -- 1,641-byte Cell ends at
+          $563E and the original puts F straight after it with no gap. Word
+          alignment, which is TP7's default, pads before both: ours had F at
+          $5642 against $563F, and the padding accumulated down the block.
+          $A is a whole-file switch in TP7, so it goes here at the head. }
 {$I-}   { no I/O check: the original goes straight on after each file
           call, with no near CALL to the RTL's check routine. }
 
@@ -77,19 +83,25 @@ var
     -- a DS-relative byte read at an offset computed from the bouncer number.
     A heap block cannot be reached that way; it would need the pointer loaded
     into a segment register first. }
-  { ONE BYTE BEFORE Under, and the whole block's position depends on it. Under's
-    real base is $0953, not the $02EA below -- that is the FOLD of a 1-based
-    first subscript, base minus 1641 -- and $0953 is ODD, so the variable before
-    it ends at $0952. Ours had Under at $0952 and every address in this unit one
-    byte low with it: the file record at $563E against the original's $563F,
-    which is measurable directly since five sites push it.
+  { UNDER STARTS AT DS:$02EA AND THAT IS ITS REAL ADDRESS, NOT A FOLD. The note
+    that stood here for weeks had it the other way round -- it called $02EA "the
+    FOLD of a 1-based first subscript" and gave Under a real base of $0953, then
+    invented a one-byte `Spare0` at $0952 to make that work. Both were wrong, and
+    the arithmetic says so in one line: $02EA is 746, and 746 plus TSaveBank's
+    16,410 is 17,156, which is $4304 -- LensTab's address, measured. The chain
+    from there is exact: $4304 + 3,282 = $4FD6 (Cell), + 1,641 = $563F (F),
+    + 128 = $56BF, one byte of padding, $56C0 where P1S2 begins.
 
-    That one byte is why the frame counter had to be a global. With F one byte
-    low, F ends at $56BD and a two-byte Frame fills $56BE..$56BF to land P1S2 at
-    $56C0. The original ends F at $56BE, pads the odd $56BF, and reaches $56C0
-    with no Frame at all -- so the counter is the local that 1012:05a7 and 05b1
-    read at [BP-$54]. }
-  Spare0  : Byte;                       { DS:$0952, never read }
+    The fold is the OTHER number. Under is `array[1..10, 0..1640]`, so a
+    reference to Under[i,j] folds to base minus 1,641, and 746 - 1641 = -895 --
+    which is exactly the displacement at 1012:036f that the lens-base ticket has
+    been quoting all along. Real base $02EA, fold -895. One number, read twice,
+    once as each.
+
+    DELETING Spare0 PUT ALL FIVE PUSHED ADDRESSES ON THE ORIGINAL'S: $4304,
+    $4FD6 and $563F against $4306, $4FD8 and $5642 before it, and dsmap went from
+    106 sites at +2 to 219 at +0 across $0000..$ACFC. P1S4's byte-level
+    difference fell from 119 to 15 with no code change anywhere. }
   Under   : TSaveBank;                  { DS:$0953, 16,410 bytes; folds to $02EA }
   { DS:$4304 -- the gather table, built once by BuildLens. AND IT COMES SECOND,
     which the four addresses already in these comments tile out exactly:
