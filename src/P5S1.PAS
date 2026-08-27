@@ -979,9 +979,13 @@ end;
   pair simply does nothing.
   -------------------------------------------------------------------------- }
 procedure Morph(A, B : Byte);
-var T : Integer;
+{ T IS A WORD. Both guards are UNSIGNED in the original -- 100e:06c2 is JB and
+  100e:0705 is JA -- and an Integer counter gives JL and JG over the same
+  zero-extended byte compares. Two bytes, and no behaviour: A and B are Bytes,
+  so neither value can reach the range where the two disagree. }
+var T : Word;
 begin
-  for T := A downto B do                         { 100e:06c2, JC guard }
+  for T := A downto B do                         { 100e:06c2, JB guard }
   begin
     HeightFromMap(T);
     Project(@Grid, @Proj);
