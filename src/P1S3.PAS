@@ -159,7 +159,14 @@ var
   LevIdx            : Byte;             { [BP-$B] }
   ColsB             : Byte;             { [BP-$C] }
   CurShift          : Byte;             { [BP-$D], and it is the init loop's Sh }
-  RowsB             : Byte;             { [BP-$E] }
+  { AND [BP-$E] IS NOT RowsB -- IT IS AN UNREAD BYTE. The block-rows counter
+    shares LevIdx's slot at [BP-$B]: 10e3:0160 stores the 200-div there and
+    10e3:01c5 DECs it, while the INIT loop had finished with LevIdx before the
+    main loop started. That is the third slot in this one routine the original
+    reuses -- I and CurSize share [BP-$8], Sh and CurShift share [BP-$D] -- and
+    the note above already had the habit written down. Declaring a separate
+    RowsB at [BP-$E] put both stores and the DEC three bytes out. }
+  Spare             : Byte;             { [BP-$E], never read }
   Lev               : array[1..MosaicLevels] of record
                         Size, Shift : Byte;
                       end;              { [BP-$18] }
@@ -235,7 +242,7 @@ begin
         MOV  CX, CurSize       { CX holds the block edge throughout         }
         MOV  AX, 200           { $C8                                        }
         DIV  CL                { AL := 200 div Size                         }
-        MOV  RowsB, AL         { block rows down the screen                 }
+        MOV  LevIdx, AL        { block rows down -- LevIdx's slot, reused    }
       @@Row:
         MOV  AX, 320           { $140                                       }
         DIV  CL                { AL := 320 div Size -- redone every row     }
@@ -283,7 +290,7 @@ begin
         MUL  BX                { AX := 320 * (Size - 1)                     }
         ADD  SI, AX
         MOV  DI, SI
-        DEC  RowsB
+        DEC  LevIdx
         JNZ  @@Row
         POP  DS                { 10e3:01ca }
         POP  ES

@@ -40,6 +40,24 @@ type
 
 var
   { DS:$9DDB, stride 9 }
+  { OUR STAR ARRAY LANDS ONE BYTE HIGH AND THAT IS THIS UNIT'S WHOLE DIFFERENCE
+    -- SEVEN BYTES, EVERY ONE A DISPLACEMENT. 12b2:001a is ADD DI,$9DD2 in the
+    original and $9DD3 in ours, and the three folded bases go with it:
+    [BX-$6225] against [BX-$6224] and so on. The address is forced from below:
+    P1S4's Blob is 145 records of 51 bytes from DS:$80F5, ending at $9DD7, and
+    its Tail3 fills $9DD8..$9DDA, so Star belongs at the ODD $9DDB. Ours pads
+    to $9DDC.
+
+    TWO HYPOTHESES ELIMINATED BY MEASUREMENT, so they need not be tried again:
+      {$A-} on THIS unit -- no effect at all, byte for byte. So TP7's $A does
+        not control where a unit's data block starts; P1S4 already carries $A-
+        and it does not help either.
+      Tail3 as TWO bytes instead of three, on the theory that our compiler's
+        boundary pad supplies the third -- measurably WORSE, 53 differing bytes
+        across part 001 to 188. Tail3 is three.
+    So the byte is a pad our build inserts at the boundary between one unit's
+    data block and the next, and nothing in either unit's source has moved it
+    yet. Read the .TPU's data-segment alignment next. }
   Star  : array[1..StarCount] of TStar;             { DS:$9DDB }
 
 procedure StarInit(C0, Ca, Cb, Speed : Byte);
