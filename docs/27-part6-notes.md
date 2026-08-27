@@ -5,7 +5,7 @@ parts; where something has not been read yet, it says so.
 
 **Status: all four scenes read and transcribed.** `P6S1`, `P6S2`, `P6S3`,
 `P6S4` and `P6Main` all build, and every routine that is assembler end to end
-is byte-checked against the binary. `src/PART6_CREDITS.PAS` — the earlier
+is byte-checked against the binary. `src/PART6_P3SPRITE.PAS` — the earlier
 inferred single-unit pass — has been deleted.
 
 The binary had to be imported into Ghidra (it was not in the project) and its

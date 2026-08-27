@@ -1,6 +1,6 @@
 # Part 3, Scene 2 — the star tube
 
-`Demo_Scene2` at `10b8:0592`. Reconstruction: [`src/PART3_STARS.PAS`](../src/PART3_STARS.PAS).
+`Demo_Scene2` at `10b8:0592`. Reconstruction: [`src/P3STARS.PAS`](../src/P3STARS.PAS).
 
 ## What it is
 

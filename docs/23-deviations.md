@@ -29,7 +29,7 @@ That distinction is invisible until a routine reads or writes outside its own
 storage — see the next entry, which is the only known instance so far, and read
 it as a correction to this one rather than as an example of it. **Once every
 other byte of a part matches, the frame IS the same**, because the frame is made
-by instructions that are themselves being compared. `PART3_MORPH.FadeStep`
+by instructions that are themselves being compared. `P3MORPH.FadeStep`
 writes three bytes outside its buffer; that hung the scene while part 003 still
 differed from the original elsewhere, and stopped hanging when it did not.
 
@@ -39,7 +39,7 @@ keeping for exactly as long as a part still differs, and no longer.
 
 ---
 
-## NOT a deviation any more: `PART3_MORPH.FadeStep` runs off both ends of its buffer, and so do we
+## NOT a deviation any more: `P3MORPH.FadeStep` runs off both ends of its buffer, and so do we
 
 **This was the last entry in this file to be retired, on 27 Aug 2026, and it is
 kept because the bug is real and somebody may want to fix it one day.** Part 003
@@ -116,7 +116,7 @@ host, a debugger that guards the frame, an emulator that faults on a write below
 SP -- this is the whole change:
 
 ```
-src/PART3_MORPH.PAS, in FadeStep's asm block:
+src/P3MORPH.PAS, in FadeStep's asm block:
     MOV  DI, $0300      ->      MOV  DI, $02FF
 ```
 
@@ -139,11 +139,11 @@ why.
 ## Shape and object tables are addressed by computed offset, not compiled-in ones
 
 **Original.** Shapes and models are identified by their absolute DGROUP offset:
-`PART3_MORPH` uses `$0636`, `$5136`, `$63F6`; part 002 scene 2's objects sit at
+`P3MORPH` uses `$0636`, `$5136`, `$63F6`; part 002 scene 2's objects sit at
 fixed addresses `$5A56`, `$65A7`, `$70F8`, `$7C49`.
 
 **Reconstruction.** The data are Pascal typed constants, which also live in
-DGROUP, but the compiler chooses where. `PART3_MORPH.BindShapes` takes `Ofs()`
+DGROUP, but the compiler chooses where. `P3MORPH.BindShapes` takes `Ofs()`
 of each at startup and the assembler is otherwise untouched; part 002's objects
 are ordinary records.
 
@@ -220,7 +220,7 @@ than in the scene:
 - **`TP3S3`** calls `SetMode13h` after the scene, because scene 3 leaves
   unchained 320x400 and the part's driver — not the scene — resets it at
   `1000:0097`.
-- **`TP3S6`** shows the wrong colours run on its own. `PART3_WAVES` sets no
+- **`TP3S6`** shows the wrong colours run on its own. `P3WAVES` sets no
   palette and neither does the binary: the scene inherits the blue ramp scene 5
   leaves behind. It looks right under `TPART3`.
 - **RETIRED, and kept because the fix is the interesting part.** Harnesses used to cost two bytes of DGROUP — `0D 0A` at the end of the initialised region — and those two bytes moved every variable in the part under test, because the uninitialised region begins where the initialised one *ends* rather than where its paragraph padding ends. Worth 752 bytes of the coverage walk on part 003 alone. `Write(s, #13, #10)` did not avoid it; the same two bytes landed at the same address. **BIOS teletype does**: `INT $10` function `$0E` writes a character and touches no runtime, and the string literal lives in the code segment where literals passed to `Write` already live. `tools/mktests.py` generates a `Say` helper that does this, so every harness keeps its prompt *and* leaves the data segment alone. Across the ten parts that was +479 aligned bytes and took the count of parts with byte-identical initialised data from four to seven.
@@ -309,7 +309,7 @@ comparison to make when most of the routine is compiled code.
   and no locals, so the transcription differed at both ends while being
   identical in between. Now a plain procedure, and it matches.
 
-- **`PART3_MORPH.TransformPoint` declared two locals that are globals.** The
+- **`P3MORPH.TransformPoint` declared two locals that are globals.** The
   original is `ENTER 0006` -- three words, `LX`, `LY`, `LZ`. Ours was
   `ENTER 000A`, because `T1` and `T2` were in the `var` list; `1139:00b8` is
   `MOV [BEAA],DX`, a store to DGROUP, not to a frame slot. Moved to unit

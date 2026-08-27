@@ -3,7 +3,7 @@
 Raw findings, written down as they are read so the work survives a context
 reset. Everything here is off `NEUROSIS_004.exe`; nothing is inferred.
 
-**Part 004 is done.** `P4VGA.PAS`, `P4VT.PAS` and `PART4_LEMMINGS.PAS` are all
+**Part 004 is done.** `P4VGA.PAS`, `P4VT.PAS` and `P4LEMS.PAS` are all
 transcribed in full, with no inference and no stubs, and `TP4S1` builds. These
 notes are kept as the working record of how it was read; the source is the
 authority.

@@ -1,6 +1,6 @@
 # Part 3, Scene 6 — the wave particles
 
-`Demo_Scene6` at `120f:04d0`. Reconstruction: [`src/PART3_WAVES.PAS`](../src/PART3_WAVES.PAS).
+`Demo_Scene6` at `120f:04d0`. Reconstruction: [`src/P3WAVES.PAS`](../src/P3WAVES.PAS).
 
 ## What it is
 

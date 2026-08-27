@@ -1,6 +1,6 @@
 # Part 3, Scene 3 — the morphing object
 
-`Demo_Scene3` at `1139:03b4`. Reconstruction: [`src/PART3_MORPH.PAS`](../src/PART3_MORPH.PAS).
+`Demo_Scene3` at `1139:03b4`. Reconstruction: [`src/P3MORPH.PAS`](../src/P3MORPH.PAS).
 
 ## What it is
 

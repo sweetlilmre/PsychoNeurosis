@@ -14,7 +14,7 @@ dosbuild.py does it, so `run.bat` reaches it as E:\VT.EXE.
 NOTHING IS RENAMED. Turbo Pascal 7 finds a unit by the first EIGHT characters
 of its identifier, which is why the release's filenames are already truncations
 -- `UNIT SoundDevices` lives in SOUNDDEV.PAS and `uses SoundDevices` finds it.
-So unlike dosbuild.py, which has to map PART3_SPRITES.PAS onto P3SPRITE.PAS,
+So unlike dosbuild.py, which has to map P3SPRITE.PAS onto P3SPRITE.PAS,
 this stages the tree by straight binary copy. The sources are latin-1 with
 Spanish text in the comments and string constants; copying bytes keeps them
 intact.

@@ -132,15 +132,15 @@ list = [
   "P2S1.PAS",
   "P2S2.PAS",
   "NEUR2.PAS",
-  "PART3_TUNNEL.PAS",
-  "PART3_STARS.PAS",
-  "PART3_MORPH.PAS",
-  "PART3_GLOBE.PAS",
-  "PART3_BLOCKS.PAS",
-  "PART3_WAVES.PAS",
-  "PART3_SPRITES.PAS",
+  "P3TUNNEL.PAS",
+  "P3STARS.PAS",
+  "P3MORPH.PAS",
+  "P3GLOBE.PAS",
+  "P3BLOCKS.PAS",
+  "P3WAVES.PAS",
+  "P3SPRITE.PAS",
   "NEUR3.PAS",
-  "PART4_LEMMINGS.PAS",
+  "P4LEMS.PAS",
   "NEUR4.PAS",
   "P5S1.PAS",
   "P5S2.PAS",
@@ -207,15 +207,15 @@ alongside = ["*.BAT"]
 "P2S1.PAS" = ["P2S1.PAS", "P2S1", "P2S1"]
 "P2S2.PAS" = ["P2S2.PAS", "P2S2", "P2S2"]
 "NEUR2.PAS" = ["NEUR2.PAS", "Neur2", "Neur2"]
-"PART3_TUNNEL.PAS" = ["P3TUNNEL.PAS", "Part3Tunnel", "P3Tunnel"]
-"PART3_STARS.PAS" = ["P3STARS.PAS", "Part3Stars", "P3Stars"]
-"PART3_MORPH.PAS" = ["P3MORPH.PAS", "Part3Morph", "P3Morph"]
-"PART3_GLOBE.PAS" = ["P3GLOBE.PAS", "Part3Globe", "P3Globe"]
-"PART3_BLOCKS.PAS" = ["P3BLOCKS.PAS", "Part3Blocks", "P3Blocks"]
-"PART3_WAVES.PAS" = ["P3WAVES.PAS", "Part3Waves", "P3Waves"]
-"PART3_SPRITES.PAS" = ["P3SPRITE.PAS", "Part3Sprites", "P3Sprite"]
+"P3TUNNEL.PAS" = ["P3TUNNEL.PAS", "Part3Tunnel", "P3Tunnel"]
+"P3STARS.PAS" = ["P3STARS.PAS", "Part3Stars", "P3Stars"]
+"P3MORPH.PAS" = ["P3MORPH.PAS", "Part3Morph", "P3Morph"]
+"P3GLOBE.PAS" = ["P3GLOBE.PAS", "Part3Globe", "P3Globe"]
+"P3BLOCKS.PAS" = ["P3BLOCKS.PAS", "Part3Blocks", "P3Blocks"]
+"P3WAVES.PAS" = ["P3WAVES.PAS", "Part3Waves", "P3Waves"]
+"P3SPRITE.PAS" = ["P3SPRITE.PAS", "Part3Sprites", "P3Sprite"]
 "NEUR3.PAS" = ["NEUR3.PAS", "Neur3", "Neur3"]
-"PART4_LEMMINGS.PAS" = ["P4LEMS.PAS", "Part4Lemmings", "P4Lems"]
+"P4LEMS.PAS" = ["P4LEMS.PAS", "Part4Lemmings", "P4Lems"]
 "NEUR4.PAS" = ["NEUR4.PAS", "Neur4", "Neur4"]
 "P5S1.PAS" = ["P5S1.PAS", "P5S1", "P5S1"]
 "P5S2.PAS" = ["P5S2.PAS", "P5S2", "P5S2"]

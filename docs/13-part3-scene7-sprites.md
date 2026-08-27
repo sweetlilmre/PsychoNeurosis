@@ -1,6 +1,6 @@
 # Part 3, Scene 7 — the spinning portraits
 
-`Demo_Scene7` at `125e:0958`. Reconstruction: [`src/PART3_SPRITES.PAS`](../src/PART3_SPRITES.PAS).
+`Demo_Scene7` at `125e:0958`. Reconstruction: [`src/P3SPRITE.PAS`](../src/P3SPRITE.PAS).
 
 The closing scene of the part.
 

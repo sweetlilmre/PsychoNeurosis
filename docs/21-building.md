@@ -41,14 +41,14 @@ quits without a window.
 compiler's output is redirected to `D:\BUILD.LOG` *inside* the mounted drive
 and read back from the host afterwards.
 
-**DOS filenames are 8.3.** `PART3_SPRITES.PAS` cannot exist, so everything is
+**DOS filenames are 8.3.** `P3SPRITE.PAS` cannot exist, so everything is
 staged into `build/` under a short name and the `unit` declarations, `uses`
 clauses and `{$I}` directives are rewritten to match:
 
 | Source | Staged | Unit |
 |---|---|---|
-| `PART3_SPRITES.PAS` | `P3SPRITE.PAS` | `P3Sprite` |
-| `PART4_LEMMINGS.PAS` | `P4LEMS.PAS` | `P4Lems` |
+| `P3SPRITE.PAS` | `P3SPRITE.PAS` | `P3Sprite` |
+| `P4LEMS.PAS` | `P4LEMS.PAS` | `P4Lems` |
 | … | | |
 
 `build/` is generated and disposable; `src/` stays canonical.

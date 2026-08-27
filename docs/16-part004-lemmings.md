@@ -2,7 +2,7 @@
 
 `NEUROSIS.004`, MOD *The Deth March*. 121 functions, **no floating point at all**.
 
-Reconstruction: [`src/PART4_LEMMINGS.PAS`](../src/PART4_LEMMINGS.PAS).
+Reconstruction: [`src/P4LEMS.PAS`](../src/P4LEMS.PAS).
 
 This is not a scroller with lemming decorations. It is a **working Lemmings
 engine** — pixel-accurate terrain collision, destructible terrain, a ten-state

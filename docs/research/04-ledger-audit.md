@@ -41,7 +41,7 @@ VERIFICATION LEDGER
   TOTAL           18
 ```
 
-That is the whole output. The three follow-up sections printed nothing: **0 inferred rows, 0 empty bodies, 0 rows missing an address.** (The empty bodies the handover doc still lists — `PART4_LEMMINGS.DrawChar/Setup/SetupPeriodic`, `PART7_FLIC.ReferenceWork` — are genuinely gone; the only `begin end;` left anywhere in `src/` is inside a comment in `PART3_GLOBE.PAS`.)
+That is the whole output. The three follow-up sections printed nothing: **0 inferred rows, 0 empty bodies, 0 rows missing an address.** (The empty bodies the handover doc still lists — `P4LEMS.DrawChar/Setup/SetupPeriodic`, `PART7_FLIC.ReferenceWork` — are genuinely gone; the only `begin end;` left anywhere in `src/` is inside a comment in `P3GLOBE.PAS`.)
 
 `python tools/ledger.py --all` adds the full 18-row table:
 
@@ -62,15 +62,15 @@ That is the whole output. The three follow-up sections printed nothing: **0 infe
   P1S5               transcribed   12c5:052a      DrawPoint
   P1S5               transcribed   12c5:061d      RenderObject
   P2S2               transcribed   108b:0b42      DrawStars
-  PART3_BLOCKS       transcribed   11f3:0085      Ramp
-  PART3_MORPH        transcribed   1139:034d      GetPalette768
+  P3BLOCKS       transcribed   11f3:0085      Ramp
+  P3MORPH        transcribed   1139:034d      GetPalette768
 ```
 
 ## 3. Coverage, in numbers
 
 - **317** routines are implemented across the **34** non-test units in `src/` (implementation-section `procedure`/`function` headers; 398 headers total including interface re-declarations).
 - **18** ledger rows → **5.7%** of implemented routines. The "94% transcribed" figure is a percentage *of the 18 rows it found*, not of the reconstruction.
-- **8** of 34 units carry any tag at all: `P1S1`, `P1S2`, `P1S3`, `P1S4`, `P1S5`, `P2S2`, `PART3_BLOCKS`, `PART3_MORPH`.
+- **8** of 34 units carry any tag at all: `P1S1`, `P1S2`, `P1S3`, `P1S4`, `P1S5`, `P2S2`, `P3BLOCKS`, `P3MORPH`.
 - **26** of 34 units carry **zero** ledger rows, including every shared unit (`VGA` 26 routines, `DEMOVT` 12, `MODEX` 4, `FIXMATH` 4, `P2VIEW` 8) and every unit of parts 004, 005, 006, 007.
 
 ### Coverage by part
@@ -80,8 +80,8 @@ That is the whole output. The three follow-up sections printed nothing: **0 infe
 | 000 | none — not reconstructed | 0 | 0 |
 | 001 | P1S1–P1S5, P1INTRO | 56 | **15** |
 | 002 | P2S1, P2S2, P2VIEW, P2MAIN (+MODEX, FIXMATH shared) | 52+8 | **1** (`P2S2.DrawStars`) |
-| 003 | PART3_TUNNEL/STARS/MORPH/GLOBE/BLOCKS/WAVES/SPRITES, P3MAIN | 63 | **2** |
-| 004 | PART4_LEMMINGS | 32 | **0** |
+| 003 | P3TUNNEL/STARS/MORPH/GLOBE/BLOCKS/WAVES/SPRITES, P3MAIN | 63 | **2** |
+| 004 | P4LEMS | 32 | **0** |
 | 005 | P5S1–P5S3, P5MAIN | 23 | **0** |
 | 006 | P6S1–P6S4, P6MAIN | 29 | **0** |
 | 007 | P7S1, P7MAIN | 16 | **0** |
@@ -114,7 +114,7 @@ Net: **15 real rows, 3 spurious, 1 of the 15 mislabelled.** After correction the
 | an evidence field | absent — no field records what was done to check the routine |
 | a means-of-verification field | absent — the docstring calls `transcribed` "read out of the binary", but nothing distinguishes read-by-eye from byte-diffed |
 | a link to a test | absent — no reference to any `TP*` harness |
-| stable identity | weak — `name` only, unqualified; `PART4_LEMMINGS.Blit` and `P6S2.Blit`, and four separate `SetPalette768`/`GetPalette768`, collide on name |
+| stable identity | weak — `name` only, unqualified; `P4LEMS.Blit` and `P6S2.Blit`, and four separate `SetPalette768`/`GetPalette768`, collide on name |
 | a regression lock | absent — nothing fails, nothing is compared to a previous run; the only "regression" concept in the repo lives in `asmverify.py` |
 | completeness | absent — a routine with no tag is not "unknown", it is *not in the ledger at all*. 299 of 317 routines are silently outside it. |
 | grouping by part/scene | absent — `unit` is the only grouping, and it is a filename |
@@ -145,7 +145,7 @@ Where the two overlap they **disagree**: `asmverify` puts `1012:0311` at `P1S1.S
 12 unit(s) meet the rule, 39 do not.
 ```
 
-Checks two of the three transcription rules mechanically (a comment on every asm line; an `EQUIVALENT PASCAL` block within 50 lines above). Its own docstring is explicit that it cannot check rule 1 and that "a unit passing this is not the same as a unit that has been audited". Unit-level, not routine-level, so it cannot host a per-routine rung. Two caveats on the 39: (i) 12 of them are generated test harnesses (`TP*.PAS`, all flagged for the same `RestoreTextMode` line 22 — an artifact of `mktests.py`, not reconstruction debt), leaving **10 real units failing**: `P5S1`, `P5S2`, `P6S1`, `P6S2`, `P6S3`, `P6S4`, `P7MAIN`, `P7S1`, `PART3_BLOCKS`, `PART4_LEMMINGS`; (ii) most of its "uncommented" hits are asm **labels** (`@Sort:`, `@LeftTop:`) rather than instructions, so its counts overstate. Note `PART3_BLOCKS` now fails, which contradicts `docs/24-continuation.md` l.56 ("every unit [in part 003] now passes `tools/asmaudit.py`").
+Checks two of the three transcription rules mechanically (a comment on every asm line; an `EQUIVALENT PASCAL` block within 50 lines above). Its own docstring is explicit that it cannot check rule 1 and that "a unit passing this is not the same as a unit that has been audited". Unit-level, not routine-level, so it cannot host a per-routine rung. Two caveats on the 39: (i) 12 of them are generated test harnesses (`TP*.PAS`, all flagged for the same `RestoreTextMode` line 22 — an artifact of `mktests.py`, not reconstruction debt), leaving **10 real units failing**: `P5S1`, `P5S2`, `P6S1`, `P6S2`, `P6S3`, `P6S4`, `P7MAIN`, `P7S1`, `P3BLOCKS`, `P4LEMS`; (ii) most of its "uncommented" hits are asm **labels** (`@Sort:`, `@LeftTop:`) rather than instructions, so its counts overstate. Note `P3BLOCKS` now fails, which contradicts `docs/24-continuation.md` l.56 ("every unit [in part 003] now passes `tools/asmaudit.py`").
 
 ### `tools/undeclared.py` — unrelated to fidelity
 
@@ -161,7 +161,7 @@ Generates 29 harnesses: 23 scene programs (`TP1S1`–`TP1S5`, `TP2S1`–`TP2S2`,
 
 ### `docs/23-deviations.md` — complementary; the qualitative counterpart
 
-16 KB, 13 sections, prose. Records deliberate divergences (verbatim-asm framing, `PART3_MORPH.FadeStep` running off both ends of its buffer, computed shape offsets, `{$G+}`, stack checking off, part 007 `{$I-}`, the TASM 386 object). Section "Every transcribed assembler routine is byte-checked" is the human narrative of `asmverify`, and it is **already stale in one number** — it quotes `56 routine(s): 55 locked … 1 unconfirmed` in one paragraph and the current `71 routines, 71 locked, 0 failing` two paragraphs later. Deviations are indexed by topic, not by routine, so you cannot ask it "is routine X's difference intended?" without reading all of it.
+16 KB, 13 sections, prose. Records deliberate divergences (verbatim-asm framing, `P3MORPH.FadeStep` running off both ends of its buffer, computed shape offsets, `{$G+}`, stack checking off, part 007 `{$I-}`, the TASM 386 object). Section "Every transcribed assembler routine is byte-checked" is the human narrative of `asmverify`, and it is **already stale in one number** — it quotes `56 routine(s): 55 locked … 1 unconfirmed` in one paragraph and the current `71 routines, 71 locked, 0 failing` two paragraphs later. Deviations are indexed by topic, not by routine, so you cannot ask it "is routine X's difference intended?" without reading all of it.
 
 ### `docs/24-continuation.md` — the actual state of record, at part granularity
 

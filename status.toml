@@ -125,70 +125,70 @@ matched = 99
 [routine."P7S1.FliSS2"]
 matched = 98
 
-[routine."PART3_BLOCKS.BlockDown"]
+[routine."P3BLOCKS.BlockDown"]
 matched = 32
 
-[routine."PART3_BLOCKS.BlockUp"]
+[routine."P3BLOCKS.BlockUp"]
 matched = 32
 
-[routine."PART3_GLOBE.RenderFrame"]
+[routine."P3GLOBE.RenderFrame"]
 matched = 121
 
-[routine."PART3_MORPH.ClearPage"]
+[routine."P3MORPH.ClearPage"]
 matched = 62
 
-[routine."PART3_MORPH.DrawMorph"]
+[routine."P3MORPH.DrawMorph"]
 matched = 56
 
-[routine."PART3_MORPH.DrawShape"]
+[routine."P3MORPH.DrawShape"]
 matched = 92
 
-[routine."PART3_MORPH.FlipPage"]
+[routine."P3MORPH.FlipPage"]
 matched = 29
 
-[routine."PART3_MORPH.GetPalette768"]
+[routine."P3MORPH.GetPalette768"]
 matched = 24
 
-[routine."PART3_MORPH.PlotPixel"]
+[routine."P3MORPH.PlotPixel"]
 matched = 62
 
-[routine."PART3_MORPH.Set400Lines"]
+[routine."P3MORPH.Set400Lines"]
 matched = 12
 
-[routine."PART3_MORPH.SetAngles"]
+[routine."P3MORPH.SetAngles"]
 matched = 18
 
-[routine."PART3_MORPH.SetPalette768"]
+[routine."P3MORPH.SetPalette768"]
 matched = 40
 
-[routine."PART3_MORPH.StepAngles"]
+[routine."P3MORPH.StepAngles"]
 matched = 390
 
-[routine."PART3_MORPH.TransformPoint"]
+[routine."P3MORPH.TransformPoint"]
 matched = 293
 
-[routine."PART3_SPRITES.DrawRotated"]
+[routine."P3SPRITE.DrawRotated"]
 matched = 103
 
-[routine."PART3_WAVES.StepEraseDraw"]
+[routine."P3WAVES.StepEraseDraw"]
 matched = 59
 
-[routine."PART4_LEMMINGS.Blit"]
+[routine."P4LEMS.Blit"]
 matched = 63
 
-[routine."PART4_LEMMINGS.ColumnSlideIn"]
+[routine."P4LEMS.ColumnSlideIn"]
 matched = 112
 
-[routine."PART4_LEMMINGS.CopyScreen"]
+[routine."P4LEMS.CopyScreen"]
 matched = 30
 
-[routine."PART4_LEMMINGS.HLine"]
+[routine."P4LEMS.HLine"]
 matched = 38
 
-[routine."PART4_LEMMINGS.ScrollRender"]
+[routine."P4LEMS.ScrollRender"]
 matched = 60
 
-[routine."PART4_LEMMINGS.VLine"]
+[routine."P4LEMS.VLine"]
 matched = 44
 
 [routine."VGA.ClearScreen"]
@@ -821,7 +821,7 @@ state = "open"
 
 [[plan.investigation]]
 name = "bss-sweep-all-parts"
-finding = "THE BSS SWEEP ACROSS ALL NINE PARTS, in one struct read each and no disassembler, and it is the worklist for the 99% target. The MZ header's minalloc field is the loader's uninitialised-data request in paragraphs; the difference from the original's is the exact shortfall. Ours against theirs: 004 is 2,768 bytes SHORT -- the largest. 002 is 2,096 short. 005 is 384 bytes OVER, the only surplus. 003 is 128 short. 006 is 48 short. And 000, 001, 007 and 009 are EXACT. PART 001'S IS NOW EXACT, which is the headline: it was 16,704 bytes short at the start of the day and matches to the paragraph. AND PART 002 IS THE INSTRUCTIVE ONE: it is 2,096 bytes short of data and its coverage walk reads 99.9%. So a data shortfall does NOT necessarily show up in the code walk -- that part's code evidently makes few absolute data references, or the ones it makes fall inside the walk's short-difference tolerance. The two instruments measure different things and neither implies the other. Do not read a high walk percentage as evidence the data is right, and do not expect fixing the data to move the walk by itself; on part 001 a 16.7KB correction moved it three bytes. WHERE 004's 2,768 BYTES ARE, localised but not yet identified. dsgaps over PART4_LEMMINGS.PAS shows EVERY sprite bank tiling exactly against its declaration -- WalkBank 432, SplatBank 480, DigBank 1,326, TunnelBk 420, DeathBBk 800, DeathABk 648, BuildBank 720 -- with ONE exception: TumbleBk is declared array[1..4] of array[0..99], which is 400 bytes, and the gap from $06D2 to SplatBank at $12B8 is 3,046. So 2,646 bytes are unaccounted between them, which is most of the shortfall. There IS something in that gap: segment 1005 references $1240, which is 120 bytes below SplatBank, and nothing else in the range. So the region reads as TumbleBk, then a large undeclared block, then a 120-byte block at $1240, then SplatBank. Read what 1005 does with $1240 first -- and note 3,046 does not divide by 4, so TumbleBk simply being bigger does not explain it."
+finding = "THE BSS SWEEP ACROSS ALL NINE PARTS, in one struct read each and no disassembler, and it is the worklist for the 99% target. The MZ header's minalloc field is the loader's uninitialised-data request in paragraphs; the difference from the original's is the exact shortfall. Ours against theirs: 004 is 2,768 bytes SHORT -- the largest. 002 is 2,096 short. 005 is 384 bytes OVER, the only surplus. 003 is 128 short. 006 is 48 short. And 000, 001, 007 and 009 are EXACT. PART 001'S IS NOW EXACT, which is the headline: it was 16,704 bytes short at the start of the day and matches to the paragraph. AND PART 002 IS THE INSTRUCTIVE ONE: it is 2,096 bytes short of data and its coverage walk reads 99.9%. So a data shortfall does NOT necessarily show up in the code walk -- that part's code evidently makes few absolute data references, or the ones it makes fall inside the walk's short-difference tolerance. The two instruments measure different things and neither implies the other. Do not read a high walk percentage as evidence the data is right, and do not expect fixing the data to move the walk by itself; on part 001 a 16.7KB correction moved it three bytes. WHERE 004's 2,768 BYTES ARE, localised but not yet identified. dsgaps over P4LEMS.PAS shows EVERY sprite bank tiling exactly against its declaration -- WalkBank 432, SplatBank 480, DigBank 1,326, TunnelBk 420, DeathBBk 800, DeathABk 648, BuildBank 720 -- with ONE exception: TumbleBk is declared array[1..4] of array[0..99], which is 400 bytes, and the gap from $06D2 to SplatBank at $12B8 is 3,046. So 2,646 bytes are unaccounted between them, which is most of the shortfall. There IS something in that gap: segment 1005 references $1240, which is 120 bytes below SplatBank, and nothing else in the range. So the region reads as TumbleBk, then a large undeclared block, then a 120-byte block at $1240, then SplatBank. Read what 1005 does with $1240 first -- and note 3,046 does not divide by 4, so TumbleBk simply being bigger does not explain it."
 seen_in = "TPART4"
 state = "open"
 

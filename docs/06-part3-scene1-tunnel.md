@@ -1,6 +1,6 @@
 # Part 3, Scene 1 — the tunnel
 
-`Demo_Scene1` at `1015:098d`. Reconstruction: [`src/PART3_TUNNEL.PAS`](../src/PART3_TUNNEL.PAS).
+`Demo_Scene1` at `1015:098d`. Reconstruction: [`src/P3TUNNEL.PAS`](../src/P3TUNNEL.PAS).
 
 ## What it actually is
 

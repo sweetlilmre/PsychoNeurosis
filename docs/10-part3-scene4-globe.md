@@ -1,6 +1,6 @@
 # Part 3, Scene 4 — the globe
 
-`Demo_Scene4` at `119d:0211`. Reconstruction: [`src/PART3_GLOBE.PAS`](../src/PART3_GLOBE.PAS).
+`Demo_Scene4` at `119d:0211`. Reconstruction: [`src/P3GLOBE.PAS`](../src/P3GLOBE.PAS).
 
 ## What it is
 

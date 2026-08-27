@@ -1,7 +1,7 @@
 # Part 3, Scene 5 — the block dissolve
 
 `Demo_Scene5` at `11f3:01ac`, body at `11f3:0017`.
-Reconstruction: [`src/PART3_BLOCKS.PAS`](../src/PART3_BLOCKS.PAS).
+Reconstruction: [`src/P3BLOCKS.PAS`](../src/P3BLOCKS.PAS).
 
 ## What it is
 
