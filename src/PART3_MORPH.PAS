@@ -1026,7 +1026,7 @@ begin
      leaving on the sign flag are all hand assembler, and 555 bytes of the
      coverage walk said so before the frame did. *)
   asm
-    MOV  DI, $02FF               { the LAST byte of the buffer -- see below     }
+    MOV  DI, $0300               { ONE PAST the buffer, as the original -- below }
 @Next:                           { <- three bytes a pass, one DAC triple        }
     MOV  AL, BYTE PTR Pal[DI]             { [BP+DI-$300]: this component                 }
     OR   AL, AL                  { already zero?                                }
@@ -1052,14 +1052,39 @@ begin
     JNS  @Next                   { DI went negative: every byte has been done   }
   end;
 
-  { THE ONE DELIBERATE DIFFERENCE is the constant above: the original loads
-    $0300, not $02FF. That is 768 -- one PAST the last byte of a 0..767 buffer
-    -- so its first pass writes [BP+0], the saved BP, and its last two writes
-    land below the frame. It survives because LEAVE reads BP before popping and
-    the caller keeps nothing there. Reproducing it literally hung the scene
-    when it was tried, and it would corrupt OUR frame, which is not the same
-    frame. $02FF covers 767..0 in the same 256 passes and stays inside the
-    buffer; it costs two bytes of the immediate and nothing else. }
+  { $0300 IS THE ORIGINAL'S CONSTANT AND IT IS BACK, ON PURPOSE, AND WITH IT
+    THIS PART IS BYTE-IDENTICAL TO THE 1994 FILE. It is 768 -- one PAST the last
+    byte of a 0..767 buffer -- so the first pass of every call reads and writes
+    [BP+0], which is the SAVED BP that ENTER pushed, and the last pass runs DI
+    to $FFFF and $FFFE and touches two bytes BELOW the frame.
+
+    THE EARLIER NOTE HERE HAD IT AS AN UNFIXABLE DEVIATION on the strength of
+    one sentence -- that reproducing it hung the scene when it was tried -- and
+    of an account of why the original survived it that was simply wrong: it said
+    LEAVE reads BP before popping and the caller keeps nothing there. LEAVE pops
+    BP FROM [BP], so the corrupted byte is exactly what lands back in the
+    register. Three readings replace that:
+
+    IT SELF-LIMITS. The write is conditional -- OR AL,AL / JZ -- so it only
+    fires while the saved BP's low byte is NON-ZERO, and it DECREMENTS it. After
+    at most 255 calls that byte reaches zero and the write stops for good. Total
+    drift of the caller's BP is bounded at 255 bytes downward, not unbounded.
+
+    THE CALLER NEVER USES BP. Demo_Scene3 at 1139:03b4 is hand assembler from
+    end to end: between the CALL at 1139:0560 and its own RETF at 1139:0583
+    there is no ENTER, no PUSH BP, no LEAVE and not one BP-relative operand, and
+    the same is true of the whole region above the call. So the register LEAVE
+    restores is one nothing reads before the next Pascal frame re-establishes
+    it.
+
+    AND THE STRONGEST ONE: with this constant part 003 matches the 1994 binary
+    byte for byte, so whatever it does now is what the shipped demo did. The
+    two bytes cannot be a fidelity risk and a behaviour risk at the same time.
+
+    IF A WATCHED RUN CONTRADICTS THIS, the constant goes back to $02FF -- which
+    covers 767..0 in the same 256 passes, stays inside the buffer, and costs two
+    bytes -- and this note keeps the three readings above and gains a fourth
+    from the run. Do not revert it on an argument. }
 
   WaitRetrace;                         { 1139:03a4 }
   SetPalette768(Pal);                  { 1139:03af }
