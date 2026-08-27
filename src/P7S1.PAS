@@ -373,21 +373,40 @@ end;
 
   A count of zero means 256.
   -------------------------------------------------------------------------- }
-procedure FliColor256(Hdr, Data : Pointer); far;
+{ `var Data`, NOT `Data : Pointer`, AND EVERY OTHER CHUNK HANDLER IN THIS UNIT
+  ALREADY SAID SO -- FliCopy, FliSS2, FliLC and FliBrun all take an untyped var
+  parameter, and TChunkProc is declared that way too. These two were the odd
+  pair. The tell is the pointer load: the original does ONE
+  LES DI,[BP+$06] / MOV AX,ES / store / MOV AX,DI / store, reusing DI for the
+  offset half, which is what an untyped var parameter's address gives. With
+  `Data : Pointer` and Seg(Data^) / Ofs(Data^) the compiler reloads the pointer
+  for the second expression -- a second LES DI,[BP+$06], three bytes, in each of
+  the two routines. }
+procedure FliColor256(Hdr : Pointer; var Data); far;
 var
-  Base    : Integer;                { [BP-$08]  the DAC register to start at }
+  { DECLARED IN SLOT ORDER, WHICH IS NOT THE ORDER THEY READ IN. Locals go down
+    from BP in declaration order, so the first named gets [BP-$02]; the slots
+    recorded beside these four have always said Start $02, Sg $04, Cur $06,
+    Base $08, and nothing had checked the declaration against them. Declared
+    Base first, 100f:00e4 zeroed [BP-$02] where the original zeroes [BP-$08]. }
   Start   : Word;                   { [BP-$02]                              }
-  Cur     : Word;                   { [BP-$06]                              }
   Sg      : Word;                   { [BP-$04]                              }
+  Cur     : Word;                   { [BP-$06]                              }
+  Base    : Integer;                { [BP-$08]  the DAC register to start at }
   Packets : Integer;                { [BP-$0a] / [BP-$15]                   }
   I, J    : Integer;                { [BP-$0e] / [BP-$0c]                   }
   Skip    : Integer;                { [BP-$10]                              }
   Cnt     : Integer;                { [BP-$12]                              }
-  Last    : Integer;                { [BP-$17]                              }
+  { NO `Last` HERE. The loop below takes Cnt * 3 - 1 as its bound directly and
+    TP7 makes ONE hidden temporary for it, at [BP-$17]. Declared as a variable
+    the expression was stored there and then COPIED into the temporary the for
+    loop makes anyway -- 100f:0169 in ours was MOV AX,[BP-$14] / MOV [BP-$18],AX,
+    six bytes for a value that was already in AX. Same class as part 002's
+    108b:0bb9 and the wiki's loop-limit-is-a-temporary. }
 begin
   Base  := 0;                                     { 100f:00e2 }
-  Sg    := Seg(Data^);                            { 100f:00ea }
-  Cur   := Ofs(Data^);                            { 100f:00ef }
+  Sg    := Seg(Data);                            { 100f:00ea }
+  Cur   := Ofs(Data);                            { 100f:00ef }
   Start := Cur;                                   { 100f:00f4 }
   Packets := MemW[Sg : Cur];                      { 100f:0102 }
   Inc(Cur, 2);                                    { 100f:0108 }
@@ -399,8 +418,7 @@ begin
     if Cnt = 0 then Cnt := 256;                   { 100f:014b }
     Inc(Base, Skip);                              { 100f:0159 }
 
-    Last := Cnt * 3 - 1;                          { 100f:015f }
-    for J := 0 to Last do                         { 100f:0169 }
+    for J := 0 to Cnt * 3 - 1 do                  { 100f:015f, limit at [BP-$17] }
     begin
       Mem[Sg : Cur] := Mem[Sg : Cur] shr 2;       { 100f:0180, 100f:0192 }
       Inc(Cur);                                   { 100f:0195 }
@@ -428,7 +446,16 @@ end;
   an FLI COLOR chunk already holds 6-bit values, so there is nothing to
   scale and nothing to wind back over.
   -------------------------------------------------------------------------- }
-procedure FliColor(Hdr, Data : Pointer); far;
+{ `var Data`, NOT `Data : Pointer`, AND EVERY OTHER CHUNK HANDLER IN THIS UNIT
+  ALREADY SAID SO -- FliCopy, FliSS2, FliLC and FliBrun all take an untyped var
+  parameter, and TChunkProc is declared that way too. These two were the odd
+  pair. The tell is the pointer load: the original does ONE
+  LES DI,[BP+$06] / MOV AX,ES / store / MOV AX,DI / store, reusing DI for the
+  offset half, which is what an untyped var parameter's address gives. With
+  `Data : Pointer` and Seg(Data^) / Ofs(Data^) the compiler reloads the pointer
+  for the second expression -- a second LES DI,[BP+$06], three bytes, in each of
+  the two routines. }
+procedure FliColor(Hdr : Pointer; var Data); far;
 var
   { DECLARATION ORDER IS THE OFFSETS, READ BACKWARDS. Turbo Pascal gives the
     first-declared local the address nearest BP, so the original's offsets fix
@@ -469,8 +496,8 @@ begin
     That points at hand assembler, and the routing supports it: a compiler
     holding the offset in DI has no reason to move it through AX before
     storing, and the original does that for BOTH halves, symmetrically. }
-  Sg    := Seg(Data^);                            { 100f:01e8 }
-  Cur   := Ofs(Data^);                            { 100f:01ed }
+  Sg    := Seg(Data);                            { 100f:01e8 }
+  Cur   := Ofs(Data);                            { 100f:01ed }
   Start := Cur;                                   { 100f:01f2 }
   Packets := MemW[Sg : Cur];                      { 100f:0200 }
   Inc(Cur, 2);                                    { 100f:0206 }
@@ -655,9 +682,12 @@ var
   T1             : LongInt;   { [BP-$12] }
   { FOUR BYTES DECLARED AND NEVER READ. ENTER $16 is 22 bytes and the routine
     references nine word slots from [BP-2] down to [BP-$12], which is 18 -- so
-    four more are declared below T1 and nothing touches them. LongInt because
-    every other local here is one; the type is a guess and the size is not. }
-  Spare          : LongInt;   { [BP-$16] }
+    four more are declared below T1. IT IS NOT SPARE, and the note that used to
+    say "nothing touches them" was reading past 100f:0383: the original stores
+    the difference T1 - T0 there and reads it straight back before adding it to
+    Acc. So it is a named intermediate, and LongInt is now measured rather than
+    guessed -- the store is MOV [BP-$16],AX / MOV [BP-$14],DX, a full 32 bits. }
+  Delta          : LongInt;   { [BP-$16] }
 begin
   asm
     MOV  AL, 34h           { 100f:0321  counter 0, both bytes, mode 2, binary}
@@ -678,7 +708,12 @@ begin
     T0   := ReadTimer;                            { 100f:0343 }
     Junk := T0 * 1000 div 1234;                   { 100f:0353, 100f:035d }
     T1   := ReadTimer;                            { 100f:036d }
-    Inc(Acc, T1 - T0);                            { 100f:037d, 100f:038f }
+    { THROUGH Delta, NOT DIRECTLY. 100f:0383 stores the difference into
+      [BP-$16] and 100f:0389 reads it back before the ADD [BP-6],AX /
+      ADC [BP-4],DX -- twelve bytes for a value that was already in DX:AX.
+      Inc(Acc, T1 - T0) skips both and cannot match. }
+    Delta := T1 - T0;                             { 100f:037d, 100f:0383 }
+    Inc(Acc, Delta);                              { 100f:0389, 100f:038f }
   end;
   Overhead := Acc div 100;                        { 100f:03a1, 100f:03ab }
 end;
@@ -772,7 +807,13 @@ var
   Speed  : Word;                    { [BP-$233] }
   Key    : Char;                    { [BP-$234] }
   Stop   : Boolean;                 { [BP-$235] -- cleared, never set }
-  Chunks : Word;                    { [BP-$237] }
+  { CHUNKS IS THE FOR LOOP'S OWN TEMPORARY, NOT A DECLARED VARIABLE, and
+    [BP-$237] is where TP7 puts it. 100f:0581 evaluates Fr.Chunks straight into
+    that slot and 100f:058c compares against it -- there is no second copy.
+    Declared, ours evaluated into [BP-$237] and then copied to the temporary the
+    loop makes anyway, at [BP-$239]: six bytes for a value already in AX. Second
+    site in this unit, and the wiki's loop-limit-is-a-temporary covers the
+    class. }
 begin
   Stop := False;                                  { 100f:046e }
   Play := 0;                                      { 100f:0475 }
@@ -821,9 +862,7 @@ begin
   repeat
     Stamp := ReadTimer;                           { 100f:0561 }
     BlockRead(F, Fr, SizeOf(Fr));                 { 100f:057c }
-    Chunks := Fr.Chunks;                          { 100f:0581 }
-
-    for N := 1 to Chunks do                       { 100f:0589 }
+    for N := 1 to Fr.Chunks do                    { 100f:0581, limit at [BP-$237] }
     begin
       BlockRead(F, Ch, 6);                        { 100f:05b0 -- a literal 6,
                                                     not SizeOf: 100f:05aa
