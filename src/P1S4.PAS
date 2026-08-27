@@ -816,26 +816,30 @@ begin
         instrument, and recorded in part1-p1s4-three-bytes rather than guessed at:
         whatever the original wrote loads the address once WITHOUT a with's entry
         sequence, and nobody has found the spelling. }
-      { THREE PLAIN STATEMENTS, AND THE LAST SIX BYTES OF PART 001 ARE HERE.
-        1107:04bc loads LES DI,[BP+$0A] ONCE and the three add pairs then take
-        es:[di], es:[di+4] and es:[di+8] with NO further load. Ours reloads
-        before the second and the third: C4 7E 0A twice, three bytes each.
+      { BARE FIELD NAMES, THROUGH THE `with` -- and this closed the last six
+        bytes of part 001's code. 1107:04bc loads the record's address ONCE and
+        the three add pairs then take es:[di], es:[di+4] and es:[di+8] with no
+        further load, because these three statements are adjacent and call
+        nothing: TP7 reloads from the with's slot only after a CALL, and there is
+        none between them. SortOutp's note in this file had the rule already --
+        a `with` whose body calls nothing keeps the address in ES:DI -- and it
+        applies to a RUN of statements inside a body that calls things elsewhere,
+        which is what took so long to see.
 
-        TWO SPELLINGS ELIMINATED BY MEASUREMENT, not by argument:
-          bare field names through the outer `with Base^` -- that resolves to the
-            hidden slot at [BP-$13] and the original plainly loads [BP+$0A];
+        THREE SPELLINGS WERE TRIED AND TWO MEASURED WORSE, which is why the
+        wrong ones are named here rather than left to be re-derived:
+          Base^.Trail[0].field, spelled out three times -- the compiler reloads
+            the PARAMETER before the second and the third, three bytes each, and
+            that was the six;
           a NESTED `with Base^.Trail[0]` -- it loads once, but a with is
             allocated its own four-byte address slot whether it needs one or not,
-            so the frame went ENTER $18 where the original has ENTER $14, and the
-            unit came out nineteen bytes long instead of six.
-        So the original is three statements whose ES:DI simply survived, and no
-        spelling found so far makes TP7 keep it across the two intervening
-        stores. SortOutp's note in this file records that a `with` whose body
-        calls nothing keeps the address in ES:DI -- these three call nothing, and
-        that is the thread to pull next. }
-      T.X := T.X + Base^.Trail[0].X;           { 1107:04bf }
-      T.Y := T.Y + Base^.Trail[0].Y;
-      T.Z := T.Z + Base^.Trail[0].Z;
+            so the frame went ENTER $18 where the original has ENTER $14 and the
+            unit came out nineteen bytes long.
+        The reading that said the original loads [BP+$0A] here was reading the
+        operand of a load that IS the with's slot in the correct build. }
+      T.X := T.X + Trail[0].X;                 { 1107:04bf }
+      T.Y := T.Y + Trail[0].Y;
+      T.Z := T.Z + Trail[0].Z;
       Project(T.X, T.Y, T.Z);                 { 1107:0503 }
       { THE ORDER IS X, Y, D, FLAG, AND D COMES AFTER Project, NOT BEFORE.
         1107:0528 pushes [BP-7] and [BP-5] -- the two halves of T.Z -- to
