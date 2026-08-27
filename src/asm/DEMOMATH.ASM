@@ -109,6 +109,21 @@ FixMul  PROC    NEAR
         ret     8                       ; 1102:03A1
 FixMul  ENDP
 
+; ONE BYTE OF PADDING, AND IT IS IN THE ORIGINAL. FixMul is 19 bytes, so FixDiv
+; would start at an ODD offset in this object -- and every one of the three
+; binaries this file is linked into has a NOP there instead: 12c5:0af8, and the
+; same byte in part 001 scene 4 and part 002 scene 2. EVEN emits exactly that
+; 90 and nothing when the offset is already even, which is why it is written as
+; an alignment directive rather than a bare `nop`.
+;
+; IT WAS WORTH 3,391 BYTES. Without it every byte of part 001 scene 5 from
+; 12c5:0af8 to the end of the segment was one place out -- the whole
+; hand-assembler tail and all three external routines -- and the same one-byte
+; drift showed in scene 4 and in part 002 as a row progseg labels
+; "past the init -- .OBJ". A coverage walk cannot see it, because it locates
+; each segment by content and one byte of slide still matches almost everything.
+        EVEN
+
 ; ----------------------------------------------------------------------------
 ; FixDiv -- function FixDiv(A, B : LongInt) : LongInt;
 ;
@@ -155,6 +170,12 @@ FixDiv  ENDP
 ; COSINE -- checked against RotatePoint below, which needs it in the cosine
 ; position for the matrix to come out orthogonal.
 ; ----------------------------------------------------------------------------
+; EVEN before this one too -- see the note above FixDiv. Every routine in this
+; object starts at an EVEN offset in the original: taking FixMul's address as
+; the segment base, FixDiv is at 20, SinCos at 3,656, RotatePoint at 3,834 and
+; Project at 4,168. EVEN costs nothing where the offset is already even, so it
+; is written before each and the assembler decides.
+        EVEN
 SinCos  PROC    NEAR
         push    bp
         mov     bp,sp
@@ -255,6 +276,12 @@ SinCos  ENDP
 ; ECX is Y, EDI is Z, ESI is the term being built -- and only the six IMULs
 ; touch memory. There is no clipping and no depth test; Project does that.
 ; ----------------------------------------------------------------------------
+; EVEN before this one too -- see the note above FixDiv. Every routine in this
+; object starts at an EVEN offset in the original: taking FixMul's address as
+; the segment base, FixDiv is at 20, SinCos at 3,656, RotatePoint at 3,834 and
+; Project at 4,168. EVEN costs nothing where the offset is already even, so it
+; is written before each and the assembler decides.
+        EVEN
 RotatePoint PROC NEAR
         push    bp
         mov     bp,sp
@@ -387,6 +414,12 @@ RotatePoint ENDP
 ; Integer, which puts the sign back. That is the original's behaviour and the
 ; reason its clipping tests read the way they do.
 ; ----------------------------------------------------------------------------
+; EVEN before this one too -- see the note above FixDiv. Every routine in this
+; object starts at an EVEN offset in the original: taking FixMul's address as
+; the segment base, FixDiv is at 20, SinCos at 3,656, RotatePoint at 3,834 and
+; Project at 4,168. EVEN costs nothing where the offset is already even, so it
+; is written before each and the assembler decides.
+        EVEN
 Project PROC    NEAR
         push    bp
         mov     bp,sp

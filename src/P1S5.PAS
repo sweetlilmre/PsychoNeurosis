@@ -574,6 +574,72 @@ end;
   the reflection -- and RenderObject calls it before drawing anything. It was
   missing here entirely.
   -------------------------------------------------------------------------- }
+{ Load IS DEFINED HERE, BETWEEN ObjTranslate AND DrawPoint, AND THE SEGMENT
+  SAYS SO. 12c5:0413 opens ENTER $482 -- 1,154 bytes, which is the 768-byte
+  palette buffer at [BP-$481] plus the rest -- and then runs Assign against the
+  string at CS:$0406, Reset, Seek to $0003BB02 and two BlockReads, of $34 bytes
+  into DS:$A5C2 and $300 into that local. That is this routine and nothing else.
+
+  Defined near the end of the file instead, its 279 bytes were missing from
+  between 12c5:03a2 and 12c5:052a and every routine after ObjTranslate was
+  displaced. Definition order is segment order. }
+
+{ --------------------------------------------------------------------------
+  Vector_Load (12c5:0413) -- NEUROSIS.DAT $03BB02:
+
+      52   the point sprite (a 2-byte W,H header and 50 pixels) -> DS:$A5C2
+      768  palette
+
+  Then it paints the backdrop the objects fly over:
+
+      FillChar(VirtScr, 64000, 0)
+      for I := 100 to 255 do SetRGB(I, 0, 0, (I - 50) shr 2)   (* blue ramp *)
+      for I :=   2 to 133 do horizontal line, colour I + 122
+      for I := 134 to 199 do horizontal line, colour 255 - (I - 133)
+  -------------------------------------------------------------------------- }
+procedure Load;
+var
+  { ENTER $482 IS 1,154 BYTES AND EVERY PART OF IT IS PINNED, because Pal's
+    base is the one local address the routine names. Only two slots are
+    referenced in the whole routine: [BP-1], which 12c5:0495 sets to $64 and
+    12c5:049b INCs -- a BYTE, and the counter of `for I := 100 to 255` -- and
+    [BP-$481], which 12c5:045b and 12c5:046d LEA for the BlockRead and then for
+    SetPalette768.
+
+    First declared is nearest BP, so I is first at [BP-1]. Working forward:
+    1 + 256 + 128 + 768 = 1,153, which puts Pal's base at exactly [BP-$481].
+    That is the check -- no other arrangement of those sizes lands there, and
+    ENTER rounds 1,153 up to the even 1,154.
+
+    So there are 384 bytes here that nothing reads. Their SIZES are forced by
+    Pal's address; their TYPES are a guess, and two strings are chosen because
+    P1S4's loader has an unreferenced String[127] in the same position and a
+    filename buffer is the obvious thing for a loader to declare and then take
+    from a constant instead. }
+  I      : Byte;                        { [BP-1] }
+  Spare1 : String;                      { [BP-$101], 256, never read }
+  Spare2 : String[127];                 { [BP-$181], 128, never read }
+  { The palette IS a local -- 12c5:046d LEAs [BP-$481] straight into
+    SetPalette768 (1491:01c2) and nothing keeps a copy. }
+  Pal    : array[0..767] of Byte;       { [BP-$481] }
+begin
+  Assign(F, 'neurosis.dat');
+  Reset(F, 1);
+  Seek(F, $03BB02);
+  BlockRead(F, ObjMeta, SizeOf(ObjMeta));
+  BlockRead(F, Pal, 768);
+  SetPalette768(@Pal);                 { before the Close, as the binary has it }
+  Close(F);
+
+  FillChar(Mem[VirtScrSeg : 0], 64000, 0);
+  for I := 100 to 255 do
+    SetRGB(I, 0, 0, (I - 50) shr 2);
+  for I := 2 to $85 do
+    DrawLine(0, I, $13F, I, I + $7A, VirtScrSeg);
+  for I := $86 to 199 do
+    DrawLine(0, I, $13F, I, $FF - (I - $85), VirtScrSeg);
+end;
+
 { --------------------------------------------------------------------------
   12c5:052a -- the point sprite. HAND ASSEMBLER, transcribed verbatim.
 
@@ -820,6 +886,39 @@ begin
     end;
 end;
 
+{ FadeToWhite IS DEFINED BEFORE Animate: 12c5:06d0 against Animate's 12c5:075e.
+  Defined after it, the two came out swapped -- mapping our routines onto the
+  original by content put ours at 07f4 where the original has 06d0. }
+
+{ --------------------------------------------------------------------------
+  12c5:06d0 -- FadeToWhite
+
+  Forty passes. Each waits for retrace, then walks colours 1..255 doing
+  GetRGB / bump every channel that is still below $3F / SetRGB. So the whole
+  palette climbs to white before the wipe.
+
+  The source had a "DrawStatic" here -- a redraw of the last frame. There is
+  no such call in Vector_Run; this is what 12c5:0a1e actually reaches.
+  -------------------------------------------------------------------------- }
+procedure FadeToWhite;
+var
+  Pass, Col : Integer;
+  R, G, B   : Byte;
+begin
+  for Pass := 1 to FadeSteps do
+  begin
+    WaitRetrace;
+    for Col := 1 to 255 do
+    begin
+      GetRGB(Col, R, G, B);
+      if R < $3F then Inc(R);
+      if G < $3F then Inc(G);
+      if B < $3F then Inc(B);
+      SetRGB(Col, R, G, B);
+    end;
+  end;
+end;
+
 { --------------------------------------------------------------------------
   Vector_Animate (12c5:075e)
 
@@ -913,35 +1012,6 @@ begin
     ObjTranslate(@Obj, Dx, Dy, Dz);                      { 12c5:084e }
 
     if KeyPressed then Exit;            { 12c5:0851 }
-  end;
-end;
-
-{ --------------------------------------------------------------------------
-  12c5:06d0 -- FadeToWhite
-
-  Forty passes. Each waits for retrace, then walks colours 1..255 doing
-  GetRGB / bump every channel that is still below $3F / SetRGB. So the whole
-  palette climbs to white before the wipe.
-
-  The source had a "DrawStatic" here -- a redraw of the last frame. There is
-  no such call in Vector_Run; this is what 12c5:0a1e actually reaches.
-  -------------------------------------------------------------------------- }
-procedure FadeToWhite;
-var
-  Pass, Col : Integer;
-  R, G, B   : Byte;
-begin
-  for Pass := 1 to FadeSteps do
-  begin
-    WaitRetrace;
-    for Col := 1 to 255 do
-    begin
-      GetRGB(Col, R, G, B);
-      if R < $3F then Inc(R);
-      if G < $3F then Inc(G);
-      if B < $3F then Inc(B);
-      SetRGB(Col, R, G, B);
-    end;
   end;
 end;
 
@@ -1125,62 +1195,6 @@ begin
       ADD WORD PTR in place. }
     W := W + 640;
   until W >= 64000;
-end;
-
-{ --------------------------------------------------------------------------
-  Vector_Load (12c5:0413) -- NEUROSIS.DAT $03BB02:
-
-      52   the point sprite (a 2-byte W,H header and 50 pixels) -> DS:$A5C2
-      768  palette
-
-  Then it paints the backdrop the objects fly over:
-
-      FillChar(VirtScr, 64000, 0)
-      for I := 100 to 255 do SetRGB(I, 0, 0, (I - 50) shr 2)   (* blue ramp *)
-      for I :=   2 to 133 do horizontal line, colour I + 122
-      for I := 134 to 199 do horizontal line, colour 255 - (I - 133)
-  -------------------------------------------------------------------------- }
-procedure Load;
-var
-  { ENTER $482 IS 1,154 BYTES AND EVERY PART OF IT IS PINNED, because Pal's
-    base is the one local address the routine names. Only two slots are
-    referenced in the whole routine: [BP-1], which 12c5:0495 sets to $64 and
-    12c5:049b INCs -- a BYTE, and the counter of `for I := 100 to 255` -- and
-    [BP-$481], which 12c5:045b and 12c5:046d LEA for the BlockRead and then for
-    SetPalette768.
-
-    First declared is nearest BP, so I is first at [BP-1]. Working forward:
-    1 + 256 + 128 + 768 = 1,153, which puts Pal's base at exactly [BP-$481].
-    That is the check -- no other arrangement of those sizes lands there, and
-    ENTER rounds 1,153 up to the even 1,154.
-
-    So there are 384 bytes here that nothing reads. Their SIZES are forced by
-    Pal's address; their TYPES are a guess, and two strings are chosen because
-    P1S4's loader has an unreferenced String[127] in the same position and a
-    filename buffer is the obvious thing for a loader to declare and then take
-    from a constant instead. }
-  I      : Byte;                        { [BP-1] }
-  Spare1 : String;                      { [BP-$101], 256, never read }
-  Spare2 : String[127];                 { [BP-$181], 128, never read }
-  { The palette IS a local -- 12c5:046d LEAs [BP-$481] straight into
-    SetPalette768 (1491:01c2) and nothing keeps a copy. }
-  Pal    : array[0..767] of Byte;       { [BP-$481] }
-begin
-  Assign(F, 'neurosis.dat');
-  Reset(F, 1);
-  Seek(F, $03BB02);
-  BlockRead(F, ObjMeta, SizeOf(ObjMeta));
-  BlockRead(F, Pal, 768);
-  SetPalette768(@Pal);                 { before the Close, as the binary has it }
-  Close(F);
-
-  FillChar(Mem[VirtScrSeg : 0], 64000, 0);
-  for I := 100 to 255 do
-    SetRGB(I, 0, 0, (I - 50) shr 2);
-  for I := 2 to $85 do
-    DrawLine(0, I, $13F, I, I + $7A, VirtScrSeg);
-  for I := $86 to 199 do
-    DrawLine(0, I, $13F, I, $FF - (I - $85), VirtScrSeg);
 end;
 
 { --------------------------------------------------------------------------
