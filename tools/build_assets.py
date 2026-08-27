@@ -1,6 +1,20 @@
 """Build the clean asset tree in assets/ from NEUROSIS.DAT and from DGROUP.
 
-Everything here is derived -- assets/ can be deleted and rebuilt at any time.
+MOST of assets/ is derived and can be rebuilt at any time. NOT ALL OF IT, and
+saying otherwise is what let the tree drift for months: this script produced 128
+files where the tree held 163, and nothing measured the difference, so the claim
+in the old first line went on being false and unread.
+
+Twenty-eight of those files are HAND-MADE -- five projections of each of part
+002's four 3-D models, a panel view and its palette, a curve composite, and one
+1,550-byte block nobody has identified. They are listed in KEPT below, they have
+no generator, and they are somebody's work. `--audit` is what keeps that honest:
+it regenerates into a temporary directory and reports every difference between
+the tree and this script, classified, so a NEW extra file is a finding rather
+than sediment.
+
+    python tools/build_assets.py            write the derived files
+    python tools/build_assets.py --audit    report tree against generator
 
 Two sources:
   * NEUROSIS.DAT, sliced with the region map recovered from the Seek/BlockRead
@@ -119,6 +133,32 @@ NAMES = {
     (0x1A047D, 0): "BLKORDER",
 }
 
+# HAND-MADE FILES WITH NO GENERATOR, kept deliberately. Every one arrived in the
+# first commit and nothing in this script produces it. Listed so that --audit can
+# tell "somebody's work" from "sediment left by a rename": an extra file that is
+# NOT here is a finding, and one that is here is a decision.
+#
+# If any of these is ever reproduced by code, delete its row -- a name on this
+# list is a statement that nothing generates it.
+KEPT = {
+    "part002/DEAD1550.BIN": "1,550 bytes, unidentified. The size matches the "
+                            "5x5 font, so it may be an earlier carve of it.",
+    "part002/OBJENTER.BIN": "part 002's Enterprise model, extracted from DGROUP",
+    "part002/OBJQUAD.BIN":  "the quad model",
+    "part002/OBJREVLV.BIN": "the revolver model",
+    "part002/OBJSAIL.BIN":  "the sailboat model",
+    "part002/S2PANEL.PAL":  "the palette the panel view below is rendered with",
+    "part002/S2PANEL.PNG":  "the banner strip rendered with S2PANEL.PAL",
+    "part003/WAVECRVA.PNG": "all of the waves curves in one composite",
+}
+# Five projections of each model, rendered by hand: front, long, long2, side, top.
+for _m in ("OBJENT", "OBJQUA", "OBJREV", "OBJSAI"):
+    for _v in ("FR", "LG", "L2", "SD", "TP"):
+        KEPT["part002/%s%s.PNG" % (_m, _v)] = "a projection of the model above"
+
+# Files that are inputs to the build rather than outputs of this script.
+NOT_ASSETS = ("NEUROSIS.MAN", "README.md")
+
 # Regions whose extension is not .BIN. Keyed like NAMES, so a rename cannot
 # reach it. (seek, index) -> extension
 EXTS = {
@@ -177,7 +217,12 @@ SPRITE_SETS = [
 # One .bin holding N frames back to back; split and render each.
 # (part, source asset, count, width, height, palette asset, name prefix)
 SPRITE_STRIPS = [
-    ("001", "COMETFRM", 10, 65, 48, "INTROPAL", "comet"),
+    # THE PREFIX IS UPPERCASE, like every other name here. It was "comet"
+    # while the files were comet0.png, and the 8.3 rename moved the FILES
+    # to COMET0.PNG without moving this -- so a regeneration wrote ten
+    # lowercase-stemmed duplicates beside them, invisibly on a
+    # case-insensitive filesystem.
+    ("001", "COMETFRM", 10, 65, 48, "INTROPAL", "COMET"),
 ]
 
 # Bitmaps stored with a 2-byte (width, height) header. In part 002 the header
@@ -368,7 +413,81 @@ def split_strips(manifest):
                              f"part{part}/{prefix}{i}.PNG", f"{w}x{h} frame {i}"))
 
 
-def main():
+def audit():
+    """Report the tree against this script, classified. The check that was missing.
+
+    Regenerates into a temporary directory rather than over the top, so nothing
+    is at risk, and sorts every difference into one of four kinds. Only two of
+    them are findings -- which is the point: a report where everything is a
+    finding gets skimmed, and this drifted for months behind exactly that.
+    """
+    import hashlib
+    import shutil
+    import tempfile
+
+    global OUT
+    real = OUT
+    tmp = Path(tempfile.mkdtemp())
+    try:
+        OUT = tmp
+        main(write_readme=False)
+    finally:
+        OUT = real
+
+    def index(root):
+        return {p.relative_to(root).as_posix():
+                hashlib.sha256(p.read_bytes()).hexdigest()
+                for p in root.rglob("*") if p.is_file()
+                and p.name not in NOT_ASSETS}
+
+    tree, gen = index(real), index(tmp)
+    by_hash = {}
+    for k, v in gen.items():
+        by_hash.setdefault(v, k)
+
+    missing = sorted(set(gen) - set(tree))
+    wrong = sorted(k for k in set(gen) & set(tree) if gen[k] != tree[k])
+    extra = sorted(set(tree) - set(gen))
+    dupes = [(k, by_hash[tree[k]]) for k in extra if tree[k] in by_hash]
+    kept = [k for k in extra if k in KEPT and tree[k] not in by_hash]
+    stray = [k for k in extra if k not in KEPT and tree[k] not in by_hash]
+    shutil.rmtree(tmp, ignore_errors=True)
+
+    print("%d file(s) in assets/, %d produced by this script"
+          % (len(tree), len(gen)))
+    print("  %d hand-made and declared in KEPT" % len(kept))
+    bad = 0
+    if missing:
+        bad += len(missing)
+        print("\n  MISSING -- this script writes these and the tree has not got")
+        print("  them, so the tree was never regenerated after a change:")
+        for k in missing:
+            print("     ", k)
+    if wrong:
+        bad += len(wrong)
+        print("\n  CONTENT DIFFERS -- same name, different bytes. Either the tree")
+        print("  was edited by hand or a generator changed under it:")
+        for k in wrong:
+            print("     ", k)
+    if dupes:
+        bad += len(dupes)
+        print("\n  DUPLICATE -- extra file whose bytes already exist under a")
+        print("  generated name. Sediment, usually from a rename. Safe to delete:")
+        for k, w in dupes:
+            print("      %-28s == %s" % (k, w))
+    if stray:
+        bad += len(stray)
+        print("\n  UNDECLARED -- unique content that nothing generates and KEPT")
+        print("  does not mention. Either it is somebody's work, in which case add")
+        print("  a KEPT row saying what it is, or it is sediment. DO NOT GUESS:")
+        for k in stray:
+            print("     ", k)
+    if not bad:
+        print("\n  the tree and this script agree, and every extra file is declared")
+    return 1 if bad else 0
+
+
+def main(write_readme=True):
     OUT.mkdir(exist_ok=True)
     manifest = []
     carve_dat(manifest)
@@ -383,7 +502,9 @@ def main():
     lines = [
         "# Extracted assets",
         "",
-        "Generated by `tools/build_assets.py`. Safe to delete and rebuild.",
+        "Generated by `tools/build_assets.py`, except for the files listed at",
+        "the bottom. **Deleting the whole directory loses those**, because",
+        "nothing reproduces them -- run `--audit` before deleting anything.",
         "",
         "Sources: `bin/NEUROSIS.DAT` sliced with the recovered region map, plus",
         "data compiled into the executables' DGROUP. See",
@@ -396,6 +517,21 @@ def main():
         off = f"`${seek:06X}`" if seek is not None else "(embedded)"
         n = "" if idx is None else str(idx)
         lines.append(f"| {part} | {off} | {n} | {size:,} | `{path}` | {note} |")
+    lines += [
+        "",
+        "## Hand-made, with no generator",
+        "",
+        "These arrived in the first commit and nothing in `build_assets.py`",
+        "produces them. They are listed in its `KEPT` table so `--audit` can",
+        "tell somebody's work from sediment left behind by a rename.",
+        "",
+        "| File | What it is |",
+        "|---|---|",
+    ]
+    for k in sorted(KEPT):
+        lines.append(f"| `{k}` | {KEPT[k]} |")
+    if not write_readme:
+        return
     (OUT / "README.md").write_text("\n".join(lines) + "\n", encoding="utf-8",
                                    newline="\n")
 
@@ -403,4 +539,6 @@ def main():
 
 
 if __name__ == "__main__":
+    if "--audit" in sys.argv:
+        sys.exit(audit())
     main()
