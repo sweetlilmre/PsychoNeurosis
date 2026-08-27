@@ -337,6 +337,71 @@ end;
   The caller widens each angle with CWD, so the parameters are LongInt while
   the arguments are Integer.
   -------------------------------------------------------------------------- }
+{ SortAll IS DEFINED HERE, BEFORE TransformPoint, AND THE ORIGINAL'S SEGMENT
+  ORDER IS WHY. 12c5:0190 is SortAll and 12c5:01b0 TransformPoint -- thirty-two
+  bytes apart, SortAll first -- and definition order is segment order. Defined
+  after ObjTranslate instead, every routine from here to 12c5:0a60 came out at
+  the wrong offset: mapping each of our routines onto the original by content
+  put ours' first routine at the original's 01b0 and the original's first at
+  ours' 0256.
+
+  NOTHING ELSE SAW IT. The part walks 100.0% of every byte, every segment is the
+  original's exact size, the program segment is byte-identical -- because Scene5
+  at 12c5:0a89 and the unit initialisation are BOTH past the disturbance, so the
+  two offsets the main body names were right either way. progseg --prologues=12c5
+  reported 18 prologue candidates against our 15 and refused to pair them, which
+  is the signal to map by content instead. }
+
+procedure SortAll(Arr : PScrArr);
+{ 12c5:0190 -- SORT-ONLY, and it takes the array BY POINTER. Ghidra's
+  decompilation of this address is two DepthSort calls and a return, nothing
+  else, so the drawing loops below it belong to RenderObject and not here.
+  12c5:0621 calls it as MOV DI,$A5F6 / PUSH DS / PUSH DI / CALL 0x190, which
+  for a near call puts the offset at [BP+4] and the segment at [BP+6].
+
+  DepthSort IS NESTED INSIDE IT, and that is the whole point: 12c5:0024 is
+  MOV DI,[BP+4] and 0027 is LES DI, SS:[DI+4] -- a static link followed to
+  this routine's Pointer parameter. Its own layout is [BP+8] = Lo, [BP+6] =
+  Hi, [BP+4] = the link, and RET 6 accounts for two Integers plus the link.
+  Top-level with a unit-level Scr, none of its 292 bytes lined up and thirteen
+  further spans downstream of it did not either. }
+  procedure DepthSort(Lo, Hi : Integer);
+  var
+    I, J, P : Integer;      { [BP-2], [BP-4], [BP-6] }
+    T       : TScreenPt;    { [BP-0C]..[BP-07] -- the swap temp }
+    { TWO MORE BYTES, DECLARED AND NEVER READ. The frame is ENTER $0E and the
+      four above it reach only $0C; nothing in the routine touches [BP-0E] or
+      [BP-0D]. Omitting them left the prologue one byte wrong and that was the
+      ONLY byte wrong in the first 64 -- everything else matched once the
+      routine was nested. }
+    Unread  : Integer;      { [BP-0E] }
+  begin
+    I := Lo;  J := Hi;
+    P := Arr^[(Lo + Hi) div 2].D;
+    repeat
+      while Arr^[I].D < P do I := I + 1;   { 12c5:0051, an ASSIGNMENT }
+      while Arr^[J].D > P do J := J - 1;   { not Dec: see below }
+      if I <= J then
+      begin
+        if Arr^[I].D <> Arr^[J].D then
+        begin
+          T := Arr^[I];  Arr^[I] := Arr^[J];  Arr^[J] := T;
+        end;
+        { ASSIGNMENTS, NOT Inc AND Dec. 12c5:0051 is MOV AX,[BP-2] / INC AX /
+        MOV [BP-2],AX -- seven bytes -- where Inc(I) is a three-byte INC WORD
+        PTR. Ghidra reads the same statements as `local = local + 1`. Four
+        sites: the two while bodies and these two. }
+      I := I + 1;  J := J - 1;
+      end;
+    until I > J;
+    if Lo < J then DepthSort(Lo, J);
+    if I < Hi then DepthSort(I, Hi);
+  end;
+begin
+  DepthSort(1, PtCount);                          { 12c5:0193 }
+  DepthSort(PtCount + 1, PtCount * 2);            { 12c5:01a1 }
+end;
+
 procedure TransformPoint(P          : TPoint3;
                          A1, A2, A3 : LongInt;
                          TX, TY, TZ : LongInt;
@@ -509,56 +574,6 @@ end;
   the reflection -- and RenderObject calls it before drawing anything. It was
   missing here entirely.
   -------------------------------------------------------------------------- }
-procedure SortAll(Arr : PScrArr);
-{ 12c5:0190 -- SORT-ONLY, and it takes the array BY POINTER. Ghidra's
-  decompilation of this address is two DepthSort calls and a return, nothing
-  else, so the drawing loops below it belong to RenderObject and not here.
-  12c5:0621 calls it as MOV DI,$A5F6 / PUSH DS / PUSH DI / CALL 0x190, which
-  for a near call puts the offset at [BP+4] and the segment at [BP+6].
-
-  DepthSort IS NESTED INSIDE IT, and that is the whole point: 12c5:0024 is
-  MOV DI,[BP+4] and 0027 is LES DI, SS:[DI+4] -- a static link followed to
-  this routine's Pointer parameter. Its own layout is [BP+8] = Lo, [BP+6] =
-  Hi, [BP+4] = the link, and RET 6 accounts for two Integers plus the link.
-  Top-level with a unit-level Scr, none of its 292 bytes lined up and thirteen
-  further spans downstream of it did not either. }
-  procedure DepthSort(Lo, Hi : Integer);
-  var
-    I, J, P : Integer;      { [BP-2], [BP-4], [BP-6] }
-    T       : TScreenPt;    { [BP-0C]..[BP-07] -- the swap temp }
-    { TWO MORE BYTES, DECLARED AND NEVER READ. The frame is ENTER $0E and the
-      four above it reach only $0C; nothing in the routine touches [BP-0E] or
-      [BP-0D]. Omitting them left the prologue one byte wrong and that was the
-      ONLY byte wrong in the first 64 -- everything else matched once the
-      routine was nested. }
-    Unread  : Integer;      { [BP-0E] }
-  begin
-    I := Lo;  J := Hi;
-    P := Arr^[(Lo + Hi) div 2].D;
-    repeat
-      while Arr^[I].D < P do I := I + 1;   { 12c5:0051, an ASSIGNMENT }
-      while Arr^[J].D > P do J := J - 1;   { not Dec: see below }
-      if I <= J then
-      begin
-        if Arr^[I].D <> Arr^[J].D then
-        begin
-          T := Arr^[I];  Arr^[I] := Arr^[J];  Arr^[J] := T;
-        end;
-        { ASSIGNMENTS, NOT Inc AND Dec. 12c5:0051 is MOV AX,[BP-2] / INC AX /
-        MOV [BP-2],AX -- seven bytes -- where Inc(I) is a three-byte INC WORD
-        PTR. Ghidra reads the same statements as `local = local + 1`. Four
-        sites: the two while bodies and these two. }
-      I := I + 1;  J := J - 1;
-      end;
-    until I > J;
-    if Lo < J then DepthSort(Lo, J);
-    if I < Hi then DepthSort(I, Hi);
-  end;
-begin
-  DepthSort(1, PtCount);                          { 12c5:0193 }
-  DepthSort(PtCount + 1, PtCount * 2);            { 12c5:01a1 }
-end;
-
 { --------------------------------------------------------------------------
   12c5:052a -- the point sprite. HAND ASSEMBLER, transcribed verbatim.
 

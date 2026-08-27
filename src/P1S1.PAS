@@ -215,7 +215,22 @@ begin
           Integers and there are four, so the original has no D2 variable.
           1012:0116 repeats the two MULs the test at 1012:002b already did. }
         S     := Sqrt(LensR * LensR - (X * X + Y * Y - LensOfs)) + LensK;
-        Scale := LensR / (LensR + S);
+        { S + LensR, AND NOT LensR + S -- THIRTY-NINE BYTES OF THIS UNIT TURNED ON IT.
+          Turbo Pascal evaluates the operands of `+` RIGHT TO LEFT when both need the
+          accumulator, so the term it evaluates FIRST is the one written SECOND. The
+          note at the head of this routine states that rule for the index expressions
+          and it holds for the floating point too: 1012:016d loads the six bytes of S
+          from [BP-$0E] and calls the runtime, and only THEN widens LensR from DS:$0002
+          into a LongInt temporary for FILD. So LensR is evaluated second, so LensR is
+          written second.
+        
+          Written LensR + S the two groups come out in the opposite order -- 29 bytes in
+          ONE run at 1012:016d..018a, the whole of this unit's remaining difference, with
+          every routine length still matching because nothing changes size. Addition is
+          commutative and the arithmetic is identical either way; only the comparison
+          against the 1994 bytes says which was typed. This unit is now byte-for-byte
+          identical to NEUROSIS.001's segment 1012. }
+        Scale := LensR / (S + LensR);
         SX    := Round(Scale * X);
         SY    := Round(Scale * Y);
         LensTab[( X + 20) + ( Y + 20) * BounceW] := ( SX + 20) + ( SY + 20) * BounceW;
