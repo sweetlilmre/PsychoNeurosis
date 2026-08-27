@@ -14,7 +14,7 @@
 
   THE USES CLAUSE IS THE LINK ORDER, REVERSED. Turbo Pascal's link walk is a
   reverse DFS post-order starting at the PROGRAM, so the last unit to finish
-  comes first in code. The original's segments are VGA (100b), P7S1 (100f),
+  comes first in code. The original's segments are VGA (100b), P7FLIC (100f),
   Crt (1099) and DemoVT (10fb), so VGA has to finish last and DemoVT first.
   Checked against build/NEUR7.MAP, not assumed.
 
@@ -41,7 +41,7 @@
 
 program Neur7;
 
-uses DemoVT, Crt, P7S1, VGA;
+uses DemoVT, Crt, P7FLIC, VGA;
 
 var
   SavedVol : Byte;                { DS:$0066 }

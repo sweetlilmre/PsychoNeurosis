@@ -16,18 +16,18 @@
 # but the three declarations are not, and cannot be:
 #
 #     VGA.SetPalette768           004 11e3:0230   FAR, in the shared unit
-#     PART3_MORPH.SetPalette768   003 1139:0335   takes an untyped `var P`
-#     P1S4.SetPalette768          001 1107:0000   takes a `P : Pointer`
+#     P3MORPH.SetPalette768       003 1139:0335   takes an untyped `var P`
+#     P1BALLS.SetPalette768       001 1107:0000   takes a `P : Pointer`
 #
 # An include carries the header, so there is no one text to share -- only the
 # same body reached three ways.
-P1S4.SetPalette768
-PART3_MORPH.SetPalette768
+P1BALLS.SetPalette768
+P3MORPH.SetPalette768
 VGA.SetPalette768
 
 # SetRGB. Part 002 compiles the DAC poke TWICE -- VGA.SetRGB at linear $043A8
 # and P2View.SetRGB at $0426F -- and the reconstruction has to as well, because
-# P2S2 calls the P2View copy eighteen times and a far call encodes the target's
+# P2SOLID calls the P2View copy eighteen times and a far call encodes the target's
 # offset. The bodies are identical and the declarations differ in the same way
 # SetPalette768's do, so there is no one text to share.
 VGA.SetRGB

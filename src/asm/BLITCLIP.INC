@@ -5,8 +5,8 @@
   blitter into more than one part, each part getting its own copy in its own
   segment:
 
-      part 001  1107:0199  P1S4.PAS   scene 4's grid of 144 balls
-      part 006  100f:0000  P6S2.PAS   the tumbling cell grid
+      part 001  1107:0199  P1BALLS.PAS   scene 4's grid of 144 balls
+      part 006  100f:0000  P6TILES.PAS   the tumbling cell grid
 
   Byte for byte and instruction for instruction between the two -- part 001's
   addresses are part 006's plus $199. In part 001 it sits BETWEEN Banner_Load

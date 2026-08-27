@@ -62,8 +62,8 @@ clauses and `{$I}` directives are rewritten to match:
 | `VGA.PAS` | 399 | 953 | 1,176 |
 | `DEMOVT.PAS` | 187 | 346 | 12 |
 | `P1INTRO` | 617 | 2,726 | 35,622 |
-| `P2S1` | 452 | — | — |
-| `P2S2` | 1,353 | — | — |
+| `P2GARAGE` | 452 | — | — |
+| `P2SOLID` | 1,353 | — | — |
 | `P3TUNNEL` | 425 | 1,457 | 2,934 |
 | `P3STARS` | 256 | 1,796 | 2,816 |
 | `P3MORPH` | 1,753 | 2,098 | 20,110 |

@@ -6,12 +6,12 @@
   its call sites, [stub] signature only.
   =========================================================================== }
 
-unit P1S2;
+unit P1TITLE;
 
 {$I-}   { NO I/O CHECK, and this unit had no I directive at all so it took the
           command line's $I+ default -- four five-byte near calls to the
           runtime's check routine that the original does not have. Part 004's
-          Lemmings unit and part 006's P6S4 were missed the same way; a unit
+          Lemmings unit and part 006's P6CREDIT were missed the same way; a unit
           with no I directive at all is worth suspecting on sight. }
 
 {$G+}   { 286: Title_Load 1082:0000 opens ENTER $182; every framed routine
@@ -171,7 +171,7 @@ var
     DS address at 1082:003a where a local would be LEA'd off SS.
 
     2 + 256 + 128 = 386. The sizes are forced; the types are a guess, and two
-    strings are chosen because P1S4's and P1S5's loaders have unreferenced
+    strings are chosen because P1BALLS's and P1VECTOR's loaders have unreferenced
     string locals in exactly this position. }
   I      : Integer;                     { [BP-2] }
   Spare1 : String;                      { 256, never read }

@@ -229,7 +229,7 @@ def emit_p002():
     # and Msg2 -- the other three models come AFTER those, from DS:$066E.
     # Emitted as one include all four land together and everything behind them
     # sits 1,606 bytes too high: dgimage put our MViewW at $0AAA against the
-    # original's $046A. So P2S2 includes the first file, declares the four
+    # original's $046A. So P2SOLID includes the first file, declares the four
     # constants, and includes the second.
     OUT.joinpath("P2OBJ.INC").write_text("\n".join(first) + "\n", encoding="ascii")
     OUT.joinpath("P2OBJ2.INC").write_text(
@@ -263,7 +263,7 @@ def emit_p005():
 
 # ---------------------------------------------------------------- part 006
 
-# P6S4 declares `Lines = 113` and indexes String[12]; the generator must
+# P6CREDIT declares `Lines = 113` and indexes String[12]; the generator must
 # agree with the source it feeds, so both live here as names rather than
 # being derived from however much text the image happens to hold.
 P6_CREDIT_LINES = 99       # NOT 113 -- see the docstring below
@@ -291,11 +291,11 @@ def emit_p006_text():
 
     This docstring used to say 113, and 113 is the LOOP'S bound, not the
     array's. The two are not the same and the address of the next variable
-    proves it: P6S1's Path pointer is at DS:$737E, and 99 slots of 256 from
+    proves it: P6WHOOSH's Path pointer is at DS:$737E, and 99 slots of 256 from
     $0D8A end at $708A while 113 would run to $7F8A -- with Path inside the
     array. It cannot be 113.
 
-    P6S4 does count to 113 (11bb:02fa stops at $72), so lines 100..113 read
+    P6CREDIT does count to 113 (11bb:02fa stops at $72), so lines 100..113 read
     PAST the array into the constants beyond it, which are zeros. That is why
     they arrive blank at run time, and it is the observation the old docstring
     had hold of by the wrong end.

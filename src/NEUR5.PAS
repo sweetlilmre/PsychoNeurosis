@@ -52,21 +52,21 @@ program Neur5;
   followed by P5Main's. DemoVT (12c8), Crt (1266) and VGA (1252) are named first
   and so land LAST in code. FixMath (124a) is NOT named -- nothing names it
   directly and the scene that needs it pulls it in there, which is where the
-  original has it, between P5S3 and VGA.
+  original has it, between P5PATCH and VGA.
 
   THE THREE SCENE UNITS ARE BACKWARDS ON PURPOSE, carried from P5MAIN.PAS which
   this file replaces. That clause fixes BOTH layouts and they run opposite ways:
   code segments follow it, DGROUP runs back down it. Measured 25 Aug 2026 by
-  building it both ways -- in scene order the code came out P5S3, P5S2, P5S1,
+  building it both ways -- in scene order the code came out P5PATCH, P5ROTO, P5MESH,
   reversed, with 5,182 of 11,648 initialised bytes differing; as written below
-  P5S1 lands first and the four trailing units are exact.
+  P5MESH lands first and the four trailing units are exact.
 
   THE COVERAGE WALK CANNOT TELL THOSE APART. It reported 10,980 of 11,440
   aligned, the same number to the byte, for a build whose three scene units were
   in reverse order, because it locates a segment by CONTENT. Only dgimage.py and
   the segment sizes see it. }
 uses DemoVT, Crt, VGA,
-     P5S3, P5S2, P5S1;
+     P5PATCH, P5ROTO, P5MESH;
 
 var
   SavedVol : Byte;                { DS:$2D7C -- a GLOBAL, and a Byte }

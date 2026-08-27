@@ -40,7 +40,7 @@
 {$G+}   { 186: the shifts take immediates }
 {$N+}   { six-byte Reals through the x87 }
 
-unit P6S2;
+unit P6TILES;
 
 {$A-}   { NO VARIABLE ALIGNMENT, and Run's frame is the witness. Pix sits at
           the ODD [BP-$11] -- 100f:05e6 LEAs the tile array at [BP-$4FB], which
@@ -105,7 +105,7 @@ const
 
   That last point is worth carrying, because four holes in this corpus HAVE been
   closed by declaring them: an unread byte at [BP-$22D], 128 unread bytes in
-  P6S1's Setup, two at [BP-$104], sixteen inside part 007's chunk header. Every
+  P6WHOOSH's Setup, two at [BP-$104], sixteen inside part 007's chunk header. Every
   one of those is a LOCAL, and locals are allocated whether or not they are
   read. A hole in the CONSTANT region cannot be filled the same way -- whatever
   is missing there is referenced by something, or the linker would have dropped
@@ -265,7 +265,7 @@ var
     file already recorded for it. Declared with Pal first, as it was, Pal landed
     at [BP-$300] and the frame came out $306.
 
-    A file record is what fits, and P6S1's Load has the same thing in the same
+    A file record is what fits, and P6WHOOSH's Load has the same thing in the same
     position, also unreferenced. }
   Unread  : file;                 { [BP-$80]..[BP-1], never referenced }
   { I, THEN J, THEN A -- and all three offsets are readable, so none of this is
@@ -520,7 +520,7 @@ begin
         07c6  c9 c3        LEAVE / RET
 
     IT IS AN Exit, AND THE ARGUMENT THAT SAID OTHERWISE WAS THE WRONG TEST.
-    That argument ran: both jumps land on 07c6, whereas in P1S2's ShowWord the
+    That argument ran: both jumps land on 07c6, whereas in P1TITLE's ShowWord the
     two went to different places, so convergence proves this is a plain
     `until A or B`. Convergence proves nothing here. This `until` is the LAST
     statement of the routine, so `Exit` and falling out of the loop have the

@@ -93,20 +93,20 @@ P7_CLOSE = ""
 
 # prog, unit, entry, uses, open, close, description
 SCENES = [
-    ("TP1S1", "P1S1", "Scene1", VGA_USES, VGA_OPEN, VGA_CLOSE,
+    ("TP1S1", "P1LOGO", "Scene1", VGA_USES, VGA_OPEN, VGA_CLOSE,
      "part 001 scene 1 -- the logo and the bouncing lenses"),
-    ("TP1S2", "P1S2", "Scene2", VGA_USES, VGA_OPEN, VGA_CLOSE,
+    ("TP1S2", "P1TITLE", "Scene2", VGA_USES, VGA_OPEN, VGA_CLOSE,
      'part 001 scene 2 -- "ASPHYXIA PRESENTS" and the comet'),
-    ("TP1S3", "P1S3", "Scene3", VGA_USES, VGA_OPEN, VGA_CLOSE,
+    ("TP1S3", "P1MOSAIC", "Scene3", VGA_USES, VGA_OPEN, VGA_CLOSE,
      "part 001 scene 3 -- the mosaic pixelate"),
-    ("TP1S4", "P1S4", "Scene4", VGA_USES, VGA_OPEN, VGA_CLOSE,
+    ("TP1S4", "P1BALLS", "Scene4", VGA_USES, VGA_OPEN, VGA_CLOSE,
      "part 001 scene 4 -- the tumbling ball grid and the message"),
-    ("TP1S5", "P1S5", "Scene5", VGA_USES, VGA_OPEN, VGA_CLOSE,
+    ("TP1S5", "P1VECTOR", "Scene5", VGA_USES, VGA_OPEN, VGA_CLOSE,
      "part 001 scene 5 -- the vector objects and the wipe"),
 
-    ("TP2S1", "P2S1", "Scene1", P2S1_USES, P2S1_OPEN, P2S1_CLOSE,
+    ("TP2S1", "P2GARAGE", "Scene1", P2S1_USES, P2S1_OPEN, P2S1_CLOSE,
      "part 002 scene 1 -- the garage: a 1280-wide pan, the door, a starfield"),
-    ("TP2S2", "P2S2", "Scene2", P2S2_USES, P2S2_OPEN, P2S2_CLOSE,
+    ("TP2S2", "P2SOLID", "Scene2", P2S2_USES, P2S2_OPEN, P2S2_CLOSE,
      "part 002 scene 2 -- solid 3-D objects, starfield, typed banner"),
 
     ("TP3S1", "Part3Tunnel",  "Scene1", VGA_USES, VGA_OPEN, VGA_CLOSE,
@@ -129,23 +129,23 @@ SCENES = [
     # Demo_Main sits inside the scene unit at 1005:1cd6 and its segment 1000
     # holds only the eighty bytes that reach it. 99.4% to 100.0%.
 
-    ("TP5S1", "P5S1", "Scene1", P5_USES, P5_OPEN, P5_CLOSE,
+    ("TP5S1", "P5MESH", "Scene1", P5_USES, P5_OPEN, P5_CLOSE,
      "part 005 scene 1 -- the heightfield mesh"),
-    ("TP5S2", "P5S2", "Scene2", P5_USES, P5_OPEN, P5_CLOSE,
+    ("TP5S2", "P5ROTO", "Scene2", P5_USES, P5_OPEN, P5_CLOSE,
      "part 005 scene 2 -- the rotozoomer and the scatter"),
-    ("TP5S3", "P5S3", "Scene3", P5_USES, P5_OPEN, P5_CLOSE,
+    ("TP5S3", "P5PATCH", "Scene3", P5_USES, P5_OPEN, P5_CLOSE,
      "part 005 scene 3 -- the turning relief"),
 
-    ("TP6S1", "P6S1", "Scene1", P5_USES, P5_OPEN, P5_CLOSE,
+    ("TP6S1", "P6WHOOSH", "Scene1", P5_USES, P5_OPEN, P5_CLOSE,
      "part 006 scene 1 -- the whooshtext"),
-    ("TP6S2", "P6S2", "Scene2", P5_USES, P5_OPEN, P5_CLOSE,
+    ("TP6S2", "P6TILES", "Scene2", P5_USES, P5_OPEN, P5_CLOSE,
      "part 006 scene 2 -- the rotating tile mesh"),
-    ("TP6S3", "P6S3", "Scene3", P5_USES, P5_OPEN, P5_CLOSE,
+    ("TP6S3", "P6FIRE", "Scene3", P5_USES, P5_OPEN, P5_CLOSE,
      "part 006 scene 3 -- the fire"),
-    ("TP6S4", "P6S4", "Scene4", P5_USES, P5_OPEN, P5_CLOSE,
+    ("TP6S4", "P6CREDIT", "Scene4", P5_USES, P5_OPEN, P5_CLOSE,
      "part 006 scene 4 -- the credits scroller"),
 
-    ("TP7S1", "P7S1", "Scene1", P7_USES, P7_OPEN, P7_CLOSE,
+    ("TP7S1", "P7FLIC", "Scene1", P7_USES, P7_OPEN, P7_CLOSE,
      "part 007 -- the FLI/FLC player"),
 ]
 
@@ -175,7 +175,7 @@ PARTS = [
     # PART 002 HAS NO HARNESS ANY MORE. src/NEUR2.PAS is the real program and
     # its segment matches the original's 128 bytes exactly. The walk did not
     # move, and that was PREDICTED before the work rather than discovered after:
-    # our P2S1 is 32 bytes small and P2S2 112 large, a net +80 that displaces
+    # our P2GARAGE is 32 bytes small and P2SOLID 112 large, a net +80 that displaces
     # the runtime whatever the program does. Part 002's 11 bytes are downstream
     # of those two, not of the harness.
     # PART 003 HAS NO HARNESS ANY MORE. src/NEUR3.PAS is the real program, and

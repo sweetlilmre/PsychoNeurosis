@@ -2,16 +2,16 @@
 
 Working notes from the disassembly of `NEUROSIS_002_fpu.exe`. Everything here
 was read out of the binary; nothing is inferred. Both scenes are transcribed
-� `src/P2S1.PAS` and `src/P2S2.PAS` � and this is the working record behind
+� `src/P2GARAGE.PAS` and `src/P2SOLID.PAS` � and this is the working record behind
 the second.
 
 Segment map for the part:
 
 | segment | unit | status |
 |---|---|---|
-| 1008 | scene 1 | transcribed — `P2S1.PAS` |
+| 1008 | scene 1 | transcribed — `P2GARAGE.PAS` |
 | 107c | Mode-X, 1280-wide | transcribed — `P2MODEX.PAS` |
-| 108b | scene 2 | transcribed � `P2S2.PAS` (this document) |
+| 108b | scene 2 | transcribed � `P2SOLID.PAS` (this document) |
 | 13f9 | resident tracker client | transcribed — the shared `DEMOVT.PAS` |
 | 140c | 320x400 two-page unchained | transcribed — `P2VIEW.PAS` |
 | 142a | 16.16 fixed point | transcribed — `P2FIX.PAS` |
@@ -395,5 +395,5 @@ slots the 23-byte face record has.
 
 ## Status
 
-Transcribed as `src/P2S2.PAS`, with `src/test/TP2S2.PAS` as the harness. Compiles
+Transcribed as `src/P2SOLID.PAS`, with `src/test/TP2S2.PAS` as the harness. Compiles
 under TP 7.01 and installs as `run/TP2S2.EXE`.

@@ -41,7 +41,7 @@
           evidence and this one was missed, while its own comment quoted the
           instruction that proves it. }
 
-unit P5S2;
+unit P5ROTO;
 {$I-}   { no I/O check: the original goes straight on after each file
           call, with no near CALL to the RTL's check routine. }
 
@@ -100,7 +100,7 @@ unit P5S2;
           Key is one byte at DS:$A5E0 and F begins at DS:$A5E1 -- with $A+ Turbo
           Pascal would push a 128-byte record to the next word boundary and put
           it at $A5E2, which is exactly where ours was. One byte, and it moved
-          every reference to F in the unit. P5S3 already carried the switch. }
+          every reference to F in the unit. P5PATCH already carried the switch. }
 
 interface
 

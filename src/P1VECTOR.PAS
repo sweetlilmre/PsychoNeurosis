@@ -8,10 +8,10 @@
   from the screen it had just blanked.
   =========================================================================== }
 
-unit P1S5;
+unit P1VECTOR;
 {$I-}   { no I/O check: the original goes straight on after each file
           call, with no near CALL to the RTL's check routine. }
-{$A-}   { data alignment off -- measured, see the note in P2S2.PAS }
+{$A-}   { data alignment off -- measured, see the note in P2SOLID.PAS }
 
 {$G+}   { 286: the binary's Scene5 pushes immediates (68 00 A0 at 12c5:0a9c)
           and closes with LEAVE -- $G+ codegen throughout the segment. }
@@ -618,7 +618,7 @@ var
 
     So there are 384 bytes here that nothing reads. Their SIZES are forced by
     Pal's address; their TYPES are a guess, and two strings are chosen because
-    P1S4's loader has an unreferenced String[127] in the same position and a
+    P1BALLS's loader has an unreferenced String[127] in the same position and a
     filename buffer is the obvious thing for a loader to declare and then take
     from a constant instead. }
   I      : Byte;                        { [BP-1] }
@@ -1133,9 +1133,9 @@ begin
 
   { 12c5:093b -- Scale := (ScreenWidth / 2.0) * 10.0, as 16.16.
     CS:$0868 = 2.0, CS:$086C = 10.0. }
-  { 12c5:0947 -- RealToFixed, and MViewW is a WORD here where P1S4's is an
+  { 12c5:0947 -- RealToFixed, and MViewW is a WORD here where P1BALLS's is an
     Integer. The spill is the difference: `MOV [BP-8],AX / MOV [BP-6],DX` then
-    FILD DWORD on the LongInt, which is how a Word reaches the x87. P1S4 does
+    FILD DWORD on the LongInt, which is how a Word reaches the x87. P1BALLS does
     FILD WORD straight off the variable. Same expression, two declarations. }
   MScale := RealToFixed(MViewW / 2.0 * 10.0);
 

@@ -364,7 +364,7 @@ format.
 
 ## Where part 005 stands
 
-`P5S1`, `P5S2`, `P5S3` and `P5Main` are all read from the binary and all
+`P5MESH`, `P5ROTO`, `P5PATCH` and `P5Main` are all read from the binary and all
 build. `src/PART5_ROTOZOOM.PAS` -- the earlier single-unit pass, which carried
 inference and stubs -- has been deleted.
 

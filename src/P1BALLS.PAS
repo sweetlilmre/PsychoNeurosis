@@ -26,7 +26,7 @@
 {$G+}   { 286 instructions: REP OUTSB in SetPalette768 (1107:0011). The
           original targets 386 and above. }
 
-unit P1S4;
+unit P1BALLS;
 {$I-}   { no I/O check: the original goes straight on after each file
           call, with no near CALL to the RTL's check routine. }
 
@@ -159,12 +159,12 @@ const
 
   $A IS A GLOBAL DIRECTIVE, and in a single compiler run its state carries
   into the units compiled after the one that sets it. So $A- here silently
-  recompiles P1S1 and P1S2 unaligned too, costing 11 bytes there to save 4
+  recompiles P1LOGO and P1TITLE unaligned too, costing 11 bytes there to save 4
   here. Net -7, which is exactly what an earlier pass measured and recorded
   without knowing where the 7 went.
 
-  AND THAT ROUTE IS WRONG -- IT IS NOT P1S1'S OR P1S2'S RECORDS. Pinning A-plus
-  explicitly at the head of P1S1, P1S2 and P1S3 changed not one byte, so their
+  AND THAT ROUTE IS WRONG -- IT IS NOT P1LOGO'S OR P1TITLE'S RECORDS. Pinning A-plus
+  explicitly at the head of P1LOGO, P1TITLE and P1MOSAIC changed not one byte, so their
   spans come from THIS unit's block shrinking and moving what follows.
 
   WHAT A-MINUS ACTUALLY BUYS, measured: every address in this unit up to Blob
@@ -319,8 +319,8 @@ type
   STILL OPEN: what the six words at $5BCC are; what the 234-byte-element array
   at $5BD8 is (array[.., 1..18, 1..13] is the shape to try, since 18 x 13 is
   234); what starts at $6336 with seven-byte records; and where the block
-  BEGINS -- P1S2's ends at $5A52 and MCos1 is at $5B52, so 256 bytes precede
-  the maths block, which is either P1S3's whole block, or two 128-byte file
+  BEGINS -- P1TITLE's ends at $5A52 and MCos1 is at $5B52, so 256 bytes precede
+  the maths block, which is either P1MOSAIC's whole block, or two 128-byte file
   records, or one String.
   ========================================================================== }
 var
@@ -775,7 +775,7 @@ var
 begin
   { TRANSFORM IS SIX BYTES LONG AND IT IS ALL OF PART 001'S REMAINING RESIDUE.
     The prologue-offset comparison in DepthSort's note above localises it here:
-    every routine in P1S4 is at the original's offset except this one, and the
+    every routine in P1BALLS is at the original's offset except this one, and the
     program segment's two differing bytes -- 1000:0029 and 1000:009d -- are its
     two references into this unit and nothing else.
 
@@ -846,7 +846,7 @@ begin
         third, four bytes each.
 
         A `with Base^.Trail[0]` loads it once and IS eight bytes closer on length
-        -- P1S4's initialisation section lands at 1107:09ba against the original's
+        -- P1BALLS's initialisation section lands at 1107:09ba against the original's
         09b7, where three statements put it at 09c0. But the coverage walk goes the
         OTHER WAY: 21,255 of 21,264 with the `with` against 21,264 of 21,264
         without. The walk compares CONTENT and the offset compares LENGTH, and on
@@ -880,7 +880,7 @@ begin
         1107:044a, one load at 1107:04bc, ENTER $14. Every reading in this file
         was already correct; the signature was not.
 
-        AND THE EVIDENCE HAD BEEN SITTING IN PART 002 THE WHOLE TIME. P2S2's
+        AND THE EVIDENCE HAD BEEN SITTING IN PART 002 THE WHOLE TIME. P2SOLID's
         ObjTransform takes `var O : TObj` and does the identical thing at
         108b:030c -- one LES DI,[BP+$10] feeding three adds at es:[di+$B2D],
         +$B2F, +$B31 -- and closing THAT byte, days earlier, is what suggested
@@ -1149,7 +1149,7 @@ begin
   { 1107:097b -- RealToFixed, not Round(.. * 65536.0), and MViewW is READ FROM
     MEMORY rather than folded. FILD WORD [$0014] / FDIV the single at CS:$096F /
     FMUL the single at CS:$0973, then DX/BX/AX pushed into a far call into
-    FixMath. Part 002's P2S2 landed on the same form at 108b:1cd4 after two
+    FixMath. Part 002's P2SOLID landed on the same form at 108b:1cd4 after two
     refutations that both turned out to be confounded, so this is the shape the
     register already trusts. Note FILD WORD with no XOR DX,DX spill, where
     part 002 has one -- that is the difference between an Integer and a Word. }

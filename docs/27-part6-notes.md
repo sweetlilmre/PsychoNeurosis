@@ -3,8 +3,8 @@
 Read out of `NEUROSIS_006_fpu.exe`. Nothing here is inferred from the other
 parts; where something has not been read yet, it says so.
 
-**Status: all four scenes read and transcribed.** `P6S1`, `P6S2`, `P6S3`,
-`P6S4` and `P6Main` all build, and every routine that is assembler end to end
+**Status: all four scenes read and transcribed.** `P6WHOOSH`, `P6TILES`, `P6FIRE`,
+`P6CREDIT` and `P6Main` all build, and every routine that is assembler end to end
 is byte-checked against the binary. `src/PART6_P3SPRITE.PAS` — the earlier
 inferred single-unit pass — has been deleted.
 
@@ -294,24 +294,24 @@ errors in two clusters.
 Three of these are the same slip: converting `0x1000:XXXX` to a segment offset
 and landing on the wrong instruction.
 
-- **`P6S1`'s plot loop re-enters at the DS RELOAD, not at the INC.**
+- **`P6WHOOSH`'s plot loop re-enters at the DS RELOAD, not at the INC.**
   `1095:073e` jumps to `1095:070F`, which is `MOV AX,PathSeg / MOV DS,AX`. The
   body may have left DS pointing at the DOT table, so coming back one
   instruction later reads the next PATH entry out of the dot table — small
   byte values as word offsets, and the dots fly off in a straight line. That
   was the "straight to the left".
-- **`P6S3`'s picture overlay advances DI on EVERY byte.** `1118:01f9` jumps to
+- **`P6FIRE`'s picture overlay advances DI on EVERY byte.** `1118:01f9` jumps to
   `1118:01FE`, which IS the `INC DI`. Reading it as landing after the INC held
   DI back on every transparent pixel and slid the picture apart — the city not
   showing.
-- **`P6S3`'s fire clears AX ONCE, outside the loop.** `1118:099f` comes back to
+- **`P6FIRE`'s fire clears AX ONCE, outside the loop.** `1118:099f` comes back to
   `1118:0959`, not to the `XOR AX,AX` at `0957`. So AH is not cleared per cell:
   the four `ADC AH,0` carry across cells and `SHR AX,2` shifts some of that
   back into AL. Clearing AX inside the loop puts the fire out.
 
 And one inverted test:
 
-- **`P6S4` feeds a glyph row when the counter is NOT 19.** `11bb:017b` is a
+- **`P6CREDIT` feeds a glyph row when the counter is NOT 19.** `11bb:017b` is a
   `JNZ` INTO the feed. Reading it the other way up feeds only row 19 of every
   glyph — which is exactly "single lines, not fonts".
 
@@ -333,25 +333,25 @@ errors, five of which are the same mistake in different clothes.
 segments in the ORIGINAL's data segment. Transcribing them literally compiles
 cleanly and reads whatever our own build happens to have there.
 
-- **`P6S2.Blit`** read its four clip bounds from `DS:$0002..$0008` and its row
+- **`P6TILES.Blit`** read its four clip bounds from `DS:$0002..$0008` and its row
   table from `DS:$96DA`. The bounds are initialised data — `5, 315, 5, 195`,
   a five-pixel border — and the row table is the VGA unit's `YOfs`. This alone
   turned scene 2's screen to rubbish.
-- **`P6S4.Render`** did the same twice: `MOV SI,942Ch` for the margin table and
+- **`P6CREDIT.Render`** did the same twice: `MOV SI,942Ch` for the margin table and
   `MOV AX,164Eh` for the data segment.
-- **`P6S2.Setup`** reached the cell shape table with
+- **`P6TILES.Setup`** reached the cell shape table with
   `absolute $164E:$000A`. It is 2,048 bytes of initialised data, now extracted
   to `gen/P6SHAPE.INC` by `tools/emit_p6shape.py`.
 
 The other three:
 
-- **`P6S2.BuildTables` had the Y rotation backwards.** `100f:02c9` pushes the
+- **`P6TILES.BuildTables` had the Y rotation backwards.** `100f:02c9` pushes the
   `X*Sin` term and `100f:0307` SUBTRACTS it from `Y*Cos`. I had
   `X*Sin - Y*Cos`, which mirrors the mesh about the wrong axis.
-- **`P6S2`'s tile builder used DX for two things.** `DX` is the outer loop
+- **`P6TILES`'s tile builder used DX for two things.** `DX` is the outer loop
   counter; the frame base lives in a local at `[BP-$15]`. I had conflated
   them, so every tile was built from the wrong bytes.
-- **`P6S3` indexed its fire grid and title bitmap one element in.** The binary
+- **`P6FIRE` indexed its fire grid and title bitmap one element in.** The binary
   writes `[$73b9 + I*80 + J]`, so element [1,1] is 81 bytes into the variable,
   not at its start. Declaring `array[1..100,1..80]` and writing `Grid[I,J]`
   shifts everything by 81 bytes and puts the seed row one byte out. The grid is

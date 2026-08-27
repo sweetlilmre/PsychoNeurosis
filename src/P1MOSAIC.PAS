@@ -6,7 +6,7 @@
   its call sites, [stub] signature only.
   =========================================================================== }
 
-unit P1S3;
+unit P1MOSAIC;
 {$I-}   { no I/O check: the original goes straight on after each file
           call, with no near CALL to the RTL's check routine. }
 

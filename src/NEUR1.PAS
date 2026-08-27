@@ -18,8 +18,8 @@
       VirtScrAlloc and nothing else. VGA:0000 beside it is three instructions,
       MOV AX,$13 / INT $10 / RETF, so it is SetMode13h.
 
-    "it calls 1012:0798 for Scene1 where P1S1.PAS records 0678" -- it calls
-      1012:0678, exactly as P1S1.PAS records. There is no 0798 in the segment.
+    "it calls 1012:0798 for Scene1 where P1LOGO.PAS records 0678" -- it calls
+      1012:0678, exactly as P1LOGO.PAS records. There is no 0798 in the segment.
 
   Both were readings of something else, and both cost weeks of the part being
   described as blocked. The lesson is the cheap one: 288 bytes is twenty minutes.
@@ -28,8 +28,8 @@
 
       1000:0000   the unit-initialisation chain, twelve far calls -- and it is
                   a FREE READING OF THE LINK ORDER, in reverse of the segment
-                  order: System, DemoVT, Crt, VGA, FixMath, P1S5, P1Star, P1S4,
-                  P1S3, P1S2, P1S1
+                  order: System, DemoVT, Crt, VGA, FixMath, P1VECTOR, P1Star, P1BALLS,
+                  P1MOSAIC, P1TITLE, P1LOGO
       1000:003c   PUSH BP / MOV BP,SP -- a frame with no locals; both of the
                   body's variables are GLOBALS, at DS:$02E8 and DS:$02E9, and
                   they are BYTES: 1000:00cb is MOV BYTE PTR [$02E8],AL
@@ -98,17 +98,17 @@ program Neur1;
   walk and so land LAST in code: DemoVT (1532), Crt (14d0), VGA (1491). FixMath
   (1483) is NOT named -- nothing names it directly and the scene that needs it
   pulls it in there, which is where the original has it. Then the scenes in
-  reverse of their segments, with P1Star between P1S5 and P1S4 exactly as the
+  reverse of their segments, with P1Star between P1VECTOR and P1BALLS exactly as the
   initialisation chain at 1000:0000 places it. }
 { AND THE SCENE ORDER IS BACKWARDS ON PURPOSE. Carried from P1INTRO.PAS, which
   this file replaces: on 25 Aug 2026 segpair.py measured the clause both ways,
   and in scene order SIX of the nine paired segments came out transposed --
-  P1S5, P1S4, FixMath, P1S3, P1S2, P1S1 -- while as written below all nine
+  P1VECTOR, P1BALLS, FixMath, P1MOSAIC, P1TITLE, P1LOGO -- while as written below all nine
   match. The initialised data improved with it too, 420 differing bytes to 393.
   spans.py CANNOT TELL THESE APART, because it locates each segment by content;
   read segpair.py and dgimage.py for this, never the walk. }
 uses DemoVT, Crt, VGA,
-     P1S5, P1STAR, P1S4, P1S3, P1S2, P1S1;
+     P1VECTOR, P1STAR, P1BALLS, P1MOSAIC, P1TITLE, P1LOGO;
 
 var
   Saved : Byte;         { DS:$02E8 -- a GLOBAL, not a local, and a Byte }

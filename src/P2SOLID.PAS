@@ -23,9 +23,9 @@
       Math_Project        108b:362f
   =========================================================================== }
 
-unit P2S2;
+unit P2SOLID;
 
-{ I/O checking off -- see the note in P2S1. }
+{ I/O checking off -- see the note in P2GARAGE. }
 {$I-}
 
 (* 80x87 CODE ON. Scene2_Setup's projection scale is computed in floating
@@ -266,7 +266,7 @@ var
     plot's folded base is $9485, one stride below. }
   Star   : array[1..StarCount] of TStar;
   { DS:$A043 -- the .DAT handle is a GLOBAL here too, exactly as it is in
-    P2S1: 108b:2467 is `MOV DI,$A043 / PUSH DS / PUSH DI` for Assign, Reset,
+    P2GARAGE: 108b:2467 is `MOV DI,$A043 / PUSH DS / PUSH DI` for Assign, Reset,
     Seek, BlockRead and Close alike, where a local would be
     `LEA DI,[BP-n] / PUSH SS / PUSH DI`. 128 bytes, so it ends at $A0C2 --
     which is exactly where Banner's pointer starts. }

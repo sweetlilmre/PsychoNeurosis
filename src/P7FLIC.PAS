@@ -41,7 +41,7 @@
           a file that was never opened (see Play), and only $I- makes that
           survivable. Turning checks back on stops the demo dead. }
 
-unit P7S1;
+unit P7FLIC;
 {$A-}   { DATA ALIGNMENT OFF, and it only bites once the byte at [BP-$22D]
           exists. Play's Buf is at an ODD [BP-$231] in the original; under the
           $A+ default that byte is padded to a word and Buf lands at $232,

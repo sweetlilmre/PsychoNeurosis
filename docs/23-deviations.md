@@ -204,7 +204,7 @@ under `archive/pre-kit-scripts`.
 
 **There is not one raw 80x87 opcode in any shipped 1994 binary, and that is not an argument that the demo was built `$N-`.** The maintainer raised exactly that on 24 Aug 2026, and it is the strongest form of the confusion: what is in the file is traps, because `$E+` overwrote every instruction's `WAIT ESC` prefix. `$N-` emits no 80x87 instructions at all, so it leaves **no traps either** — floating point becomes far calls into the software six-byte-`Real` library, and there is nothing for an emulator to emulate. **A trap is therefore positive evidence of `$N+`.** `$N` decides which code is emitted; `$E` decides how it ships; the demo is `$N+` `$E+` and never had a coprocessor.
 
-Settled without anyone having to read a trap correctly, on 24 Aug 2026: P5S2 was built both ways and every byte of part 005 walked against `bin/NEUROSIS.005`. `$N+` aligns **80.4%**, `$N-` aligns **79.2%** — so `$N-` moves the rebuild 137 bytes *further* from the 1994 file. Had the original been `$N-`, that number would have gone the other way. `kit/wiki/observations/n-and-e-are-different/` carries the general form.
+Settled without anyone having to read a trap correctly, on 24 Aug 2026: P5ROTO was built both ways and every byte of part 005 walked against `bin/NEUROSIS.005`. `$N+` aligns **80.4%**, `$N-` aligns **79.2%** — so `$N-` moves the rebuild 137 bytes *further* from the 1994 file. Had the original been `$N-`, that number would have gone the other way. `kit/wiki/observations/n-and-e-are-different/` carries the general form.
 
 Two figures in the older record are corrected there and in `status.toml`: the motion-table loop body at `1096:051a..0591` carries **12** traps, not 14 — 14 is the count for the whole of `Demo_Scene2`, `1096:03d7..06b7` — and the loop makes **4,002** trig calls, not 3,424, since the counter at `DS:$63ca` is seeded at `1096:050f` and tested against `$7D0` at `1096:0592`, so it turns 2001 times at two calls a turn.
 
@@ -301,7 +301,7 @@ comparison to make when most of the routine is compiled code.
   behaviour -- but it shifted every conditional jump below it by four bytes.
   Now transcribed.
 
-- **`P1S1.ScrollLeft` was declared `assembler` and should not have been.** The
+- **`P1LOGO.ScrollLeft` was declared `assembler` and should not have been.** The
   original (`1012:03bd`) opens `PUSH BP` / `MOV BP,SP` and closes `LEAVE`, a
   stack frame it neither needs nor uses -- which is what a plain Pascal
   procedure whose body happens to be one `asm` block compiles to. Declared
@@ -316,7 +316,7 @@ comparison to make when most of the routine is compiled code.
   variables, and the routine now matches for all **293** bytes of it, which is
   its exact length (`1139:0096`..`01bb`).
 
-- **`P1S4.SetPalette768` is at `1107:0000`,** not `1107:0446`. Found by
+- **`P1BALLS.SetPalette768` is at `1107:0000`,** not `1107:0446`. Found by
   searching the binary for its own `MOV DX,3C8 / MOV AL,0 / OUT DX,AL /
   INC DX / MOV CX,0300 / REP OUTSB`, which also turned up part 001's VGA copy
   at `1491:01c2` and confirmed that one.
@@ -390,7 +390,7 @@ there.
 
 `src/asm/DEMOMATH.ASM` holds `SinCos`, `RotatePoint` and `Project` -- the three
 routines the 3-D scenes share -- plus the 901-entry 16.16 cosine table they
-read. It is assembled by TASM and linked into `P1S4`, `P1S5` and `P2S2` with
+read. It is assembled by TASM and linked into `P1BALLS`, `P1VECTOR` and `P2SOLID` with
 `{$L DEMOMATH.OBJ}`, which is what the original does: the same code appears
 three times, once per unit's code segment, and all three copies in the two
 binaries are byte-identical to each other.

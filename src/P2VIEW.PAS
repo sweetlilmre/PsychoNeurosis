@@ -479,10 +479,10 @@ end;
   what cannot be shared, which is the same reason SetPalette768 is exempt.
 
   This reconstruction used to keep only one of them and point every caller at
-  VGA.SetRGB. That is a deviation with a price: P2S2 calls this EIGHTEEN
+  VGA.SetRGB. That is a deviation with a price: P2SOLID calls this EIGHTEEN
   times, and a far call encodes its target's segment AND offset, so every one
   of those sites differed in four bytes -- a run the coverage walk cannot
-  forgive. P2S2's `uses` lists P2View after VGA, so simply declaring it here
+  forgive. P2SOLID's `uses` lists P2View after VGA, so simply declaring it here
   points those eighteen calls at the right routine.
   -------------------------------------------------------------------------- }
 { EQUIVALENT PASCAL -- REFERENCE ONLY, and not what is compiled:

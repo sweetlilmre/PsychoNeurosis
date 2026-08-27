@@ -33,7 +33,7 @@
 {$G+}   { 286 instructions: 1008:0045 is SHL AX,8 and 1008:0069 SHR AX,8
           in the blit. The original targets 386 and above. }
 
-unit P2S1;
+unit P2GARAGE;
 
 {$A-}   { NO VARIABLE ALIGNMENT. Run's counter is the decisive reading: ENTER 4
           with one byte declared ahead of it puts an Integer at the ODD
@@ -641,7 +641,7 @@ var
     not the original's [BP-$03]; only the A-minus switch moves it, and that is global
     rather than per-routine. Setting it on this unit changed not one byte in
     any of the seven parts. A `with` temp is not aligned that way, which is why
-    P1S5's ObjTranslate reaches [BP-$05] with the same shape. So the frame SIZE
+    P1VECTOR's ObjTranslate reaches [BP-$05] with the same shape. So the frame SIZE
     and the variable COUNT are right here and the offset is one byte out. }
   Spare : Byte;                            { [BP-$01], never touched }
   X     : Integer;                         { [BP-$03], BOTH loops }

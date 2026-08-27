@@ -32,10 +32,10 @@
   restores it with VIDMODE.
 
   THE USES CLAUSE IS THE LINK ORDER, REVERSED, and it is the harness's clause
-  followed by P2MAIN's. P2S2 BEFORE ModeX BEFORE P2S1 is load-bearing: the
-  original's order is P2S1 (1008), ModeX (107c), P2S2 (108b), DemoVT (13f9),
+  followed by P2MAIN's. P2SOLID BEFORE ModeX BEFORE P2GARAGE is load-bearing: the
+  original's order is P2GARAGE (1008), ModeX (107c), P2SOLID (108b), DemoVT (13f9),
   P2View (140c), FixMath (142a), VGA (1436), Crt (144f), and ModeX lands second
-  only because nothing names it directly -- P2S1 pulls it in there. Naming it
+  only because nothing names it directly -- P2GARAGE pulls it in there. Naming it
   in the clause put it sixth. Checked against build/NEUR2.MAP.
   =========================================================================== }
 
@@ -45,7 +45,7 @@
 
 program Neur2;
 
-uses Crt, VGA, FixMath, P2View, DemoVT, P2S2, ModeX, P2S1;
+uses Crt, VGA, FixMath, P2View, DemoVT, P2SOLID, ModeX, P2GARAGE;
 
 { 1000:0032 -- and it ends in Halt(0), exactly as the original's does. }
 begin

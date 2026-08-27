@@ -37,7 +37,7 @@
 {$S-}   { 1095:000d opens ENTER $386,0 with no stack check. }
 {$N+}   { six-byte Reals through the x87, which is what the binary uses }
 
-unit P6S1;
+unit P6WHOOSH;
 {$I-}   { no I/O check: the original goes straight on after each file
           call, with no near CALL to the RTL's check routine. }
 
@@ -87,7 +87,7 @@ type
     upper bound follows from it rather than being chosen. }
   TFont = array[FirstCh..FirstCh + FontSize div 256 - 1,
                 1..16, 1..16] of Byte;
-  { Entry by channel, for the same reason -- see P6S2 and part 004. }
+  { Entry by channel, for the same reason -- see P6TILES and part 004. }
   TPal768 = array[0..767] of Byte;
 
 var

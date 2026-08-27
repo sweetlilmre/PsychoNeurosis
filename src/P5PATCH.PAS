@@ -40,10 +40,10 @@
 
 {$S-}   { 1102:0000 opens ENTER $26,0 with no stack check. }
 
-unit P5S3;
+unit P5PATCH;
 {$I-}   { no I/O check: the original goes straight on after each file
           call, with no near CALL to the RTL's check routine. }
-{$A-}   { data alignment off -- measured, see the note in P2S2.PAS }
+{$A-}   { data alignment off -- measured, see the note in P2SOLID.PAS }
 
 {$G+}   { 286: RenderPatch 1102:0000 opens ENTER $26; the whole segment is
           ENTER-framed. }
@@ -89,7 +89,7 @@ const
 
     DECLARED H FIRST, and the addresses are the whole reason: the original
     puts MViewH at $2d16 and MViewW at $2d18, so W-then-H transposes them.
-    They cannot move to P5S1 either -- DEMOMATH.OBJ's EXTRN resolves by
+    They cannot move to P5MESH either -- DEMOMATH.OBJ's EXTRN resolves by
     Pascal scope in the unit that links it, and declaring them there gives
     `Undefined external (MViewW)`. }
   MViewH : Word = 200;
@@ -332,13 +332,13 @@ begin
     end;
     if Frame >= 564 then Running := False;       { 1102:020b }
 
-    { Inc, NOT AN ASSIGNMENT, AND IT IS THE OPPOSITE WAY ROUND FROM P1S1. The
+    { Inc, NOT AN ASSIGNMENT, AND IT IS THE OPPOSITE WAY ROUND FROM P1LOGO. The
       original is MOV AX,[BP-6] / ADD [BP-2],AX -- six bytes, the addend loaded
       and added straight into memory -- where `CX := CX + DX_` loads CX first,
       adds, and stores back: nine. Three bytes each, six across the pair, and
       that was the whole of this unit's excess.
 
-      P1S1's two bouncer updates went the other way: there the ORIGINAL wrote
+      P1LOGO's two bouncer updates went the other way: there the ORIGINAL wrote
       the assignment and recomputed the subscript three times, and Inc was the
       shorter form we had to give up. The ADD's operand direction names which
       was written -- ADD [mem],reg is Inc, ADD reg,[mem] with a store after is
@@ -373,8 +373,8 @@ var
     of declaration that nothing reads, and ours had no frame at all.
 
     128 + 2 is a file record and one more word, and a file record is what this
-    part's other scenes declare and leave unopened in the same position: P6S1's
-    Load, P6S2's Setup and P6S4's Setup all do it. The file this routine
+    part's other scenes declare and leave unopened in the same position: P6WHOOSH's
+    Load, P6TILES's Setup and P6CREDIT's Setup all do it. The file this routine
     actually uses is the GLOBAL at DS:$A984, which 1102:02ed pushes.
 
     The TYPES are a guess and only the total is measured. }

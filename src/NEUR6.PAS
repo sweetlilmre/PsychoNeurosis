@@ -14,11 +14,11 @@
   the four, but the main body calls 1095 first. Segment number tells you the
   link order, not the running order.
 
-  THE USES CLAUSE IS THE LINK ORDER, REVERSED, and P6S2 BEFORE P6S1 IS
+  THE USES CLAUSE IS THE LINK ORDER, REVERSED, and P6TILES BEFORE P6WHOOSH IS
   LOAD-BEARING -- this note comes from P6MAIN and it still applies. The
-  original's variable region opens with P6S2's Cells at DS:$70EE and its block
-  ends at $737D, exactly where P6S1's Path begins at $737E; its constants open
-  with P6S2's CellShape at DS:$000A too. Named the other way round, P6S1 came
+  original's variable region opens with P6TILES's Cells at DS:$70EE and its block
+  ends at $737D, exactly where P6WHOOSH's Path begins at $737E; its constants open
+  with P6TILES's CellShape at DS:$000A too. Named the other way round, P6WHOOSH came
   first and every variable in the part was out. The walk is a reverse DFS
   post-order from the PROGRAM, so the whole clause reads backwards: DemoVT
   first here finishes first and lands last in code.
@@ -37,7 +37,7 @@
 
 program Neur6;
 
-uses DemoVT, Crt, VGA, P6S4, P6S3, P6S1, P6S2;
+uses DemoVT, Crt, VGA, P6CREDIT, P6FIRE, P6WHOOSH, P6TILES;
 
 var
   SavedVol : Byte;                { DS:$70ec }

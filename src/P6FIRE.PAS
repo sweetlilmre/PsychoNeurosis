@@ -36,7 +36,7 @@
 {$G+}   { 186: SHR AX,2 with an immediate, in the diffusion loop }
 {$N+}   { the spark and the palette ramp go through the x87 }
 
-unit P6S3;
+unit P6FIRE;
 
 {$A-}   { NO VARIABLE ALIGNMENT. Run's Frame is the witness: it is a WORD at the
           ODD [BP-$07], immediately below a Byte at [BP-$05], and 1118:09a8,
@@ -92,7 +92,7 @@ var
 
     Declared FLAT and 0-based the displacement matches just as well -- both
     forms produce the same instruction -- but they put the array in different
-    places, and $73B9 is not available: P6S1's file record occupies $738A to
+    places, and $73B9 is not available: P6WHOOSH's file record occupies $738A to
     $7409. $740A is the first free byte after it, and the chain closes from
     there: $740A + 8,000 is $934A, which is Pic; Pic and TitleB together run to
     $9420, which is SparkX. An earlier pass rejected the 2-D form on the
@@ -527,7 +527,7 @@ begin
         already assembles to $740A -- element [1,1] -- and adding 81 to it
         added the low bounds a second time. Three bytes, and the loop read a
         column and a row off for as long as it was there. Same trap as the
-        hardcoded lens base in P1S1: the binary's literal was reproduced by
+        hardcoded lens base in P1LOGO: the binary's literal was reproduced by
         adding a constant the assembler already accounts for. }
       MOV  AX, OFFSET Grid   { 1118:0949  assembles to $740A, element [1,1]   }
       MOV  SI, AX            { 1118:094c                                     }

@@ -1,18 +1,18 @@
 { ==========================================================================
   P1STAR -- part 001 scene 4's starfield, segment 12b2.
 
-  These three routines were transcribed into P1S4 and measured wrong there for
+  These three routines were transcribed into P1BALLS and measured wrong there for
   as long as they stayed: 1107:09a7 is a FAR call to 12b2:0000, and a routine
   in the calling unit cannot be reached by one. The far call is the whole
   evidence -- within a single segment Turbo Pascal emits PUSH CS plus a near
   CALL, four bytes, and never a 9A. So the original had a unit here, between
-  P1S4 (1107) and P1S5 (12c5), holding nothing but the starfield.
+  P1BALLS (1107) and P1VECTOR (12c5), holding nothing but the starfield.
 
   The uses clause of P1INTRO runs in REVERSE segment order, so this unit is
-  named there between P1S5 and P1S4.
+  named there between P1VECTOR and P1BALLS.
 
   `Star` comes with them. It sits at DS:$9DDB in the original, immediately
-  after P1S4's data, which is what a unit linked directly after P1S4
+  after P1BALLS's data, which is what a unit linked directly after P1BALLS
   contributes -- so the address is evidence for this split rather than a cost
   of it.
   ========================================================================== }
@@ -52,7 +52,7 @@ var
     The block's start is still not reachable, but it does not have to be. What
     Star needs is an ODD address, and it takes three changes AT ONCE:
 
-      P1S4's Tail3 becomes TWO bytes, so that unit's block ends at $9DD9 and
+      P1BALLS's Tail3 becomes TWO bytes, so that unit's block ends at $9DD9 and
         ours pads the next block to the EVEN $9DDA rather than to $9DDC;
       this unit takes A-minus, so a word-sized type does not step past an odd
         offset;

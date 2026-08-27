@@ -47,7 +47,7 @@ unit FixMath;
 
   The hot routines elsewhere do NOT have it and must not get it: P2View's
   Plot at 140c:00b1 and FillRect at 140c:011e open `PUSH BP / MOV BP,SP` and
-  go straight into the body, and P2S2's ObjTransform opens a bare ENTER.
+  go straight into the body, and P2SOLID's ObjTransform opens a bare ENTER.
 
   IT MAKES THE REBUILD SLOWER, and that is the right direction. FixedToInt is
   called once per vertex and calls RealToFixed once itself, so the original

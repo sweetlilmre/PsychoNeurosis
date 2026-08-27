@@ -41,7 +41,7 @@
           other three scene units all carry the directive; this one was missed,
           exactly as part 004's Lemmings unit was. }
 
-unit P6S4;
+unit P6CREDIT;
 
 interface
 
@@ -99,7 +99,7 @@ type
 
 { THE ARRAY IS 99 AND THE LOOP COUNTS TO 113, and both are the original's.
   11bb:02fa stops at $72, so Lines really is 113; the table really is 99
-  slots, because P6S1's Path pointer sits at DS:$737E and 99 slots of 256
+  slots, because P6WHOOSH's Path pointer sits at DS:$737E and 99 slots of 256
   from $0D8A end at $708A -- 113 would run to $7F8A with Path inside it.
   Lines 100..113 therefore read PAST the array, into constants that are
   zeros, which is why they draw blank.
@@ -155,8 +155,8 @@ var
     trap as part 007's function result: a slot the routine uses is not
     necessarily a slot it declares.
 
-    P6S2's Setup has the identical shape -- an unreferenced file record nearest
-    BP ahead of its palette -- and so does P6S1's Load. Three routines in this
+    P6TILES's Setup has the identical shape -- an unreferenced file record nearest
+    BP ahead of its palette -- and so does P6WHOOSH's Load. Three routines in this
     part declare a file they never open. }
   Unread : file;                  { [BP-$80]..[BP-1], never referenced }
   I      : Integer;               { [BP-$82] }
