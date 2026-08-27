@@ -145,7 +145,7 @@ list = [
   "P5S1.PAS",
   "P5S2.PAS",
   "P5S3.PAS",
-  "P5MAIN.PAS",
+  "NEUR5.PAS",
   "P6S1.PAS",
   "P6S2.PAS",
   "P6S3.PAS",
@@ -215,7 +215,7 @@ alongside = ["*.BAT"]
 "P5S1.PAS" = ["P5S1.PAS", "P5S1", "P5S1"]
 "P5S2.PAS" = ["P5S2.PAS", "P5S2", "P5S2"]
 "P5S3.PAS" = ["P5S3.PAS", "P5S3", "P5S3"]
-"P5MAIN.PAS" = ["P5MAIN.PAS", "P5Main", "P5Main"]
+"NEUR5.PAS" = ["NEUR5.PAS", "Neur5", "Neur5"]
 "P6S1.PAS" = ["P6S1.PAS", "P6S1", "P6S1"]
 "P6S2.PAS" = ["P6S2.PAS", "P6S2", "P6S2"]
 "P6S3.PAS" = ["P6S3.PAS", "P6S3", "P6S3"]

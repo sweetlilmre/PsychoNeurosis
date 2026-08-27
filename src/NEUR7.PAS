@@ -35,6 +35,10 @@
     DS:$0066  the volume as we found it   DS:$0067  the fade's copy of it
   =========================================================================== }
 
+{$G+}   { 286, AND A PROGRAM IS A FILE -- nothing inherits $G from its units.
+          Without it an immediate argument comes out MOV AX,imm / PUSH AX rather
+          than PUSH imm8, and the frame teardown POP BP rather than LEAVE. }
+
 program Neur7;
 
 uses DemoVT, Crt, P7S1, VGA;
@@ -79,5 +83,10 @@ begin
     INT  10h               { 1000:009a }
   end;
 
-  Halt(0);                        { 1000:009f }
+  { NO Halt(0). `end.` already emits the exit -- LEAVE / XOR AX,AX /
+    LCALL System:0116 -- so an explicit Halt(0) puts that sequence in TWICE,
+    once for the statement and once for the end of the body. Seven bytes, and
+    every program in this corpus except part 001's and part 005's had them:
+    the comment that used to sit here pointed at the address of the single copy
+    the original has, which is exactly what a doubled one looks like. }
 end.

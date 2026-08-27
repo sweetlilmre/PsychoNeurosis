@@ -183,9 +183,15 @@ PARTS = [
     # did not move, because our P3Tunnel is 144 bytes LARGER than the original's
     # 2,608 and that moves the runtime just as a harness did. Part 003's 34
     # far-call bytes are downstream of that, not of the harness.
-    ("TPART5", "P5Main", "RunPart5",
-     "DemoVT, Crt, VGA",
-     "part 005 -- all three scenes, through the main body at 1000:002d"),
+    # PART 005 HAS NO HARNESS ANY MORE, AND IT WAS THE LAST ONE. src/NEUR5.PAS
+    # is the real program; P5MAIN.PAS is gone with it. Its 224-byte segment came
+    # out BYTE-IDENTICAL to the original's, the first program segment in this
+    # corpus to do so, and the part went from 10,980 of 11,440 to every byte.
+    #
+    # SO THIS LIST IS EMPTY, and that is the finished state rather than a gap.
+    # Every part now builds as its own program and RUNPART.BAT launches it; the
+    # per-SCENE harnesses in SCENES above are still generated and still useful,
+    # because a scene is not a program in the original either.
     # PART 006 HAS NO HARNESS ANY MORE. src/NEUR6.PAS is the real program --
     # the main body that P6MAIN.PAS held as a unit -- and part 006 went 99.6% to
     # 100.0% with 32 far-call bytes closing at once. Its one remaining byte is

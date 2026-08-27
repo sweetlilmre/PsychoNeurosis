@@ -29,6 +29,10 @@
   whatever PSYCHO.EXE ran next. RUNPART.BAT restores it with VIDMODE.
   =========================================================================== }
 
+{$G+}   { 286, AND A PROGRAM IS A FILE -- nothing inherits $G from its units.
+          Without it an immediate argument comes out MOV AX,imm / PUSH AX rather
+          than PUSH imm8, and the frame teardown POP BP rather than LEAVE. }
+
 program Neur3;
 
 uses DemoVT, Crt, VGA,
@@ -75,5 +79,10 @@ begin
   SetVolume(SavedVol);                { 1000:012f }
 
   VirtScrFree;
-  Halt(0);
+  { NO Halt(0). `end.` already emits the exit -- LEAVE / XOR AX,AX /
+    LCALL System:0116 -- so an explicit Halt(0) puts that sequence in TWICE,
+    once for the statement and once for the end of the body. Seven bytes, and
+    every program in this corpus except part 001's and part 005's had them:
+    the comment that used to sit here pointed at the address of the single copy
+    the original has, which is exactly what a doubled one looks like. }
 end.

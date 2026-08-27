@@ -804,8 +804,6 @@ end;
   wrong offset and every one of its eight blocks with it -- 476 bytes, the
   largest single span in this target, and all of it downstream of one
   declaration's position. }
-function CheckKey : Boolean; forward;
-
 { --------------------------------------------------------------------------
   Demo_Scene3 (1139:03b4) -- HAND ASSEMBLER, and the whole procedure is.
 
@@ -877,6 +875,61 @@ end;
 
   { RowOfs is the Mode-X unit's own table (1192:0000 fills it), not this
     scene's -- see MODEX.PAS. It is imported, not declared here. }
+
+{ CheckKey IS DEFINED HERE, BETWEEN FlipPage AND Set400Lines, AND NOT AT THE
+  END OF THE FILE. Definition order is segment order and the map at the top of
+  this file gives the original's: ModeX_FlipPage 1139:02c3, Morph_CheckKey
+  02e0, VGA_Set400Lines 02f2. Defined last, behind a `forward`, its eighteen
+  bytes sat past Scene3 instead and every routine from Set400Lines on came out
+  eighteen bytes early -- Demo_Scene3 at 03a2 against the original's 03b4.
+
+  NOTHING IN THIS UNIT'S OWN MEASUREMENTS COULD SEE THAT. The segment is the
+  right size either way, the coverage walk locates each routine by content and
+  scored them all aligned, and the initialised data image is identical. What
+  found it was the PROGRAM segment: 1000:0082 is LCALL 1139:03b4, so the main
+  body names Scene3's offset exactly, and ours said 03a2. A part's program
+  segment is a list of every unit's entry-point offsets, and comparing it byte
+  for byte is the only instrument here that reads them. }
+
+{ --------------------------------------------------------------------------
+  Morph_CheckKey (1139:02e0) -- ASSEMBLER, AND IT RETURNS IN DX.
+
+  The scene tests for a key through its own routine and not through Crt's
+  KeyPressed directly: 1139:040a is a NEAR call and CALLF never appears in the
+  eight loops. So there is a routine of this unit's own in between.
+
+  TWO THINGS ABOUT IT ARE NOT PASCAL, and both were visible for weeks.
+
+  IT HAS NO STACK FRAME. 1139:02e0 is the far call itself -- no PUSH BP, no
+  MOV BP,SP, and a bare RET at 02f1 with no LEAVE. A compiled procedure gets
+  the frame whether or not it has locals; only `assembler` omits it.
+
+  AND IT ANSWERS IN DX. Turbo Pascal returns a Boolean in AL, a word in AX, a
+  LongInt or a pointer in DX:AX -- and nothing at all in DX alone. The
+  MOV DX,0 / MOV DX,1 pair here, and the OR DX,DX that Scene3 tests it with,
+  appear EXACTLY ONCE in the whole demo: this routine and its callers. Every
+  part carries the runtime's own AL form of the same shape, which is what made
+  the DX form look like a decoding mistake rather than a finding.
+
+  So it is the author's own calling convention, and the callers are asm because
+  nothing else can read it. That is why this and Scene3 had to change together:
+  making this `assembler` on its own leaves the callers testing AL, and the
+  measurement gets WORSE rather than better.
+
+  The declared result type stays Boolean because that is what the routine
+  MEANS; nothing reads AL, so nothing depends on Turbo Pascal's idea of where
+  the answer goes.
+  -------------------------------------------------------------------------- }
+function CheckKey : Boolean; assembler;
+asm
+        CALL    KeyPressed              { 1139:02e0 -- far, into Crt          }
+        OR      AL,AL                   { 02e5 -- Crt's answer IS in AL       }
+        JNE     @@Yes                   { 02e7                                }
+        MOV     DX,0                    { 02e9                                }
+        JMP     @@Out                   { 02ec                                }
+@@Yes:  MOV     DX,1                    { 02ee                                }
+@@Out:                                  { 02f1 is the RET Turbo Pascal adds   }
+end;
 
 { --------------------------------------------------------------------------
   VGA_Set400Lines (1139:02f2)
@@ -1229,45 +1282,6 @@ asm
 @@Done:                                 { 0583 is the RETF Turbo Pascal adds  }
 end;
 
-{ --------------------------------------------------------------------------
-  Morph_CheckKey (1139:02e0) -- ASSEMBLER, AND IT RETURNS IN DX.
-
-  The scene tests for a key through its own routine and not through Crt's
-  KeyPressed directly: 1139:040a is a NEAR call and CALLF never appears in the
-  eight loops. So there is a routine of this unit's own in between.
-
-  TWO THINGS ABOUT IT ARE NOT PASCAL, and both were visible for weeks.
-
-  IT HAS NO STACK FRAME. 1139:02e0 is the far call itself -- no PUSH BP, no
-  MOV BP,SP, and a bare RET at 02f1 with no LEAVE. A compiled procedure gets
-  the frame whether or not it has locals; only `assembler` omits it.
-
-  AND IT ANSWERS IN DX. Turbo Pascal returns a Boolean in AL, a word in AX, a
-  LongInt or a pointer in DX:AX -- and nothing at all in DX alone. The
-  MOV DX,0 / MOV DX,1 pair here, and the OR DX,DX that Scene3 tests it with,
-  appear EXACTLY ONCE in the whole demo: this routine and its callers. Every
-  part carries the runtime's own AL form of the same shape, which is what made
-  the DX form look like a decoding mistake rather than a finding.
-
-  So it is the author's own calling convention, and the callers are asm because
-  nothing else can read it. That is why this and Scene3 had to change together:
-  making this `assembler` on its own leaves the callers testing AL, and the
-  measurement gets WORSE rather than better.
-
-  The declared result type stays Boolean because that is what the routine
-  MEANS; nothing reads AL, so nothing depends on Turbo Pascal's idea of where
-  the answer goes.
-  -------------------------------------------------------------------------- }
-function CheckKey : Boolean; assembler;
-asm
-        CALL    KeyPressed              { 1139:02e0 -- far, into Crt          }
-        OR      AL,AL                   { 02e5 -- Crt's answer IS in AL       }
-        JNE     @@Yes                   { 02e7                                }
-        MOV     DX,0                    { 02e9                                }
-        JMP     @@Out                   { 02ec                                }
-@@Yes:  MOV     DX,1                    { 02ee                                }
-@@Out:                                  { 02f1 is the RET Turbo Pascal adds   }
-end;
 
 { The original gives every unit an EMPTY initialisation section, and the
   main body's opening far calls are the chain that runs them -- eleven of

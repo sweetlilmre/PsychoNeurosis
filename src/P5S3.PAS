@@ -290,7 +290,13 @@ var
     SECOND: the source is `Angle + AngStep` and not the other way round. }
   Angle    : Word;                { [BP-$0A] }
   AngStep  : Integer;             { [BP-$0C] }
-  Frame    : Integer;             { [BP-$0E] }
+  { A WORD, NOT AN INTEGER, AND THE BRANCH SAYS SO. 1102:01f5 and 1102:0210 are
+    JB where a signed compare gives JL -- the same two bytes with the wrong
+    condition -- so `Frame >= 500` and `Frame >= 564` are UNSIGNED comparisons
+    and Frame is unsigned. Nothing else about the routine changes: Frame runs
+    0..564 and never goes negative, so the two forms behave identically here and
+    only the 1994 bytes say which was written. }
+  Frame    : Word;                { [BP-$0E] }
   Running  : Boolean;             { [BP-$0F] }
 begin
   Running := True;                               { 1102:0182 }
@@ -326,8 +332,20 @@ begin
     end;
     if Frame >= 564 then Running := False;       { 1102:020b }
 
-    CX := CX + DX_;                              { 1102:0216 }
-    CY := CY + DY_;                              { 1102:021c }
+    { Inc, NOT AN ASSIGNMENT, AND IT IS THE OPPOSITE WAY ROUND FROM P1S1. The
+      original is MOV AX,[BP-6] / ADD [BP-2],AX -- six bytes, the addend loaded
+      and added straight into memory -- where `CX := CX + DX_` loads CX first,
+      adds, and stores back: nine. Three bytes each, six across the pair, and
+      that was the whole of this unit's excess.
+
+      P1S1's two bouncer updates went the other way: there the ORIGINAL wrote
+      the assignment and recomputed the subscript three times, and Inc was the
+      shorter form we had to give up. The ADD's operand direction names which
+      was written -- ADD [mem],reg is Inc, ADD reg,[mem] with a store after is
+      the assignment -- and it has now been read in both directions in one
+      corpus. }
+    Inc(CX, DX_);                                { 1102:0216 }
+    Inc(CY, DY_);                                { 1102:021c }
     Angle := (Angle + AngStep) mod FullTurn;     { 1102:0222 }
 
     if CX < 0   then begin CX := 0;   DX_ := -DX_ end;   { 1102:0244 }
