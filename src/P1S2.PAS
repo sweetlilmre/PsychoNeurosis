@@ -88,7 +88,16 @@ type
 
 var
   { THE ORDER BELOW IS THE ADDRESSES', and it was not before -- WorkBuf came
-    first here and belongs fifth. Sorted, this unit's block TILES with no gap:
+    first here and belongs fifth. IT IS RIGHT NOW, MEASURED: every absolute
+    displacement into this block is identical in both images, with identical
+    reference counts -- $56C0 three times, $56C4 twice, $56C8 once, $56CA four
+    times, $56CE five times. dsmap reports six sites here at +10, +4 and -14,
+    and those are MIS-PAIRINGS, not defects: it anchors on the bytes before a
+    reference and this block has several that look alike, which is why it also
+    reports 87 sites skipped as ambiguous. Read the displacements directly
+    before believing a shift row in a block this dense.
+
+    Sorted, this unit's block TILES with no gap:
 
         $56C0  CometBank      4
         $56C4  Backdrop       4

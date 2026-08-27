@@ -565,8 +565,13 @@ begin
     written by a statement of its own and blobs 2..144 by the loop, which
     together is every blob -- redundant, and what ships. }
   Move(ProfileA, Blob[1].Pix, BlobPixels);       { 1107:0113 }
+  { AND THE LOOP COPIES BLOB 1, NOT ProfileA. 1107:012f is MOV DI,$80F7 --
+    Blob[1].Pix again, the same absolute address the statement above writes --
+    as the SOURCE, where ours named ProfileA and emitted MOV DI,$5B6A. So blob 1
+    is filled from the profile and then propagated to blobs 2..144, which is why
+    the statement above is separate rather than redundant: it is the seed. }
   for I := 2 to TrailCount do
-    Move(ProfileA, Blob[I].Pix, BlobPixels);
+    Move(Blob[1].Pix, Blob[I].Pix, BlobPixels);
   for I := 1 to TrailCount do
   begin
     Blob[I].W := BlobW;
