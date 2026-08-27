@@ -95,6 +95,13 @@ data compiled into the executables' DGROUP. See
 | 006 | `$18B23F` | 2 | 768 | `part006/CREDPAL.PAL` | VGA palette, 6-bit |
 | 007 | `$19117F` | 0 | 62,206 | `part007/LEMEND.FLC` |  |
 | 003 | `$1A047D` | 0 | 13,104 | `part003/BLKORDER.BIN` |  |
+| 001 | (embedded) |  | 97,463 | `part001/INAWE.MOD` | ProTracker module "In awe of you.", appended past the load image |
+| 002 | (embedded) |  | 185,555 | `part002/STARTREK.MOD` | ProTracker module "StarTrek Samples", appended past the load image |
+| 003 | (embedded) |  | 234,853 | `part003/TECHTICK.MOD` | ProTracker module "Techno Tick", appended past the load image |
+| 004 | (embedded) |  | 58,967 | `part004/DETHMRCH.MOD` | ProTracker module "The Deth March", appended past the load image |
+| 005 | (embedded) |  | 188,721 | `part005/NEUROTIC.MOD` | ProTracker module "Neurotic Interlude", appended past the load image |
+| 006 | (embedded) |  | 65,937 | `part006/LATEXLVR.MOD` | ProTracker module "LaTeX LoVeR", appended past the load image |
+| 007 | (embedded) |  | 58,967 | `part007/DETHMRCH.MOD` | ProTracker module "The Deth March", appended past the load image |
 | 002 | (embedded) |  | 12,410 | `part002/GARAGE.PNG` | 146x85, dimensions from code not header |
 | 002 | (embedded) |  | 12,800 | `part002/BANNER.PNG` | 320x40, dimensions from code not header |
 | 002 | (embedded) |  | 1,462 | `part002/REWIND.PNG` | 34x43, dimensions from code not header |

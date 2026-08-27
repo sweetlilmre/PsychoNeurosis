@@ -159,6 +159,25 @@ for _m in ("OBJENT", "OBJQUA", "OBJREV", "OBJSAI"):
 # Files that are inputs to the build rather than outputs of this script.
 NOT_ASSETS = ("NEUROSIS.MAN", "README.md")
 
+# THE MUSIC. Each shipped part is an executable with a ProTracker module
+# APPENDED PAST ITS LOAD IMAGE -- the MZ header's own arithmetic says so, and
+# mzinfo reports it as overlay_bytes. So the modules are derived from bin/ like
+# everything else here, not loose files somebody has to keep.
+#
+# The names are the modules' OWN titles, read out of the 20 bytes at offset 0 of
+# each one, shortened to 8.3. Parts 004 and 007 SHARE a module: "The Deth March"
+# is byte-identical in both, 58,967 bytes, so it appears in both folders.
+# part -> (8.3 stem, the title in the file)
+MUSIC = {
+    "001": ("INAWE",    "In awe of you."),
+    "002": ("STARTREK", "StarTrek Samples"),
+    "003": ("TECHTICK", "Techno Tick"),
+    "004": ("DETHMRCH", "The Deth March"),
+    "005": ("NEUROTIC", "Neurotic Interlude"),
+    "006": ("LATEXLVR", "LaTeX LoVeR"),
+    "007": ("DETHMRCH", "The Deth March"),
+}
+
 # Regions whose extension is not .BIN. Keyed like NAMES, so a rename cannot
 # reach it. (seek, index) -> extension
 EXTS = {
@@ -245,6 +264,36 @@ EMBEDDED_PALETTES = [
 
 def ramp_palette():
     return bytes(((i >> 2) & 63) for i in range(256) for _ in range(3))
+
+
+def carve_music(manifest):
+    """The appended ProTracker module of each shipped part.
+
+    Nothing about this needs the region map: the MZ header says where the load
+    image ends and everything past it is the module.
+    """
+    for part, (stem, title) in sorted(MUSIC.items()):
+        src = Path("bin") / ("NEUROSIS.%s" % part)
+        if not src.exists():
+            continue
+        mz = parse(src)
+        # THE TAIL, BY LENGTH, NOT BY A COMPUTED START. hdrsize + imagesize
+        # looked like the end of the load image and is not: it overshot part
+        # 001 by exactly the 1,040-byte header and got parts 004 and 007 wrong
+        # by different amounts, which is what says the arithmetic was invented
+        # rather than read. mzinfo already reports overlay_bytes, so take that
+        # many bytes off the end and let the field that was measured do the
+        # work.
+        raw = src.read_bytes()[-mz["overlay_bytes"]:] if mz["overlay_bytes"] else b""
+        if not raw:
+            continue
+        d = OUT / ("part%s" % part)
+        d.mkdir(parents=True, exist_ok=True)
+        (d / ("%s.MOD" % stem)).write_bytes(raw)
+        manifest.append((part, None, None, len(raw),
+                         "part%s/%s.MOD" % (part, stem),
+                         'ProTracker module "%s", appended past the load image'
+                         % title))
 
 
 def carve_dat(manifest):
@@ -491,6 +540,7 @@ def main(write_readme=True):
     OUT.mkdir(exist_ok=True)
     manifest = []
     carve_dat(manifest)
+    carve_music(manifest)
     render_headered(manifest)
     render_sprites(manifest)
     split_strips(manifest)
