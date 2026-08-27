@@ -112,7 +112,7 @@ flags = "/ML /Z"
 # TPART0 (uses Detect) was added above DETECT.PAS.
 mode = "uses"
 list = [
-  "VIDMODE.PAS",
+  "test/VIDMODE.PAS",
   "PSYCHO.PAS",
   "BYEBYE.PAS",
   "STARTUP.PAS",
@@ -160,7 +160,7 @@ list = [
 encoding = "ascii"
 # The generated test harnesses already carry conforming 8.3 names and matching
 # unit identifiers, so they map to themselves and adding one needs no edit here.
-identity = ["TP*.PAS"]
+identity = ["test/TP*.PAS"]
 # The 386 maths module and its include go in the build ROOT, not GEN: TASM
 # resolves INCLUDE relative to the current directory, and TPC looks for the
 # .OBJ next to the unit that links it.
@@ -187,7 +187,7 @@ alongside = ["*.BAT"]
 # unit name inside a file is independent of the filename, but TP7 finds a unit
 # BY FILENAME, so `uses Part3Sprites` must become `uses P3Sprite`.
 [names]
-"VIDMODE.PAS" = ["VIDMODE.PAS", "VidMode", "VidMode"]
+"test/VIDMODE.PAS" = ["VIDMODE.PAS", "VidMode", "VidMode"]
 "PSYCHO.PAS" = ["TPSYCHO.PAS", "Psycho", "Psycho"]
 "BYEBYE.PAS" = ["TPART9.PAS", "ByeBye", "ByeBye"]
 "STARTUP.PAS" = ["TPART0.PAS", "Startup", "Startup"]

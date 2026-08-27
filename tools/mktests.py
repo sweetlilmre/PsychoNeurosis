@@ -9,7 +9,7 @@ they are generated rather than written by hand.
                checked in sequence and in context.
 
 Names are 8.3 and uniform: part number, scene number. dosbuild.py registers
-anything matching src/TP*.PAS automatically, so adding a row here is the only
+anything matching src/test/TP*.PAS automatically, so adding a row here is the only
 step.
 
     python tools/mktests.py                     write them all
@@ -385,7 +385,11 @@ def write(prog, unit, entry, uses, opening, closing, what):
             + "  %s;\n\n" % entry
             + closing
             + TAIL % dict(say=say))
-    (SRC / (prog + ".PAS")).write_text(text, encoding="ascii", newline="\r\n")
+    # src/test/, not src/: these are harnesses, not the demo. build.toml's
+    # identity glob reads them from there.
+    out = SRC / "test" / (prog + ".PAS")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(text, encoding="ascii", newline="\r\n")
     print("  %-12s %s" % (prog + ".PAS", what))
 
 

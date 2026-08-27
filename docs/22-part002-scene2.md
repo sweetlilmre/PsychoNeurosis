@@ -395,5 +395,5 @@ slots the 23-byte face record has.
 
 ## Status
 
-Transcribed as `src/P2S2.PAS`, with `src/TP2S2.PAS` as the harness. Compiles
+Transcribed as `src/P2S2.PAS`, with `src/test/TP2S2.PAS` as the harness. Compiles
 under TP 7.01 and installs as `run/TP2S2.EXE`.
