@@ -42,7 +42,13 @@ const
   CometW      = 65;
   CometH      = 48;
   CometSize   = CometW * CometH;   { 3120 -- the stride in the loaded buffer }
-  RevealOfs   = 614;               { $266 -- where DrawRevealed lands }
+  { 294, NOT 614, AND OURS WAS ADDING THE ROW TWICE. 1082:01d7 is MOV DI,$126 --
+    294 -- and 1082:01da adds 320 on top of it, so the address DrawRevealed
+    starts from is 614. Written as 614 the constant already carried the row and
+    the ADD put a second one on: DI came out 934, a whole row and a bit past
+    where the original writes. One byte in the image and a visibly wrong
+    destination in the scene. }
+  RevealOfs   = 294;               { $126, and 01da adds a row to it }
   FontBias    = 8209;              { = 32*256 + 17, see DrawChar }
 
 const

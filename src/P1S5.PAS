@@ -867,7 +867,14 @@ var
     is not where the four go. Nothing below the address pair at [BP-$9] is
     referenced at any width. }
   I     : Byte;                                   { [BP-$1] }
-  Spare : LongInt;                                { never read }
+  { THREE BYTES, NOT FOUR, AND THE COMPILER'S OWN TEMPORARIES MEASURE IT. The
+    frame is ENTER $0A either way, so its size proves nothing -- what does is
+    WHERE the temporaries land. The original puts the for limit at [BP-$5] and
+    the address pair at [BP-$9]/[BP-$7]; a four-byte Spare fills [BP-$2]..[BP-$5]
+    and pushes both one lower, to [BP-$6] and [BP-$A]/[BP-$8], which is ten of
+    this unit's remaining bytes. Three bytes leaves [BP-$5] free for the limit
+    and the pair at [BP-$9]. Type unknown, size measured. }
+  Spare : array[1..3] of Byte;                    { never read }
 begin
   SortAll(@Scr);                                  { 12c5:0626 }
 
