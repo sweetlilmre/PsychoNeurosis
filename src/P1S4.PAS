@@ -657,17 +657,23 @@ procedure SortOutp(var Arr : TOutArr);
         begin
           T := Arr[I];  Arr[I] := Arr[J];  Arr[J] := T;
         end;
-        { Inc AND Dec, IN PLACE, AND A MASKED DIFF SAID OTHERWISE AND WAS WRONG.
-          A masked instruction diff showed the original doing
-          MOV AX,[BP-2] / INC AX / MOV [BP-2],AX here and ours the in-place
-          form, so both were written longhand -- and BOTH instruments got worse:
-          the coverage walk went from 21,264 of 21,264 to 21,262 and the program
-          segment's references into this unit from 2 differing bytes to 37,
-          because P1S4 grew nine bytes and displaced every segment after it by a
-          paragraph. The diff's "original" side was anchored at a DRIFTED offset
-          and was not the counterpart of this statement at all. Reverted.
-          A masked diff names candidates; the walk and the program segment
-          decide, and here they agreed against it. }
+        { Inc AND Dec IN PLACE, AND THIS ROUTINE IS EIGHT BYTES SHORT BECAUSE OF
+          IT -- LEFT THAT WAY DELIBERATELY. 1107:0390 in the original is
+          MOV AX,[BP-2] / INC AX / MOV [BP-2],AX and the same shape with DEC for
+          J, so the longhand is what was written and the in-place form below is
+          not.
+
+          IT CANNOT BE FIXED ON ITS OWN. Comparing PROLOGUE OFFSETS across P1S4
+          -- the instrument that finally separated the two defects here -- gives
+          every routine at the original's offset up to 1107:0287, then THIS
+          routine 8 bytes short, then Transform at 0446 nine bytes LONG, then a
+          constant +1 to the end. The two very nearly cancel. Write the longhand
+          alone and DepthSort becomes exact while Transform's nine bytes stop
+          being hidden: the part's coverage walk goes 21,264 of 21,264 to 21,262
+          and the program segment's references into this unit go from 2 differing
+          bytes to 37, because P1S4 grows and displaces every segment after it by
+          a paragraph. Both defects have to close together.
+          Carried as part1-p1s4-three-bytes with Transform's three candidates. }
         Inc(I);  Dec(J);
       end;
     until I > J;
@@ -738,6 +744,35 @@ var
   T : TTrail;                           { [BP-$0F], the working copy }
   P : PWork;                            { [BP-$13], from Base }
 begin
+  { TRANSFORM IS NINE BYTES LONG AND THIS ROUTINE IS WHERE ALL OF PART 001'S
+    RESIDUE LIVES. The prologue-offset comparison in DepthSort's note above
+    localises it here exactly; the program segment's two differing bytes,
+    1000:0029 and 1000:009d, are its two references into P1S4 and nothing else.
+    Three candidates, each diffed with THIS routine's own prologue as the anchor:
+
+      1107:044a  `P := Base` -- the original is LES DI,[BP+$0A] /
+                 MOV [BP-$13],DI / MOV [BP-$11],ES, nine bytes, where ours
+                 copies two words in four MOVs, twelve. PWork is declared
+                 ^TWork so both are pointer assignments, and what makes TP7
+                 choose LES here is not known. Worth three.
+      1107:04bc  the three adds below load the parameter ONCE in the original
+                 and ours reloads before the second and the third, four bytes
+                 each. See the note there: a `with` is eight bytes closer and
+                 puts the load in the wrong place. Worth eight.
+      1107:0491  the Move's source is [BP-$13], the local P, not [BP+$0A].
+                 Size-neutral, and applying it ALONE took the walk from 21,264
+                 of 21,264 to 21,262 -- so it is either wrong or only right in
+                 combination with the other two. Read it again before believing
+                 it.
+
+    Three plus eight is eleven against a nine-byte excess, so at least one of
+    those readings is wrong, which is the honest state of it.
+
+    AND HOW TO DIFF THIS: a masked instruction diff over a WHOLE UNIT anchors
+    its "original" side at whatever offset the drift has reached, so its
+    pairings across a defect are not counterparts -- that misread cost a full
+    cycle here. Use prologue offsets to find WHICH routine, then diff that one
+    routine anchored on its own prologue. }
   P := Base;                                { 1107:044a }
 
   SinCos(A1, MCos1, MSin1);                 { -> DS:$5B52, $5B56 }
