@@ -55,9 +55,26 @@ var
       Tail3 as TWO bytes instead of three, on the theory that our compiler's
         boundary pad supplies the third -- measurably WORSE, 53 differing bytes
         across part 001 to 188. Tail3 is three.
-    So the byte is a pad our build inserts at the boundary between one unit's
-    data block and the next, and nothing in either unit's source has moved it
-    yet. Read the .TPU's data-segment alignment next. }
+    A THIRD MEASUREMENT PINS IT DOWN, and it makes this a floor rather than an
+    open question. Declaring a one-byte Probe immediately before Star moved Star
+    from $9DDC to $9DDE -- a jump of TWO, not one. So the Probe took $9DDC and
+    Star was then word-aligned past the odd $9DDD, which means our P1Star data
+    BLOCK begins at $9DDC and Star's own alignment is a separate, currently
+    harmless effect. The byte is the BLOCK's placement: P1S4's data ends at
+    $9DDA, the next free byte is the odd $9DDB, and our TP7 pads the following
+    unit's block to a word while the original's did not.
+
+    Nothing in either unit's source reaches that. $A- controls variable
+    alignment -- it demonstrably works, since adding it to P1S1 is what put F at
+    the odd $563F -- and it does not move a block. Moving P1Star in the uses
+    clause would move the block, but the clause is also the code segment order,
+    which is exact.
+
+    SO THESE SEVEN BYTES ARE A FLOOR: one pad byte, its six folded consequences,
+    and three hypotheses eliminated by measurement rather than by argument. The
+    next thing that could move it is the .TPU's own data-segment alignment
+    record, which is not source-controllable, or a different patch level of
+    TP 7.00. }
   Star  : array[1..StarCount] of TStar;             { DS:$9DDB }
 
 procedure StarInit(C0, Ca, Cb, Speed : Byte);
