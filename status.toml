@@ -385,6 +385,15 @@ achieved = "R7"
 target = "R7"
 measured_at = "abea6bdc9ad9"
 
+[artefact."NEUR6"]
+ours = "run/NEUR6.EXE"
+original = "work/split/NEUROSIS_006.exe"
+compare = "file"
+sha256 = "07279a48b3f8607f60bbf27bccd7c3140afd7ada98943f755544bc42d50758d6"
+achieved = "R7"
+target = "R7"
+measured_at = "ef7f39b5cd4b"
+
 [artefact."TPART0"]
 ours = "run/TPART0.EXE"
 original = "bin/NEUROSIS.000"

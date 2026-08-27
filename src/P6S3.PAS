@@ -37,6 +37,13 @@
 {$N+}   { the spark and the palette ramp go through the x87 }
 
 unit P6S3;
+
+{$A-}   { NO VARIABLE ALIGNMENT. Run's Frame is the witness: it is a WORD at the
+          ODD [BP-$07], immediately below a Byte at [BP-$05], and 1118:09a8,
+          09c3 and 09d3 all address it there. Under A-plus the compiler steps it
+          to [BP-$08] and takes the x87 status byte below it down with it. The
+          note in Run already recorded the $02/$04/$05/$07 sequence; the
+          declarations could not produce it while alignment was on. }
 {$I-}   { no I/O check: the original goes straight on after each file
           call, with no near CALL to the RTL's check routine. }
 
@@ -384,7 +391,12 @@ begin
     SparkSlow;                         { 1118:083b }
   end;
 
-  for I := 1 to $1F4 do                          { 1118:0847 }
+  { BOTH TAIL LOOPS REUSE X, the slide counter, not I. 1118:084e and 1118:0878
+    count in [BP-$02], which the four slide loops above have already fixed as
+    X -- 1118:0843 compares it against -$1E. The inner I and J belong to the
+    bitmap blit and the original does not touch them again once the slide is
+    over. Counting in I instead moved seventeen bytes across the two loops. }
+  for X := 1 to $1F4 do                          { 1118:0847 }
   begin
     SparkSlow;                         { 1118:0851 }
     Delay(2);                                    { 1118:0856 }
@@ -392,9 +404,9 @@ begin
 
   SetRGB(0, $3F, $3F, $3F);                      { 1118:086a -- white }
   Delay($64);                                    { 1118:0871 }
-  for I := $3F downto 0 do                       { 1118:0876 }
+  for X := $3F downto 0 do                       { 1118:0876 }
   begin
-    SetRGB(0, I, I, I);                          { 1118:088e }
+    SetRGB(0, X, X, X);                          { 1118:088e }
     Delay(2);                                    { 1118:0895 }
   end;
 end;
@@ -452,9 +464,16 @@ begin
   Overlay(Segment);                              { 1118:08e3 }
   CopyScreen(Segment, VGASeg);                   { 1118:08ec }
   Title;                                         { 1118:08f1 }
-  if KeyPressed then Exit;                       { 1118:08f4 }
 
   repeat
+    { THE KEY TEST IS INSIDE THE LOOP, and the back edge is what says so:
+      1118:09d8 is JMP to 1118:08F4, the KeyPressed call itself, not to
+      1118:0900 where the seeding loop begins. Outside the repeat it is tested
+      once and the fire then runs its full 300 frames whatever the keyboard
+      does; inside, every frame can end the scene. One byte of jump
+      displacement, and the difference between a scene that can be skipped and
+      one that cannot. }
+    if KeyPressed then Exit;                     { 1118:08f4 }
     { 1118:0907 -- reseed the bottom row. Random is the REAL one here, and
       the threshold is the extended 0.4 at CS:$08c9. }
     { TWO DEFECTS HERE AND TOGETHER THEY ARE WHY THE FIRE DID NOT CLIMB AS
