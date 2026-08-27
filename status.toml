@@ -311,6 +311,8 @@ observer = "maintainer"
 date = "2026-08-22"
 confirmed_at = "fa3fb7dce541"
 fingerprint = "fe684476bd604f52"
+superseded_by = "NEUR1"
+superseded_on = "2026-08-27"
 
 [observation."TPART2"]
 harness = "TPART2"
@@ -322,6 +324,8 @@ date = "2026-08-24"
 confirmed_at = "32b38f1778f5"
 fingerprint = "def2481f9e409647"
 note = "Watched after the three renderers were rebuilt to take the object by value. NO FURTHER CHANGE - about the same as the previous run, which was already much better than before ObjSortFaces. So the addressing-mode change accounts for the one improvement and repeating it in the renderers added nothing measurable. The remaining gap is something else and is not explained yet."
+superseded_by = "NEUR2"
+superseded_on = "2026-08-27"
 
 [observation."TPART3"]
 harness = "TPART3"
@@ -332,6 +336,8 @@ observer = "maintainer"
 date = "2026-08-22"
 confirmed_at = "18b7c8786d33"
 fingerprint = "08d271ae3e818baa"
+superseded_by = "NEUR3"
+superseded_on = "2026-08-27"
 
 [observation."TPART4"]
 harness = "TPART4"
@@ -355,6 +361,8 @@ date = "2026-08-24"
 confirmed_at = "0b5975a17527"
 fingerprint = "d8f38bc0784b1fb0"
 note = "TPART5 beside ORIG5, watched, after {$G+} landed on P5S2 and changed 885 bytes of the part. THE RESIDUAL HAS MOVED, which is what makes this run worth recording rather than a repeat. On 24 Aug before the switch the observer reported scene 2's image build as slower than the original; after it, what remains is a slight lag IN THE SCENE SWITCH BETWEEN 1 AND 2 -- a transition cost, not a per-frame one. The observer parked part 005 here and moved the queue to part 002. Where that points, and it is consistent with the very first report of this part which called it the rotozoom setup: the scene 1 to 2 boundary is Demo_Scene2's own preamble at 1096:03d7 -- GetMem of the $FFFF texture at 1096:0485, the 200-row texture load at 1096:04ee, and the motion-table build at 1096:051a. The coverage walk still shows 1096:0477..0537 unaligned at 192 bytes, which covers the GetMem and the head of the table build, so the eye and the walk agree on the boundary the same way they agreed on Shatter. NOT INVESTIGATED, deliberately: parked at the observer's call with part 005 at 88.1%, up from 80.4% at the previous run. Recorded as differs because a difference was seen."
+superseded_by = "NEUR5"
+superseded_on = "2026-08-27"
 
 [observation."TPART6"]
 harness = "TPART6"
@@ -367,6 +375,8 @@ confirmed_at = "d1b7e9a59d5e"
 fingerprint = "64bde46a96c2b509"
 against = "NEUROSIS_006.exe"
 note = "THE FIRE IS CONFIRMED CORRECT. Watched beside ORIG6 on 25 Aug 2026, after the reseed fix -- the test changed from `>` to `<` and the store to Grid[99,I] made UNCONDITIONAL, so the seed is sticky across columns. The maintainer reports scene 3's fire now correct, which closes part6-fire-height against a run rather than against a byte count. OUTCOME STILL `differs` DELIBERATELY: this report is about the fire and says nothing about scene 1, which the 25 Aug run called JERKY and for which no cause has been found. Nothing here retracts that, so part6-confirm-r3 stays open and the part is not confirmable at R3 yet. Recording `matches` on the strength of a sentence about one scene would be putting words in the observer's mouth."
+superseded_by = "NEUR6"
+superseded_on = "2026-08-27"
 
 [observation."TPART7"]
 harness = "TPART7"
@@ -378,6 +388,8 @@ date = "2026-08-21"
 confirmed_at = "be253cb07d6c"
 fingerprint = "5741a180fb198746"
 against = "ORIG7.EXE"
+superseded_by = "NEUR7"
+superseded_on = "2026-08-27"
 
 [artefact."NEUR1"]
 ours = "run/NEUR1.EXE"
