@@ -657,24 +657,9 @@ procedure SortOutp(var Arr : TOutArr);
         begin
           T := Arr[I];  Arr[I] := Arr[J];  Arr[J] := T;
         end;
-        { Inc AND Dec IN PLACE, AND THIS ROUTINE IS EIGHT BYTES SHORT BECAUSE OF
-          IT -- LEFT THAT WAY DELIBERATELY. 1107:0390 in the original is
-          MOV AX,[BP-2] / INC AX / MOV [BP-2],AX and the same shape with DEC for
-          J, so the longhand is what was written and the in-place form below is
-          not.
-
-          IT CANNOT BE FIXED ON ITS OWN. Comparing PROLOGUE OFFSETS across P1S4
-          -- the instrument that finally separated the two defects here -- gives
-          every routine at the original's offset up to 1107:0287, then THIS
-          routine 8 bytes short, then Transform at 0446 nine bytes LONG, then a
-          constant +1 to the end. The two very nearly cancel. Write the longhand
-          alone and DepthSort becomes exact while Transform's nine bytes stop
-          being hidden: the part's coverage walk goes 21,264 of 21,264 to 21,262
-          and the program segment's references into this unit go from 2 differing
-          bytes to 37, because P1S4 grows and displaces every segment after it by
-          a paragraph. Both defects have to close together.
-          Carried as part1-p1s4-three-bytes with Transform's three candidates. }
-        Inc(I);  Dec(J);
+        { LONGHAND. 1107:0390 is MOV AX,[BP-2] / INC AX / MOV [BP-2],AX and the
+          same shape with DEC for J. }
+        I := I + 1;  J := J - 1;
       end;
     until I > J;
     if Lo < J then DepthSort(Lo, J);
@@ -742,95 +727,128 @@ var
     LongInt locals. That is why there are no X, Y, Z locals to declare. }
   I : Integer;                          { [BP-2] }
   T : TTrail;                           { [BP-$0F], the working copy }
-  P : PWork;                            { [BP-$13], from Base }
+  { AND [BP-$13] IS NOT A DECLARED LOCAL -- IT IS THE `with`'s HIDDEN SLOT.
+    1107:044a is LES DI,[BP+$0A] / MOV [BP-$13],DI / MOV [BP-$11],ES, nine bytes,
+    and that is exactly what TP7 emits ENTERING a `with` on a pointer
+    dereference: the record's address stored in a slot allocated below the
+    declared locals. Declared as `P : PWork` with `P := Base` the same slot got
+    filled by four MOVs instead, twelve bytes -- and SortOutp's note in this
+    same file had already recorded that a `with` is allocated a four-byte
+    address slot whether or not it needs one. 2 + 13 + 4 = 19, rounded to 20,
+    either way. }
 begin
-  { TRANSFORM IS NINE BYTES LONG AND THIS ROUTINE IS WHERE ALL OF PART 001'S
-    RESIDUE LIVES. The prologue-offset comparison in DepthSort's note above
-    localises it here exactly; the program segment's two differing bytes,
-    1000:0029 and 1000:009d, are its two references into P1S4 and nothing else.
-    Three candidates, each diffed with THIS routine's own prologue as the anchor:
+  { TRANSFORM IS SIX BYTES LONG AND IT IS ALL OF PART 001'S REMAINING RESIDUE.
+    The prologue-offset comparison in DepthSort's note above localises it here:
+    every routine in P1S4 is at the original's offset except this one, and the
+    program segment's two differing bytes -- 1000:0029 and 1000:009d -- are its
+    two references into this unit and nothing else.
 
-      1107:044a  `P := Base` -- the original is LES DI,[BP+$0A] /
-                 MOV [BP-$13],DI / MOV [BP-$11],ES, nine bytes, where ours
-                 copies two words in four MOVs, twelve. PWork is declared
-                 ^TWork so both are pointer assignments, and what makes TP7
-                 choose LES here is not known. Worth three.
-      1107:04bc  the three adds below load the parameter ONCE in the original
-                 and ours reloads before the second and the third, four bytes
-                 each. See the note there: a `with` is eight bytes closer and
-                 puts the load in the wrong place. Worth eight.
-      1107:0491  the Move's source is [BP-$13], the local P, not [BP+$0A].
-                 Size-neutral, and applying it ALONE took the walk from 21,264
-                 of 21,264 to 21,262 -- so it is either wrong or only right in
-                 combination with the other two. Read it again before believing
-                 it.
+    THE ARITHMETIC IS NOW CLOSED, and an earlier version of this note was wrong
+    about it. It read "three plus eight is eleven against a nine-byte excess, so
+    at least one of those readings is wrong". The mis-reading was mine, not the
+    evidence's: LES DI,[BP+$0A] is C4 7E 0A, THREE bytes, not four. The nine
+    broke down as three plus six, exactly:
 
-    Three plus eight is eleven against a nine-byte excess, so at least one of
-    those readings is wrong, which is the honest state of it.
+      1107:044a  the entry, worth THREE -- CLOSED. It is a `with` on the pointer
+                 dereference, not a declared `P : PWork` filled by `P := Base`.
+                 See the note in the var block.
+      1107:04bc  the three adds, worth SIX -- OPEN. Two reloads of the parameter
+                 at three bytes each. See the note beside them, which records the
+                 two spellings measurement has already eliminated.
 
-    AND HOW TO DIFF THIS: a masked instruction diff over a WHOLE UNIT anchors
-    its "original" side at whatever offset the drift has reached, so its
-    pairings across a defect are not counterparts -- that misread cost a full
-    cycle here. Use prologue offsets to find WHICH routine, then diff that one
-    routine anchored on its own prologue. }
-  P := Base;                                { 1107:044a }
+    Closing the entry also fixed the Move's source for free: 1107:0491 is
+    LES DI,[BP-$13] and field names inside the with resolve through that slot, so
+    the third candidate this note used to list was never a separate defect.
 
-  SinCos(A1, MCos1, MSin1);                 { -> DS:$5B52, $5B56 }
-  SinCos(A2, MCos2, MSin2);                 { -> DS:$5B5A, $5B5E }
-  SinCos(A3, MCos3, MSin3);                 { -> DS:$5B62, $5B66 }
+    AND HOW TO DIFF THIS. A masked instruction diff over a WHOLE UNIT anchors its
+    "original" side at whatever offset the drift has reached, so its pairings
+    across a defect are not counterparts -- that misread cost a full cycle here,
+    and it also hid the fact that DepthSort's eight bytes and this routine's nine
+    were CANCELLING. Use prologue offsets to find which routine, then diff that
+    one routine anchored on its own prologue. }
 
-  for I := 1 to LastEntry do
+  { A `with`, AND ITS ENTRY IS THE NINE BYTES AT 1107:044a. Field names inside
+    it resolve through the hidden slot -- 1107:0491's Move source and the four
+    writes at 1107:050d onwards are all LES DI,[BP-$13]. The three adds keep
+    Base^ SPELLED OUT on purpose: 1107:04bc loads LES DI,[BP+$0A], the
+    parameter itself, so those three do NOT go through the with. }
+  with Base^ do
   begin
-    { THROUGH THE PARAMETER, NOT THROUGH THE COPY, and the routine really does
-      use both. 1107:049f's Move and the three adds at 1107:04bc load
-      LES DI,[BP+$A] -- the parameter itself -- while the four stores at
-      1107:050d onwards load LES DI,[BP-$13], the local copy. So the reads name
-      Base^ and the writes name P^; using one for everything is four bytes
-      different at each of the four read sites. }
-    Move(Base^.Trail[I], T, SizeOf(TTrail));  { 1107:049f, thirteen bytes }
-    RotatePoint(T.X, T.Y, T.Z);             { 1107:04b3 }
-    { THE TRANSLATION IS READ THROUGH THE POINTER, not from Trail absolutely.
-      1107:04bc is LES DI,[BP+0A] -- the parameter again -- and the three adds
-      take es:[di], es:[di+4] and es:[di+8], which is element ZERO of whatever
-      was passed. Reading Work.Trail[0] by name is the same value and an absolute
-      displacement instead of a register indirection. }
-    { A `with`, AND THE ADDRESS IS LOADED ONCE. 1107:04bc is LES DI,[BP+$0A] and
-      the three adds then take es:[di], es:[di+4] and es:[di+8] with NO further
-      load -- so all three name fields of one record whose address is already in
-      ES:DI. Written out as three separate Base^.Trail[0].field references the
-      compiler reloads the parameter before the second and the third, four bytes
-      each. }
-    { THREE SEPARATE STATEMENTS, AND TWO INSTRUMENTS DISAGREE ABOUT THIS SITE.
-      1107:04bc loads LES DI,[BP+$0A] once and the three adds then take es:[di],
-      es:[di+4] and es:[di+8] with no further load; written out as three
-      references the compiler reloads the parameter before the second and the
-      third, four bytes each.
 
-      A `with Base^.Trail[0]` loads it once and IS eight bytes closer on length
-      -- P1S4's initialisation section lands at 1107:09ba against the original's
-      09b7, where three statements put it at 09c0. But the coverage walk goes the
-      OTHER WAY: 21,255 of 21,264 with the `with` against 21,264 of 21,264
-      without. The walk compares CONTENT and the offset compares LENGTH, and on
-      this site they contradict each other, so the `with` is closer in total and
-      wrong in detail. Left as three statements because the walk is the stronger
-      instrument, and recorded in part1-p1s4-three-bytes rather than guessed at:
-      whatever the original wrote loads the address once WITHOUT a with's entry
-      sequence, and nobody has found the spelling. }
-    T.X := T.X + Base^.Trail[0].X;           { 1107:04bf }
-    T.Y := T.Y + Base^.Trail[0].Y;
-    T.Z := T.Z + Base^.Trail[0].Z;
-    Project(T.X, T.Y, T.Z);                 { 1107:0503 }
-    { THE ORDER IS X, Y, D, FLAG, AND D COMES AFTER Project, NOT BEFORE.
-      1107:0528 pushes [BP-7] and [BP-5] -- the two halves of T.Z -- to
-      FixedToInt, and 1107:0503 has already called Project on that same slot.
-      So the depth key is taken from the PROJECTED Z, not the rotated one, and
-      this had it the other way round: a different number in the field the
-      depth sort is keyed on, not merely a different instruction order. }
-    { both come back zero-extended, so the low word carries the sign }
-    P^.Outp[I].X    := Integer(T.X);           { 1107:0506 }
-    P^.Outp[I].Y    := Integer(T.Y);           { 1107:0517 }
-    P^.Outp[I].D    := FixedToInt(T.Z);        { 1107:052e }
-    P^.Outp[I].Flag := T.Flag;                 { 1107:0543 }
+    SinCos(A1, MCos1, MSin1);                 { -> DS:$5B52, $5B56 }
+    SinCos(A2, MCos2, MSin2);                 { -> DS:$5B5A, $5B5E }
+    SinCos(A3, MCos3, MSin3);                 { -> DS:$5B62, $5B66 }
+
+    for I := 1 to LastEntry do
+    begin
+      { THROUGH THE PARAMETER, NOT THROUGH THE COPY, and the routine really does
+        use both. 1107:049f's Move and the three adds at 1107:04bc load
+        LES DI,[BP+$A] -- the parameter itself -- while the four stores at
+        1107:050d onwards load LES DI,[BP-$13], the local copy. So the reads name
+        Base^ and the writes name P^; using one for everything is four bytes
+        different at each of the four read sites. }
+      Move(Trail[I], T, SizeOf(TTrail));        { 1107:049f, thirteen bytes }
+      RotatePoint(T.X, T.Y, T.Z);             { 1107:04b3 }
+      { THE TRANSLATION IS READ THROUGH THE POINTER, not from Trail absolutely.
+        1107:04bc is LES DI,[BP+0A] -- the parameter again -- and the three adds
+        take es:[di], es:[di+4] and es:[di+8], which is element ZERO of whatever
+        was passed. Reading Work.Trail[0] by name is the same value and an absolute
+        displacement instead of a register indirection. }
+      { A `with`, AND THE ADDRESS IS LOADED ONCE. 1107:04bc is LES DI,[BP+$0A] and
+        the three adds then take es:[di], es:[di+4] and es:[di+8] with NO further
+        load -- so all three name fields of one record whose address is already in
+        ES:DI. Written out as three separate Base^.Trail[0].field references the
+        compiler reloads the parameter before the second and the third, four bytes
+        each. }
+      { THREE SEPARATE STATEMENTS, AND TWO INSTRUMENTS DISAGREE ABOUT THIS SITE.
+        1107:04bc loads LES DI,[BP+$0A] once and the three adds then take es:[di],
+        es:[di+4] and es:[di+8] with no further load; written out as three
+        references the compiler reloads the parameter before the second and the
+        third, four bytes each.
+
+        A `with Base^.Trail[0]` loads it once and IS eight bytes closer on length
+        -- P1S4's initialisation section lands at 1107:09ba against the original's
+        09b7, where three statements put it at 09c0. But the coverage walk goes the
+        OTHER WAY: 21,255 of 21,264 with the `with` against 21,264 of 21,264
+        without. The walk compares CONTENT and the offset compares LENGTH, and on
+        this site they contradict each other, so the `with` is closer in total and
+        wrong in detail. Left as three statements because the walk is the stronger
+        instrument, and recorded in part1-p1s4-three-bytes rather than guessed at:
+        whatever the original wrote loads the address once WITHOUT a with's entry
+        sequence, and nobody has found the spelling. }
+      { THREE PLAIN STATEMENTS, AND THE LAST SIX BYTES OF PART 001 ARE HERE.
+        1107:04bc loads LES DI,[BP+$0A] ONCE and the three add pairs then take
+        es:[di], es:[di+4] and es:[di+8] with NO further load. Ours reloads
+        before the second and the third: C4 7E 0A twice, three bytes each.
+
+        TWO SPELLINGS ELIMINATED BY MEASUREMENT, not by argument:
+          bare field names through the outer `with Base^` -- that resolves to the
+            hidden slot at [BP-$13] and the original plainly loads [BP+$0A];
+          a NESTED `with Base^.Trail[0]` -- it loads once, but a with is
+            allocated its own four-byte address slot whether it needs one or not,
+            so the frame went ENTER $18 where the original has ENTER $14, and the
+            unit came out nineteen bytes long instead of six.
+        So the original is three statements whose ES:DI simply survived, and no
+        spelling found so far makes TP7 keep it across the two intervening
+        stores. SortOutp's note in this file records that a `with` whose body
+        calls nothing keeps the address in ES:DI -- these three call nothing, and
+        that is the thread to pull next. }
+      T.X := T.X + Base^.Trail[0].X;           { 1107:04bf }
+      T.Y := T.Y + Base^.Trail[0].Y;
+      T.Z := T.Z + Base^.Trail[0].Z;
+      Project(T.X, T.Y, T.Z);                 { 1107:0503 }
+      { THE ORDER IS X, Y, D, FLAG, AND D COMES AFTER Project, NOT BEFORE.
+        1107:0528 pushes [BP-7] and [BP-5] -- the two halves of T.Z -- to
+        FixedToInt, and 1107:0503 has already called Project on that same slot.
+        So the depth key is taken from the PROJECTED Z, not the rotated one, and
+        this had it the other way round: a different number in the field the
+        depth sort is keyed on, not merely a different instruction order. }
+      { both come back zero-extended, so the low word carries the sign }
+      Outp[I].X    := Integer(T.X);           { 1107:0506 }
+      Outp[I].Y    := Integer(T.Y);           { 1107:0517 }
+      Outp[I].D    := FixedToInt(T.Z);        { 1107:052e }
+      Outp[I].Flag := T.Flag;                 { 1107:0543 }
+    end;
   end;
 end;
 
