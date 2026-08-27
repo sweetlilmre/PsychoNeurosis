@@ -174,23 +174,40 @@ type
     decremented value instead of folding. }
   TRewind = array[1..RewindH, 1..RewindW] of Byte;
 
+{ THE WHOLE OF THIS UNIT'S BSS IS IN ADDRESS ORDER, and the order was read off
+  the original rather than chosen. Every anchor below is a displacement in the
+  original's own code, paired against ours instruction by instruction -- which
+  is only sound because every routine in segment 108b is already the right
+  LENGTH, so a memory operand at a given code offset on one side is the
+  counterpart of the operand at that offset on the other.
+
+      $5148  Pal        768        $A043  DatFile    128
+      $5448  Font      1550        $A0C3  Banner       4
+      $5A56  Obj      11588        $A0C7  SaveVol      1
+      $879A  Dead1       18        $A0C8  CurVol       1
+      $87AC  MCos1..MSin3 24       $A0C9  Dead4        1
+      $87C4  MScale       4        $A0CA  RowOfs     480
+      $87C8  FaceCopy  1495        $A2AA  Span       964
+             Dead2      305        $A66E  Dead5       40
+      $8ED0  SetupDone    1        $A696  -- P2View's block begins
+      $8ED1  Frame        4
+      $8ED5  Rewind    1462
+      $948B  Star      3000
+
+  FOUR OF THOSE ROWS ARE DEAD SPACE, 364 bytes of it, and they are declared
+  because the original's DGROUP contains them. Nothing in NEUROSIS.002
+  references any byte of Dead1, Dead2, Dead4 or Dead5 -- no absolute operand,
+  no folded array base, no immediate loaded into a register -- so their SIZES
+  and POSITIONS are measured and their identities are not recoverable from the
+  binary. FaceCopy is unreferenced too and is the same kind of thing: 1,495
+  bytes the compiler allocates for a snapshot array no code reads. That it
+  shares the 1,800-byte hole with Dead2 is certain; where inside the hole it
+  sits is not, so this puts it first and the padding after.
+
+  Leaving them out is what put every variable above them at the wrong address
+  and, through P2View, put part 002's whole upper DGROUP 2,614 bytes early. }
+
 var
-  { FOUR FIXED DGROUP BLOCKS, and $B51 apart at $5A56, $65A7, $70F8 and
-    $7C49 -- which is contiguous, so it is one array of four and not four
-    separate variables. The reconstruction had them as heap pointers and
-    New()'d them, so every call site loaded a far pointer out of a variable
-    where the original has an immediate: 108b:1287 is `MOV DI, $5A56 /
-    PUSH DS / PUSH DI`, and no pointer is read at all. }
-  Obj    : array[1..4] of TObj;
-  Star   : array[1..StarCount] of TStar;
-  { A STATIC ARRAY, NOT A POINTER. 108b:24A8 loads DI with $5448 and pushes
-    DS:DI straight into BlockRead -- no GetMem, no New, and the glyph blit
-    addresses the table at $5122, which is $5448 less 32*25 less 5 less 1, the
-    folded FontFirst and the two loop biases. A heap block would put a pointer
-    in DGROUP and dereference it. }
-  Font   : TFont;                               { DS:$5448 }
-  Banner : ^TBanner;                            { the GetMem'd 12,800 bytes }
-  Rewind : TRewind;
   { DS:$5148 -- 256 entries of THREE BYTES, not 768 flat bytes. 108b:1113
     computes 3*X straight into DI and then reads [DI+$5148], [DI+$5149] and
     [DI+$514A]: the +1 and +2 are ADDRESSING DISPLACEMENTS, which is what an
@@ -198,6 +215,22 @@ var
     compute the +1 -- an INC AX and a MOV DI,AX per component that the
     original does not have. }
   Pal    : TPalette;
+  { A STATIC ARRAY, NOT A POINTER. 108b:24A8 loads DI with $5448 and pushes
+    DS:DI straight into BlockRead -- no GetMem, no New, and the glyph blit
+    addresses the table at $5122, which is $5448 less 32*25 less 5 less 1, the
+    folded FontFirst and the two loop biases. A heap block would put a pointer
+    in DGROUP and dereference it. }
+  Font   : TFont;                               { DS:$5448 }
+  { FOUR FIXED DGROUP BLOCKS, and $B51 apart at $5A56, $65A7, $70F8 and
+    $7C49 -- which is contiguous, so it is one array of four and not four
+    separate variables. The reconstruction had them as heap pointers and
+    New()'d them, so every call site loaded a far pointer out of a variable
+    where the original has an immediate: 108b:1287 is `MOV DI, $5A56 /
+    PUSH DS / PUSH DI`, and no pointer is read at all. }
+  Obj    : array[1..4] of TObj;
+  { DS:$879A -- see the table above. Obj ends at $8799, MCos1 is at
+    $87AC, and nothing reads the eighteen bytes between. }
+  Dead1  : array[1..18] of Byte;
 
 { --------------------------------------------------------------------------
   THE SHARED 386 MATHS MODULE.
@@ -215,33 +248,57 @@ var
   MCos1, MSin1, MCos2, MSin2, MCos3, MSin3 : LongInt;
   { DS:$87C4 -- the projection scale, 16.16 }
   MScale : LongInt;
+  { DS:$87C8 -- the snapshot Obj_SortFaces was to work from, and NOTHING reads
+    it, here or in the original. 1,495 bytes. }
+  FaceCopy : array[1..MaxFaces] of TFace;
+  { The 305 bytes that close the 1,800-byte hole between MScale and
+    SetupDone. }
+  Dead2  : array[1..305] of Byte;
   { DS:$8ED0 -- ONE BYTE, written 1 by Scene2_Setup at 108b:1cae and never
     read: the whole segment holds exactly that one reference. Declared
     immediately before Frame, which is what puts it at $8ED0. }
   SetupDone : Byte;
   { DS:$8ED1 -- a LongInt frame counter, and what drives the text. }
   Frame  : LongInt;
+  { DS:$8ED5, 1,462 bytes -- assets/part002/rewind_button.bin }
+  Rewind : TRewind;
+  { DS:$948B, 500 records of six bytes, immediately after Rewind. The star
+    plot's folded base is $9485, one stride below. }
+  Star   : array[1..StarCount] of TStar;
   { DS:$A043 -- the .DAT handle is a GLOBAL here too, exactly as it is in
     P2S1: 108b:2467 is `MOV DI,$A043 / PUSH DS / PUSH DI` for Assign, Reset,
     Seek, BlockRead and Close alike, where a local would be
     `LEA DI,[BP-n] / PUSH SS / PUSH DI`. 128 bytes, so it ends at $A0C2 --
     which is exactly where Banner's pointer starts. }
   DatFile : file;
+  { DS:$A0C3 -- the GetMem'd 12,800 bytes, and its pointer begins exactly
+    where DatFile's 128 bytes end. }
+  Banner : ^TBanner;
   { DS:$A0C7 and DS:$A0C8 -- two BYTES, and they are GLOBALS, not locals of
     Scene2. The volume ramp at 108b:2564 stores every GetVolume result to a
-    fixed address rather than to a stack slot, and they sit immediately before
-    RowOfs, which is what puts them here in the var block. }
+    fixed address rather than to a stack slot. }
   SaveVol : Byte;
   CurVol  : Byte;
+  { DS:$A0C9 -- A THIRD BYTE, and the unit's A-minus is what makes it visible.
+    With alignment off RowOfs would follow CurVol at $A0C9; the original has it
+    at $A0CA, so one more byte stands between them. Under A-plus this would be
+    indistinguishable from padding. }
+  Dead4  : Byte;
   { DS:$A0CA -- RowOfs80[I] = I * 80. }
   RowOfs : array[0..Rows - 1] of Word;
-  { the snapshot Obj_SortFaces works from }
-  FaceCopy : array[1..MaxFaces] of TFace;
   { Tri_Fill's per-scanline span buffer, DS:$A2AA, immediately after
     RowOfs -- which ends at $A2A9, 240 words from $A0CA. ONE
     INTERLEAVED array of (left, right) pairs, not two arrays: the
     walk stores a word and advances its byte index by 2 each time. }
   Span : array[0..2 * Rows + 1] of Integer;
+  { DS:$A66E -- THIRTY-EIGHT bytes, not forty. Span ends at $A66D and P2View's
+    PageBase is at $A696, which is forty bytes on, but the last two of them
+    are not this unit's: $A694 is DemoVT's cue comparand, the word 13f9:00a2
+    writes and 13f9:00b2 spins against. So DemoVT contributes exactly one Word
+    to part 002's DGROUP and it sits between this unit and P2View. Forty here
+    instead of thirty-eight pushed everything from $A694 up two bytes -- 178
+    references, and every one of them looked like a separate defect. }
+  Dead5  : array[1..38] of Byte;
 
 
 

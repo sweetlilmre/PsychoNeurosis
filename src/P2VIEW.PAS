@@ -41,23 +41,45 @@ type
   TCrtcTable = array[0..CrtcCount - 1] of Word;
 
 var
-  { DS:$A69C -- SetMode400 fills this then hands it to SetMode. }
+  { BSS, AND THE ORIGINAL'S OWN CODE SETTLES IT: eighty-four references. The
+    original addresses these as $A696, $A698 and $A69A -- twenty-two, seven
+    and fifty-five sites, every one of them in the scene-2 renderers and the
+    unit's own SetMode400. Made typed constants they moved to $0CE6..$0CEB and
+    all eighty-four went with them.
+
+    An earlier note here argued the other way, from the data image: declaring
+    them `var` left dgimage reading 3,392 bytes against the original's 3,408,
+    with the first difference at $0CE6, and six bytes of typed constant closed
+    the first of it. That reasoning was backwards. The image is a weaker
+    witness than a reference count, and the sixteen bytes it was pointing at
+    are a separate hole -- initialised data the original has ahead of
+    PageIndex that we do not, and which has to be found rather than filled
+    with the nearest variables to hand. }
+  PageBase  : array[0..1] of Word;    { DS:$A696, $A698 }
+  WritePage : Word;                   { DS:$A69A }
+
+  { DS:$A69C, and it follows the three above: $A69A + 2. SetMode400 fills this
+    then hands it to SetMode. }
   Crtc : TCrtcTable;
 
 const
-  { INITIALISED, AND THAT PUTS THEM IN A DIFFERENT PLACE ENTIRELY. The original
-    has 0, $4B00, 0 at DS:$0CE6..$0CEB -- immediately ahead of PageIndex below
-    -- which is PageBase[0], PageBase[1] and WritePage with their compiled-in
-    values. Declared `var` they went to BSS instead and the addresses recorded
-    against them, $A696/$A698/$A69A, were OUR build's, not the original's.
-    Six bytes, and they were the last of part 002's data image that had a
-    cause: dgimage read 3,392 bytes against the original's 3,408 with the
-    first difference at $0CE6. All three are written at run time, which a
-    typed constant permits. }
-  PageBase  : array[0..1] of Word = (0, Page1Base);  { DS:$0CE6, $0CE8 }
-  WritePage : Word = 0;                              { DS:$0CEA }
+  { DS:$0CE6..$0CEB -- SIX BYTES OF INITIALISED DATA NOTHING REFERENCES, and
+    they are the whole of part 002's data-image shortfall. The original's image
+    is 3,408 bytes; without these it is 3,398, which pads to 3,408 -- so this
+    one declaration accounts for all sixteen bytes the file was short.
 
-const
+    The values are 0, $4B00, 0 -- Page0Base, Page1Base and a zero, the same
+    three words the BSS trio above holds at run time. A search of the whole
+    part finds NO instruction addressing $0CE6, $0CE8 or $0CEA: the two
+    apparent hits at 108b:13af and 14b1:0f48 are `E8 0C` inside near-CALL
+    displacements, which is what sent an earlier reading here down the wrong
+    path entirely. So this is a dead copy -- most likely how the author first
+    wrote the page table before the working variables moved to `var` -- and
+    what is measured is its SIZE, its POSITION ahead of PageIndex, and its
+    three values. Its name here is ours; the original's is not recoverable
+    from the binary, because nothing names it. }
+  DeadPageTable : array[0..2] of Word = (Page0Base, Page1Base, 0);
+
   { DS:$0CEC -- which of the two pages is being drawn into. Initialised data;
     the compiled-in value is 1. The renderers toggle it after every flip. }
   { WORD, not Integer. The page swap at the end of every renderer is

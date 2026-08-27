@@ -111,8 +111,6 @@ var
     ONE-BASED, and $0D46 - $0CB5 = $91, so that lands on pixel (X, Y) with the
     two-byte header skipped, which is what the declaration below folds. }
   Door : TDoor;
-  { DS:$40BD, $40BF, $40C1 -- stride 5, indices 1..50. }
-  Star : array[1..NumStars] of TStar;
   { DS:$3DC2 -- 256 RGB triples. }
   { 256 entries of THREE BYTES. 1008:0206 reads [DI+$3DC2], [DI+$3DC3] and
     [DI+$3DC4] off ONE 3*Col index -- the components are addressing
@@ -121,11 +119,29 @@ var
     has to become a Byte at the same time, because with an Integer counter the
     compiler shapes the index differently and neither half lands. }
   Pal  : TPalette;
+  { DS:$40C2, and the folded bases $40BD, $40BF and $40C1 are one stride
+    below it: 50 records of five bytes, immediately after Pal's 768. Declared
+    BEFORE Pal it took $3DC2 and pushed the palette 250 bytes up, which moved
+    every one of the 31 folded reads. }
+  Star : array[1..NumStars] of TStar;
+  { DS:$41BC -- 2,250 bytes NOTHING IN NEUROSIS.002 TOUCHES. Star ends at
+    $41BB and the .DAT handle is at $4A86, and between them the original
+    carries this much DGROUP that no absolute operand, no folded array base
+    and no immediate anywhere in the part refers to. Its size and position are
+    measured; what it was is not recoverable from the binary, because nothing
+    names it. It is the same habit LoadFrames shows on the stack a few lines
+    down -- ENTER $80 with not one slot read -- only at unit level, and it is
+    the reason DatFile and everything above it sat 2,250 bytes low. }
+  Dead1 : array[1..2250] of Byte;
   { DS:$4A86 -- the .DAT handle is a GLOBAL, not a local of LoadFrames.
     1008:00bd is `MOV DI,$4A86 / PUSH DS / PUSH DI` for every one of Assign,
     Reset, Seek, BlockRead and Close; a local would be
     `LEA DI,[BP-n] / PUSH SS / PUSH DI`. }
   DatFile : file;
+  { DS:$4B06 -- two more dead bytes. DatFile's 128 end at $4B05 and the next
+    live variable is at $4B08, with alignment off, so these two are real and
+    not padding. }
+  Dead2 : array[1..2] of Byte;
 
 { The one-based pixel index Scene1_DoorLoop uses. }
 { DoorPix is gone: the original has no such routine and no call to one. Its
