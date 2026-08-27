@@ -241,16 +241,30 @@ begin
     end;
 
     Err := Err + Minor;                          { 1095:0477 }
-    if Major > Err then                          { 1095:04a4 }
-    begin
-      X := X + Round(SideDX);                    { 1095:0533 }
-      Y := Y + Round(SideDY);                    { 1095:0555 }
-    end
-    else
+    { BOTH HALVES OF THIS TEST ARE MEASURED, and getting either wrong moved
+      115 bytes without changing one instruction -- the same two blocks in the
+      other order, each addressing the slots the other had.
+
+      ERR IS ON THE LEFT. Turbo Pascal evaluates left to right and the operand
+      loaded SECOND ends up in ST(0), so the flags read against it: 1095:0487
+      loads Err's slot and 1095:0495 Major's.
+
+      AND THE TEST IS `>=`, WITH THE SUBTRACT ARM FIRST. 1095:04b0 is JA, a
+      jump on the condition being FALSE -- Major > Err is the negation of
+      Err >= Major once the flags are read against Major -- so the arm that
+      falls through is the one the source names first. Written as
+      `if Err < Major` with the arms swapped, every instruction was still the
+      right length and the branch came out JBE. }
+    if Err >= Major then                         { 1095:04a4 }
     begin
       Err := Err - Major;                        { 1095:04cf }
       X := X + Round(StepDX);                    { 1095:04ed }
       Y := Y + Round(StepDY);                    { 1095:050f }
+    end
+    else
+    begin
+      X := X + Round(SideDX);                    { 1095:0533 }
+      Y := Y + Round(SideDY);                    { 1095:0555 }
     end;
   end;
 end;

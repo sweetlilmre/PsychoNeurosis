@@ -41,6 +41,14 @@
 {$N+}   { six-byte Reals through the x87 }
 
 unit P6S2;
+
+{$A-}   { NO VARIABLE ALIGNMENT, and Run's frame is the witness. Pix sits at
+          the ODD [BP-$11] -- 100f:05e6 LEAs the tile array at [BP-$4FB], which
+          fixes everything above it -- and a Word does not land on an odd offset
+          under A-plus. With alignment on the compiler stepped Pix to [BP-$12]
+          and took the array and the seven words below it with it, whichever
+          length the unread filler was given: ten bytes left the frame a byte
+          high, eleven left it a byte low, and neither could ever land. }
 {$I-}   { no I/O check: the original goes straight on after each file
           call, with no near CALL to the RTL's check routine. }
 
@@ -225,9 +233,15 @@ begin
         YTab^[A, I, J] :=                        { 100f:0331 }
           ((CosT[A] - Bias) * G[I, J].Y) div Bias -
           ((SinT[A] - Bias) * G[I, J].X) div Bias + 100;
+        { AND THE COSINE TERM IS WRITTEN FIRST HERE, the other way round from
+          YTab above. Borland computes the RIGHT operand of the addition first,
+          so whichever term is named SECOND is the one emitted first: the
+          original's statement 2 opens with the SINE term at 100f:0343, which
+          means the source names it last. Ten bytes, five operand pairs, and
+          addition is commutative, so this is spelling. }
         XTab^[A, I, J] :=                        { 100f:03d7 }
-          ((SinT[A] - Bias) * G[I, J].Y) div Bias +
-          ((CosT[A] - Bias) * G[I, J].X) div Bias + 160;
+          ((CosT[A] - Bias) * G[I, J].X) div Bias +
+          ((SinT[A] - Bias) * G[I, J].Y) div Bias + 160;
       end;
 end;
 
@@ -331,7 +345,14 @@ var
     Src at [BP-$13] and Dst at [BP-$15] leave $05..$0F -- eleven bytes -- with
     nothing to put in them. Pix at an ODD offset is the tell: a word does not
     land there unless an odd number of bytes was declared before it. }
-  Unread         : array[1..10] of Byte;   { [BP-$05]..[BP-$0E], never read }
+  Unread         : array[1..11] of Byte;   { [BP-$05]..[BP-$0F], never read
+                                             -- ELEVEN, which is the count the
+                                             note above works out. Declared as
+                                             ten it put Pix at the EVEN [BP-$10]
+                                             and moved the tile array and the
+                                             seven words below it one byte up,
+                                             closing the frame at $508 instead
+                                             of $50A. }
   Pix            : Word;   { [BP-$11] }
   Src            : Word;   { [BP-$13] }
   Dst            : Word;   { [BP-$15] }
