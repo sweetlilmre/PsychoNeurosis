@@ -37,8 +37,14 @@ NAMES = {
     (0x00FD00, 0): "INTROPAL",
     (0x00FD00, 1): "COMETFRM",
     (0x00FD00, 2): "INTROBAK",
-    (0x00FD00, 3): "00FD00D",
+    (0x00FD00, 3): "TITLEFNT",   # the 15,104-byte font ShowWord draws with
     (0x02AEE0, 0): "INTROSCR",
+    (0x03A8E0, 0): "BALLFONT",   # scene 4's own font, TFont, 3,776 bytes
+    (0x03A8E0, 1): "BALLSPAL",   # the ball scene palette
+    (0x03A8E0, 2): "PROFILEA",   # ProfileA, one 7x7 ball sprite
+    (0x03A8E0, 3): "PROFILEB",   # ProfileB, the other 7x7 ball sprite
+    (0x03BB02, 0): "OBJMETA",   # ObjMeta, 52 bytes of vector object metadata
+    (0x03BB02, 1): "VECTORPL",   # the vector scene palette
     (0x03BE36, 0): "HOUSEPAL",
     (0x03BE36, 1): "HOUSEPL0",
     (0x03BE36, 2): "HOUSEPL1",
@@ -68,13 +74,49 @@ NAMES = {
     (0x11EEC0, 3): "SPRITE3",
     (0x11EEC0, 4): "SPRITE4",
     (0x11EEC0, 5): "SPRTSPAL",
-    (0x1A047D, 0): "BLKORDER",
-    (0x1228CE, 1): "LEMSPAL",
-    (0x1228CE, 2): "LEMSPR1",
-    (0x1228CE, 3): "LEMSPR2",
+    (0x1228CE, 0): "LEMFONT",   # Font^, TFont
+    (0x1228CE, 1): "TITLEPAL",   # Pal, set before the title screen
+    (0x1228CE, 2): "TITLESCR",   # VirtScr^, 64,000 -- the title screen
+    (0x1228CE, 3): "HILLSIDE",   # VirtScr^, 64,000 -- the hillside
+    (0x1228CE, 4): "HILLPAL",   # Pal, set after the hillside
+    (0x1228CE, 5): "SCENEPAL",   # ScenePal, DS:$CC07
+    (0x1228CE, 6): "WALKBANK",   # WalkBank, 8 x 54
+    (0x1228CE, 7): "TUMBLEBK",   # TumbleBk, 4 x 100
+    (0x1228CE, 8): "SPLATBNK",   # SplatBank, 4 x 120
+    (0x1228CE, 9): "DIGBANK",   # DigBank, 6 x 221
+    (0x1228CE, 10): "TUNNELBK",   # TunnelBk, 3 x 140
+    (0x1228CE, 11): "DEATHBBK",   # DeathBBk, 5 x 160
+    (0x1228CE, 12): "HILLANIM",   # HillAnim, 3 x 1032
+    (0x1228CE, 13): "DEATHABK",   # DeathABk, 6 x 108
+    (0x1228CE, 14): "BUILDBNK",   # BuildBank, 6 x 120
+    (0x1228CE, 15): "DEATHAPC",   # DeathAPic, 60 x 53, the storm
+    (0x1228CE, 16): "INTROANM",   # IntroAnim, 7 x 1560
+    (0x1228CE, 17): "SIDEANIM",   # SideAnim, 6 x 140
+    (0x1228CE, 18): "EXPLOSN",   # Explosion, 7 x 3465
+    (0x1228CE, 19): "FUSEBANK",   # FuseBank, the last read of the region
+    (0x153DE5, 0): "HEIGHT1",   # the first 32x32 height map, morphed to at 100e:0823
+    (0x153DE5, 1): "HEIGHT2",   # the second, morphed to at 100e:0840
+    (0x153DE5, 2): "HEIGHT3",   # the third, morphed to at 100e:085d
     (0x1549E5, 0): "P5PAL",
     (0x1549E5, 1): "P5SCREEN",
+    (0x1646E5, 0): "PATCHPIC",   # Pic^, the picture the 30x30 patch is lifted out of
+    (0x1646E5, 1): "PATCHPAL",   # its palette
+    (0x1743E5, 0): "WHOOSHFN",   # the whooshtext's font, 15,104 bytes
+    (0x1743E5, 1): "WHOOSHPL",   # its palette
+    (0x1781E5, 0): "CMAP2",   # colour map 2, "p5.cel" -- one 256-byte TCel
+    (0x1781E5, 1): "CMAP1",   # colour map 1, "p8.cel"
+    (0x1781E5, 2): "TILESPAL",   # the tile palette, written to the DAC entry by entry
+    (0x1781E5, 3): "TILEANIM",   # Anim^, 72 frames of a 25x25 animation
+    (0x1836AD, 0): "FIREPIC",   # Pic^, the picture that burns in front of the fire
+    (0x1836AD, 1): "FIRETITL",   # TitleB, the 30x7 title bitmap that slides in
+    (0x1836AD, 2): "FIREPAL",   # the full DAC, all 256 entries at 1118:00aa
+    (0x1836AD, 3): "FIREPAL2",   # read again for entries $EE..$FF only, 1118:0105
+    (0x1836AD, 4): "FIREPAL3",   # and again for $E1..$ED only, 1118:0160
+    (0x18B23F, 0): "MARGIN",   # Margin, 180 bytes, the scroller edge table
+    (0x18B23F, 1): "CREDFONT",   # the credits font -- 23,436 bytes, part 004's size
+    (0x18B23F, 2): "CREDPAL",   # its palette
     (0x19117F, 0): "LEMEND",
+    (0x1A047D, 0): "BLKORDER",
 }
 
 # Regions whose extension is not .BIN. Keyed like NAMES, so a rename cannot

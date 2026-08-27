@@ -13,14 +13,14 @@ data compiled into the executables' DGROUP. See
 | 001 | `$00FD00` | 0 | 768 | `part001/INTROPAL.PAL` | VGA palette, 6-bit |
 | 001 | `$00FD00` | 1 | 31,200 | `part001/COMETFRM.BIN` |  |
 | 001 | `$00FD00` | 2 | 64,000 | `part001/INTROBAK.PNG` | 320x200 screen |
-| 001 | `$00FD00` | 3 | 15,104 | `part001/00FD00D.BIN` |  |
+| 001 | `$00FD00` | 3 | 15,104 | `part001/TITLEFNT.BIN` |  |
 | 001 | `$02AEE0` | 0 | 64,000 | `part001/INTROSCR.PNG` | 320x200 screen (palette carried forward) |
-| 001 | `$03A8E0` | 0 | 3,776 | `part001/03A8E0A.BIN` |  |
-| 001 | `$03A8E0` | 1 | 768 | `part001/03A8E0B.PAL` | VGA palette, 6-bit |
-| 001 | `$03A8E0` | 2 | 49 | `part001/03A8E0C.BIN` |  |
-| 001 | `$03A8E0` | 3 | 49 | `part001/03A8E0D.BIN` |  |
-| 001 | `$03BB02` | 0 | 52 | `part001/03BB02A.BIN` |  |
-| 001 | `$03BB02` | 1 | 768 | `part001/03BB02B.PAL` | VGA palette, 6-bit |
+| 001 | `$03A8E0` | 0 | 3,776 | `part001/BALLFONT.BIN` |  |
+| 001 | `$03A8E0` | 1 | 768 | `part001/BALLSPAL.PAL` | VGA palette, 6-bit |
+| 001 | `$03A8E0` | 2 | 49 | `part001/PROFILEA.BIN` |  |
+| 001 | `$03A8E0` | 3 | 49 | `part001/PROFILEB.BIN` |  |
+| 001 | `$03BB02` | 0 | 52 | `part001/OBJMETA.BIN` |  |
+| 001 | `$03BB02` | 1 | 768 | `part001/VECTORPL.PAL` | VGA palette, 6-bit |
 | 002 | `$03BE36` | 0 | 768 | `part002/HOUSEPAL.PAL` | VGA palette, 6-bit |
 | 002 | `$03BE36` | 1 | 64,000 | `part002/HOUSEPL0.RAW` | Mode-X plane; see the composite below |
 | 002 | `$03BE36` | 2 | 64,000 | `part002/HOUSEPL1.RAW` | Mode-X plane; see the composite below |
@@ -50,47 +50,47 @@ data compiled into the executables' DGROUP. See
 | 003 | `$11EEC0` | 3 | 3,136 | `part003/SPRITE3.BIN` |  |
 | 003 | `$11EEC0` | 4 | 3,136 | `part003/SPRITE4.BIN` |  |
 | 003 | `$11EEC0` | 5 | 768 | `part003/SPRTSPAL.PAL` | VGA palette, 6-bit |
-| 004 | `$1228CE` | 0 | 23,436 | `part004/1228CEA.BIN` |  |
-| 004 | `$1228CE` | 1 | 768 | `part004/LEMSPAL.PAL` | VGA palette, 6-bit |
-| 004 | `$1228CE` | 2 | 64,000 | `part004/LEMSPR1.PNG` | 320x200 screen |
-| 004 | `$1228CE` | 3 | 64,000 | `part004/LEMSPR2.PNG` | 320x200 screen |
-| 004 | `$1228CE` | 4 | 768 | `part004/1228CEE.PAL` | VGA palette, 6-bit |
-| 004 | `$1228CE` | 5 | 768 | `part004/1228CEF.PAL` | VGA palette, 6-bit |
-| 004 | `$1228CE` | 6 | 432 | `part004/1228CEG.BIN` |  |
-| 004 | `$1228CE` | 7 | 400 | `part004/1228CEH.BIN` |  |
-| 004 | `$1228CE` | 8 | 480 | `part004/1228CEI.BIN` |  |
-| 004 | `$1228CE` | 9 | 1,326 | `part004/1228CEJ.BIN` |  |
-| 004 | `$1228CE` | 10 | 420 | `part004/1228CEK.BIN` |  |
-| 004 | `$1228CE` | 11 | 800 | `part004/1228CEL.BIN` |  |
-| 004 | `$1228CE` | 12 | 3,096 | `part004/1228CEM.BIN` |  |
-| 004 | `$1228CE` | 13 | 648 | `part004/1228CEN.BIN` |  |
-| 004 | `$1228CE` | 14 | 720 | `part004/1228CEO.BIN` |  |
-| 004 | `$1228CE` | 15 | 3,180 | `part004/1228CEP.BIN` |  |
-| 004 | `$1228CE` | 16 | 10,920 | `part004/1228CEQ.BIN` |  |
-| 004 | `$1228CE` | 17 | 840 | `part004/1228CER.BIN` |  |
-| 004 | `$1228CE` | 18 | 24,255 | `part004/1228CES.BIN` |  |
-| 004 | `$1228CE` | 19 | 750 | `part004/1228CET.BIN` |  |
-| 005 | `$153DE5` | 0 | 1,024 | `part005/153DE5A.BIN` |  |
-| 005 | `$153DE5` | 1 | 1,024 | `part005/153DE5B.BIN` |  |
-| 005 | `$153DE5` | 2 | 1,024 | `part005/153DE5C.BIN` |  |
+| 004 | `$1228CE` | 0 | 23,436 | `part004/LEMFONT.BIN` |  |
+| 004 | `$1228CE` | 1 | 768 | `part004/TITLEPAL.PAL` | VGA palette, 6-bit |
+| 004 | `$1228CE` | 2 | 64,000 | `part004/TITLESCR.PNG` | 320x200 screen |
+| 004 | `$1228CE` | 3 | 64,000 | `part004/HILLSIDE.PNG` | 320x200 screen |
+| 004 | `$1228CE` | 4 | 768 | `part004/HILLPAL.PAL` | VGA palette, 6-bit |
+| 004 | `$1228CE` | 5 | 768 | `part004/SCENEPAL.PAL` | VGA palette, 6-bit |
+| 004 | `$1228CE` | 6 | 432 | `part004/WALKBANK.BIN` |  |
+| 004 | `$1228CE` | 7 | 400 | `part004/TUMBLEBK.BIN` |  |
+| 004 | `$1228CE` | 8 | 480 | `part004/SPLATBNK.BIN` |  |
+| 004 | `$1228CE` | 9 | 1,326 | `part004/DIGBANK.BIN` |  |
+| 004 | `$1228CE` | 10 | 420 | `part004/TUNNELBK.BIN` |  |
+| 004 | `$1228CE` | 11 | 800 | `part004/DEATHBBK.BIN` |  |
+| 004 | `$1228CE` | 12 | 3,096 | `part004/HILLANIM.BIN` |  |
+| 004 | `$1228CE` | 13 | 648 | `part004/DEATHABK.BIN` |  |
+| 004 | `$1228CE` | 14 | 720 | `part004/BUILDBNK.BIN` |  |
+| 004 | `$1228CE` | 15 | 3,180 | `part004/DEATHAPC.BIN` |  |
+| 004 | `$1228CE` | 16 | 10,920 | `part004/INTROANM.BIN` |  |
+| 004 | `$1228CE` | 17 | 840 | `part004/SIDEANIM.BIN` |  |
+| 004 | `$1228CE` | 18 | 24,255 | `part004/EXPLOSN.BIN` |  |
+| 004 | `$1228CE` | 19 | 750 | `part004/FUSEBANK.BIN` |  |
+| 005 | `$153DE5` | 0 | 1,024 | `part005/HEIGHT1.BIN` |  |
+| 005 | `$153DE5` | 1 | 1,024 | `part005/HEIGHT2.BIN` |  |
+| 005 | `$153DE5` | 2 | 1,024 | `part005/HEIGHT3.BIN` |  |
 | 005 | `$1549E5` | 0 | 768 | `part005/P5PAL.PAL` | VGA palette, 6-bit |
 | 005 | `$1549E5` | 1 | 64,000 | `part005/P5SCREEN.PNG` | 320x200 screen |
-| 005 | `$1646E5` | 0 | 64,000 | `part005/1646E5A.PNG` | 320x200 screen (palette carried forward) |
-| 005 | `$1646E5` | 1 | 768 | `part005/1646E5B.PAL` | VGA palette, 6-bit |
-| 006 | `$1743E5` | 0 | 15,104 | `part006/1743E5A.BIN` |  |
-| 006 | `$1743E5` | 1 | 768 | `part006/1743E5B.PAL` | VGA palette, 6-bit |
-| 006 | `$1781E5` | 0 | 256 | `part006/1781E5A.BIN` |  |
-| 006 | `$1781E5` | 1 | 256 | `part006/1781E5B.BIN` |  |
-| 006 | `$1781E5` | 2 | 768 | `part006/1781E5C.PAL` | VGA palette, 6-bit |
-| 006 | `$1781E5` | 3 | 45,000 | `part006/1781E5D.BIN` |  |
-| 006 | `$1836AD` | 0 | 29,120 | `part006/1836ADA.BIN` |  |
-| 006 | `$1836AD` | 1 | 210 | `part006/1836ADB.BIN` |  |
-| 006 | `$1836AD` | 2 | 768 | `part006/1836ADC.PAL` | VGA palette, 6-bit |
-| 006 | `$1836AD` | 3 | 768 | `part006/1836ADD.PAL` | VGA palette, 6-bit |
-| 006 | `$1836AD` | 4 | 768 | `part006/1836ADE.PAL` | VGA palette, 6-bit |
-| 006 | `$18B23F` | 0 | 180 | `part006/18B23FA.BIN` |  |
-| 006 | `$18B23F` | 1 | 23,436 | `part006/18B23FB.BIN` |  |
-| 006 | `$18B23F` | 2 | 768 | `part006/18B23FC.PAL` | VGA palette, 6-bit |
+| 005 | `$1646E5` | 0 | 64,000 | `part005/PATCHPIC.PNG` | 320x200 screen (palette carried forward) |
+| 005 | `$1646E5` | 1 | 768 | `part005/PATCHPAL.PAL` | VGA palette, 6-bit |
+| 006 | `$1743E5` | 0 | 15,104 | `part006/WHOOSHFN.BIN` |  |
+| 006 | `$1743E5` | 1 | 768 | `part006/WHOOSHPL.PAL` | VGA palette, 6-bit |
+| 006 | `$1781E5` | 0 | 256 | `part006/CMAP2.BIN` |  |
+| 006 | `$1781E5` | 1 | 256 | `part006/CMAP1.BIN` |  |
+| 006 | `$1781E5` | 2 | 768 | `part006/TILESPAL.PAL` | VGA palette, 6-bit |
+| 006 | `$1781E5` | 3 | 45,000 | `part006/TILEANIM.BIN` |  |
+| 006 | `$1836AD` | 0 | 29,120 | `part006/FIREPIC.BIN` |  |
+| 006 | `$1836AD` | 1 | 210 | `part006/FIRETITL.BIN` |  |
+| 006 | `$1836AD` | 2 | 768 | `part006/FIREPAL.PAL` | VGA palette, 6-bit |
+| 006 | `$1836AD` | 3 | 768 | `part006/FIREPAL2.PAL` | VGA palette, 6-bit |
+| 006 | `$1836AD` | 4 | 768 | `part006/FIREPAL3.PAL` | VGA palette, 6-bit |
+| 006 | `$18B23F` | 0 | 180 | `part006/MARGIN.BIN` |  |
+| 006 | `$18B23F` | 1 | 23,436 | `part006/CREDFONT.BIN` |  |
+| 006 | `$18B23F` | 2 | 768 | `part006/CREDPAL.PAL` | VGA palette, 6-bit |
 | 007 | `$19117F` | 0 | 62,206 | `part007/LEMEND.FLC` |  |
 | 003 | `$1A047D` | 0 | 13,104 | `part003/BLKORDER.BIN` |  |
 | 002 | (embedded) |  | 12,410 | `part002/GARAGE.PNG` | 146x85, dimensions from code not header |

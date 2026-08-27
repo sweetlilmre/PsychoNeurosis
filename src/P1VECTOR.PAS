@@ -630,7 +630,7 @@ var
 begin
   Assign(F, 'neurosis.dat');
   Reset(F, 1);
-  Seek(F, DAT_P1_03BB02A);                { was $03BB02 }
+  Seek(F, DAT_P1_OBJMETA);                { was $03BB02 }
   BlockRead(F, ObjMeta, SizeOf(ObjMeta));
   BlockRead(F, Pal, 768);
   SetPalette768(@Pal);                 { before the Close, as the binary has it }

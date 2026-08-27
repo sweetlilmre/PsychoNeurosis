@@ -547,7 +547,7 @@ var
 begin
   Assign(F, 'neurosis.dat');
   Reset(F, 1);
-  Seek(F, DAT_P1_03A8E0A);                { was $0003A8E0 }
+  Seek(F, DAT_P1_BALLFONT);                { was $0003A8E0 }
   BlockRead(F, Font, SizeOf(TFont));
   BlockRead(F, Pal, 768);
   BlockRead(F, ProfileA, BlobPixels);
