@@ -120,13 +120,15 @@ type
   TChunkProc = procedure(Hdr : Pointer; var Data);
 
 var
-  Names    : array[1..MaxFlics] of String[127];  { DS:$0206 }
   { THESE TWO COME FIRST, and their own recorded addresses say so: $01FE and
     $0202 are the LOWEST in this block, and Turbo Pascal allocates a unit's
-    variables at increasing addresses in declaration order. Declared last they
-    landed after the 128-byte file record instead. }
+    variables at increasing addresses in declaration order. Declared AFTER
+    Names -- which is where they were, whatever this note said -- they landed
+    at $33FE and $3402, the whole 12,800 bytes of the name table further on,
+    and every reference to either went with them. }
   Overhead : LongInt;                            { DS:$01fe }
   Stamp    : LongInt;                            { DS:$0202 }
+  Names    : array[1..MaxFlics] of String[127];  { DS:$0206 }
 
   Count    : Integer;                            { DS:$3406 }
   PlayIdx  : Integer;                            { DS:$3408 }
@@ -394,9 +396,18 @@ var
   Cur     : Word;                   { [BP-$06]                              }
   Base    : Integer;                { [BP-$08]  the DAC register to start at }
   Packets : Integer;                { [BP-$0a] / [BP-$15]                   }
-  I, J    : Integer;                { [BP-$0e] / [BP-$0c]                   }
+  { J FIRST. The slots recorded here have always been I at $0e and J at $0c,
+    and locals go DOWN in declaration order, so J is the one that has to be
+    named first. 100f:011d initialises the outer loop in [BP-$0e]. }
+  J, I    : Integer;                { [BP-$0c] / [BP-$0e]                   }
   Skip    : Integer;                { [BP-$10]                              }
   Cnt     : Integer;                { [BP-$12]                              }
+  { ONE DECLARED BYTE, AND THE TEMPORARIES BELOW IT ARE WHAT FIND IT. The nine
+    words above fill BP-$13..BP-$01; under this unit's A-minus the first
+    temporary would then be the word at [BP-$14], and the original's is at the
+    ODD [BP-$15] -- 100f:010f stores the packet count there. So one byte stands
+    between, and with it the frame closes at ENTER $18 instead of $16. }
+  Spare   : Byte;                   { [BP-$14], never read }
   { NO `Last` HERE. The loop below takes Cnt * 3 - 1 as its bound directly and
     TP7 makes ONE hidden temporary for it, at [BP-$17]. Declared as a variable
     the expression was stored there and then COPIED into the temporary the for
@@ -482,7 +493,12 @@ var
   I       : Integer;                { [BP-$0e] }
   Skip    : Integer;                { [BP-$10] }
   Cnt     : Integer;                { [BP-$12] }
-  Spare2  : Integer;                { [BP-$14], never touched }
+  { A BYTE, NOT A WORD, and the loop temporary is what measures it: 100f:020d
+    puts the packet count at the ODD [BP-$15], so the declarations above it
+    fill an odd number of bytes. Nine words are eighteen; one more byte makes
+    nineteen and the temporary lands where the original has it. As a word the
+    temporary went to [BP-$16] and the frame stayed $16 either way. }
+  Spare2  : Byte;                   { [BP-$13], never touched }
 begin
   Base  := 0;                                     { 100f:01e0 }
   { FOUR BYTES HERE ARE NOT REACHABLE FROM PASCAL, and probe/SEGOFS.PAS says
@@ -833,7 +849,11 @@ begin
   if Hdr.Magic = MagicFLC then
     Speed := Word(Hdr.Speed)                      { 100f:04db }
   else
-    Speed := Round(Hdr.Speed / 70.0 * 1000.0);    { 100f:04e6 }
+    { TRUNC. 100f:04f2 calls System:$31EE and the rounding entry is $320D,
+      thirty-one bytes on -- the same pair, at the same spacing, that parts 002
+      and 003 turned on. One frame delay in a hundred lands a millisecond
+      short of the original's. }
+    Speed := Trunc(Hdr.Speed / 70.0 * 1000.0);    { 100f:04e6 }
 
   { 100f:04ff -- and it has to be exactly 320 x 200, because every handler
     above writes straight into mode 13h with a hard-coded 320 stride. }
@@ -896,8 +916,13 @@ begin
         12 : HLC(@Hdr, Buf^);                      { 100f:061d }
         16 : HCopy(@Hdr, Buf^);                    { 100f:0634 }
         15 : HBrun(@Hdr, Buf^);                    { 100f:064b }
-         4 : FliColor256(@Hdr, Buf);              { 100f:0663 }
-        11 : FliColor(@Hdr, Buf);                 { 100f:067a }
+        { BUF-CARET, like the four arms above it. 100f:065c is LES DI,[BP-$231]
+          -- a far pointer LOADED from the local -- where passing Buf itself
+          gives LEA DI / PUSH SS. Both reach the same bytes, because Buf points
+          at the heap block; the difference is whether the pointer is read or
+          its own address is taken. Two bytes at each of two sites. }
+         4 : FliColor256(@Hdr, Buf^);             { 100f:0663 }
+        11 : FliColor(@Hdr, Buf^);                { 100f:067a }
       else
         Halt(5);                                  { 100f:067f  unknown chunk }
       end;
