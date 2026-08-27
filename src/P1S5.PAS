@@ -903,7 +903,13 @@ end;
 procedure FadeToWhite;
 var
   Pass, Col : Integer;
-  R, G, B   : Byte;
+  { B, G, R, BACKWARDS, for the reason part 003's P3Globe records twice: locals
+    go down from BP in declaration order, so the first byte named gets [BP-$5]
+    and the last [BP-$7] -- and 12c5:06f1 passes the address of [BP-$7] FIRST to
+    GetRGB, so R is the lowest of the three. Declared the natural way round, all
+    six references to R and B swapped: eight bytes, and no length check could
+    ever see it. }
+  B, G, R   : Byte;
 begin
   for Pass := 1 to FadeSteps do
   begin

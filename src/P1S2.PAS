@@ -679,10 +679,16 @@ begin
     initialisation 0602 -- contiguous, with no gap for an Unload routine. And
     1082:0601 is CB, a FAR return, which is Scene2's own epilogue; ours emitted
     C3 because a near local Unload ended there instead. }
-  FreeMem(FontBuf,   SizeOf(TFontBuf));   { 1082:05C1 }
-  FreeMem(CometBank, SizeOf(TCometBank));
-  FreeMem(Backdrop,  64000);
-  FreeMem(WorkBuf,   SizeOf(TWorkBuf));
+  { THE ORDER IS CometBank, Backdrop, FontBuf, WorkBuf -- and the sizes pushed
+    are what say so. 1082:05c8 pushes $79E0, 31,200, which is CometBank;
+    1082:05d8 pushes $FA00, 64,000, the backdrop; 1082:05e8 pushes $3B00,
+    15,104, the font. Ours freed the font FIRST, so all three calls named the
+    wrong pointer and the wrong size: seventeen bytes, twelve runs, every one a
+    DS displacement or a size immediate rotated by one place. }
+  FreeMem(CometBank, SizeOf(TCometBank));  { 1082:05C1, $79E0 = 31,200 }
+  FreeMem(Backdrop,  64000);               { 1082:05D1, $FA00 }
+  FreeMem(FontBuf,   SizeOf(TFontBuf));    { 1082:05E1, $3B00 = 15,104 }
+  FreeMem(WorkBuf,   SizeOf(TWorkBuf));    { 1082:05F1 }
 end;
 
 { AN EMPTY INITIALISATION SECTION, AND THE ORIGINAL GIVES EVERY UNIT ONE. 1082:0602
