@@ -56,7 +56,7 @@
           of them was out of step. Every other part's units carry the
           directive; this one was simply missed. }
 
-unit Part4Lemmings;
+unit P4Lems;
 {$A-}   { DATA ALIGNMENT OFF. The scroller's constants run contiguously in the
           original -- Message $0005 for 237 bytes, ScrollCol $00F2, ScrollIdx
           $00F4, ScrollPal $00F5 -- and 237 is odd. Under TP7's $A+ default the

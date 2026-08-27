@@ -32,7 +32,7 @@
     RTL_Sin  137b:3252     RTL_Cos  137b:3257    RTL_Shl32  137b:36f2
   =========================================================================== }
 
-unit Part3Stars;
+unit P3Stars;
 
 { BYTE ALIGNMENT. RunScene's `for T` limit temporary sits at [BP-$0B], an ODD
   offset -- 10b8:03db writes CollapseFrames into it and 10b8:0452 compares

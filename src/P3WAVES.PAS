@@ -17,7 +17,7 @@
     Waves_Run    120f:01f8     Waves_Step        120f:00fe
   =========================================================================== }
 
-unit Part3Waves;
+unit P3Waves;
 
 {$G+}   { 286: the binary's Step is 286 codegen -- SHL DI,2 as C1 E7 02 and
           curve*714 as IMUL AX,AX,2CAh. This is not cosmetic here: with $G-

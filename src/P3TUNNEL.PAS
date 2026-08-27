@@ -30,7 +30,7 @@
     cross-checked (see notes at the end). Items marked (?) are inferred.
   =========================================================================== }
 
-unit Part3Tunnel;
+unit P3Tunnel;
 {$A-}   { DATA ALIGNMENT OFF, and the palette's own recorded addresses say so:
           the three 225-byte tables sit at DS:$0002, $00E3 and $01C4 in the
           original -- ODD offsets, one after another with no gap. Under TP7's

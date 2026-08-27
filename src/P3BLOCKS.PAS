@@ -19,7 +19,7 @@
           ten-byte extended 0.2 at CS:$000D. Same values either way (I*0.2
           never lands on an exact half), but the original's arithmetic. }
 
-unit Part3Blocks;
+unit P3Blocks;
 {$I-}   { no I/O check: the original goes straight on after each file
           call, with no near CALL to the RTL's check routine. }
 

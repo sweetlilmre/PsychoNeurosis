@@ -180,46 +180,19 @@ alongside = ["*.BAT"]
 
 # Reconstruction source -> 8.3 DOS name, unit identifier before and after. The
 # unit name inside a file is independent of the filename, but TP7 finds a unit
-# BY FILENAME, so `uses Part3Sprites` must become `uses P3Sprite`.
+# BY FILENAME, so `uses P3Sprite` must become `uses P3Sprite`.
 [names]
+# A row is only needed when something has to CHANGE: a source whose 8.3 DOS name
+# differs from its filename, or a unit identifier that has to be rewritten for
+# TP7 to find the unit by file. build.py treats anything absent as identity, so a
+# row saying "call NEUR1.PAS NEUR1.PAS and Neur1 Neur1" is config that looks like
+# it does something and does not. There were 32 of those, left behind as each
+# source took the name it compiles to; they are gone.
+# VIDMODE lives in src/test/ but must stage FLAT. build.py resolves an
+# [order] entry as `src / <key>` and names the staged copy after the KEY, so
+# without this row it tries to write build/TEST/VIDMODE.PAS into a directory
+# that does not exist. The row LOOKS like identity and is not -- it strips the
+# subdirectory -- which is exactly what a "does this row do anything?" filter
+# has to account for, and the one that pruned this table did not.
 "test/VIDMODE.PAS" = ["VIDMODE.PAS", "VidMode", "VidMode"]
 "PSYCHO.PAS" = ["TPSYCHO.PAS", "Psycho", "Psycho"]
-"NEUR9.PAS" = ["NEUR9.PAS", "NEUR9", "NEUR9"]
-"NEUR0.PAS" = ["NEUR0.PAS", "NEUR0", "NEUR0"]
-"DETECT.PAS" = ["DETECT.PAS", "Detect", "Detect"]
-"VGA.PAS" = ["VGA.PAS", "VGA", "VGA"]
-"DEMOVT.PAS" = ["DEMOVT.PAS", "DemoVT", "DemoVT"]
-"MODEX.PAS" = ["MODEX.PAS", "ModeX", "ModeX"]
-"FIXMATH.PAS" = ["FIXMATH.PAS", "FixMath", "FixMath"]
-"P1LOGO.PAS" = ["P1LOGO.PAS", "P1LOGO", "P1LOGO"]
-"P1TITLE.PAS" = ["P1TITLE.PAS", "P1TITLE", "P1TITLE"]
-"P1MOSAIC.PAS" = ["P1MOSAIC.PAS", "P1MOSAIC", "P1MOSAIC"]
-"P1STAR.PAS" = ["P1STAR.PAS", "P1Star", "P1Star"]
-"P1BALLS.PAS" = ["P1BALLS.PAS", "P1BALLS", "P1BALLS"]
-"P1VECTOR.PAS" = ["P1VECTOR.PAS", "P1VECTOR", "P1VECTOR"]
-"NEUR1.PAS" = ["NEUR1.PAS", "Neur1", "Neur1"]
-"P2VIEW.PAS" = ["P2VIEW.PAS", "P2View", "P2View"]
-"P2GARAGE.PAS" = ["P2GARAGE.PAS", "P2GARAGE", "P2GARAGE"]
-"P2SOLID.PAS" = ["P2SOLID.PAS", "P2SOLID", "P2SOLID"]
-"NEUR2.PAS" = ["NEUR2.PAS", "Neur2", "Neur2"]
-"P3TUNNEL.PAS" = ["P3TUNNEL.PAS", "Part3Tunnel", "P3Tunnel"]
-"P3STARS.PAS" = ["P3STARS.PAS", "Part3Stars", "P3Stars"]
-"P3MORPH.PAS" = ["P3MORPH.PAS", "Part3Morph", "P3Morph"]
-"P3GLOBE.PAS" = ["P3GLOBE.PAS", "Part3Globe", "P3Globe"]
-"P3BLOCKS.PAS" = ["P3BLOCKS.PAS", "Part3Blocks", "P3Blocks"]
-"P3WAVES.PAS" = ["P3WAVES.PAS", "Part3Waves", "P3Waves"]
-"P3SPRITE.PAS" = ["P3SPRITE.PAS", "Part3Sprites", "P3Sprite"]
-"NEUR3.PAS" = ["NEUR3.PAS", "Neur3", "Neur3"]
-"P4LEMS.PAS" = ["P4LEMS.PAS", "Part4Lemmings", "P4Lems"]
-"NEUR4.PAS" = ["NEUR4.PAS", "Neur4", "Neur4"]
-"P5MESH.PAS" = ["P5MESH.PAS", "P5MESH", "P5MESH"]
-"P5ROTO.PAS" = ["P5ROTO.PAS", "P5ROTO", "P5ROTO"]
-"P5PATCH.PAS" = ["P5PATCH.PAS", "P5PATCH", "P5PATCH"]
-"NEUR5.PAS" = ["NEUR5.PAS", "Neur5", "Neur5"]
-"P6WHOOSH.PAS" = ["P6WHOOSH.PAS", "P6WHOOSH", "P6WHOOSH"]
-"P6TILES.PAS" = ["P6TILES.PAS", "P6TILES", "P6TILES"]
-"P6FIRE.PAS" = ["P6FIRE.PAS", "P6FIRE", "P6FIRE"]
-"P6CREDIT.PAS" = ["P6CREDIT.PAS", "P6CREDIT", "P6CREDIT"]
-"NEUR6.PAS" = ["NEUR6.PAS", "Neur6", "Neur6"]
-"P7FLIC.PAS" = ["P7FLIC.PAS", "P7FLIC", "P7FLIC"]
-"NEUR7.PAS" = ["NEUR7.PAS", "Neur7", "Neur7"]

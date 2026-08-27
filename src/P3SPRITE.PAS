@@ -42,7 +42,7 @@
           A shift by an immediate other than 1 is a 286 encoding, so the
           rotate-and-sample below will not assemble without this. }
 
-unit Part3Sprites;
+unit P3Sprite;
 {$I-}   { no I/O check: the original goes straight on after each file
           call, with no near CALL to the RTL's check routine. }
 

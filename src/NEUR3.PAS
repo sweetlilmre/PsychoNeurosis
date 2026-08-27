@@ -36,8 +36,8 @@
 program Neur3;
 
 uses DemoVT, Crt, VGA,
-     Part3Sprites, Part3Waves, Part3Blocks, Part3Globe,
-     Part3Morph, Part3Stars, Part3Tunnel;
+     P3Sprite, P3Waves, P3Blocks, P3Globe,
+     P3Morph, P3Stars, P3Tunnel;
 
 var
   SavedVol : Word;      { DS:$9F1A }

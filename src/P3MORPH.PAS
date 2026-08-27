@@ -42,7 +42,7 @@
           immediate other than 1 is a 286 encoding. The original
           targeted 286+, so enabling this is faithful, not a shortcut. }
 
-unit Part3Morph;
+unit P3Morph;
 
 interface
 

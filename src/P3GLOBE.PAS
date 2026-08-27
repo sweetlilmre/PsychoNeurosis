@@ -34,7 +34,7 @@
           Nothing else in the segment differed -- every prologue was at an
           identical offset and the tail matched byte for byte, shifted. }
 
-unit Part3Globe;
+unit P3Globe;
 
 interface
 

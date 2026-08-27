@@ -17,7 +17,7 @@
   THE USES CLAUSE IS THE LINK ORDER, REVERSED. The link walk is a reverse DFS
   post-order starting at the program, so the last unit to finish comes first in
   code. The original's segments are P4Lems (1005), DemoVT (11d9), VGA (11e3)
-  and Crt (1226), so Part4Lemmings has to finish last and Crt first. Checked
+  and Crt (1226), so P4Lems has to finish last and Crt first. Checked
   against build/NEUR4.MAP.
   =========================================================================== }
 
@@ -27,7 +27,7 @@
 
 program Neur4;
 
-uses Crt, VGA, DemoVT, Part4Lemmings;
+uses Crt, VGA, DemoVT, P4Lems;
 
 { 1000:001e -- and every instruction of it is accounted for:
 
