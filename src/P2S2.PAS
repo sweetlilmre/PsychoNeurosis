@@ -542,9 +542,14 @@ begin
       V.X := V.X + P.X;
       V.Y := V.Y + P.Y;
       V.Z := V.Z + P.Z;
-      V.X := V.X + Trans.X;
-      V.Y := V.Y + Trans.Y;
-      V.Z := V.Z + Trans.Z;          { 108b:033b }
+      { AND THROUGH THE PARAMETER, NOT THE `with` TEMP. 108b:030c is
+        LES DI,[BP+$10] -- O itself -- where the `with` would reload from
+        [BP-$32], the spill made at 108b:00c6. One byte, and it is the last
+        divergence in the routine. Naming O inside a `with O do` is legal and
+        is what makes the compiler go back to the parameter. }
+      V.X := V.X + O.Trans.X;
+      V.Y := V.Y + O.Trans.Y;
+      V.Z := V.Z + O.Trans.Z;        { 108b:033b }
       Project(V.X, V.Y, V.Z);        { 108b:035a }
       { both come back zero-extended, so the low word carries the sign }
       Scr[I].X := Integer(V.X);        { 108b:0370 }
@@ -1602,8 +1607,15 @@ var
     temporaries come to six bytes here, and 2,897 + 1,531 + 6 rounds to
     $1152, two short of the original's $1154. With this byte the declared
     total is odd, the frame rounds up, and $1154 is exact. }
-  Flag  : Byte;
-  Flag2 : Word;   { the frame does not close without it -- see below }
+  { THE UNREAD WORD COMES FIRST. K is a Word ending at [BP-$114B], the flag
+    byte is at [BP-$114F], and the unit is A-minus so nothing between them can
+    be padding: two bytes stand there, and one more below the flag. Declared
+    the other way round the flag took [BP-$114D] and the frame stayed exactly
+    $1154 -- same size, same instruction lengths, three bytes wrong across the
+    three renderers, which is the whole of what part 002 had left. }
+  Flag2 : Word;   { [BP-$114E], never read -- the frame does not close
+                    without it, see below }
+  Flag  : Byte;   { [BP-$114F], written 0 per face and never read }
   { AND NOTHING ELSE BEYOND IT. The eight bytes below K -- a byte at [BP-$114f] written
     0 and never read, and words at [BP-$1151] and [BP-$1153] -- are the CODE
     GENERATOR'S, not declarations. 108b:0bb9 reads O.FaceCount into
@@ -1669,8 +1681,15 @@ var
     temporaries come to six bytes here, and 2,897 + 1,531 + 6 rounds to
     $1152, two short of the original's $1154. With this byte the declared
     total is odd, the frame rounds up, and $1154 is exact. }
-  Flag  : Byte;
-  Flag2 : Word;   { the frame does not close without it -- see below }
+  { THE UNREAD WORD COMES FIRST. K is a Word ending at [BP-$114B], the flag
+    byte is at [BP-$114F], and the unit is A-minus so nothing between them can
+    be padding: two bytes stand there, and one more below the flag. Declared
+    the other way round the flag took [BP-$114D] and the frame stayed exactly
+    $1154 -- same size, same instruction lengths, three bytes wrong across the
+    three renderers, which is the whole of what part 002 had left. }
+  Flag2 : Word;   { [BP-$114E], never read -- the frame does not close
+                    without it, see below }
+  Flag  : Byte;   { [BP-$114F], written 0 per face and never read }
   { AND NOTHING ELSE BEYOND IT. The eight bytes below K -- a byte at [BP-$114f] written
     0 and never read, and words at [BP-$1151] and [BP-$1153] -- are the CODE
     GENERATOR'S, not declarations. 108b:0bb9 reads O.FaceCount into
@@ -1729,8 +1748,15 @@ var
     temporaries come to six bytes here, and 2,897 + 1,531 + 6 rounds to
     $1152, two short of the original's $1154. With this byte the declared
     total is odd, the frame rounds up, and $1154 is exact. }
-  Flag  : Byte;
-  Flag2 : Word;   { the frame does not close without it -- see below }
+  { THE UNREAD WORD COMES FIRST. K is a Word ending at [BP-$114B], the flag
+    byte is at [BP-$114F], and the unit is A-minus so nothing between them can
+    be padding: two bytes stand there, and one more below the flag. Declared
+    the other way round the flag took [BP-$114D] and the frame stayed exactly
+    $1154 -- same size, same instruction lengths, three bytes wrong across the
+    three renderers, which is the whole of what part 002 had left. }
+  Flag2 : Word;   { [BP-$114E], never read -- the frame does not close
+                    without it, see below }
+  Flag  : Byte;   { [BP-$114F], written 0 per face and never read }
   { AND NOTHING ELSE BEYOND IT. The eight bytes below K -- a byte at [BP-$114f] written
     0 and never read, and words at [BP-$1151] and [BP-$1153] -- are the CODE
     GENERATOR'S, not declarations. 108b:0bb9 reads O.FaceCount into

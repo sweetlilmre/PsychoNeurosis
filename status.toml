@@ -367,6 +367,15 @@ confirmed_at = "be253cb07d6c"
 fingerprint = "5741a180fb198746"
 against = "ORIG7.EXE"
 
+[artefact."NEUR2"]
+ours = "run/NEUR2.EXE"
+original = "work/split/NEUROSIS_002.exe"
+compare = "file"
+sha256 = "107ed64a6320c3416ae6c06182cdc1b429d9720c7690c5ac7f03859e2b99b3d0"
+achieved = "R7"
+target = "R7"
+measured_at = "00cb23684319"
+
 [artefact."NEUR4"]
 ours = "run/NEUR4.EXE"
 original = "work/split/NEUROSIS_004.exe"
