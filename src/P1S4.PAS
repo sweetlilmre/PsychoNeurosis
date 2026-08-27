@@ -571,7 +571,21 @@ begin
     is filled from the profile and then propagated to blobs 2..144, which is why
     the statement above is separate rather than redundant: it is the seed. }
   for I := 2 to TrailCount do
-    Move(Blob[1].Pix, Blob[I].Pix, BlobPixels);
+    { AN ASSIGNMENT, NOT Move -- AND THE RUNTIME ROUTINE IS WHAT SAYS SO. TP7's
+      System holds two copiers and their first seventeen bytes are identical, so
+      only the call OFFSET tells them apart: $3B06 is Move, which compares SI
+      against DI and copies backwards when the blocks overlap, and $3639 is a
+      plain forward CLD / REP MOVSB / RETF with no overlap test at all. The
+      compiler emits the forward one for a STRUCTURED ASSIGNMENT, because it
+      knows the two sides are distinct objects; a Move call always gets the safe
+      one. The original calls $3639 here, so this was written as an assignment.
+      Two bytes, and the same two at 1107:049f in Transform.
+
+      OUR RUNTIME IS BYTE-IDENTICAL TO THE ORIGINAL'S -- 15,184 bytes, no
+      difference, same paragraph -- which is what ruled out the easy answer that
+      these offsets were a smart-link artefact and made the source the only
+      remaining explanation. }
+    Blob[I].Pix := Blob[1].Pix;
   for I := 1 to TrailCount do
   begin
     Blob[I].W := BlobW;
@@ -792,7 +806,10 @@ begin
         1107:050d onwards load LES DI,[BP-$13], the local copy. So the reads name
         Base^ and the writes name P^; using one for everything is four bytes
         different at each of the four read sites. }
-      Move(Trail[I], T, SizeOf(TTrail));        { 1107:049f, thirteen bytes }
+      { AN ASSIGNMENT, NOT Move -- see the note in BuildBlobs. 1107:049f calls
+        System:$3639, the forward-only copier a structured assignment emits, not
+        $3B06's overlap-safe Move. Thirteen bytes of TTrail either way. }
+      T := Trail[I];                            { 1107:049f, thirteen bytes }
       RotatePoint(T.X, T.Y, T.Z);             { 1107:04b3 }
       { THE TRANSLATION IS READ THROUGH THE POINTER, not from Trail absolutely.
         1107:04bc is LES DI,[BP+0A] -- the parameter again -- and the three adds
@@ -1054,7 +1071,11 @@ begin
         Work.Trail[Idx].Z    := 0;                 { 1107:0903, XOR AX,AX }
         Work.Trail[Idx].Flag := 0;
         Inc(Idx);                                 { 1107:0917 }
-        if Idx > TrailCount then                  { 1107:091b, CMP $91 }
+        { >= LastEntry, NOT > TrailCount. 1107:091b is CMP WORD PTR [$6A31],$91
+          -- 145 -- with JL, where `> TrailCount` compares against 144 and
+          inverts the condition to JLE. The comment beside this line already
+          said CMP $91 and the code compared against $90. Same test, two bytes. }
+        if Idx >= LastEntry then                   { 1107:091b, CMP $91 }
         begin
           Col := Length(Rows[Row]);               { 1107:0930 }
           Row := TrailRows;                       { 1107:0933 }
