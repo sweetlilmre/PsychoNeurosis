@@ -617,9 +617,37 @@ var
     references are from segment 1082, so it is P1S2's; nothing anywhere reads
     $56BF. F sits at $563F and is 128 bytes, ending at $56BE, so $56BF is odd
     and word alignment pads it to $56C0 -- one byte of padding, not a variable.
-    So something ELSE in this block is two bytes larger than we have it, and
-    Frame has been standing in for it. Find those two bytes first; converting
-    the loop before that will always cost the same 47. }
+
+    MEASURED AGAIN ON 27 Aug 2026, AND THE SIGN IN THE PARAGRAPH ABOVE IS THE
+    OTHER WAY ROUND NOW. Five sites in this unit push a data address as
+    MOV DI,imm / PUSH DS / PUSH DI, so the three big ones can be read straight
+    out of both images:
+
+        LensTab   original $4304   ours $4306    +2
+        Cell      original $4FD6   ours $4FD8    +2
+        F         original $563F   ours $5642    +3
+
+    So ours is two bytes HIGH from LensTab onwards -- not two low -- and gains a
+    THIRD byte between Cell and F. Cell is 1,641 bytes: the original runs
+    $4FD6..$563E and puts F at the odd $563F with no padding, while ours runs
+    $4FD8..$5640 and puts F at $5642, so ours pads and the original does not.
+    dsmap agrees on the first part, reporting a clean boundary -- shift +0 below
+    $56C0 and +2 across $56C4..$ACFC, 106 sites.
+
+    THAT IS TWO DEFECTS, NOT ONE, and the earlier reading of "two low" was taken
+    from a build that has since changed underneath it. Two bytes too many before
+    LensTab, and one byte of padding before F that the original does not have.
+    Frame is 2 bytes and cannot account for 3. Whatever it is standing in for,
+    the arithmetic no longer works, so re-derive rather than trusting the
+    paragraph above -- and note that the chain quoted further up this file
+    ("Under at $02EA plus 16,410 is $4304") adds a FOLD base to a size, which
+    tiles self-consistently and is not a layout. Read the five pushed addresses;
+    they are the only unambiguous numbers here.
+
+    Carried by p1s1-hardcoded-lens-base, whose own note says the hardcoded lens
+    displacement will emit the original's -895 by itself once these bytes are
+    found. Converting the loop to a local before that will always cost the same
+    47. }
   BDX    : array[1..NumBouncers] of Integer;   { base [BP-$14] }
   BDY    : array[1..NumBouncers] of Integer;   { base [BP-$28] }
   BX     : array[1..NumBouncers] of Integer;   { base [BP-$3C] }
