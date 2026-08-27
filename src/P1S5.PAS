@@ -1048,8 +1048,8 @@ end;
   with no depth at all and the perspective divide had nothing to work with.
 
   ASSETS  Compiled into the executable, not in NEUROSIS.DAT:
-            assets/part001/vector_globe.bin    DS:$01A8, 36 points
-            assets/part001/vector_logo_a.bin   DS:$001C, 48 points
+            assets/part001/VECGLOBE.BIN    DS:$01A8, 36 points
+            assets/part001/VECLOGOA.BIN   DS:$001C, 48 points
   -------------------------------------------------------------------------- }
 procedure VectorRun;
 var

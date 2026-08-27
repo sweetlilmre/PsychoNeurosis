@@ -69,7 +69,7 @@ type
   Blocks_Run (11f3:0017)
 
   ASSETS  NEUROSIS.DAT $1A047D, 13,104 bytes:
-            assets/part003/blocks_order.bin
+            assets/part003/BLKORDER.BIN
           6,552 16-bit screen offsets: 91 frames x 8 x 9 blocks. The size
           being exactly 91*8*9*2 is what identifies the layout.
           See docs/11-part3-scene5-blocks.md.

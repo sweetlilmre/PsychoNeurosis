@@ -25,25 +25,25 @@ All from `$0C0E2E`, 92,756 bytes in three reads:
 
 | File | Size | Role |
 |---|---:|---|
-| [`scene4_palette.pal`](../assets/part003/scene4_palette.pal) | 768 | shared by all four images |
-| [`globe_src_offsets.bin`](../assets/part003/globe_src_offsets.bin) | 45,994 | source offsets into the virtual screen |
-| [`globe_dst_offsets.bin`](../assets/part003/globe_dst_offsets.bin) | 45,994 | destination offsets into video memory |
+| [`S4PAL.PAL`](../assets/part003/S4PAL.PAL) | 768 | shared by all four images |
+| [`GLOBESRC.BIN`](../assets/part003/GLOBESRC.BIN) | 45,994 | source offsets into the virtual screen |
+| [`GLOBEDST.BIN`](../assets/part003/GLOBEDST.BIN) | 45,994 | destination offsets into video memory |
 
 The four full-screen images:
 
 | File | DAT offset | Content |
 |---|---|---|
-| [`scene4_screen1.png`](../assets/part003/scene4_screen1.png) | `$0D7882` | "ReAl TiMe" gold lettering — shown three times |
-| [`scene4_screen2.png`](../assets/part003/scene4_screen2.png) | `$0E7282` | city skyline against clouds |
-| [`scene4_screen3.png`](../assets/part003/scene4_screen3.png) | `$0F6C82` | two figures against clouds |
-| [`scene4_screen4.png`](../assets/part003/scene4_screen4.png) | `$106682` | fiery DETH logo |
+| [`S4SCRN1.PNG`](../assets/part003/S4SCRN1.PNG) | `$0D7882` | "ReAl TiMe" gold lettering — shown three times |
+| [`S4SCRN2.PNG`](../assets/part003/S4SCRN2.PNG) | `$0E7282` | city skyline against clouds |
+| [`S4SCRN3.PNG`](../assets/part003/S4SCRN3.PNG) | `$0F6C82` | two figures against clouds |
+| [`S4SCRN4.PNG`](../assets/part003/S4SCRN4.PNG) | `$106682` | fiery DETH logo |
 
 Generated coverage maps, not present in the demo:
 
 | File | Shows |
 |---|---|
-| [`globe_warp_dst.png`](../assets/part003/globe_warp_dst.png) | a filled **disc** — 22,996 pixels |
-| [`globe_warp_src.png`](../assets/part003/globe_warp_src.png) | a **300×150 band**, dense at left and right — 16,316 pixels |
+| [`GLBWRPDS.PNG`](../assets/part003/GLBWRPDS.PNG) | a filled **disc** — 22,996 pixels |
+| [`GLBWRPSR.PNG`](../assets/part003/GLBWRPSR.PNG) | a **300×150 band**, dense at left and right — 16,316 pixels |
 
 ## Why we know it is a sphere
 

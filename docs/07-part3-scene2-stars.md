@@ -16,7 +16,7 @@ Mode-X with hardware panning. The two scenes share only the VGA unit.
 
 | File | Role |
 |---|---|
-| [`assets/part003/stars_waypoints.bin`](../assets/part003/stars_waypoints.bin) | 3,000 bytes from `$0C0276` — 6-byte waypoint records |
+| [`assets/part003/STARSWPT.BIN`](../assets/part003/STARSWPT.BIN) | 3,000 bytes from `$0C0276` — 6-byte waypoint records |
 
 **The point cloud is not an asset.** It is generated procedurally at startup;
 only the camera waypoints come from the blob.

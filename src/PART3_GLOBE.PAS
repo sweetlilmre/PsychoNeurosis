@@ -189,13 +189,13 @@ var
   Globe_LoadTables (119d:010f)
 
   ASSETS  NEUROSIS.DAT $0C0E2E, 92,756 bytes in three reads:
-            assets/part003/scene4_palette.pal      768 B, shared by all four
+            assets/part003/S4PAL.PAL      768 B, shared by all four
                                                    images -- see note above
-            assets/part003/globe_src_offsets.bin   45,994 B, source offsets
-            assets/part003/globe_dst_offsets.bin   45,994 B, destination offsets
+            assets/part003/GLOBESRC.BIN   45,994 B, source offsets
+            assets/part003/GLOBEDST.BIN   45,994 B, destination offsets
           Coverage maps (generated, not in the demo):
-            assets/part003/globe_warp_dst.png      a filled disc, 22,996 px
-            assets/part003/globe_warp_src.png      a 300x150 band, 16,316 px
+            assets/part003/GLBWRPDS.PNG      a filled disc, 22,996 px
+            assets/part003/GLBWRPSR.PNG      a 300x150 band, 16,316 px
           The destination is a disc and the source a rectangle sampled
           many-to-one at the edges: that is a sphere map.
           See docs/10-part3-scene4-globe.md.

@@ -76,11 +76,11 @@ writes the de-interleaved composite instead.
 
 ## Verified by eye
 
-- `assets/part001/asphyxia_logo.png` — the **ASPHYXIA logo**, chrome/green with reflection
+- `assets/part001/ASPHLOGO.PNG` — the **ASPHYXIA logo**, chrome/green with reflection
 - `assets/part002/house_screen1.png` — a **house exterior**, brick and corrugated roof
-- `assets/part004/lemming_sprite1.png` — the **Lemming character** with a thought bubble
-- `assets/part003/tunnel_640x400.png` — the tunnel texture
-- `assets/part003/scene4_screen1.png` — **"ReAl TiMe"** gold 3-D lettering
+- `assets/part004/LEMSPR1.PNG` — the **Lemming character** with a thought bubble
+- `assets/part003/TUNNEL.PNG` — the tunnel texture
+- `assets/part003/S4SCRN1.PNG` — **"ReAl TiMe"** gold 3-D lettering
 
 Images decoding correctly against their paired palettes is independent
 confirmation that both the offsets and the sizes are right.

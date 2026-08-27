@@ -17,7 +17,7 @@ the picture emerges.
 
 | File | Size | Role |
 |---|---:|---|
-| [`blocks_order.bin`](../assets/part003/blocks_order.bin) | 13,104 | 6,552 16-bit screen offsets |
+| [`BLKORDER.BIN`](../assets/part003/BLKORDER.BIN) | 13,104 | 6,552 16-bit screen offsets |
 
 The size identifies the layout: **91 × 8 × 9 × 2 = 13,104** exactly, matching
 the three nested loops (91 frames, 8 columns, 9 rows) and the address strides

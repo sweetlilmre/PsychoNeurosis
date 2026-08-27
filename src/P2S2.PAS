@@ -154,7 +154,7 @@ type
   TObjPtr = ^TObj;
 
   TStar = record X, Y, Z : Integer end;         { DS:$9485, stride 6 }
-  { DS:$5448, 1,550 bytes -- assets/part002/font_5x5.bin }
+  { DS:$5448, 1,550 bytes -- assets/part002/FONT5X5.BIN }
   { THREE DIMENSIONS, AND THE LOW BOUNDS DO THE SUBTRACTING. 108b:0075 is
     `IMUL DI, AX, $19` on Ord(S[I]) with no subtraction anywhere, R is
     multiplied by five and C added raw, and the whole constant sits in the
@@ -163,9 +163,9 @@ type
     run time that the declaration can absorb. }
   TFont = array[FontFirst..FontFirst + FontCount - 1,
                 1..GlyphSide, 1..GlyphSide] of Byte;
-  { the GetMem'd 12,800 bytes -- assets/part002/banner_320x40.png }
+  { the GetMem'd 12,800 bytes -- assets/part002/BANNER.PNG }
   TBanner = array[0..BannerH - 1, 0..ScrWidth - 1] of Byte;
-  { DS:$8ED5, 1,462 bytes -- assets/part002/rewind_button.bin }
+  { DS:$8ED5, 1,462 bytes -- assets/part002/REWIND.BIN }
   { TWO-DIMENSIONAL. 108b:0443 is `IMUL DI, [BP-$04], $22` then `ADD DI, AX`
     and reads `[DI-$714E]` -- Y multiplied by the row width directly, X added,
     and the whole bias folded into the displacement: $8ED5 - 35, which is
@@ -260,7 +260,7 @@ var
   SetupDone : Byte;
   { DS:$8ED1 -- a LongInt frame counter, and what drives the text. }
   Frame  : LongInt;
-  { DS:$8ED5, 1,462 bytes -- assets/part002/rewind_button.bin }
+  { DS:$8ED5, 1,462 bytes -- assets/part002/REWIND.BIN }
   Rewind : TRewind;
   { DS:$948B, 500 records of six bytes, immediately after Rewind. The star
     plot's folded base is $9485, one stride below. }

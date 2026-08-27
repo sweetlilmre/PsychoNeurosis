@@ -318,11 +318,11 @@ end;
   When the counter reaches -18 a 100-frame outro plays.
 
   ASSETS  NEUROSIS.DAT $00FD00, 111,072 bytes:
-            assets/part001/intro_palette.pal    768 B
-            assets/part001/comet0.png .. comet9.png
+            assets/part001/INTROPAL.PAL    768 B
+            assets/part001/COMET0.PNG .. COMET9.PNG
                                       10 frames of 65x48 -- a flaming comet
-            assets/part001/intro_backdrop.png   64,000 B
-            assets/part001/00FD00_03.bin        15,104 B = a 59-character
+            assets/part001/INTROBAK.PNG   64,000 B
+            assets/part001/00FD00D.BIN        15,104 B = a 59-character
                                       16x16 font (59 x 256), drawn two
                                       rows at a time by 1082:0200
           A 5,200-byte working buffer is allocated separately.
@@ -532,11 +532,11 @@ end;
   When the counter reaches -18 a 100-frame outro plays.
 
   ASSETS  NEUROSIS.DAT $00FD00, 111,072 bytes:
-            assets/part001/intro_palette.pal    768 B
-            assets/part001/comet0.png .. comet9.png
+            assets/part001/INTROPAL.PAL    768 B
+            assets/part001/COMET0.PNG .. COMET9.PNG
                                       10 frames of 65x48 -- a flaming comet
-            assets/part001/intro_backdrop.png   64,000 B
-            assets/part001/00FD00_03.bin        15,104 B = a 59-character
+            assets/part001/INTROBAK.PNG   64,000 B
+            assets/part001/00FD00D.BIN        15,104 B = a 59-character
                                       16x16 font (59 x 256), drawn two
                                       rows at a time by 1082:0200
           A 5,200-byte working buffer is allocated separately.

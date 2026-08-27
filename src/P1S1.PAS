@@ -587,8 +587,8 @@ end;
   Demo_Scene1 (1012:0678)
 
   ASSETS  NEUROSIS.DAT $000000, 64,768 bytes:
-            assets/part001/logo_palette.pal    768 B
-            assets/part001/asphyxia_logo.png   64,000 B -- the chrome/green
+            assets/part001/LOGOPAL.PAL    768 B
+            assets/part001/ASPHLOGO.PNG   64,000 B -- the chrome/green
                                                ASPHYXIA logo with reflection
           See docs/14-part001-intro.md.
   -------------------------------------------------------------------------- }

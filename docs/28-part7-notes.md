@@ -88,7 +88,7 @@ lives, and confirms the layout independently.
 `neurosis.dat` by name, so nothing ever reads this slot. It is the author's
 own working filename left in, the same as part 006's `.cel` names, and the
 file is not shipped with the demo. (An extracted copy of the animation is at
-`assets/part007/lemend_flc.flc`, 62,206 bytes.)
+`assets/part007/LEMEND.FLC`, 62,206 bytes.)
 
 ### `100f:07d4` — PlayAll
 

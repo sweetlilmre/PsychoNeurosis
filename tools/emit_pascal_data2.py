@@ -86,7 +86,7 @@ def emit_p001():
   VecLogoA is flat (Z = 0 throughout) -- the circled "A" logo mark.
   VecGlobe is three orthogonal rings, +/-50 on every axis.
 
-  See assets/part001/vector_logo_a.png and vector_globe.png.""")]
+  See assets/part001/VECLOGOA.PNG and VECGLOBE.PNG.""")]
     total = 0
     # VecRing sits BETWEEN the two and nothing reads it. It is 18 points of a
     # radius-50 circle in the YZ plane at 20-degree steps -- one of the globe's

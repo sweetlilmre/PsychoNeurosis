@@ -291,7 +291,7 @@ WritePage`.
 ### `108b:0000` DrawText(X, Y, S)
 
 A 5 × 5 bitmap font. The glyph byte is at `Ord(Ch) * 25 + R * 5 + C` off
-`DS:$5122`, and the loader reads the glyphs to `DS:$5448` (`assets/part002/font_5x5.bin`) — 806 bytes higher,
+`DS:$5122`, and the loader reads the glyphs to `DS:$5448` (`assets/part002/FONT5X5.BIN`) — 806 bytes higher,
 and `806 = 32*25 + 6` — so the effective index is
 
 ```

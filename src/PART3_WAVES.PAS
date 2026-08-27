@@ -79,7 +79,7 @@ var
   Waves_LoadCurves (120f:0017)
 
   ASSETS  NEUROSIS.DAT $116082, 36,414 bytes:
-            assets/part003/waves_curves.bin
+            assets/part003/WAVECURV.BIN
           51 curves x 357 signed 16-bit X offsets. 51 * 714 = 36,414 exactly,
           which is what fixes the stride.
           See docs/12-part3-scene6-waves.md.
@@ -416,7 +416,7 @@ end.
     amplitude, so they all trace the same wave), and the later passes spread
     the indices to fan the particles out into a family of nested waves.
 
-    All 51 overlaid: assets/part003/waves_curves_all.png
+    All 51 overlaid: assets/part003/WAVECRVA.PNG
 
   RESOLVED -- WHY THE LEFT HALF RENDERED DARKER THAN THE ORIGINAL
   * LoadCurves builds the scene's own palette after the BlockRead: a blue

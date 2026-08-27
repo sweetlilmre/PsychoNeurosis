@@ -288,12 +288,12 @@ end;
   Sprites_Load (125e:012e)
 
   ASSETS  NEUROSIS.DAT $11EEC0, 14,862 bytes in six reads:
-            assets/part003/font_5x5.bin          1,550 B, the 5x5 bitmap font
-            assets/part003/sprite1.png / .bin    3,136 B = 56x56 portrait
-            assets/part003/sprite2.png / .bin    3,136 B
-            assets/part003/sprite3.png / .bin    3,136 B
-            assets/part003/sprite4.png / .bin    3,136 B
-            assets/part003/sprites_palette.pal     768 B
+            assets/part003/FONT5X5.BIN          1,550 B, the 5x5 bitmap font
+            assets/part003/SPRITE1.PNG / .bin    3,136 B = 56x56 portrait
+            assets/part003/SPRITE2.PNG / .bin    3,136 B
+            assets/part003/SPRITE3.PNG / .bin    3,136 B
+            assets/part003/SPRITE4.PNG / .bin    3,136 B
+            assets/part003/SPRTSPAL.PAL     768 B
           The four 3,136-byte reads sit in a loop in the original; 3136 =
           56*56 is what fixes the sprite dimensions, and rendering them at
           that size shows the four Asphyxia members.
@@ -769,7 +769,7 @@ end.
     [DI + $DAB8] with DI = Ord*25 + Row*5 + Col, which resolves to the same
     $DDDE the BlockRead writes. 1550 = 62 glyphs x 25. It is dead in part 002
     and live here.
-        assets/part003/font_5x5.bin
+        assets/part003/FONT5X5.BIN
 
   * Each portrait gets a RANDOM starting angle for the closing sweep, so the
     four are never in phase even though they all spin at the same rate.

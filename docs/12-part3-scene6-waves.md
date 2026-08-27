@@ -15,7 +15,7 @@ and advancing its phase walks it along its curve.
 
 | File | Size | Role |
 |---|---:|---|
-| [`waves_curves.bin`](../assets/part003/waves_curves.bin) | 36,414 | 51 × 357 signed 16-bit X offsets |
+| [`WAVECURV.BIN`](../assets/part003/WAVECURV.BIN) | 36,414 | 51 × 357 signed 16-bit X offsets |
 
 51 × 714 = 36,414 exactly, which is what fixes the stride (`$2CA` = 714 bytes
 per curve, as used in the indexing).
@@ -96,9 +96,9 @@ the passes work as they do: pass 0 puts every particle on curve 30 so they all
 trace the same mid-amplitude wave, and the later passes spread the indices to
 fan the particles into a family of nested waves.
 
-![all 51 curves overlaid](../assets/part003/waves_curves_all.png)
+![all 51 curves overlaid](../assets/part003/WAVECRVA.PNG)
 
-*All 51 overlaid — [`waves_curves_all.png`](../assets/part003/waves_curves_all.png).*
+*All 51 overlaid — [`WAVECRVA.PNG`](../assets/part003/WAVECRVA.PNG).*
 
 ## Open
 

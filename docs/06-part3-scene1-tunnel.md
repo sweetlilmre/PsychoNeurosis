@@ -22,9 +22,9 @@ That is why the source artwork looks like static concentric rings.
 
 | File | Role |
 |---|---|
-| [`assets/part003/tunnel_plane0.raw`](../assets/part003/tunnel_plane0.raw) … `plane3.raw` | the four 64,000-byte Mode-X planes, as loaded |
-| [`assets/part003/tunnel_palette.pal`](../assets/part003/tunnel_palette.pal) | 768-byte DAC image rebuilt from the three embedded tables |
-| [`assets/part003/tunnel_640x400.png`](../assets/part003/tunnel_640x400.png) | de-interleaved composite in its real colours |
+| [`assets/part003/TUNNPLN0.RAW`](../assets/part003/TUNNPLN0.RAW) … `plane3.raw` | the four 64,000-byte Mode-X planes, as loaded |
+| [`assets/part003/TUNNELPL.PAL`](../assets/part003/TUNNELPL.PAL) | 768-byte DAC image rebuilt from the three embedded tables |
+| [`assets/part003/TUNNEL.PNG`](../assets/part003/TUNNEL.PNG) | de-interleaved composite in its real colours |
 
 ## Where the palette lives
 

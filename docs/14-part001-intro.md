@@ -140,8 +140,8 @@ to Real at load time by `Math_IntToReal` (`1483:0000`) into 12-byte records:
 
 | Object | DGROUP | Points | What it is |
 |---|---|---:|---|
-| [`vector_globe`](../assets/part001/vector_globe.png) | `DS:$01A8` | 36 | three orthogonal rings — a wireframe **globe**, ±50 on all axes |
-| [`vector_logo_a`](../assets/part001/vector_logo_a.png) | `DS:$001C` | 48 | a circled **"A"** — the Asphyxia logo mark, flat (Z = 0 throughout) |
+| [`vector_globe`](../assets/part001/VECGLOBE.PNG) | `DS:$01A8` | 36 | three orthogonal rings — a wireframe **globe**, ±50 on all axes |
+| [`vector_logo_a`](../assets/part001/VECLOGOA.PNG) | `DS:$001C` | 48 | a circled **"A"** — the Asphyxia logo mark, flat (Z = 0 throughout) |
 
 Each is spun for 240 frames at 2.0° per frame before the next.
 
@@ -153,9 +153,9 @@ the screen down by 640 bytes (two rows) and zeroing the top, 100 steps to clear
 
 | File | DAT offset | Content |
 |---|---|---|
-| [`asphyxia_logo.png`](../assets/part001/asphyxia_logo.png) | `$000000` | the logo, chrome/green with reflection |
+| [`ASPHLOGO.PNG`](../assets/part001/ASPHLOGO.PNG) | `$000000` | the logo, chrome/green with reflection |
 | `00FD00_*.bin` | `$00FD00` | scene 2 buffers |
-| [`intro_screen.png`](../assets/part001/intro_screen.png) | `$02AEE0` | scene 3's mosaic source |
+| [`INTROSCR.PNG`](../assets/part001/INTROSCR.PNG) | `$02AEE0` | scene 3's mosaic source |
 | `03A8E0_*.bin` | `$03A8E0` | scene 4 banner data |
 | `03BB02_*.bin` | `$03BB02` | scene 5 |
 

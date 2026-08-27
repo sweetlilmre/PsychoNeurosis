@@ -135,7 +135,7 @@ type
   through the middle, then back down -- with black at both ends of every band,
   which draws the dark grid lines between the tunnel tiles.
 
-  ASSETS  assets/part003/tunnel_palette.pal   (rebuilt 768-byte DAC image)
+  ASSETS  assets/part003/TUNNELPL.PAL   (rebuilt 768-byte DAC image)
           Rendering the texture with this instead of a neutral ramp shows the
           tunnel is red-tiled with a repeated letter "A". }
 {$I gen/P3PAL.INC}       { const Red, Green, Blue : TColourTable = (...) }
@@ -436,12 +436,12 @@ end;
   staging buffer per plane, then a 32000-word copy to A000:0000.
 
   ASSETS  NEUROSIS.DAT $081A76, four consecutive 64000-byte planes:
-            assets/part003/tunnel_plane0.raw   plane 0  (x mod 4 = 0)
-            assets/part003/tunnel_plane1.raw   plane 1
-            assets/part003/tunnel_plane2.raw   plane 2
-            assets/part003/tunnel_plane3.raw   plane 3
+            assets/part003/TUNNPLN0.RAW   plane 0  (x mod 4 = 0)
+            assets/part003/TUNNPLN1.RAW   plane 1
+            assets/part003/TUNNPLN2.RAW   plane 2
+            assets/part003/TUNNPLN3.RAW   plane 3
           De-interleaved, these are one 640x400 image:
-            assets/part003/tunnel_640x400.png
+            assets/part003/TUNNEL.PNG
           A single plane viewed at 320 wide shows a phantom second ring
           centre -- that is a stride artefact, not the artwork.
           See docs/06-part3-scene1-tunnel.md.

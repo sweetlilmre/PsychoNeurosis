@@ -15,9 +15,9 @@ From `$11EEC0`, 14,862 bytes in six reads:
 
 | File | Size | Role |
 |---|---:|---|
-| [`font_5x5.bin`](../assets/part003/font_5x5.bin) | 1,550 | the 5 x 5 bitmap font -- byte-identical to `part002/font_5x5.bin`; see docs/15 |
-| [`sprite1.png`](../assets/part003/sprite1.png) … `sprite4.png` | 3,136 each | 56×56 portraits |
-| [`sprites_palette.pal`](../assets/part003/sprites_palette.pal) | 768 | |
+| [`FONT5X5.BIN`](../assets/part003/FONT5X5.BIN) | 1,550 | the 5 x 5 bitmap font -- byte-identical to `part002/FONT5X5.BIN`; see docs/15 |
+| [`SPRITE1.PNG`](../assets/part003/SPRITE1.PNG) … `SPRITE4.PNG` | 3,136 each | 56×56 portraits |
+| [`SPRTSPAL.PAL`](../assets/part003/SPRTSPAL.PAL) | 768 | |
 
 The four 3,136-byte reads sit in a 4-iteration loop in the original.
 **3136 = 56×56** is what fixes the dimensions, and rendering at that size shows
@@ -107,7 +107,7 @@ Nothing consumes it in either place — the read simply walks the file pointer
 This was wrong. The block is the 5 x 5 bitmap font, indexed off a base
 806 bytes below where it is loaded, which is why nothing appears to
 reference the destination buffer. See
-[`assets/part002/font_5x5.bin`](../assets/part002/font_5x5.bin) and the
+[`assets/part002/FONT5X5.BIN`](../assets/part002/FONT5X5.BIN) and the
 worked explanation in [docs/15](15-part002.md).
 
 ## Open

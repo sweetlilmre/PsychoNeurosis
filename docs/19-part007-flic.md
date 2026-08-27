@@ -38,5 +38,5 @@ consistent with part 007 being the only part with timer writes.
 
 ## Assets
 
-[`assets/part007/lemend_flc.flc`](../assets/part007/lemend_flc.flc) — extracted
+[`assets/part007/LEMEND.FLC`](../assets/part007/LEMEND.FLC) — extracted
 verbatim, 62,206 bytes, playable in any FLIC viewer.

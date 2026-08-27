@@ -21,9 +21,9 @@ is why part 003's DAT map has no entry for segment `1139`. It lives in DGROUP in
 
 | File | DGROUP | Extent |
 |---|---|---|
-| [`assets/part003/shape_sphere.png`](../assets/part003/shape_sphere.png) / `.bin` | `DS:$0636` | X,Y,Z −800…800 |
-| [`assets/part003/shape_cube.png`](../assets/part003/shape_cube.png) / `.bin` | `DS:$5136` | X,Y,Z −400…400 |
-| [`assets/part003/shape_grid.png`](../assets/part003/shape_grid.png) / `.bin` | `DS:$63F6` | X,Z −1000…1000, Y −400…400 |
+| [`assets/part003/SHPSPHER.PNG`](../assets/part003/SHPSPHER.PNG) / `.bin` | `DS:$0636` | X,Y,Z −800…800 |
+| [`assets/part003/SHPCUBE.PNG`](../assets/part003/SHPCUBE.PNG) / `.bin` | `DS:$5136` | X,Y,Z −400…400 |
+| [`assets/part003/SHPGRID.PNG`](../assets/part003/SHPGRID.PNG) / `.bin` | `DS:$63F6` | X,Z −1000…1000, Y −400…400 |
 
 Rendering the raw vertex data with the recovered constants produces a
 recognisable dotted sphere, cube and flat grid. That independently confirms the

@@ -58,7 +58,7 @@ const
      64x64 4096 px   shr 12
 
   ASSETS  NEUROSIS.DAT $02AEE0, 64,000 bytes:
-            assets/part001/intro_screen.png
+            assets/part001/INTROSCR.PNG
   -------------------------------------------------------------------------- }
 { --------------------------------------------------------------------------
   THIS UNIT'S ONLY GLOBAL, and it was a local in Load.

@@ -447,7 +447,7 @@ end;
   Demo_Scene2 (10b8:0592)
 
   ASSETS  NEUROSIS.DAT $0C0276, 3000 bytes:
-            assets/part003/stars_waypoints.bin
+            assets/part003/STARSWPT.BIN
           500 six-byte records (PanX, PanY, Hold); the scene walks indices
           50 down to 1. The point cloud is NOT an asset -- the unit's
           initialisation section builds it procedurally.

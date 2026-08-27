@@ -712,9 +712,9 @@ end;
 
   ASSETS  The shapes are compiled into the EXE, not in NEUROSIS.DAT.
           Extracted from DGROUP to:
-            assets/part003/shape_sphere.bin / .png    DS:$0636
-            assets/part003/shape_cube.bin   / .png    DS:$5136
-            assets/part003/shape_grid.bin   / .png    DS:$63F6
+            assets/part003/SHPSPHER.BIN / .png    DS:$0636
+            assets/part003/SHPCUBE.BIN   / .png    DS:$5136
+            assets/part003/SHPGRID.BIN   / .png    DS:$63F6
           765 points x 6 bytes, three signed words (X, Y, Z).
           The .png files are previews rendered with the constants below.
           See docs/08-part3-scene3-morph.md.
