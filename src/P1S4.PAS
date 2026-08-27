@@ -236,6 +236,9 @@ type
     Trail : array[0..LastEntry] of TTrail;   { offset 0,    1,898 bytes }
     Outp  : array[1..LastEntry] of TOut;     { offset $76A, 1,015 bytes }
   end;
+  { PWork is no longer used: Transform takes `var Base : TWork` and there is no
+    pointer to TWork anywhere in the unit. Kept because TWork's own note reads
+    against it. }
   PWork = ^TWork;
 
   { 51 bytes in the original ($33): a two-byte (W, H) header the blitter reads
@@ -728,7 +731,7 @@ end;
   1107:04bf reads ES:[DI], ES:[DI+4], ES:[DI+8] with DI still pointing at the
   base of the array -- entry 0. It is the object position, not a point.
   -------------------------------------------------------------------------- }
-procedure Transform(Base : PWork; A1, A2, A3 : Integer);
+procedure Transform(var Base : TWork; A1, A2, A3 : Integer);
 var
   { TWENTY BYTES, AND THE EARLIER READING OF THEM WAS WRONG. It said a Byte
     then three LongInts then three Integers, because every referenced offset
@@ -753,13 +756,17 @@ var
   T : TTrail;                           { [BP-$0F], the working copy }
   { AND [BP-$13] IS NOT A DECLARED LOCAL -- IT IS THE `with`'s HIDDEN SLOT.
     1107:044a is LES DI,[BP+$0A] / MOV [BP-$13],DI / MOV [BP-$11],ES, nine bytes,
-    and that is exactly what TP7 emits ENTERING a `with` on a pointer
-    dereference: the record's address stored in a slot allocated below the
-    declared locals. Declared as `P : PWork` with `P := Base` the same slot got
-    filled by four MOVs instead, twelve bytes -- and SortOutp's note in this
-    same file had already recorded that a `with` is allocated a four-byte
-    address slot whether or not it needs one. 2 + 13 + 4 = 19, rounded to 20,
-    either way. }
+    and that is exactly what TP7 emits ENTERING a `with` on a VAR PARAMETER: the
+    record's address stored in a slot allocated below the declared locals. A
+    declared pointer local filled by an assignment got the same slot with four
+    MOVs instead, twelve bytes -- and SortOutp's note in this same file had
+    already recorded that a `with` is allocated a four-byte address slot whether
+    or not it needs one. 2 + 13 + 4 = 19, rounded to 20, either way.
+
+    THE NINE BYTES ARE THE SAME whether Base is a pointer dereferenced by the
+    with or a var parameter, which is why this note read correctly for a long
+    time while the signature was wrong. What tells the two apart is 1107:04bc,
+    forty-one instructions later. }
 begin
   { TRANSFORM IS SIX BYTES LONG AND IT IS ALL OF PART 001'S REMAINING RESIDUE.
     The prologue-offset comparison in DepthSort's note above localises it here:
@@ -774,11 +781,11 @@ begin
     broke down as three plus six, exactly:
 
       1107:044a  the entry, worth THREE -- CLOSED. It is a `with` on the pointer
-                 dereference, not a declared `P : PWork` filled by `P := Base`.
-                 See the note in the var block.
-      1107:04bc  the three adds, worth SIX -- OPEN. Two reloads of the parameter
-                 at three bytes each. See the note beside them, which records the
-                 two spellings measurement has already eliminated.
+                 var parameter, not a declared pointer local filled by an
+                 assignment. See the note in the var block.
+      1107:04bc  the three adds -- CLOSED, and not by a spelling. Base is a
+                 VAR parameter, not a pointer, which is what lets one
+                 LES DI,[BP+$0A] feed all three. See the note beside them.
 
     Closing the entry also fixed the Move's source for free: 1107:0491 is
     LES DI,[BP-$13] and field names inside the with resolve through that slot, so
@@ -793,10 +800,10 @@ begin
 
   { A `with`, AND ITS ENTRY IS THE NINE BYTES AT 1107:044a. Field names inside
     it resolve through the hidden slot -- 1107:0491's Move source and the four
-    writes at 1107:050d onwards are all LES DI,[BP-$13]. The three adds keep
-    Base^ SPELLED OUT on purpose: 1107:04bc loads LES DI,[BP+$0A], the
-    parameter itself, so those three do NOT go through the with. }
-  with Base^ do
+    writes at 1107:050d onwards are all LES DI,[BP-$13]. The three adds name
+    Base explicitly, so they load the parameter instead; see the note beside
+    them, which is where this routine's last byte was. }
+  with Base do
   begin
 
     SinCos(A1, MCos1, MSin1);                 { -> DS:$5B52, $5B56 }
@@ -840,33 +847,56 @@ begin
         without. The walk compares CONTENT and the offset compares LENGTH, and on
         this site they contradict each other, so the `with` is closer in total and
         wrong in detail. Left as three statements because the walk is the stronger
-        instrument, and recorded in part1-p1s4-three-bytes rather than guessed at:
-        whatever the original wrote loads the address once WITHOUT a with's entry
-        sequence, and nobody has found the spelling. }
-      { BARE FIELD NAMES, THROUGH THE `with` -- and this closed the last six
-        bytes of part 001's code. 1107:04bc loads the record's address ONCE and
-        the three add pairs then take es:[di], es:[di+4] and es:[di+8] with no
-        further load, because these three statements are adjacent and call
-        nothing: TP7 reloads from the with's slot only after a CALL, and there is
-        none between them. SortOutp's note in this file had the rule already --
-        a `with` whose body calls nothing keeps the address in ES:DI -- and it
-        applies to a RUN of statements inside a body that calls things elsewhere,
-        which is what took so long to see.
+        instrument, and recorded in part1-p1s4-three-bytes rather than guessed
+        at. FOUND, 27 Aug 2026: the address is loaded once without a with's
+        entry sequence because Base is a VAR PARAMETER -- see the note below,
+        which carries the whole account. }
+      { BASE NAMED EXPLICITLY, AND IT IS A VAR PARAMETER -- WHICH IS THE WHOLE
+        ANSWER, AND IT WAS NOT IN THE SPELLING AT ALL. 1107:04bc loads
+        LES DI,[BP+$0A] -- the parameter -- ONCE, and the three add pairs then
+        take es:[di], es:[di+4] and es:[di+8] with no further load. This was the
+        last differing byte in the entire demo.
 
-        THREE SPELLINGS WERE TRIED AND TWO MEASURED WORSE, which is why the
-        wrong ones are named here rather than left to be re-derived:
-          Base^.Trail[0].field, spelled out three times -- the compiler reloads
-            the PARAMETER before the second and the third, three bytes each, and
-            that was the six;
-          a NESTED `with Base^.Trail[0]` -- it loads once, but a with is
-            allocated its own four-byte address slot whether it needs one or not,
-            so the frame went ENTER $18 where the original has ENTER $14 and the
-            unit came out nineteen bytes long.
-        The reading that said the original loads [BP+$0A] here was reading the
-        operand of a load that IS the with's slot in the correct build. }
-      T.X := T.X + Trail[0].X;                 { 1107:04bf }
-      T.Y := T.Y + Trail[0].Y;
-      T.Z := T.Z + Trail[0].Z;
+        THE SEARCH WAS IN THE WRONG PLACE FOR A LONG TIME. Six spellings of
+        these three statements were built and measured while the signature said
+        `Base : PWork`, and the reason none of them could work is structural: a
+        POINTER dereference has to be re-loaded for every mention, so three
+        mentions give three loads; and the one construct that shares a load -- a
+        nested `with` -- is allocated its own four-byte slot whether it needs one
+        or not, so the frame goes ENTER $18 where the original has $14. Under a
+        pointer parameter those two facts have no common solution, and no amount
+        of re-spelling was going to find one.
+
+        A VAR PARAMETER HAS NEITHER PROBLEM. Its address IS [BP+$0A], so Turbo
+        Pascal keeps one load across a run of adjacent statements that name it,
+        and it needs no slot of its own. So `Base.Trail[0].X` three times gives
+        exactly one LES and three displacements, and `with Base do` above still
+        spills the address to [BP-$13] for the indexed accesses. Nine bytes at
+        1107:044a, one load at 1107:04bc, ENTER $14. Every reading in this file
+        was already correct; the signature was not.
+
+        AND THE EVIDENCE HAD BEEN SITTING IN PART 002 THE WHOLE TIME. P2S2's
+        ObjTransform takes `var O : TObj` and does the identical thing at
+        108b:030c -- one LES DI,[BP+$10] feeding three adds at es:[di+$B2D],
+        +$B2F, +$B31 -- and closing THAT byte, days earlier, is what suggested
+        looking here. The lesson is about where to look: when six spellings of a
+        statement all fail, stop re-spelling the statement and question the
+        DECLARATION it depends on.
+
+        THE CALL SITE DID NOT MOVE. FrameStep passes it as
+        MOV DI,$5BCC / PUSH DS / PUSH DI, which is what a var parameter and
+        @Work both compile to, so the change is invisible from outside.
+
+        MEASURED AND REJECTED, so nobody re-derives them: bare `Trail[0].field`
+        through the with (one byte, the slot instead of the parameter);
+        `Base^.Trail[0].field` spelled out three times (three loads, sixteen
+        bytes longer); a nested `with Trail[0]` (ENTER $18, and it derives from
+        the OUTER slot, not the parameter); a nested `with Base^.Trail[0]`
+        (ENTER $18, and this one DOES load the parameter -- which is what showed
+        the mechanism was right and only the slot was in the way). }
+      T.X := T.X + Base.Trail[0].X;            { 1107:04bf }
+      T.Y := T.Y + Base.Trail[0].Y;
+      T.Z := T.Z + Base.Trail[0].Z;
       Project(T.X, T.Y, T.Z);                 { 1107:0503 }
       { THE ORDER IS X, Y, D, FLAG, AND D COMES AFTER Project, NOT BEFORE.
         1107:0528 pushes [BP-7] and [BP-5] -- the two halves of T.Z -- to
@@ -890,7 +920,7 @@ end;
   Transform with the array base DS:$5BCC, then the rest of the frame. }
 procedure FrameStep(A1, A2, A3 : Integer);
 begin
-  Transform(@Work, A1, A2, A3);     { 1107:0446 }
+  Transform(Work, A1, A2, A3);      { 1107:0446 }
   BuildBlobs(@Work.Outp[1]);        { 1107:0576, DS:$6336 }
   StarStep;                         { 12b2:00c0 }
   StarDraw(VirtScrSeg);             { 12b2:00f1 }
