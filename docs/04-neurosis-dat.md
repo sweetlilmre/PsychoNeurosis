@@ -62,7 +62,7 @@ Part 003's Scene 3 never appears in the DAT map because its 3-D shape data is
 this map is a signal to go looking in the data segment, not evidence that a
 scene is procedural.
 
-## Building it back: the manifest and MKDAT
+## Building it back: the manifest and mkdat.py
 
 Carving is only half of it. Reading a blob somebody else built needs the map;
 BUILDING one needs the map to be the only copy of itself, and the hardcoded
@@ -73,15 +73,13 @@ it. The reads still succeed. They just return the wrong bytes.
 So the blob is now built from a manifest, and the offsets are generated:
 
     assets/NEUROSIS.MAN     the ordered list of files, and nothing else
-    src/dos/MKDAT.PAS       concatenates them, emits src/gen/DATOFS.INC
-    src/dos/MKDAT.BAT       compiles and runs it at the DOS prompt
+    tools/mkdat.py          concatenates them, emits src/gen/DATOFS.INC
     tools/mkmanifest.py     regenerates the manifest from the recovered map
-    tools/mkdat_mirror.py   a host mirror of MKDAT, so it can be checked here
 
 **The manifest holds the ORDER and not the offsets.** Offsets are a consequence
 of the order and the file lengths, so putting them in the manifest would be a
 second copy of a derived fact, and a second copy is a thing that can disagree.
-`MKDAT` computes them, and writes each file's offset and length out as a pair
+`mkdat.py` computes them, and writes each file's offset and length as a pair
 of Pascal constants.
 
 **The constants are UNTYPED, and that is what makes this free.** An untyped
@@ -96,25 +94,35 @@ move every variable after it and change the data image of every part that
 included the file. `DATOFS.INC`'s own header says so, where somebody editing it
 would look.
 
-**Every asset filename is 8.3**, and that is not tidiness. `MKDAT` is a
-real-mode DOS program and DOS cannot open `asphyxia_logo.raw`. The names were
-shortened for it — `ASPHLOGO.RAW`, `TUNNPLN0.RAW`, and the offset-coded ones as
-six hex digits plus an index letter (`03A8E0A.BIN`) — and
-`tools/build_assets.py` produces them that way, so a regeneration keeps them
-8.3.
+**Every asset filename is 8.3, and that is now a CONVENTION rather than a
+constraint.** It was a constraint while the builder was `src/dos/MKDAT.PAS`,
+a real-mode DOS program that could not open `asphyxia_logo.raw`. That program
+is gone — see below — and the names stay because `NEUROSIS.DAT` itself is read
+by real-mode DOS code, so one naming rule across everything that ships is
+worth keeping. `tools/build_assets.py` produces them that way, so a
+regeneration keeps them 8.3, and `--audit` reports it if one ever does not.
 
 **What the round trip proves.** `tools/mkmanifest.py` refuses to write a
 manifest unless every entry names a file that exists, whose length equals the
 `BlockRead` size the map records, and whose bytes equal that slice of the 1994
-file. Then `mkdat_mirror.py` concatenates the manifest and compares: **85
-files, 1,718,189 of 1,718,189 bytes, identical.** `MKDAT` itself takes an
-optional reference blob and does the same comparison in DOS, which is the check
-that matters — a manifest in the wrong ORDER produces a blob of exactly the
-right LENGTH that every part misreads.
+file. Then `mkdat.py` concatenates the manifest and compares: **85 files,
+1,718,189 of 1,718,189 bytes, identical.** That comparison is the check that
+matters — a manifest in the wrong ORDER produces a blob of exactly the right
+LENGTH that every part misreads, so length is not evidence and this is.
 
-`MKDAT` is deliberately **not** in `build.toml`. That file's output is what the
-ten byte-identical artefacts are measured from, and `build.py build.toml` should
-go on meaning "build the demo".
+**IT WAS A DOS PROGRAM FIRST, AND THAT WAS THE WRONG INSTINCT.** `MKDAT.PAS`
+was written in Turbo Pascal on the reasoning that a tool building one of the
+demo's inputs belongs in the demo's own toolchain. Nothing about concatenating
+files needs a 1994 compiler, and making it real-mode DOS bought a 16-bit
+segment limit, 8.3 filenames and a build step that could not be run from the
+host at all — so a second implementation had to exist purely to check the
+first. Two implementations of one job, one of them unrunnable here. The rule it
+leaves behind: **reach for the period toolchain when the OUTPUT has to be
+period-exact, not when the input happens to be old.**
+
+`mkdat.py` is deliberately **not** wired into `build.py`. That command's output
+is what the ten byte-identical artefacts are measured from, and it should go on
+meaning "build the demo".
 
 ## Carving
 

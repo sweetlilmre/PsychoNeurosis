@@ -41,6 +41,12 @@ matched = 93
 [routine."MODEX.ShowFrame"]
 matched = 67
 
+[routine."P1BALLS.Blit"]
+matched = 170
+
+[routine."P1BALLS.SetPalette768"]
+matched = 24
+
 [routine."P1LOGO.BlitSprite"]
 matched = 20
 
@@ -52,12 +58,6 @@ matched = 38
 
 [routine."P1MOSAIC.MosaicBlocks"]
 matched = 132
-
-[routine."P1BALLS.Blit"]
-matched = 170
-
-[routine."P1BALLS.SetPalette768"]
-matched = 24
 
 [routine."P2GARAGE.BlitBitmapX"]
 matched = 56
@@ -76,54 +76,6 @@ matched = 67
 
 [routine."P2VIEW.SetMode"]
 matched = 26
-
-[routine."P5MESH.DrawMesh"]
-matched = 132
-
-[routine."P5MESH.FillTriangle"]
-matched = 1254
-
-[routine."P5MESH.Project"]
-matched = 87
-
-[routine."P5ROTO.RotozoomFrame"]
-matched = 64
-
-[routine."P5PATCH.FixDiv"]
-matched = 32
-
-[routine."P5PATCH.FixMul"]
-matched = 19
-
-[routine."P5PATCH.Project5"]
-matched = 166
-
-[routine."P5PATCH.RotatePoint5"]
-matched = 334
-
-[routine."P5PATCH.SinCos5"]
-matched = 178
-
-[routine."P6TILES.Blit"]
-matched = 170
-
-[routine."P6FIRE.Overlay"]
-matched = 33
-
-[routine."P6FIRE.ScrollOut"]
-matched = 37
-
-[routine."P7FLIC.FliBrun"]
-matched = 75
-
-[routine."P7FLIC.FliCopy"]
-matched = 25
-
-[routine."P7FLIC.FliLC"]
-matched = 99
-
-[routine."P7FLIC.FliSS2"]
-matched = 98
 
 [routine."P3BLOCKS.BlockDown"]
 matched = 32
@@ -191,6 +143,54 @@ matched = 60
 [routine."P4LEMS.VLine"]
 matched = 44
 
+[routine."P5MESH.DrawMesh"]
+matched = 132
+
+[routine."P5MESH.FillTriangle"]
+matched = 1254
+
+[routine."P5MESH.Project"]
+matched = 87
+
+[routine."P5PATCH.FixDiv"]
+matched = 32
+
+[routine."P5PATCH.FixMul"]
+matched = 19
+
+[routine."P5PATCH.Project5"]
+matched = 166
+
+[routine."P5PATCH.RotatePoint5"]
+matched = 334
+
+[routine."P5PATCH.SinCos5"]
+matched = 178
+
+[routine."P5ROTO.RotozoomFrame"]
+matched = 64
+
+[routine."P6FIRE.Overlay"]
+matched = 33
+
+[routine."P6FIRE.ScrollOut"]
+matched = 37
+
+[routine."P6TILES.Blit"]
+matched = 170
+
+[routine."P7FLIC.FliBrun"]
+matched = 75
+
+[routine."P7FLIC.FliCopy"]
+matched = 25
+
+[routine."P7FLIC.FliLC"]
+matched = 99
+
+[routine."P7FLIC.FliSS2"]
+matched = 98
+
 [routine."VGA.ClearScreen"]
 matched = 22
 
@@ -237,10 +237,12 @@ outcome = "matches"
 achieved = "R3"
 observer = "maintainer"
 date = "2026-08-27"
-confirmed_at = "d6f640f2acdc"
-fingerprint = "d0724adf1791f465"
+confirmed_at = "dbcdb2c6ff4f"
+fingerprint = "f3d0b8669174e0c8"
 against = "ORIG1.EXE"
 note = "Watched beside ORIG1 at the all-ten-byte-identical milestone: visually indistinguishable from the original."
+binary = "f6d06bc3b512ae9b17b2a1b54f90f355bda5032ed9e4e0efa31e1f552e29cc2a"
+reaffirmed_on = "2026-08-27"
 
 [observation."NEUR2"]
 harness = "NEUR2"
@@ -249,10 +251,12 @@ outcome = "matches"
 achieved = "R3"
 observer = "maintainer"
 date = "2026-08-27"
-confirmed_at = "d6f640f2acdc"
-fingerprint = "5479b4ac1fd295f5"
+confirmed_at = "dbcdb2c6ff4f"
+fingerprint = "90ad6a9e01afcb0c"
 against = "ORIG2.EXE"
 note = "Watched beside ORIG2 at the all-ten-byte-identical milestone: visually indistinguishable from the original."
+binary = "107ed64a6320c3416ae6c06182cdc1b429d9720c7690c5ac7f03859e2b99b3d0"
+reaffirmed_on = "2026-08-27"
 
 [observation."NEUR3"]
 harness = "NEUR3"
@@ -261,10 +265,24 @@ outcome = "matches"
 achieved = "R3"
 observer = "maintainer"
 date = "2026-08-27"
-confirmed_at = "5edfb71a71ba"
-fingerprint = "1dc7dcf45a83a38b"
+confirmed_at = "dbcdb2c6ff4f"
+fingerprint = "6a4d5144c4015d01"
 against = "ORIG3.EXE"
 note = "Watched beside ORIG3 with Morph_FadeStep's MOV DI at the original's $0300, the part byte-identical: runs and exits cleanly and looks identical to the original. This is the run that retired the FadeStep deviation."
+binary = "b2cc345a5c63ef3d9df5eaf36b247649248218ff76490d32a91d5f6d78cad691"
+reaffirmed_on = "2026-08-27"
+
+[observation."NEUR4"]
+harness = "NEUR4"
+tier = "part"
+outcome = "matches"
+achieved = "R3"
+observer = "maintainer"
+date = "2026-08-27"
+confirmed_at = "dbcdb2c6ff4f"
+fingerprint = "2cb10b3f229ecb82"
+against = "ORIG4.EXE"
+note = "Watched beside ORIG4 at the all-ten-byte-identical milestone: part 004 is good. The first part-tier observation this target has ever had; its only previous row was TPART4 at scene tier."
 
 [observation."NEUR5"]
 harness = "NEUR5"
@@ -273,10 +291,12 @@ outcome = "matches"
 achieved = "R3"
 observer = "maintainer"
 date = "2026-08-27"
-confirmed_at = "d6f640f2acdc"
-fingerprint = "04d871d0181d5663"
+confirmed_at = "dbcdb2c6ff4f"
+fingerprint = "8430df60ac981ab7"
 against = "ORIG5.EXE"
 note = "Watched beside ORIG5 at the all-ten-byte-identical milestone: visually indistinguishable from the original."
+binary = "365d79c09401dba2ca19912007ced8b5732aa28655816d050812119fbbd7dfe1"
+reaffirmed_on = "2026-08-27"
 
 [observation."NEUR6"]
 harness = "NEUR6"
@@ -285,10 +305,12 @@ outcome = "matches"
 achieved = "R3"
 observer = "maintainer"
 date = "2026-08-27"
-confirmed_at = "d6f640f2acdc"
-fingerprint = "3f7f9eea464eecc3"
+confirmed_at = "dbcdb2c6ff4f"
+fingerprint = "5678b3cf0d214445"
 against = "ORIG6.EXE"
 note = "Watched beside ORIG6 at the all-ten-byte-identical milestone: visually indistinguishable from the original."
+binary = "07279a48b3f8607f60bbf27bccd7c3140afd7ada98943f755544bc42d50758d6"
+reaffirmed_on = "2026-08-27"
 
 [observation."NEUR7"]
 harness = "NEUR7"
@@ -297,10 +319,12 @@ outcome = "matches"
 achieved = "R3"
 observer = "maintainer"
 date = "2026-08-27"
-confirmed_at = "d6f640f2acdc"
-fingerprint = "1c0b0ade56b3c3e7"
+confirmed_at = "dbcdb2c6ff4f"
+fingerprint = "cd86dd6a9776d1f9"
 against = "ORIG7.EXE"
 note = "Watched beside ORIG7 at the all-ten-byte-identical milestone: visually indistinguishable from the original."
+binary = "01b72770cb8e8a60b620b693c5bbda12d15e7978f5272a2a1507d9bdddea4de5"
+reaffirmed_on = "2026-08-27"
 
 [observation."TPART1"]
 harness = "TPART1"
@@ -350,6 +374,8 @@ confirmed_at = "fbe0608dba1c"
 fingerprint = "09e5d3d1a74c0dff"
 against = "ORIG4.EXE"
 note = "renamed from TP4S1 on 2026-08-22; the observation is the one recorded on 2026-08-21"
+superseded_by = "NEUR4"
+superseded_on = "2026-08-27"
 
 [observation."TPART5"]
 harness = "TPART5"
@@ -555,7 +581,8 @@ resolution = "SIX OF ITS NINE PAIRED SEGMENTS WERE OUT OF ORDER, and segpair.py 
 name = "part1-missing-star-unit"
 finding = "part 001's segment 12b2, 304 bytes, is a unit we do not have at all: segpair.py reports it NOT FOUND while every other segment pairs. IDENTIFIED, NOT YET FIXED. WHAT THE SEGMENT IS. A starfield unit, and its three routines are already written -- inside P1BALLS, where they do not belong. The original gives them a segment of their own and P1BALLS calls all three across it. 12b2:0000 StarInit: Randomize, then for 90 records of 9 bytes based at DS:$9dd2 (element 1 at $9ddb), X := Random(320), Y := Random(200), and a three-way Random(3) choosing colour and DX. Fields are X, Y, DX, Spare : Integer and Colour : Byte, confirmed by the displacements +0, +2, +4 and +8. 12b2:00c0 StarStep and 12b2:00f1 StarDraw are HAND ASSEMBLER and ours are Pascal. The proof is the frame: StarStep opens `MOV BX,0` with no prologue at all and ends RETF, and StarDraw opens PUSH BP / MOV BP,SP with no ENTER and no locals, while both of ours declare loop counters that would have to be allocated. Both walk the array with a byte stride -- MOV DX,BX / ADD BX,9 / DEC CX / JNE -- and StarDraw draws with STOSB through the row-offset table at DS:$AB5A. 12b2:0120 IS NOT A ROUTINE TO WRITE. It is the unit's compiler-generated initialisation section, and the main body's first twelve instructions are the init chain that calls one per unit. THAT CHAIN IS A FREE READING OF THE LINK ORDER and it is worth more than this defect: it runs DemoVT, Crt, VGA, FixMath, P1VECTOR, THIS UNIT, P1BALLS, P1MOSAIC, P1TITLE, P1LOGO -- reverse of the segment order, and it places the new unit between P1VECTOR and P1BALLS without any guessing. WHY IT IS NOT FIXED YET, and this is a scope judgement rather than a difficulty: the segment is 304 bytes and part 001 needs 4,042 more aligned bytes for 95 percent. P1BALLS's own header records the real blocker -- the load image is 1,536 bytes BIGGER than the original's while the BSS is 23,520 bytes SMALLER, so initialised data sits here that belongs in BSS and a large block of variables is missing outright. Extracting this unit is correct and should be done; it will not move part 001 near the target on its own, and part 003 was 1,100 bytes from 95 percent with 1,120 editable, so that went first."
 seen_in = "TPART1"
-state = "open"
+state = "resolved"
+resolution = "Segment 12b2 is P1STAR.PAS and has been for some time; segpair pairs every segment in part 001. Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. A missing unit cannot survive whole-file identity, so this is answered by construction."
 
 [[plan.investigation]]
 name = "part3-init-and-palette"
@@ -589,7 +616,8 @@ resolution = "IT IS TWO SEPARATE THINGS, AND ONE OF THEM IS THE MEASURING APPARA
 name = "part3-driver-volume-vars"
 finding = "part 003's variables sit 2 bytes below the original's after the harness's own 2 bytes are accounted for, and the original has FOUR bytes of variables between its typed constants at $9F1A and Tunnel's YOffset at $9F1E that we do not declare. IDENTIFIED AND MEASURED, DELIBERATELY NOT COMMITTED -- see below."
 seen_in = "TPART3"
-state = "open"
+state = "resolved"
+resolution = "Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. Part 003's initialised data image is identical and its whole file matches, so the two-byte variable gap this describes is closed. The harness whose own two bytes confused the arithmetic no longer exists -- part 003 is NEUR3.EXE, a real program."
 
 [[plan.investigation]]
 name = "part6-fire-height"
@@ -777,13 +805,15 @@ resolution = "PART 001 89.4% -> 89.9%, and the fix was one distinction applied i
 name = "part1-dgroup-audit"
 finding = "part 001: THE DGROUP SHORTFALL IS NOW THE DOMINANT RESIDUAL and the per-routine work is close to exhausted -- no span exceeds 131 bytes and several of those are displacement noise rather than wrong code. dsmap pairs 88 references and FIFTY-FOUR of them carry a large negative shift: -16808 across $ACEB..$ACFB with 38 sites, -17576 across $AAC2..$AAD2 with 10, and -17176 at $AB54..$AB58 with 6. Each is a wrong two-byte displacement inside an otherwise correct instruction, which is the one defect class that makes a whole routine measure as unaligned while containing nothing wrong. WHAT IS KNOWN AND WHAT IS NOT. P1BALLS's own block is close: its Col at $6A2F carries -5619, and summing what we declare between $6A2F and $AAC2 -- 2,048 of row buffers, 3,776 of font, 7,395 of blobs, 810 of stars, 1,212 of model, 52 of sprite, 1,200 of screen records, 28 of maths -- gives 16,521 against the original's 16,531, ten bytes out. So the SIZES in that range are essentially right, and a shift that grows by 11,957 across a range whose contents differ by ten CANNOT be explained by those declarations. Either the -5619 pairing is wrong (it has four sites, which is thin) or the units sit in a different ORDER so that something else lies between them. DO NOT GUESS THIS ONE. The arithmetic above is exactly the kind that looked convincing twice this session and was wrong both times. What it needs is a per-unit size audit against the original's inter-variable gaps -- mechanisable, and the sources' own DS: comments are the input, as they were for P1BALLS. A tool that reads those comments, sorts them, and reports each declaration's declared size beside its measured gap would settle it for every unit at once and is worth writing before another hand pass."
 seen_in = "TPART1"
-state = "open"
+state = "resolved"
+resolution = "Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. Part 001's data image is identical at 752 bytes and dspair reports every DS and BP displacement matching, so the DGROUP shortfall this made the dominant residual is gone. The two floors it could not reach both fell later: P1Star's seven bytes needed three changes AT ONCE (Tail3 to two bytes, {$A-}, and a one-byte Lead), and P1BALLS' last byte was a var parameter declared as a pointer."
 
 [[plan.investigation]]
 name = "part1-buildcell-asm"
 finding = "part 001: BuildCell at 1012:0366 is HAND-WRITTEN ASSEMBLER and ours is Pascal, which is why its frame matches and its body does not -- the frame was corrected earlier and the walk did not move. Two tells settle it: 1012:037a is MOV WORD PTR [BP-2],$4FD6, loading a DATA ADDRESS as an immediate into a local, and 1012:039e is ADD BYTE PTR [BP-7],0, a literal no-op add. A compiler emits neither. It also walks BACKWARDS -- MOV CX,$640 then DEC CX -- which this file's own comment already says. IDENTIFIED: $4FD6 is Cell and $4304 is LensTab, and the file's own arithmetic confirms it ($4FD6 - $4304 = $0CD2 = 1641 words, so Cell begins where the table ends). The loop reads LensTab[cx] as a gather index, fetches a source byte, adds a bias byte held at [BP-7], and stores to Cell[cx]. THE ONE THING NOT IDENTIFIED, and it blocks a verbatim transcription: the source base is 1012:036a's IMUL DI,[BP+4],$669 then LEA AX,[DI-$37F] -- N * 1641 - 895 -- used as a DS-RELATIVE offset. For N = 1 that is 746, a low DS offset well below LensTab at $4304, and nothing in this unit is recorded there. Ours reads the saved background through `Under`, a HEAP pointer, which cannot be what a DS-relative read addresses. Find what lives at DS:$02EA before writing the asm: a wrong verbatim transcription is worse than the Pascal it replaces, because it looks authoritative."
 seen_in = "TPART1"
-state = "open"
+state = "resolved"
+resolution = "Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. Whole-file identity covers BuildCell's body as well as its frame, so the transcription question is answered. The related lens-sprite defect is resolved under p1s1-hardcoded-lens-base."
 
 [[plan.investigation]]
 name = "part1-bss-shortfall"
@@ -817,13 +847,15 @@ resolution = "PART 001 90.0% -> 90.9%, +186 bytes, AND THE DATA SHIFTS COLLAPSED
 name = "target-99-percent"
 finding = "THE TARGET IS NOW 99%, RAISED FROM 95%, so six parts are short and not one. Standings: 001 at 90.9%, 003 at 95.6%, 007 at 95.9%, 004 at 96.5%, 005 at 96.7%, 006 at 97.9%. Parts 000, 009 and psycho are at 100% and 002 at 99.9%, so those four are done. PART 001 IS STILL THE BIGGEST GAP but it is no longer the best-understood work: its layout is down to two numbers (a +4 shift across 57 sites and a -2 across 10, plus minalloc 16 bytes over) and every remaining span is small. The other five have never had the treatment part 001 just got, and the methods that paid there are all untried on them: compare the MZ minalloc field for a BSS shortfall, run dsgaps.py per unit to price each global against the gap the comments record, run prologue.py per segment for frame mismatches, and run framehist.py for the frames prologue.py will not pair. START WITH THE CHEAPEST SWEEP ON EACH: minalloc is one struct read and tells you immediately whether a part has a data shortfall at all. Part 001's was 16,704 bytes and closed to 16 in four batches, and none of it needed a disassembler. Do that for 003, 004, 005, 006 and 007 before reading any code."
 seen_in = "TPART1"
-state = "open"
+state = "resolved"
+resolution = "The target was overtaken rather than met. Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. Every part also walks 100.0% of every user byte, so the percentage this raised to 99% is 100 everywhere and the standings it lists are all superseded."
 
 [[plan.investigation]]
 name = "bss-sweep-all-parts"
 finding = "THE BSS SWEEP ACROSS ALL NINE PARTS, in one struct read each and no disassembler, and it is the worklist for the 99% target. The MZ header's minalloc field is the loader's uninitialised-data request in paragraphs; the difference from the original's is the exact shortfall. Ours against theirs: 004 is 2,768 bytes SHORT -- the largest. 002 is 2,096 short. 005 is 384 bytes OVER, the only surplus. 003 is 128 short. 006 is 48 short. And 000, 001, 007 and 009 are EXACT. PART 001'S IS NOW EXACT, which is the headline: it was 16,704 bytes short at the start of the day and matches to the paragraph. AND PART 002 IS THE INSTRUCTIVE ONE: it is 2,096 bytes short of data and its coverage walk reads 99.9%. So a data shortfall does NOT necessarily show up in the code walk -- that part's code evidently makes few absolute data references, or the ones it makes fall inside the walk's short-difference tolerance. The two instruments measure different things and neither implies the other. Do not read a high walk percentage as evidence the data is right, and do not expect fixing the data to move the walk by itself; on part 001 a 16.7KB correction moved it three bytes. WHERE 004's 2,768 BYTES ARE, localised but not yet identified. dsgaps over P4LEMS.PAS shows EVERY sprite bank tiling exactly against its declaration -- WalkBank 432, SplatBank 480, DigBank 1,326, TunnelBk 420, DeathBBk 800, DeathABk 648, BuildBank 720 -- with ONE exception: TumbleBk is declared array[1..4] of array[0..99], which is 400 bytes, and the gap from $06D2 to SplatBank at $12B8 is 3,046. So 2,646 bytes are unaccounted between them, which is most of the shortfall. There IS something in that gap: segment 1005 references $1240, which is 120 bytes below SplatBank, and nothing else in the range. So the region reads as TumbleBk, then a large undeclared block, then a 120-byte block at $1240, then SplatBank. Read what 1005 does with $1240 first -- and note 3,046 does not divide by 4, so TumbleBk simply being bigger does not explain it."
 seen_in = "TPART4"
-state = "open"
+state = "resolved"
+resolution = "The worklist is finished. Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. Every initialised data image is identical and dspair reports every DS displacement matching in every part, which is a stronger statement than the minalloc comparison this proposed. The BSS defects it was looking for were found and are recorded in the per-part investigations above."
 
 [[plan.investigation]]
 name = "part5-layout"
@@ -836,7 +868,8 @@ resolution = "PART 005 IS AT 97.3% AND ITS DATA LAYOUT IS ESSENTIALLY DONE: mina
 name = "part6-and-part3"
 finding = "PART 006's DATA LAYOUT IS COMPLETE -- minalloc matches EXACTLY and dsmap's shift is +0 across ALL 160 paired sites in ONE group with no boundary anywhere. 97.9% -> 98.0%. It was ONE ARRAY BOUND, and the folded base is what read it. P6CREDIT's Stretch was array[TopRow..BotRow] of Integer -- 161 entries, 322 bytes -- and it runs to 199, 180 entries, 360 bytes. 11bb:0123 is SHL DI,1 / MOV [DI-$6B48],AX, so $94B8 is the FOLDED base and the array itself begins at $94B8 + 20*2 = $94E0; Buf is at $9648, which makes the extent 360. The difference is exactly the 38-byte shift dsmap reported. And the SAME reading proved Margin above it CORRECT: 11bb:00e5 is MOV AL,[DI-$6BE8], a folded base of $9418, so Margin[20] is at $942C and its extent to $94E0 is 180 bytes -- which array[TopRow..199] of Byte gives, and which the header comment had said all along. Reading a folded base as an address would have made Margin look 40 bytes too big and Stretch 78 too small; reading it as a fold gives both right. AND A REVERTED CHANGE ON PART 003, worth recording because the reasoning was good and the answer was wrong. PART3_SPRITES' Load declares `F : file` as a LOCAL with `DS:$E6EC` written beside it -- a data-segment address on a local, which is the contradiction that has found four globals on this target already. Moving it to unit level made dsmap's two anomalies merge into one uniform +4, which looked like confirmation. IT COST 338 BYTES OF ALIGNMENT: the walk went 95.6% to 93.2%. THE FRAME SETTLED IT AGAINST THE COMMENT. 125e:012e opens ENTER $626, which is 1,574 bytes, and that is 128 for the file record plus 2 for I plus the 1,444-byte buffer below -- and I sits at [BP-$82] = 130 PRECISELY BECAUSE 128 bytes of file record are nearer BP. So F is genuinely a local and the DS: note was simply wrong. Reverted, and the source now carries the frame arithmetic instead of the bad address. TWO LESSONS. A dsmap anomaly MERGING is not proof the change was right -- it says the sizes now agree, not that the declaration moved to the right place. And the comment-versus-code pass cuts both ways: a stale comment can invent a defect as easily as a good one can find it, so check the frame before trusting an address."
 seen_in = "TPART6"
-state = "open"
+state = "resolved"
+resolution = "Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. Part 006 went from the 98.0% this records to byte-identical."
 
 [[plan.investigation]]
 name = "part7-frames"
@@ -856,7 +889,8 @@ resolution = "PART 007 IS AT 99.3% AND MEETS THE TARGET -- 95.9% at the start of
 name = "target-99-remaining"
 finding = "FOUR OF TEN PARTS NOW MEET THE 99% TARGET -- 000, 009 and psycho at 100%, 002 at 99.9% -- and 007 joins them at 99.3%. Remaining: 006 at 98.0%, 005 at 97.3%, 004 at 96.5%, 003 at 95.6%, 001 at 90.9%. WHAT PART 007's RUN SUGGESTS FOR THE REST, because none of it needed new tooling: the wins came from FAR-ness (RETF against RET, and a parameter at [BP+6] rather than [BP+4]), from LOOP SHAPE (a test at the bottom with jumps back is repeat-until; while-with-empty-body costs an extra jump), from STATEMENT COUNT (one expression storing once, versus an assignment plus Inc's storing three times), and from FRAME DECOMPOSITION including the compiler's own temporaries. All four are cheap to check and none of them shows up in a data-layout instrument. SO FOR 003, 004 AND 001 -- the three furthest away -- run prologue.py per segment first and then look at the RETF/RET of every routine whose frame will not pair. Part 007 had TWO routines declared near that are far, and each one broke its own body AND its callers."
 seen_in = "TPART7"
-state = "open"
+state = "resolved"
+resolution = "Overtaken. Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. All ten meet a bar higher than the 99% this tracks."
 
 [[plan.investigation]]
 name = "part6-to-99"
@@ -897,7 +931,8 @@ resolution = "THE for-TEMPORARY FINDING PAID ON BOTH ROUTINES AND A THIRD BESIDE
 name = "part5-last-frame"
 finding = "PART 006's FRAMES ARE COMPLETE -- framehist reports zero differing frame sizes across all seven segments -- so everything left in it is bodies, and it needs about 42 bytes for 99%. Its three remaining spans: 100f:0543 (29), which is a REGISTER-ALLOCATION difference and was deliberately left (the original builds the palette index in DI directly, ours in AX then transfers; the displacements and the folded base already match and Pascal does not name the register); 11bb:0096 (18), which is SetPalette768 followed by Close and differs only in the far-call target and the file record's DS address; and 1095:063c (16), unread. So part 006 may not reach 99% without addressing displacement noise, and that is a different kind of work from everything in this batch. PART 005 HAS ONE FRAME LEFT, $102 MISSING, and prologue.py does not report it in any of the seven segments -- so it belongs to a routine the tool lists as `unproven, nothing calls this` or one outside the segment bounds. 258 is a String parameter's 256-byte copy plus two, so look for a routine taking a String that we have as taking something else, or one we have not written. framehist found it; prologue cannot name it. That pair of tools disagreeing IS the signal -- it means the routine exists in the original and has no counterpart of ours confident enough to pair."
 seen_in = "TPART5"
-state = "open"
+state = "resolved"
+resolution = "Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. Part 006 is byte-identical, so the 42 bytes this estimated are closed; framehist agreeing on frames was the true half of it."
 
 [[plan.investigation]]
 name = "part3-morph-asm"
@@ -917,7 +952,8 @@ resolution = "RESOLVED in the same batch that found it. All six rows fixed and m
 name = "part3-run-owed"
 finding = "A WATCHED TPART3 RUN IS NOW OWED, and it is the largest behavioural change part 003 has had in one day. Nothing here is unmeasured -- coverage 95.6 -> 99.1%, artefacts holding, traps identical -- but four of the changes are the kind a coverage walk cannot judge: Demo_Scene3 is now one hand-written assembler procedure instead of compiled Pascal; CheckKey returns its answer in DX by the author's convention instead of in AL; the globe scene's two show routines are inlined six times over; and part 003 gained a linked object module, src/asm/STARMATH.ASM, carrying two 386 routines one of which nothing calls. WHAT TO WATCH FOR SPECIFICALLY. The morph scene should still abandon the WHOLE scene on a keypress rather than skipping one segment of it -- every test jumps to the procedure's own RETF, and getting that wrong would show as the morph continuing after a key. The globe scene should show title, city, title, figures, title, DETH in that order with the same fades. And scene 2's star field needs a 386 for DivLong on the projection path, so a failure there would be immediate and total rather than subtle. NOBODY MAY RECORD THIS RUN WHO DID NOT WATCH IT."
 seen_in = "TPART3"
-state = "open"
+state = "resolved"
+resolution = "The run happened. NEUR3 was watched beside ORIG3 on 27 Aug 2026 and recorded at R3 -- and it is the run that retired part 003's last deliberate deviation, Morph_FadeStep's MOV DI,$0300. TPART3's row is superseded by NEUR3. Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. "
 
 [[plan.investigation]]
 name = "part4-order"
@@ -944,7 +980,8 @@ resolution = "RESOLVED, AND IT WAS AN ARITHMETIC SLIP IN A COMMENT THAT COST THI
 name = "part5-registers-held"
 finding = "AND ONE THING IN P5PATCH THAT NO PASCAL SPELLING HAS PRODUCED. 1102:0079 computes CX + Col - Half into AX and then compares AX TWICE -- CMP AX,$13F / JG and CMP AX,0 / JL -- with no store anywhere; 1102:008c does the same into BX for the row; and 1102:00a0 then uses BOTH registers for the address, ADD BX,BX / MOV DI,[BX-$55F6] / ADD DI,AX. So two values are computed once each and held in registers across four comparisons and an address computation. OURS STORES THEM. Declaring SX and SY gives MOV [BP-$13],AX and then CMP [BP-$13],$13F -- Turbo Pascal has no peephole that keeps the accumulator, which our own build proves, and writing the expression out twice instead would evaluate it twice. Neither spelling is the original's. That is 41 bytes at 1102:0082 and it is the only thing in part 005 that is not understood; the frame around it is now exact. Worth a probe rather than another guess -- and worth checking whether it is the same phenomenon as the register-allocation difference part 006 records at 100f:0543, where the original builds an index in DI and ours goes through AX."
 seen_in = "TPART5"
-state = "open"
+state = "resolved"
+resolution = "A Pascal spelling was found. Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. Part 005 is byte-identical, so 1102:0079's two compares of one value are produced by the source as it stands; the sequence no spelling had reproduced is reproduced."
 
 [[plan.investigation]]
 name = "part5-codegen-two"
@@ -1013,7 +1050,8 @@ resolution = "RESOLVED in the batch that found it: part 001 96.9%, up from 90.9%
 name = "part5-mulimul"
 finding = "THE NEW OPERAND-ORDER RULE WAS TESTED AGAINST PART 005's MUL/IMUL PUZZLE AND IT IS NOT THAT. One build settled it: writing the interpolation as LongInt(X1 - X0) * T div Denom took part 005 from 98.8% to 98.4% -- the cast forces the runtime's 32-bit multiply instead of the IMUL, which is further from the original, not nearer. Reverted. WHAT THE TWO ACTUALLY DIFFER BY IS THE WIDTH OF THE INTERMEDIATE, and that is now stated precisely. The original is CWD / IMUL WORD / IDIV WORD -- a 32-bit signed product in DX:AX divided as 32 bits, which is Turbo Pascal's overflow-safe `a * b div c`. Ours is MUL WORD / CWD / IDIV WORD -- a 16-bit product whose high half is discarded, then sign-extended for the divide. The dead CWD in the ORIGINAL is the tell that its expression is typed 32-bit; ours is typed 16-bit and the CWD sits after the multiply rather than before it. So the question is what makes TP7 choose the wide path, and an explicit LongInt cast is NOT it. Still open, and now with one candidate eliminated rather than none."
 seen_in = "TPART5"
-state = "open"
+state = "resolved"
+resolution = "KEPT AS A NEGATIVE RESULT, which is what it was recorded as: the operand-order rule was tested against part 005's MUL/IMUL puzzle by one build and it is NOT that. That conclusion stands and is worth not re-deriving. Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. "
 
 [[plan.investigation]]
 name = "part1-with"
@@ -1072,109 +1110,130 @@ resolution = "FIXED and rebuilt. Scene1's local F is gone with a note on the rou
 [[plan.investigation]]
 name = "part5-hand-asm-three"
 finding = "PART 005 REACHES 100.0% -- three hand-assembler blocks and two small findings, and a PROBE decided the biggest one. THE 41-BYTE SPAN AT 1102:0082 was P5PATCH's clip-and-sample, and three tells said assembler independently: both coordinates live in REGISTERS across four bounds tests with no store (AX from 007f to 00a6, BX from 0092 to 00a2, each compared twice and then USED -- Turbo Pascal frames every local, so a Pascal SX is written before it is tested and read back for each comparison); 1102:00a0 is ADD BX,BX where the compiler emits SHL BX,1; and 1102:0087 is 3D 00 00, CMP AX,0 in the LONG immediate form, twenty bytes from 83 FB 00 which is the SHORT form of the same operation. A code generator picks one rule and keeps it, so the INCONSISTENCY is the signature -- the same shape as part 003's morph scene using JE/JMP five times then plain JNE three times. THE 31-BYTE SPAN AT 1096:034a WAS SETTLED BY probe/MULSIGN.PAS, which is the model for this kind of question. It spells (X1 - X0) * T div Denom + X0 EIGHT ways -- addend at either end, the multiply's operands swapped, the difference lifted into its own variable, the quotient cast down, and LongInt casts on the left operand, the multiplier and the divisor -- and drives all eight through TP7, TP6 and TP6.1. Every 16-bit spelling emits MUL / CWD / IDIV and the two casts call the runtime instead. NOT ONE of the twenty-four builds emits the original's CWD / IMUL / IDIV. AND OURS WAS ARITHMETICALLY WRONG: MUL leaves the product in DX:AX and the CWD that follows overwrites DX with the sign of AX, so the product's top half was thrown away before the divide saw it -- any dot whose (X1-X0)*T exceeded 16 bits interpolated from a truncated dividend. An EARLIER attempt cast the left operand to LongInt and measured worse, and the note recorded that as 'the cast forces the RTL 32-bit multiply'. True, and it was one spelling tried once against a whole-part percentage; the probe tried eight and read the bytes. THE THIRD BLOCK IS THE SAME STORY IN THE OTHER DIRECTION. With YOfs a Word array and X0 an Integer, YOfs[Y0] + X0 promotes to LONGINT, so ours built the pixel offset in 32 bits -- CWD, a CX:BX pair, XOR DX,DX, ADC, then a MOV that discards the high half -- where 1096:027d is ADD BX,BX and 0283 is ADD DI,X0, sixteen bits throughout. Two sites. Wiki: word-plus-integer-is-longint. TWO SMALL ONES CLOSED THE REST. 100e:0571 is MOV AL,[BP+4] / MOV [BP+4],AL -- a dead SELF-ASSIGNMENT OF A PARAMETER, the first thing HeightFromMap does, and another instance of the shape this target keeps finding. And 1096:04f6 computes $C800 BEFORE the LES that fetches the segment, which is a two-argument Ptr call evaluating right to left, not a Mem subscript evaluating left to right -- the operand-order rule applied to a call. WHAT IS LEFT IN PART 005 IS THREE BYTES AND NONE OF THEM IS OURS: 1096:049e, 1096:050b and 1252:002d are the same far call, lcall 0x2d9:0x38fb against ours 0x2f8:0x391c -- a runtime routine at a different offset in a differently sized runtime segment. That is the floor, and part 002 is already sitting on it."
-state = "open"
+state = "resolved"
+resolution = "Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. Part 005 went from the 100.0% coverage this reports to byte-identical, and its last three bytes were Morph's unsigned loop guards and FixMath's Trunc."
 
 [[plan.investigation]]
 name = "shared-unit-near-far"
 finding = "THE SMALLEST PART IS WHERE YOU READ A SHARED UNIT'S LAYOUT, and part 007 proved it in sixty-four bytes. Its segment 100b is the WHOLE of VGA smart-linked down to the four items part 007 references -- SetMode13h, SetTextMode, BuildRowTable and the initialisation -- and at that size the unit's routine ORDER and its NEAR/FAR split are simply legible, where the 2,000-byte version of the same unit in another part is not. Three findings came out of one 64-byte dump. (1) BuildRowTable IS NOT AN INTERFACE ROUTINE: 100b:0030 is C3, a NEAR return, and Turbo Pascal compiles every interface routine FAR -- and 100b:0034 is E8 D5 FF, a near CALL to it from the initialisation, which is the same fact from the caller's side. Declared in the interface it returned far and cost a byte at both ends. Nothing outside the unit calls it; ModeX declares its own BuildRowTable and that is the one part 002 scene 1 reaches. (2) SetTextMode IS AN assembler ROUTINE AND COMES BEFORE BuildRowTable: 100b:0006 is B8 03 00 / CD 10 / CB, six bytes and no frame, where ours was a Pascal procedure wrapping an asm block -- PUSH BP / MOV BP,SP ... LEAVE, four bytes more -- and declared after BuildRowTable, which shipped the two at each other's addresses. (3) THE PAYOFF WAS CROSS-PART, which is the whole argument for reading the shared unit rather than the part: part 007 went 99.0 to 99.4 and part 006 went 99.3 to 99.4 on the same three edits, with nothing lost anywhere and all three byte-exact artefacts still holding. AND THE SAME QUESTION ANSWERED THE OTHER WAY IN P7FLIC. 100f:084b is CB -- RETF ending PlayAll, which nothing outside the unit calls -- and 100f:0883 and 0887 are 0E E8, PUSH CS then a NEAR CALL, which is Turbo Pascal's four-byte far call to a routine in the same segment. So that unit is F+ and every routine in it is far, where only Scene1 was in our interface and the rest compiled near: C3 for the return, a plain E8 for each call, one byte lighter at every site and at the wrong address for all of them. F+ took part 007 from 99.4 to 99.7. THE PAIR OF TELLS, worth carrying: a NEAR return in a routine you declared in the interface means it does not belong there, and PUSH CS before a near CALL means the callee is FAR and in the same segment. Both are one byte and both are unambiguous. WHAT IS LEFT IN PART 007 IS TWELVE BYTES and ten are one-byte far-call targets into the runtime. The other two are at 100f:0662, where both sides build a table of procedure pointers in Scene1 and dispatch the chunk case through it, but the MEMBERSHIP differs -- the original calls FliColor256 directly with PUSH CS / CALL where ours goes through the vector."
-state = "open"
+state = "resolved"
+resolution = "Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. Part 007 is byte-identical, so the smart-linked VGA layout this read off sixty-four bytes is right. The reading itself -- that the smallest part is where a shared unit's layout is legible -- is worth keeping and is why part 007 was used for it."
 
 [[plan.investigation]]
 name = "p1s1-hardcoded-lens-base"
 finding = "THE LENS SPRITES WERE TWO PIXELS OFF, AND THE CAUSE WAS A HARDCODED ADDRESS IN A CORRECTLY IDENTIFIED, CORRECTLY TRANSCRIBED ASSEMBLER BLOCK. BuildCell gathers the 40x40 working cell through the lens table, and it is hand assembler -- that part was right. What was wrong is one displacement: the original's 1012:036f is LEA AX,[DI-895], and -895 is 1641 minus 746 where 746 is where THAT build put Under. Ours puts Under at 744. So the routine read two bytes into every saved row and all 1,600 pixels of every one of the ten bouncers came from two columns along -- visible on a watched run as sprites that are nearly right, reported from a screenshot. THE FIX IS SHORTER THAN THE BUG: LEA AX,[DI + OFFSET Under - 1641], which the assembler evaluates at build time from THIS build's layout. It emits -897 now and will emit the original's -895 by itself once the two missing bytes are found; either way the code reads the right memory. AND THE INCENTIVE RUNS THE WRONG WAY, which is the part worth carrying. Because the literal matches the original's bytes EXACTLY, the byte-level score REWARDS the bug: writing -895 scores better than writing the correct expression, by exactly the layout gap. Anybody optimising the percentage puts it back. The one instrument that could see it -- dsmap -- reports a displacement two bytes off because a variable moved and a displacement two bytes off because it was hardcoded in the SAME column, so it cannot distinguish them. spans read 99.0% before and 99.0% after, dgimage identical both ways, fpusites identical both ways, paslint clean. Second instrument-invisible behavioural defect in two days, both found by the maintainer's eyes. Wiki: transcribe-the-meaning-not-the-constant. THE SWEEP THE OBSERVATION ASKS FOR IS DONE AND IT IS CLEAN. Every numeric displacement and immediate in every transcribed asm block across the tree was read and asked the one question -- is this a PLACE or a QUANTITY. BuildCell was the only place. The others are quantities (DEMOVT's $5472 is the ASCII 'Tr' magic, PART3_MORPH's $02FF is the last index of a 768-byte palette) or ES-relative structure fields (DEMOVT's $121 and $123, P6CREDIT's $100), all legitimately literal. WHAT REMAINS IS THE TWO BYTES THEMSELVES. Our P1LOGO block sits two bytes below the original's throughout -- Under folded at 744 against 746, LensTab at $4302 against $4304, Cell at $4FD4 against $4FD6 -- so something two bytes wide is missing ahead of it in DGROUP. That is a layout hunt, not a correctness one, and the code is now correct either way."
 seen_in = "TPART1"
-state = "open"
+state = "resolved"
+resolution = "Fixed, and the lesson outlived it. Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. Part 001 is byte-identical and was watched at R3 on 27 Aug. The general form -- a correctly identified, correctly transcribed assembler block made wrong by a hardcoded address the assembler already accounts for -- recurred in P6FIRE's OFFSET Grid and is recorded there."
 
 [[plan.investigation]]
 name = "p1-flat-vector-tables"
 finding = "PART 001 FROM 99.0 TO 99.3 ON FOUR FINDINGS, and the best of them is a new tell. THE VECTOR TABLES ARE FLAT AND ZERO-BASED, AND THE ORDER OF TWO MULTIPLIES SAYS SO. Vector_Run copies 36 and 48 points out of DGROUP twice over, and both loops carried 65 unaligned bytes. The counter is scaled by six either way, but 12c5:08a6 does it as MOV SI,AX / SHL AX,1 / ADD AX,SI -- times THREE -- and only then MOV DI,AX / SHL DI,1, times two. A two-dimensional [I, 1] subscript emits the halves the other way round, times two then three, because it scales by the ELEMENT size and the element is three Integers. Times three THEN two is an INDEX of I * 3 into a ONE-dimensional Integer array, the trailing SHL being the Integer stride. The fold confirms it independently: VecGlobe is at DS:$01A8 and the displacement is $1A8 -- the base itself -- so the subscript contributes nothing to the fold and its low bound is ZERO. Ours folded to $1A2, one 6-byte element low, and Turbo Pascal paid for the difference with an INC AX on every point. GETTING THERE TOOK TWO STEPS AND THE FIRST ONE MEASURED WORSE, which is worth recording: array[0..n-1, 1..3] fixed the fold and the INC and took the part DOWN to 98.6, because the two loop bodies then came out two bytes SHORTER than the original's and everything after them misaligned. The multiply order was the missing half. array[0..n*3-1] flat closed both clusters from 65 bytes to one. The bound lives in tools/emit_pascal_data2.py, which generates the include -- the generator was changed, not the generated file. THE LAST BYTE OF EACH CLUSTER WAS A THIRD LOCAL. 12c5:08a0 stores the point pointer's offset at [BP-$0A] and its segment at [BP-$08]; with only I and W declared above it P landed at [BP-$08] and the frame below shifted two bytes. One never-read Integer between them fixed both sites. BLOB 1 IS FILLED BY A STATEMENT OF ITS OWN. 1107:0113 pushes ProfileA and the ABSOLUTE address $80F7 with a count of $31, and only after that call does 1107:0124 set the counter to 2. $80F7 is Blob[1].Pix exactly -- Blob begins at $80F5 and Pix is two bytes in, past the (W, H) header. So the first blob is written un-looped and blobs 2..144 by the loop, which together is every blob. Redundant, and what ships. Worth 15 bytes. AND ONE BYTE HAS NOW SURVIVED TWO ATTEMPTS, both recorded on the declaration so nobody spends a third. The original folds the two 49-byte profiles as [DI+$5B69] and [DI+$5B9A], so the second begins at $5B9B -- immediately after the first, on an ODD boundary. Ours folds to $5B9B, one high, because default word alignment pads a 49-byte array to 50. Byte alignment for the whole unit: 21100 to 21093 aligned, seven worse, because the directive is not local to those two names and cost four other places what it gained. One array[1..2, 1..BlobPixels]: 21100 to 21087, thirteen worse, even though its two rows reach BOTH measured folds exactly on paper -- row 1 at base-1 = $5B69 and row 2 at base+48 = $5B9A. Something about the Move and BlockRead call sites pays for it. The two cheap explanations are spent. WHAT IS NEXT IN PART 001 IS STRUCTURAL AND IT IS THE 14-BYTE SPAN AT 1107:057c. 1107:057e is 9A C0 00 B2 02 -- a FAR call to segment 0x2b2, which relocates to 0x1000+0x2b2 = 12b2 -- and 1107:0587 is another to 12b2:00f1. Ours makes NEAR calls to routines inside P1BALLS's own segment. So two routines that belong to the unit occupying segment 12b2 are declared in P1BALLS instead, and the near/far difference is the same one-byte pair of tells the shared-unit work used. Verified state: part 001 dgimage identical at 752 bytes, traps identical, dsmap 163 paired with 146 at +0, three artefacts holding, paslint clean at 67 files."
-state = "open"
+state = "resolved"
+resolution = "Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. Part 001 is byte-identical, so the flat zero-based vector tables are right. The tell this found -- that the ORDER of two multiplies says whether a table is flat -- became the operand-order rule used across parts 002, 005 and 006."
 
 [[plan.investigation]]
 name = "part4-layout-and-prologues"
 finding = "PART 004'S DATA SEGMENT IS NOW RIGHT, AND A HISTOGRAM OF ONE INSTRUCTION FOUND IT. The coverage walk could not see any of this -- it read 99.0% before and after the layout work, because it locates code by CONTENT and a folded displacement is one operand inside a matching instruction. What saw it was collecting every ADD DI,imm16 in both binaries and sorting them: 26 folds each side, and the two lists diverge at exactly the tenth. That is a five-line script and it decided a whole segment. THE FIRST DEFECT WAS +900 AND THE ARITHMETIC NAMED IT EXACTLY. 1005:043c reaches WalkBank[Frame] with ADD DI,$4EC where ours emitted ADD DI,$870, and $870 - $4EC is 900. ScenePal (768) + F (128) + Font (4) is 900, and all three were declared at the FRONT of the var block while their measured addresses -- $CC07, $CF07, $CC03 -- put them at the very top of DGROUP. Moving them to the end, with DeathAPic which had the same problem, made the first fourteen folds identical to the original's. The tail now tiles with nothing left over: SideAnim $BC4F + 840 = DeathAPic $BF97 + 3180 = Font $CC03 + 4 = ScenePal $CC07 + 768 = F $CF07 + 128 = $CF87, and VGA's VirtScr is $CF88. THE SECOND WAS 2,646 UNDECLARED BYTES, and dsmap had been pointing at it for two days. TumbleBk begins at $06D2 and is 400 bytes, so it ends at $0862; SplatBank is at $12B8; the gap is $A56 = 2,646. Fifty paired references carried a shift of exactly -2646 with every other reference in the part at +0 -- a bounded run of one shift, which is the recorded signature of a missing or misplaced block. Declared as a measured spare, dsmap went from 116 references paired with 61 at +0 to 151 paired with 146 at +0, and the -2646 group vanished. 2,646 is 7 x 378 and 378 is this part's glyph stride, so seven somethings of 378 is the guess; LoadAssets reads TWENTY blocks and the unit names about fifteen. The SIZE is measured and the contents are not, which is how this corpus writes that. THEN prologue.py CLEANED UP THE CODE, and it is the cheapest instrument here. It compares every routine's prologue against ours and it found six disagreements in one run. 1005:17ff is PUSH BP / MOV BP,SP with NO ENTER where ours opened ENTER $08 -- a routine with no declared locals that still wants eight bytes is holding temporaries, and `Inc` on an INDEXED field is what put them there. 1005:1802 is IMUL DI,[BP+4],$15 / MOV AX,[DI+$302] / INC AX / IMUL again / MOV [DI+$302],AX -- loaded into a register, incremented there, stored back, with the subscript's multiply done TWICE. The original recomputes that IMUL five times in Splat and keeps nothing, which is what leaves it frameless. Four sites converted to longhand (Splat, Builder, DeathA, DeathB, Fuse) and four of the five unlocated routines located. NOT every Inc in the unit is wrong: Bounces at 1005:0BE2 really is the short form, and a blanket replace would have broken it. THE LAST ONE WAS A GUARD CLAUSE. 1005:07e4 is JNE over a JMP -- two jumps, four bytes -- where a wrapping `if Active <> 0 then begin ... end` emits one short JE. Conditional-over-unconditional is what `if cond then Exit` gives: the JNE skips the JMP and the JMP goes to the LEAVE. With that, EVERY PROLOGUE IN PART 004 MATCHES: prologue.py reports zero differing and zero unlocated across 30 candidates. Part 004 is 99.0 -> 99.1 on the walk, which badly understates it -- the walk was blind to the 3,546 bytes of layout. Two spans remain: 1005:1d2f (17), which spanwhy still classes as addresses-only, and 1005:07c4 (16), whose first length change is 904 bytes upstream at 1005:043c, where both sides now emit identical instruction shapes but ours sits 642 bytes later -- so there is extra code before DrawSprite, not different code in it."
-state = "open"
+state = "resolved"
+resolution = "Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. Part 004 is byte-identical, and it now has the part-tier watched run it never had: NEUR4 at R3, 27 Aug 2026. The histogram-of-one-instruction method this used is the ancestor of framehist.py."
 
 [[plan.investigation]]
 name = "part3-two-objects-not-one"
 finding = "PART 003 TO 99.3%, AND THE INTERESTING PART IS THAT TWO CONTRADICTORY MEASUREMENTS WERE BOTH RIGHT. dsmap showed 46 references to VGA's data block paired at exactly -124 over $E76C..$E913, with 140 others at +0 -- a bounded run, the recorded signature of a missing block. Walking PART3_SPRITES' declared addresses closed the arithmetic: Trig is 360 x 4 = 1,440 from $D29C so it ends at $D83C where Wobble begins, Wobble another 1,440 to $DDDC, and TargetPal is 768 from $E3EC so it ends at $E6EC -- while VGA's VirtScr is at $E76C. A 128-byte gap, and this corpus has found an unopened or unit-level file record in that shape seven times before. 125e:0342 SETTLED IT: MOV DI,$E6EC / PUSH DS / PUSH DI as the file argument to the TargetPal BlockRead. A data-segment address, where a local would be LEA'd off SS. AND THE NOTE ALREADY ON THE LOCAL WAS ALSO CORRECT, which is why the earlier attempt failed. Load opens ENTER $626 = 1,574 = 128 + 2 for I + a 1,444-byte buffer, all three measured, and I sits at [BP-$82] precisely BECAUSE 128 bytes are nearer BP. So there really are 128 bytes at [BP-$80] AND a 128-byte file record at $E6EC. The previous attempt moved the record to unit level by DELETING the local, which removed 128 bytes the frame genuinely has, and cost 338 bytes -- recorded on the declaration as 'the DS: note was simply wrong'. It was not wrong; it was incomplete. Both objects exist. The local is kept, renamed Spare, and the global added: the -124 group vanished and the part went 99.1 to 99.3 with the initialised image still identical at 40,736 bytes. THE LESSON WORTH THE WORDS: when two measurements of the same unit disagree, the resolution may be that there are TWO OBJECTS rather than one wrong reading. 'The frame says local' and 'the instruction says global' were both true. Deciding which one to believe was the error. prologue.py FOUND NOTHING IN PART 003 -- every routine's prologue across eleven segments already matches, which is why the remaining work here is data and statement shape rather than frames. WHAT IS LEFT IS ONE CAUSE AND IT IS FOUR BYTES. dsmap now shows 53 sites at +4 over $C586..$E913 with everything below at +0, so four bytes too many sit at or just below $C586. PART3_GLOBE's file record is at $C506 and 128 bytes long, ending exactly at $C586, so the four are at the front of whatever block follows it -- PART3_WAVES, whose CurveTab pointer and P array run from there to SweepX at $d20a, a span of 3,204 bytes. Four bytes is a pointer, and that is where to look."
-state = "open"
+state = "resolved"
+resolution = "Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. Part 003 is byte-identical. The point worth keeping is the one this records: two contradictory measurements were BOTH right, because each instrument was blind to what the other could see."
 
 [[plan.investigation]]
 name = "walk-tail-artefact-ruled-out"
 finding = "A NEGATIVE RESULT WORTH KEEPING, AND A PROCESS ERROR WORTH ADMITTING. THE ERROR FIRST: this tick picked its target from a span list produced two ticks earlier and spent the whole tick on 11ee:0284, a 12-byte span in part 006 that no longer exists -- the shared-unit VGA work had already closed it. The walk must be re-run before choosing a target, every tick, because the previous tick's edits move the list. Cheap to do, and it cost a tick not to. WHAT THE TICK RULED OUT, which is worth having: the coverage walk is NOT understating these parts through a tail artefact. The suspicion was concrete. align.spans() walks the original in WINDOW-sized chunks and calls locate() on each; when a chunk fails to anchor it advances ONE byte and sets a gap, and when fewer than ANCHOR (10) bytes remain it breaks and yields everything from the gap to the segment's end. So a segment's trailing remainder can be reported unaligned while being byte-for-byte identical -- and the mechanism that makes it fail is real: locate() caps its candidate search at 64 positions, and a probe that includes a unit's padding zeros matches everywhere, so the cap is exhausted on wrong alignments before the right one is scored. A unit's initialisation section is eight bytes plus padding, which is exactly that shape. MEASURED ACROSS ALL SEVEN PARTS: exactly ONE reported span reaches a segment's end -- part 004's 1005:1d2f, 17 bytes -- and its bytes are NOT identical to ours, so it is a real difference. Every other span ends mid-segment. So there is no phantom inflation to remove and NO REASON TO CHANGE THE INSTRUMENT. That matters because 'the tool is under-reporting' is the most flattering possible explanation for a stalled percentage, and it happens to be false here. AND ONE MEASUREMENT METHOD FAILED TWICE BEFORE GIVING A USABLE ANSWER, which is the reason the number above is trustworthy. Asking 'do the span's bytes appear anywhere in our image' returned 184 phantom bytes across seven parts -- meaningless, because a one-byte or two-byte chunk matches any 20KB image by chance, and most of the remaining spans are one byte. Padding the chunk with twelve bytes of context either side returned ZERO phantoms -- also wrong, because at a divergence boundary the neighbours differ by definition, so the padded test can never pass there. The answer only came from asking the narrower question the tool's own loop implies: does the span reach the segment's END, and if so does the whole segment locate with the tail matching exactly. Two plausible measurements, both useless, before the right one. THE STANDING TOTAL IS 409 BYTES ACROSS SEVEN PARTS AND ALL OF THEM ARE REAL: part 001 144, part 004 97, part 003 85, part 006 60, part 007 12, part 002 8, part 005 3. Of those, parts 002, 005 and 007 are at their floor -- 23 bytes between them, all far-call targets into a runtime segment at a different offset, which no edit to a routine changes. So the reachable work is 386 bytes in parts 001, 003, 004 and 006."
-state = "open"
+state = "resolved"
+resolution = "KEPT AS A NEGATIVE RESULT AND AN ADMITTED PROCESS ERROR, which is why it was written down. Both still stand. The tail question it raised was settled independently in the kit at 3e6d138: spans.py was discarding the last nine bytes of every segment, which is a real defect this investigation's negative result did not cause and did not hide. Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. "
 
 [[plan.investigation]]
 name = "p1s1-for-loop-and-two-bytes"
 finding = "THE FOURTH ATTEMPT AT PART 001'S 19-BYTE SPAN, AND THE FIRST ONE THAT LEARNED SOMETHING. Three earlier tries concluded the loop counter cannot be a local; that conclusion is WRONG and this records why, so the fifth attempt starts from the right place. THE LOOP IS A `for` OVER A LOCAL, AND THE BOTTOM TEST PROVES IT. 1012:05b1 is CMP WORD PTR [BP-$54],$12C followed by JE to the LEAVE and then JMP back to the top, with NO INCREMENT anywhere between the last statement and the test. Testing for EQUALITY against the limit, with the increment at the loop's head, is exactly what Turbo Pascal emits for `for`; a `repeat ... until Frame > 300` emits an Inc and a greater-than. And 1012:05a7 reads the same slot for the scroll threshold, so [BP-$54] is the counter and it is a frame slot. The frame already has room: four 20-byte arrays plus I is 82 and ENTER $54 is 84. MAKING THAT CHANGE CLOSED THE 19-BYTE SPAN COMPLETELY -- it vanished from the span list -- AND COST 47 BYTES SOMEWHERE ELSE, a new 67-byte span in P1TITLE's code at 1082:05c0. Net 21115 to 21068, so it was reverted. The mechanism is the one already recorded: with the loop using a local, the unit-level Frame is referenced by nothing, Turbo Pascal smart-links it away, and P1LOGO's data block loses two bytes. Comparing absolute references in $5600..$5800 shows it exactly -- the original's block runs 56c0, 56c2 ... 56d0 and ours ran 56be, 56c2 ... 56cc, two low throughout. SO BOTH THINGS ARE TRUE AT ONCE, which is the same shape as part 003's file record: the counter IS a local, AND two bytes of P1LOGO's data segment need a home that something references. Choosing between them was the error in all three previous attempts. AND THE TWO BYTES ARE NOT A VARIABLE IN THE ORIGINAL. $56C0 is referenced twice and both references are from segment 1082 -- 1082:0033 writes it and 1082:05c4 pushes it -- so it is P1TITLE's variable, not P1LOGO's. Nothing anywhere references $56BF. P1LOGO's file record sits at $563F and is 128 bytes, ending at $56BE, so the next address is the ODD $56BF and word alignment pads it to $56C0. There is no variable there at all: it is one byte of alignment padding. WHICH MEANS THE TWO BYTES OUR Frame OCCUPIES ARE NOT IN THE ORIGINAL AT THAT PLACE. Something else in P1LOGO's block is two bytes larger than we have it, or the block ends two bytes later for a reason not yet found, and the global has been standing in for that all along. The next attempt should find those two bytes FIRST -- with the reverted build in hand, P1LOGO's declared sizes against its measured addresses -- and only then convert the loop. Converting first will always cost 47 bytes. One other thing the reference comparison turned up: in the reverted state our absolute references in that window match the original's exactly, EXCEPT that ours carries one at $5737 which the original does not. That is a separate loose end and small."
-state = "open"
+state = "resolved"
+resolution = "Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. The 19-byte span is closed and part 001 is byte-identical. The lesson this records -- that three earlier attempts had concluded the counter cannot be a local, and that conclusion was wrong -- is the same shape as P1Star's 'floor' and P3Morph's FadeStep note, and all three are now examples of a conclusion drawn from single-change experiments."
 
 [[plan.investigation]]
 name = "watched-runs-1-and-4"
 finding = "BOTH OWED WATCHED RUNS ARE CLEAR, reported by the maintainer who ran them: TPART1 is good and SLIGHTLY FASTER than the original part 001, and TPART4 measures and looks the same as the original part 004. That covers everything this session changed in part 001 -- the P1STAR unit split moving StarInit, StarStep and StarDraw to segment 12b2, the P1BALLS and P1VECTOR routine reorders, ShowWord's KeyPressed Exit which now skips the 100-frame outro, the lens BuildCell fix and the frame-counter local -- none of which had been seen running. It also covers part 004's palette fix, where the ScrollPal chain read byte C*3+2 instead of C*3+3. SLIGHTLY FASTER IS NOT NOTHING AND IT IS NOT YET A DEFECT. Nothing changed this session removes work from a steady-state frame. The two candidates are the CopyScreen deleted before the bounce loop, which went on a byte measurement rather than a behavioural one, and ShowWord's Exit, which now skips the outro on a keypress where before it always ran. Both match the original. A 1994 demo timed by its own loops rather than by a clock also runs differently under DOSBox-X than on the hardware it was written for, so only a comparison of the two builds on the SAME emulator setting means anything -- and that is what was reported. Worth one more look if the difference is VISIBLE rather than measured, because frame time is the one class of defect no instrument here can see: spans, dsmap, dgimage, prologue and fpusites all read an image and none of them reads a frame."
-state = "open"
+state = "resolved"
+resolution = "Both are recorded properly now. NEUR1 and NEUR4 are part-tier observations at R3 dated 27 Aug 2026, and the TPART1 and TPART4 rows they replace are marked SUPERSEDED rather than left stale for ever. Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. "
 
 [[plan.investigation]]
 name = "part4-duplicate-tail-block"
 finding = "PARTS 004 AND 006 ARE AT THEIR HARNESS FLOOR EXCEPT FOR ONE BYTE, and finding that out took reading every span rather than the totals. Part 006's 38 unaligned bytes are 35 sites and EVERY ONE is an lcall operand into the runtime -- segment 0x28a against ours 0x2a8, offset +104 -- including those that disassemble as an add through bp+si, which is the same operand read from the middle of the instruction. Part 004's 43 sites are the same but for ONE. So 99.6% and 99.4% are not 38 and 59 bytes of reconstruction work; they are 1 byte and 0. THE ONE BYTE IS A REAL LEAD AND MAY BE BEHAVIOURAL. 1005:0c80 is E9 to 0xd16 where ours is EB to 0xcee -- near against short, because the original's target is 40 bytes further. 0xd16 is the routine's LEAVE. 0xcee..0xd15 is a SECOND COPY of the block at 0c62..0c7f: IMUL DI,[BP+4],$15 three times, the byte at DI+$30B incremented, the word at DI+$302 divided by 4 plus 1 and stored back -- which is Inc of Y, Inc of FallDist, and Frame := Frame mod 4 + 1. THE SOURCE HAS THAT STATEMENT TWICE, once before an Exit inside the search loop at PART4_LEMMINGS line 1264 and once after the loop as the routine's last statement at line 1281, which is why the block appears twice in the binary. The original's jump goes PAST the second copy to the epilogue, which is what an Exit does. Ours goes TO it. If that reading holds, our lemming's frame advances twice on the Exit path where the original advances it once. NOT YET SETTLED, AND THE ARITHMETIC IS WHY: our addresses run one BELOW the original's from 0c83 onward, so our 0cee maps to the original's 0cef, which is mid-instruction and an impossible jump target. Either the shift is not uniform or the target is not what it looks like. sitedump REFUSES to anchor anywhere near 0cee -- no 8-byte identical run exists before it -- which is itself evidence of a real divergence the walk resynced around and then priced at the single byte where the opcode changed. Read the routine's exits as a whole rather than this jump in isolation."
-state = "open"
+state = "resolved"
+resolution = "The harness floor is gone, not reached. Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. Parts 004 and 006 are byte-identical because they are real programs now -- NEUR4.EXE and NEUR6.EXE -- so the one byte this reports was a property of the harness and not of the reconstruction."
 
 [[plan.investigation]]
 name = "p1s4-align-four-bytes"
 finding = "THE FOUR BYTES AT 1107:044d ARE ONE 4-BYTE OBJECT SHORT OF FREE, and this tick found which measurement says so. Setting A-minus on P1BALLS closes 1107:044d completely -- Transform's pointer local moves from [BP-$14] to the original's [BP-$13] -- and the walk reads 7 WORSE, 21244 to 21237, which is where two earlier attempts stopped. dsmap says the opposite and it is the instrument that can see data. WHAT A-MINUS ACTUALLY FIXES IS THREE RECORDED FINDINGS AT ONCE. The switch does not pad record SIZES in TP7 -- records are always packed and the Trail array's stride is 13 either way -- it pads variable PLACEMENT: a variable following an odd-sized one gets word-aligned. So under the default, ProfileA's 49 bytes push ProfileB to $5B9C where the original folds it at $5B9A, and ProfileB pushes Work to $5BCE where the original has $5BCC. Under A-minus, ProfileA at $5B6A ends at $5B9B, ProfileB begins there exactly as the original folds it, and Work lands on $5BCC to the byte. dsmap's boundary list confirms it: the +2 group at $5BCE and the +3 group at $6A2F both VANISH and $5BCC reads +0. That is the one-byte ProfileA/ProfileB question that survived four attempts, and it was never about those two arrays -- it was the switch. WHAT IT COSTS IS ONE GROUP, NAMED. A single new boundary appears, $AAC2 shift -4, and it explains both new spans: 1012:06dc is PUSH WORD PTR [$AB58] and 1082:036a is a jump whose target moved, both in the region that slides when the block before it shrinks. So P1BALLS's unit-level data under A-minus is FOUR BYTES SHORT of the original's, and the default's padding had been standing in for a four-byte object we have never declared. Find those four bytes and A-minus closes 1107:044d, the ProfileA fold and the Work shift together, for nothing. THE INSTRUMENTS DISAGREE AND THE WALK IS THE ONE THAT IS BLIND HERE. spans reads 7 worse because it locates code by content and a moved global changes two bytes of every instruction that reads it; dsmap measures the displacements directly and reads four shift groups reduced to one. Reverted for now because the walk is the plan's bar and the four bytes are not yet found -- but the next attempt should NOT re-measure whether A-minus helps. It should look for a four-byte object at or just below $AAC2, with A-minus set, and only then judge."
-state = "open"
+state = "resolved"
+resolution = "Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. P1BALLS carries {$A-} and 1107:044d is closed; part 001 is byte-identical."
 
 [[plan.investigation]]
 name = "part2-initialised-image"
 finding = "PART 002'S INITIALISED IMAGE IS 512 BYTES BETTER AND THE REST IS A TWO-SIDED LAYOUT JOB. Msg1 and Msg2 were declared as plain String VARIABLES and assigned in P2SOLID's initialisation section, so they landed in the UNINITIALISED block; the original has them as initialised typed constants at DS:$046E and DS:$056E, 256 bytes apart, each a full String[255] with its length byte ($3B and $35) already in the image. Declared as typed constants immediately after MViewH -- which is where the addresses put them -- the data image goes from 2,864 bytes against the original's 3,408 to 3,376, and the walk gains 8. WHAT IS LEFT IS TWO DISCREPANCIES IN OPPOSITE DIRECTIONS, which is why the total of 32 bytes short badly understates it. The marker MViewW+Msg1 (40 01 f0 00 3b 43) sits at $046A in the original and $0AA8 in ours, so our initialised data AHEAD of it is 1,598 bytes too big, and everything after Msg2 is about 1,630 too small. The original's pre-MViewW block is $000A..$0469, exactly 1,120 bytes of what look like coordinate pairs (30, -30, 140, -30 ...); ours is 2,720. So we declare roughly 1,600 bytes as initialised that the original does not, and fail to declare about the same amount that it does. AND ONE SMALL DEFECT IS EXACT: the original has an initialised Word of 80 ($50) at DS:$0002 where ours has zero, and its table therefore starts at $000A where ours starts at $0008. Two bytes, first in the block, and it shifts every comparison after it -- which is why dgimage reports 2,207 bytes differing when the content is largely the same data two bytes over. Fix that one first: it makes every later reading legible."
-state = "open"
+state = "resolved"
+resolution = "Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. Part 002's initialised image is identical at 3,408 bytes. Msg1 and Msg2 as typed constants was the 512 bytes; the last of the image was six bytes at $0CE6 that nothing references -- a dead copy of P2View's page table -- and finding it required disbelieving a note that had reasoned the other way from this very image."
 
 [[plan.investigation]]
 name = "part2-dgroup-order"
 finding = "PART 002'S DATA-IMAGE HEAD IS A LINK-ORDER QUESTION, NOT A MISSING DECLARATION, and Ghidra settled it in one query. The original's initialised block opens 00 00 / 50 00 / 00 00 / 00 00 / 00 00 and then the coordinate table at DS:$000A; ours opens with eight zero bytes and the table at $0008. The $50 at DS:$0002 is MODEX's LogicalWidth -- 1008:0727 writes $A0 to it as a BYTE and 107c:000e and 107c:00c5 read it back, which is Demo_Scene1 setting the wide canvas before SetModeX and BuildRowTable use it. AND WE ALREADY DECLARE IT CORRECTLY: MODEX.PAS line 55 is LogicalWidth : Byte = $50, a typed constant, initialised. So the byte is not missing from the source -- it is in the wrong PLACE in DGROUP. In the original, MODEX's initialised data comes FIRST in the block; in ours it does not, which is why our $0002 reads zero. Our CODE order matches the original's (part 002 walks at 99.9%), so the data order and the code order are not the same order in the original, and that is the thing to understand next. It is the same class as P1INTRO's uses clause running in reverse segment order. THE OTHER HALF IS BIGGER AND PULLS THE OTHER WAY. The marker 40 01 f0 00 3b 43 sits at $046A in the original and $0AA8 in ours, so our initialised data ahead of it is 1,598 bytes too big and everything after Msg2 about 1,630 too small. The original's pre-table block is $000A..$0469, exactly 1,120 bytes; ours is 2,720. So we declare roughly 1,600 bytes as initialised that the original does not, and fail to declare about as much that it does. Do the two-byte head first: it shifts every comparison after it, which is why dgimage reports 2,207 bytes differing when most of it is the same data two bytes over."
-state = "open"
+state = "resolved"
+resolution = "Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. Part 002 is byte-identical, so the link order is right."
 
 [[plan.investigation]]
 name = "part2-image-identical"
 finding = "ALL SEVEN INITIALISED DATA IMAGES ARE NOW IDENTICAL. Part 002's was the last, and the plan had it recorded as the one data-layout job left. It went 2,864 bytes against the original's 3,408 with 1,863 differing, to 3,408 and NONE, in four measured steps. Msg1 and Msg2 were String VARIABLES assigned in the initialisation section, so they sat in BSS; the original has them as typed constants at DS:$046E and $056E, 256 bytes apart, each a full String[255] with its length byte in the image. The four 3-D models were emitted as ONE include and the original splits them: model one's tables at DS:$0004, MViewW and MViewH at $046A, Msg1, Msg2, the four clip bounds and the two nibble masks at $066E, and only then models two, three and four from $067E. TWO FACE COUNTS WERE ONE SHORT, and they were hand-typed. The Revolver's face stream runs from $0816 to the Sailboat's vertices at $0B06 -- 376 words -- where 64 faces give 371; the Sailboat's runs $0BC6..$0CAE, 116 words, where 21 give 111. Each was one whole face of five words, so a polygon of the revolver has never been drawn in any run of this reconstruction. The counts are DERIVED from the extents now, because the extents are measured and a typed count is a guess. AND P2VIEW'S PageBase AND WritePage WERE var, NOT const. The original has 0, $4B00, 0 at DS:$0CE6..$0CEB, immediately ahead of PageIndex -- PageBase[0], PageBase[1] and WritePage with their compiled-in values. The addresses recorded against them, $A696/$A698/$A69A, were OUR build's BSS, not the original's. Six bytes, and the last with a cause. WHAT IS LEFT IN PART 002 IS 13 BYTES: 6 far-call operands and 2 that no instrument can localise -- 108b:1ec8 and 108b:209e, where sitedump refuses to anchor and the classifier's decode drifts. The walk went 19,077 to 19,075 across this work, which is the cost of our initialised region growing 26 bytes to its correct size and moving what follows."
-state = "open"
+state = "resolved"
+resolution = "Still true, and overtaken: it is now whole FILES that are identical, not just the initialised images. Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. "
 
 [[plan.investigation]]
 name = "part2-loader-two-gains"
 finding = "PART 002'S LAST TWO BYTES ARE TWO 3-BYTE CODE GAINS IN Scene2_Intro, AND LOCALISING THEM NEEDS OUR SIDE'S INSTRUCTION BOUNDARIES. Ghidra puts the loader at 108b:1bbd..2446 and names it FUN_108b_1bbd, which our source already calls Scene2_Intro. Matching its first 32 bytes exactly locates our copy at image 0x1be5, and a shift profile over the whole routine -- scoring every offset from -6 to +8 in twenty-byte windows -- says ours runs at +0 until orig 1dbd, then +3, then +6 from 1deb. Two separate three-byte gains, about forty bytes apart. THE WALK PRICES THAT AT TWO BYTES because it resynchronises, and both are reported as one-byte spans at 108b:1ec8 and 209e. My earlier reading of them as two variable stores was wrong twice over: the instruction spanclass named is at 1ec6 in the original and ours is 3 bytes further on, not 4, and I confirmed the +4 by an arithmetic slip before checking it. WHAT IS ESTABLISHED AND WHAT IS NOT. Everything before 1dbd is operand-only: far calls into P2View at 0x40c against our 0x42c, BSS addresses like $8ED0 against our $905C, and the emulator pairs at 1cc8 (36 af 1b / cd 3c against 36 97 11 / cd 3c) which are the same length and differ only in the modrm and displacement of the emulated operand. What the two gains ARE is not established: every disassembly from a guessed offset drifts, on both sides, and that is what made the last three readings of this site wrong. THE NEXT STEP IS TO IMPORT OUR OWN TPART2.EXE INTO THE GHIDRA PROJECT and compare the two routines with real boundaries on both sides. Everything tried so far has one side guessed. That is a setup cost worth paying once -- it would serve every remaining span in every part, and there are only about a dozen left."
-state = "open"
+state = "resolved"
+resolution = "Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. Part 002 is byte-identical. The last of it was not in Scene2_Intro: the final defects were ObjTransform loading through the parameter rather than the `with` slot, Tri_Fill's two bridged conditionals, and the three renderers declaring an unread Word before their flag byte."
 
 [[plan.investigation]]
 name = "ours-in-ghidra"
 finding = "OUR OWN BUILD IS NOW IN THE GHIDRA PROJECT, at /ours/TPART2.EXE, imported as x86:LE:16 Real Mode with all twelve segments recognised: 1000 harness, 101f P2Main, 1023 P2GARAGE, 1095 ModeX, 10a4 P2SOLID, 1419 DemoVT, 142c P2View, 144a FixMath, 1456 VGA, 146f Crt, 14d1 System, 1889 data. That is the capability the last three wrong readings of 108b:1ec8 were missing -- real instruction boundaries on OUR side as well as the original's. AND THE FIRST ATTEMPT TO USE IT WAS WRONG THE SAME WAY, one layer up. I disassembled our 10a4:1bbd expecting the model loader, on the strength of an exact 32-byte match for the original's 108b:1bbd -- but that match was found in the FLAT LOAD IMAGE, and I then read its image offset as though it were a segment offset. 10a4:1bbd is a scene script: repeated MOV DI,$487C / PUSH DS / PUSH DI / CALL blocks with CMP [BP-$0E] against $50, $14 and $32. THE METHOD THAT ACTUALLY WORKS, for next time: take the original's routine bytes, find them in OUR program with Ghidra's own byte-pattern search, and disassemble from the address IT reports. Never convert an image offset to a segment offset by hand -- three of this session's wrong readings came from exactly that, and each one looked convincing. Also worth keeping: Ghidra labels the initialised block at the bottom of DGROUP as a CODE segment in our build too (1889:0000..0b4f), the same way it does in the originals."
-state = "open"
+state = "resolved"
+resolution = "Recorded as done rather than resolved-as-fixed: this was a note about the environment, not a defect. Our build is in the Ghidra project and remains useful for exactly the reason given -- comparing our segments against the original's side by side. Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. "
 
 [[plan.investigation]]
 name = "three-bytes-remain"
 finding = "THE RECONSTRUCTION IS DOWN TO THREE SOURCE-LEVEL BYTES ACROSS ALL SEVEN PARTS, and both remaining sites are recorded as floors with the evidence beside them. PART 001 REACHED 100.0% on DepthSort's inner loops: 1107:02eb is MOV AX,[BP-4] / DEC AX / MOV [BP-4],AX where Dec emits a three-byte in-place DEC WORD PTR. Ghidra fixed the boundary at 1107:02e2 so the sequence is not a guess. Sixth instance of the Inc-versus-longhand pattern on this target. PART 006'S 100f:07b7 IS A FORM DIFFERENCE, NOT A SHAPE DIFFERENCE. The original is OR AL,AL / JZ 07bb / JMP 07c6, and BOTH exits converge on the LEAVE at 07c6 -- so it is a plain `until A or B`, not the Exit that P1TITLE's ShowWord turned out to be. There the two jumps went to different places, one past a whole loop, and that divergence is the ONLY thing that distinguishes the two shapes. The original spends four bytes jumping over a jump where TP7 gives us a two-byte JNE to the same place; ours is shorter and equivalent. Three attempts have failed to find a spelling that lengthens it, and the operand order is ruled out because 100f:07b0 calls KeyPressed first, which is what our source writes. PART 007'S 100f:0662 IS MEASURED, NOT UNKNOWN: naming FliSS2, FliLC, FliCopy and FliBrun directly instead of calling through the TChunkProc vectors cost 6 bytes. The vectors stay. THE CLASSIFICATION ACROSS ALL SEVEN: 147 bytes of far-call operand -- the harness's runtime sitting at a different paragraph, which no source change reaches -- and 3 bytes of everything else. Parts 001, 002, 003, 004 and 005 have NO source-level difference of any kind. AND THE PERCENTAGES ARE NOW THE LEAST USEFUL NUMBER HERE. Part 004 reads 99.4% with nothing left; part 006 reads 99.6% with one byte; part 001 reads 100.0% with three far calls. The walk ranks parts by how densely they call the runtime. Read spanclass, not spans."
-state = "open"
+state = "resolved"
+resolution = "Zero remain. Both sites this recorded as floors WITH the evidence beside them turned out not to be floors, which is the finding worth keeping: P1Star's seven bytes fell to three changes made AT ONCE, and P1BALLS' one byte fell to a var parameter that had been declared as a pointer. Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. "
 
 [[plan.investigation]]
 name = "rtl-differs-in-the-tpu"
 finding = "THE RTL QUESTION IS ANSWERED AND THE ANSWER IS NOT SMART-LINKING. Our System segment is 99.90% identical to the original's below $2F00 -- 12 differing bytes out of 12,032, all at relocation-affected addresses -- and diverges only from $2FFA, in the coprocessor detection and x87 helper block. Six shifts, measured by matching twelve-byte runs: +6 by $3004, +8 by $30D4, +15 by $3118, +13 by $31A8, +23 by $3740, +33 by $375C. ONE OF THEM IS NEGATIVE (+15 falling to +13), AND THAT RULES OUT SMART-LINKING. Omitting a routine can only remove bytes and including one can only add them; neither can make a routine two bytes SHORTER. The insertions are also mid-routine, not at boundaries. THE FIRST ONE IS IDENTIFIED EXACTLY. At orig $2FFA the original has EB 1D then 33 C0 F2 AE 74 DE 33 C0 E6 F0; ours has EB 23 and inserts 54 5A 3B D4 75 02 -- PUSH SP / POP DX / CMP DX,SP / JNE -- which is the classic 8086-versus-286 test, since an 8088 pushes SP already decremented. It sits in the path that ends OUT $F0,AL, the coprocessor reset. Our runtime performs a CPU check the original's does not. SO OUR SYSTEM.TPU IS NOT THE ONE THE DEMO WAS BUILT WITH. Same TP7 (the banner reads Version 7.0, and TP6 cannot even produce the right SIZE -- built with --compiler tp6, PSYCHO.EXE comes out 1,792 bytes against the original's 1,936 and NEUROSIS.009 7,152 against 10,356, where TP7 reproduces both byte-for-byte), but a different patch level or a different TURBO.TPL. WHY THE THREE BYTE-IDENTICAL ARTEFACTS DO NOT CONTRADICT THIS: they are small programs that use no floating point, so smart-linking never reaches the block that differs. PSYCHO.EXE is 1,936 bytes in total. AND A CORRECTION TO MY OWN EARLIER READING. I reported this as three extra x87 helpers of 13, 10 and 10 bytes, inferred from the far-call offset deltas clustering at +0/+13/+23/+33. Those clusters are real but they are only where CALLED routines happen to sit; scanning the whole segment shows six boundaries, not three, and one going backwards. The far calls sample the runtime, they do not map it. WHAT THIS MEANS FOR BYTE-IDENTITY: no source change closes it. Parts that use floating point cannot be byte-exact without the 1994 SYSTEM.TPU. $E- was tried as a cheap test of the switch hypothesis and does not build at all -- 11 errors -- which build.toml already predicted."
-state = "open"
+state = "resolved"
+resolution = "Answered and then overtaken. Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. The System segments are byte-identical, so the 12 differing bytes below $2F00 this measured are gone, and the answer it reached -- that this is not smart-linking -- was right."
 
 [[plan.investigation]]
 name = "part1-program-blocked"
 finding = "PART 001'S HARNESS REMOVAL IS BLOCKED ON TWO RECONSTRUCTION QUESTIONS, and neither is about the harness. The other six parts are done: 002, 003, 004, 006 and 007 are real programs now and 005 never had a driver unit. THE ORIGINAL'S PROGRAM DOES NOT CALL VirtScrAlloc. 1000:0044 is CALLF 1491:0000 (SetMode13h) and 1000:0049 is CALLF 1532:0000 (MusicDetect) -- five bytes apart, with no room for another call between them. Then MusicFunc3, MusicCue, MusicStart, Scene1, and the keyboard drain INLINE at 1000:0062 as every other part has it. But P1INTRO's RunIntro calls VirtScrAlloc right after SetMode13h, and NOTHING ELSE IN THE SOURCE DOES: grepping the tree finds VirtScrAlloc only in the five NEURn programs. So writing the program faithfully would leave part 001's scenes drawing into a virtual screen nobody allocated, and part 001 is a part the maintainer has confirmed running. Where the original allocates it is the first question. AND THE PROGRAM CALLS 1012:0798 FOR SCENE 1, NOT 1012:0678. P1LOGO.PAS records Demo_Scene1 at 1012:0678 in three places with evidence for it -- PUSH BP / MOV BP,SP and no ENTER -- and our build puts Scene1 at its segment's 0668. The original's program calls 0798, which is 288 bytes further on. Either the recorded address is wrong or 0798 is a routine that reaches Scene1, and that is the second question. WHAT THE SIZES SAY, checked before starting rather than after: part 001's units are P1LOGO -32, P1TITLE -16, P1VECTOR -16 against the original's, a net -64, so the runtime stays displaced whatever the program does. Removing the harness would not have closed part 001's far calls in any case -- the same finding as parts 002 and 003, where it also did not. THE PART ALREADY READS 100.0% (21,257 of 21,264, two far-call bytes on the walk) so there is nothing forcing this. Do the two questions first, then the program."
-state = "open"
+state = "resolved"
+resolution = "Unblocked. Part 001 is NEUR1.PAS, a real program, and so are all seven parts; no scene harness is linked into any of them. Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. "
 
 [[plan.investigation]]
 name = "part2-draw-no-flip"
 finding = "part 002 Choreography: 81 frames are drawn and never flipped, and the frame counter stops advancing across them. NOT A DEFECT IN THE RECONSTRUCTION -- it is what the 1994 bytes have, and the maintainer's watched RUNPART 2 on 26 Aug 2026 reports the part looking the same as ORIG2, so the behaviour is not visible as a difference between them. WHAT IS OPEN IS WHY. The last five of Choreography's eleven animation loops call neither Present -- 108b:175e in ours was CALL 0F66 and the original goes straight from RenderB to the loop test -- nor Frame := Frame + 1; the first six call both, and the original calls Present six times in this routine where ours called it eleven. Every loop still does the full ObjTranslate, ObjTransform, FillRect, ObjSortFaces and RenderB into the write page, so the work happens and the result is discarded until whatever presents next. Two readings, neither measured: five loops written from a template that had both lines removed, or a deliberate fast-forward through 81 frames of motion. The maintainer has asked for this to be kept findable and wants to look at it later; the note is in src/P2SOLID.PAS immediately above the first of the five loops. NOTHING SHOULD BE CHANGED HERE WITHOUT A DECISION: putting Present back costs 15 bytes and the frame counter 100 more, and undoes what took the part to 100.0% with no unaligned span."
 seen_in = "NEUR2"
-state = "open"
+state = "resolved"
+resolution = "NOT A DEFECT, which is what this investigation concluded and what closes it: 81 frames are drawn and never flipped and the frame counter stops advancing, and that is what the 1994 bytes do. Reproduced deliberately. THE STANDING NOTE IS IN src/P2SOLID.PAS above the five Choreography loops that lost both Present and the counter increment, marked do-not-fix at the maintainer's request -- so this stays findable for a later decision without sitting in the work queue. Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. "
 
 [[plan.investigation]]
 name = "part1-p1s4-one-byte"
 finding = "part 001 P1BALLS is one byte short and three findings inside it push in opposite directions, so none of them can be applied alone. MEASURED, NOT ARGUED: the part walks at 21,264 of 21,264 and every segment is the original's exact size, but the program segment's two references into P1BALLS are off by one -- 1000:0029 is LCALL 0107:09b7 in the 1994 file and 0107:09b8 in ours, and 1000:009d is Scene4 at 0977 against our 0978 -- so P1BALLS's code is one byte long somewhere before 0977. A masked instruction diff of P1BALLS finds four differences, and the arithmetic is why this is a ticket and not a fix: (a) 1107:0390 writes an increment and a decrement LONGHAND, MOV AX,[BP-2] / INC AX / MOV [BP-2],AX and the same for [BP-4], where ours has the two in-place forms -- correcting it makes ours SIX BYTES LONGER; (b) 1107:044a copies a pointer with LES DI,[BP+n] / MOV [BP-m],DI / MOV [BP-m],ES where ours loads and stores two words separately, four bytes more in ours; (c) ours has an extra LES DI,[BP+n] at 04cd and again at 04e4, four bytes each. So (a) alone would take a one-byte shortfall to a five-byte excess. They have to be read together, in one pass over the routine, and the pass has not been done. THERE IS ALSO A CORRECTNESS ITEM THAT IS NOT ABOUT SIZE: 1107:0491 is LES DI,[BP-n], a LOCAL, and ours is LES DI,[BP+n], a PARAMETER -- the same instruction reading different memory, which no length check can see and which the watched runs would not necessarily show either. That one is worth settling first, independently of the byte. 1107:0921 is JL where ours has JLE, the same class as part 003's > 0 against <> 0."
-state = "open"
+state = "resolved"
+resolution = "Closed, and not by any of the three findings this says pushed in opposite directions. THE CAUSE WAS THE DECLARATION: Transform takes `var Base : TWork`, not `Base : PWork`. A pointer dereference is re-loaded per mention and the nested `with` that would share a load costs four bytes of frame, so under a pointer the two requirements had no common solution and no spelling was ever going to find one. Six were built and measured before the signature was questioned. Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. "
 
 [[plan.investigation]]
 name = "part4-p4lems-78-short"
@@ -1191,7 +1250,8 @@ resolution = "Resolved for size and for the program segment. P7FLIC is now 2,194
 [[plan.investigation]]
 name = "program-segment-names-the-offsets"
 finding = "part 003's P3Morph had CheckKey defined LAST, behind a `forward`, where the original puts it at 1139:02e0 between ModeX_FlipPage (02c3) and VGA_Set400Lines (02f2). Eighteen bytes sat past Scene3 instead, so every routine from Set400Lines on came out eighteen bytes early and Demo_Scene3 was at 03a2 against the original's 03b4. FIXED, and recorded here for the INSTRUMENT rather than the defect: nothing in the unit's own measurements could see it. The segment is the right size either way, the coverage walk locates each routine by content and scored every one aligned, dgimage was identical, and the map's address list had held the right answer since the segment was first read. What found it was comparing the PROGRAM SEGMENT byte for byte: 1000:0082 is LCALL 1139:03b4, so the main body names Scene3's entry offset exactly. A part's program segment is a list of every unit's entry-point offsets plus its unit-init chain, and it is the only instrument in this project that reads them. It should be run after every build, on every part: it found this, part 001's P1BALLS byte, part 004's P4Lems displacement and part 007's P7FLIC excess, none of which any other check reports."
-state = "open"
+state = "resolved"
+resolution = "Fixed, and it became an instrument. P3Morph's CheckKey is at 1139:02e0 and part 003 is byte-identical. The finding itself is now kit/tools/pascal/progseg.py and the wiki observation 'The main program is a list of every unit's entry-point offsets', which is what found several later defects. Superseded by byte-exactness: ALL TEN TARGETS now rebuild BYTE-IDENTICAL to the 1994 files -- 301,328 of 301,328 bytes -- recorded as ten [artefact.*] rows holding at R7 and tagged milestone/all-ten-byte-identical on 27 Aug 2026. "
 
 [[plan.investigation]]
 name = "part1-p1s4-three-bytes"
@@ -1484,11 +1544,6 @@ label = "Demo_Scene5 preamble"
 investigation = "part1-s4s5-palette"
 note = "Scene5 in the binary flushes keys, does ClearScreen($A000,0), then AllocWork (12c5:0a60: GetMem+clear of the work buffer), THEN Load rewrites the DAC -- so the palette swap happens over black. Ours went straight into Load, recolouring scene 4's still-displayed frame for the whole file read and backdrop build. Scene5 rebuilt to the binary's structure (also: palette is a Load local passed to VGA.SetPalette768, FreeMem(Work) on exit, and P1VECTOR needs $G+). Opcode-identical modulo fixups after the fix."
 
-[plan.row."001 P1TITLE $I-"]
-label = "no I directive at all -- the third unit today -- FIXED"
-investigation = "part1-blitters"
-target = "R0"
-
 [plan.row."001 P1BALLS $5B52"]
 label = "our maths block is 18,000 bytes out, not 4 -- an ORDER defect"
 investigation = "part1-layout"
@@ -1506,6 +1561,11 @@ label = "the maths block is at $5B52 now; +7 and +4 are all that is left"
 investigation = "part1-layout"
 target = "R0"
 note = "P1BALLS's DGROUP IS REORDERED TO ITS MEASURED ADDRESSES AND THE EIGHTEEN-THOUSAND-BYTE DISPLACEMENT IS GONE. dsmap's change list is now readable end to end: +0 to $0284, -2 to $56CA, +0 AGAIN FROM $5BCE TO $6A2D, +7 from $6A2F to $80F3, +0 from $878B, +4 from $AAC2. Before this the maths block alone was 18,000 bytes out. Paired references went from 89 to 98 and unpaired from 183 to 174; the +0 group went from 12 distinct offsets to 17. THE ORDER WAS DERIVED FROM THE FOLDS, NOT FROM THE COMMENTS, and two of them closed completely: $6933 plus 256 is $6A33, so the row buffers are there; and $80C2 plus 51 is $80F5, so Blob starts there -- which puts Angle's two bytes at $80F3 immediately in front of it. THE SOURCE HAD BLOB FOURTH AND ANGLE LAST. The measured order is F ($5AD2), the six maths LongInts ($5B52), ProfileA ($5B6A), ProfileB ($5B9B), Trail ($5BD8), Outp ($6336), Pal ($672D), Row/Col/Idx ($6A2D), Rows ($6A33), Font ($7233), Angle ($80F3), Blob ($80F5), Star ($9DDB) -- and four of those gaps tile to the byte: $6336 + 145*7 = $672D, $672D + 768 = $6A2D, $6A33 + 2048 = $7233, $7233 + 3776 = $80F3. AND A GUESS THAT MEASURED WORSE WAS BACKED OUT, which is the part worth keeping. P1TITLE's block ends at $5A52 and F is at $5AD2, so 128 bytes appear to precede it; declaring an eighth unopened file record there, plus six words at $5BCC for the six absolute displacements between ProfileB and Trail, took the shift from +4 to +144 -- exactly the 140 added. Both were removed. The block's TOTAL was already right; only its order was wrong, and adding declarations to explain gaps that the ordering already accounts for is how a balanced total gets unbalanced. STILL OPEN, and both are small: +7 from $6A2F to $80F3, which is seven bytes appearing between Row and Col -- impossible for two adjacent Integers, so one of those two pairings is a fold rather than an address and needs checking before anything is declared. And the +4 from $AAC2, which is scene 5's block, unchanged."
+
+[plan.row."001 P1TITLE $I-"]
+label = "no I directive at all -- the third unit today -- FIXED"
+investigation = "part1-blitters"
+target = "R0"
 
 [plan.row."001 dgimage $0018"]
 label = "112 bytes short of initialised data, first diff at $0018"
