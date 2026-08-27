@@ -657,6 +657,17 @@ procedure SortOutp(var Arr : TOutArr);
         begin
           T := Arr[I];  Arr[I] := Arr[J];  Arr[J] := T;
         end;
+        { Inc AND Dec, IN PLACE, AND A MASKED DIFF SAID OTHERWISE AND WAS WRONG.
+          A masked instruction diff showed the original doing
+          MOV AX,[BP-2] / INC AX / MOV [BP-2],AX here and ours the in-place
+          form, so both were written longhand -- and BOTH instruments got worse:
+          the coverage walk went from 21,264 of 21,264 to 21,262 and the program
+          segment's references into this unit from 2 differing bytes to 37,
+          because P1S4 grew nine bytes and displaced every segment after it by a
+          paragraph. The diff's "original" side was anchored at a DRIFTED offset
+          and was not the counterpart of this statement at all. Reverted.
+          A masked diff names candidates; the walk and the program segment
+          decide, and here they agreed against it. }
         Inc(I);  Dec(J);
       end;
     until I > J;
@@ -748,7 +759,29 @@ begin
       take es:[di], es:[di+4] and es:[di+8], which is element ZERO of whatever
       was passed. Reading Work.Trail[0] by name is the same value and an absolute
       displacement instead of a register indirection. }
-    T.X := T.X + Base^.Trail[0].X;                   { 1107:04bf }
+    { A `with`, AND THE ADDRESS IS LOADED ONCE. 1107:04bc is LES DI,[BP+$0A] and
+      the three adds then take es:[di], es:[di+4] and es:[di+8] with NO further
+      load -- so all three name fields of one record whose address is already in
+      ES:DI. Written out as three separate Base^.Trail[0].field references the
+      compiler reloads the parameter before the second and the third, four bytes
+      each. }
+    { THREE SEPARATE STATEMENTS, AND TWO INSTRUMENTS DISAGREE ABOUT THIS SITE.
+      1107:04bc loads LES DI,[BP+$0A] once and the three adds then take es:[di],
+      es:[di+4] and es:[di+8] with no further load; written out as three
+      references the compiler reloads the parameter before the second and the
+      third, four bytes each.
+
+      A `with Base^.Trail[0]` loads it once and IS eight bytes closer on length
+      -- P1S4's initialisation section lands at 1107:09ba against the original's
+      09b7, where three statements put it at 09c0. But the coverage walk goes the
+      OTHER WAY: 21,255 of 21,264 with the `with` against 21,264 of 21,264
+      without. The walk compares CONTENT and the offset compares LENGTH, and on
+      this site they contradict each other, so the `with` is closer in total and
+      wrong in detail. Left as three statements because the walk is the stronger
+      instrument, and recorded in part1-p1s4-three-bytes rather than guessed at:
+      whatever the original wrote loads the address once WITHOUT a with's entry
+      sequence, and nobody has found the spelling. }
+    T.X := T.X + Base^.Trail[0].X;           { 1107:04bf }
     T.Y := T.Y + Base^.Trail[0].Y;
     T.Z := T.Z + Base^.Trail[0].Z;
     Project(T.X, T.Y, T.Z);                 { 1107:0503 }

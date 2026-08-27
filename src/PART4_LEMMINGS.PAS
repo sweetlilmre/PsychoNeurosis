@@ -394,7 +394,9 @@ const
     ' ',' ');
 
 const
-  ScrollCol  : Integer = 0;                      { DS:$00F2 }
+  { A WORD, NOT AN INTEGER, and 1005:08bb is the tell: JB, an unsigned branch,
+    where a signed compare gives JLE. }
+  ScrollCol  : Word = 0;                         { DS:$00F2 }
   ScrollIdx  : Byte    = 1;                      { DS:$00F4 }
   { FLAT AND ONE-BASED, not eight triples. Every reference computes the index
     at run time from a single byte counter -- 1005:098D is MOV SI,AX / SHL AX,1
@@ -770,15 +772,22 @@ begin
     StFaller:
       if L.FallDist < 4 then
       begin
-        if L.Dir < 1 then
-          Blit(@WalkBank[L.Frame + 4], L.X - 3, L.Y - 8, 6, 9, WorkSeg)
-        else
+        { THE BARE-FRAME ARM COMES FIRST HERE TOO, and it is the same trap the
+          StWalker note below describes -- fixed there, missed here. 1005:0435 is
+          CMP BYTE PTR ES:[DI+$0E],0 / JLE, so the test is `> 0`; the arm it
+          falls into at 043c does the IMUL with no ADD AX,4, and the ELSE at
+          047b is the one that adds 4. Written `if Dir < 1 then <+4> else
+          <bare>` the two arms came out the other way round and the condition
+          as CMP ,1 / JGE. The counter step belongs to the BARE arm. }
+        if L.Dir > 0 then
         begin
           Blit(@WalkBank[L.Frame], L.X - 3, L.Y - 8, 6, 9, WorkSeg);
           { 1005:0467 -- the only place DrawSprite changes state, and it
             steps TWICE: MOV AX,Frame / INC AX / DIV 4 / INC AX. }
           L.Frame := ((L.Frame + 1) mod 4) + 1;
-        end;
+        end
+        else
+          Blit(@WalkBank[L.Frame + 4], L.X - 3, L.Y - 8, 6, 9, WorkSeg);
       end
       else
         Blit(@TumbleBk[L.Frame], L.X - 3, L.Y - 10, 10, 10, WorkSeg);
@@ -788,8 +797,12 @@ begin
         and JMPs over the second, and the second -- at 1005:0513 -- is the one
         that does MOV AX,ES:[DI+6] / ADD AX,4 before the IMUL, so `Frame + 4`
         is the ELSE. Written `if Dir < 1 then <+4> else <bare>` the two arms
-        come out the other way round; the test is the same either way. }
-      if L.Dir >= 1 then
+        come out the other way round; the test is the same either way.
+
+        AND THE TEST IS `> 0`, NOT `>= 1`. 1005:04e2 is CMP BYTE PTR
+        ES:[DI+$0E],0 / JLE; `>= 1` gives CMP ,1 / JL -- the same two
+        instructions with a different immediate and a different condition. }
+      if L.Dir > 0 then
         Blit(@WalkBank[L.Frame], L.X - 3, L.Y - 8, 6, 9, WorkSeg)
       else
         Blit(@WalkBank[L.Frame + 4], L.X - 3, L.Y - 8, 6, 9, WorkSeg);
@@ -1087,7 +1100,10 @@ var
   Last : Byte;                    { [BP-$01], then the colour index }
 begin
   Inc(ScrollCol, 2);                             { 1005:08b1 }
-  if ScrollCol > GlyphCols then
+  { >= GlyphCols + 1, NOT > GlyphCols. 1005:08b6 is CMP WORD PTR [$F2],$16 --
+    twenty-two -- and the branch is JB; `> GlyphCols` compares against 21 and
+    inverts the condition. Same test, different bytes. }
+  if ScrollCol >= GlyphCols + 1 then
   begin
     ScrollCol := 1;
     Inc(ScrollIdx);
@@ -1325,8 +1341,16 @@ begin
     Lem[N].Frame := (Lem[N].Frame mod 6) + 1;
     if Lem[N].Frame = 6 then
     begin
-      Inc(Lem[N].X, 2);
-      Dec(Lem[N].Y);
+      { LONGHAND, AND THE NOTE AT THE TOP OF THIS ROUTINE ALREADY SAID SO.
+        1005:0d6a is MOV AX,[DI+$2FC] / INC AX / INC AX / IMUL DI,[BP+4],$15 /
+        MOV [DI+$2FC],AX -- loaded, stepped in the register, subscript
+        RECOMPUTED, stored back -- and 1005:0d78 is the same shape with one DEC.
+        Inc and Dec increment in place and skip both the reload and the second
+        IMUL. Note the original steps by two with INC AX twice rather than
+        ADD AX,2: two bytes against three, so TP7 prefers it, and a written
+        `+ 2` produces exactly that. }
+      Lem[N].X := Lem[N].X + 2;
+      Lem[N].Y := Lem[N].Y - 1;
       HLine(Lem[N].X - 2, Lem[N].X + 2, Lem[N].Y + 2,
             BrickColour, VirtScrSeg);
     end;
@@ -1374,8 +1398,11 @@ begin
   Hit := False;
   { THE RIGHTWARD BRANCH COMES FIRST. 1005:0E01 is CMP/JG, which jumps INTO
     this branch and falls through to the other -- so the source tests
-    `Dir >= 1`, not `Dir < 1`. }
-  if Lem[N].Dir >= 1 then
+    `Dir > 0`, not `Dir < 1` -- and not `Dir >= 1` either. The arm ORDER is
+    what the surrounding note settles; the IMMEDIATE is separate, and the
+    original writes CMP BYTE PTR [DI+$0E],0 at every one of the four sites.
+    `>= 1` gives CMP ,1 with the condition inverted: same length, wrong bytes. }
+  if Lem[N].Dir > 0 then
   begin
     for Col := Lem[N].X - 3 to Lem[N].X + 3 + 1 do   { 1005:0E0B }
     begin
@@ -1426,8 +1453,19 @@ begin
     Lem[N].Frame := (Lem[N].Frame mod 6) + 1;
     if Lem[N].Frame mod 6 = 0 then
     begin
-      Inc(Lem[N].X, Lem[N].Dir * 2);
-      Inc(Lem[N].Y);
+      { LONGHAND, AND THE X STEP IS EVALUATED IN LongInt. 1005:1101 loads the
+        Dir byte, sign-extends it, doubles it and then CDQs -- so the term is
+        32-bit -- and 1005:1111 widens X with XOR DX,DX, unsigned, does
+        ADD AX,CX / ADC DX,BX and stores back only the low word. That is an
+        assignment to a Word from a LongInt expression, which is what the cast
+        below spells. THE CAST GOES OUTSIDE THE DOUBLING: the original does
+        SHL AX,1 and only then CDQ, so it multiplies in sixteen bits and widens
+        the result. LongInt(Dir) * 2 widens first and then calls the runtime's
+        32-bit multiply -- MOV CX,2 / XOR BX,BX / LCALL -- which is both longer
+        and not what is there. Inc(Lem[N].X, Lem[N].Dir * 2) does a plain sixteen-bit
+        ADD [mem],AX and skips the widening, the reload and the second IMUL. }
+      Lem[N].X := Lem[N].X + LongInt(Lem[N].Dir * 2);
+      Lem[N].Y := Lem[N].Y + 1;
     end;
   end;
 
@@ -1452,8 +1490,9 @@ var
 begin
   Hit := False;
   { THE RIGHTWARD BRANCH COMES FIRST: 1005:1172 is CMP/JG, which jumps into it
-    and falls through to the other, so the test is `Dir >= 1`. }
-  if Lem[N].Dir >= 1 then
+    and falls through to the other, so the arm order is settled; the test
+    itself is `Dir > 0` -- CMP ,0, not CMP ,1. }
+  if Lem[N].Dir > 0 then
   begin
     for Col := Lem[N].X + 3 + 1 to Lem[N].X + 3 + 1 + 1 do   { 1005:117C }
       for Row := Lem[N].Y - 9 to Lem[N].Y do                 { 1005:11A5 }
@@ -1483,8 +1522,13 @@ begin
     for Col := Lem[N].X - 3 - 1 - 1 to Lem[N].X - 3 - 1 do   { 1005:1324 }
       for Row := Lem[N].Y - 9 to Lem[N].Y do
       begin
-        Pix := GetPixel(Col, Row, VirtScrSeg);
-        if Pix in Wall then Hit := True;
+        { INLINE HERE, AND ONLY HERE. 1005:137a returns the pixel in AL and
+          1005:137f goes straight into MOV AH,1 / MOV DX,$20 / the set test --
+          no store. The other three sites of this pair DO go through Pix and
+          match as written; this one does not, so the value is used where it is
+          produced. Storing it cost MOV [BP-6],AL / MOV AL,[BP-6], six bytes
+          round trip for a byte already in the register. }
+        if GetPixel(Col, Row, VirtScrSeg) in Wall then Hit := True;
       end;
 
     VLine(Lem[N].X - 3 - 1,     Lem[N].Y - 9,         Lem[N].Y,
@@ -1497,7 +1541,11 @@ begin
 
   Lem[N].Frame := (Lem[N].Frame mod 3) + 1;
   if Lem[N].Frame mod 3 = 0 then
-    Inc(Lem[N].X, Lem[N].Dir);
+    { LONGHAND AND WIDENED, like the tunneller's step above. 1005:1464 loads
+      the Dir byte, CWDEs it to a word and CDQs it to 32 bits, then 1005:1472
+      widens X with XOR DX,DX and does ADD AX,CX / ADC DX,BX, storing back only
+      the low word -- an assignment to a Word from a LongInt expression. }
+    Lem[N].X := Lem[N].X + LongInt(Lem[N].Dir);
 
   if not Hit then SetState(N, StWalker);
 end;
@@ -1584,7 +1632,7 @@ Stand:
     twice, which is `+ 3 + 2` and not `+ 5` -- Turbo Pascal emits one operation
     per operator rather than folding the constants first. }
   for DX_ := Lem[N].Y - 9 to Lem[N].Y - 4 do
-    if Lem[N].Dir >= 1 then
+    if Lem[N].Dir > 0 then
     begin
       for Col := Lem[N].X + 3 to Lem[N].X + 3 + 2 do   { 1005:15B8 }
         if GetPixel(Col, DX_, VirtScrSeg) in Wall then
@@ -1609,7 +1657,7 @@ Stand:
     row, so a row loop that kept going would step back onto the row it just
     left and stay there. }
   for DX_ := Lem[N].Y - 4 to Lem[N].Y do
-    if Lem[N].Dir >= 1 then
+    if Lem[N].Dir > 0 then
     begin
       for Col := Lem[N].X + 3 to Lem[N].X + 3 + 1 do   { 1005:16C6 }
         if GetPixel(Col, DX_, VirtScrSeg) in Wall then
@@ -1627,7 +1675,10 @@ Stand:
         end;
 
 Move:
-  Inc(Lem[N].X, Lem[N].Dir);                     { 1005:1791 }
+  { LONGHAND AND WIDENED, the third site of this shape. 1005:1795 loads the Dir
+    byte, CWDEs and CDQs it, and 1005:17a3 widens X with XOR DX,DX before
+    ADD AX,CX / ADC DX,BX and a low-word store. }
+  Lem[N].X := Lem[N].X + LongInt(Lem[N].Dir);     { 1005:1791 }
   Lem[N].Tick := (Lem[N].Tick mod 2) + 1;
   if Lem[N].Tick mod 2 = 0 then
     Lem[N].Frame := (Lem[N].Frame mod 4) + 1;
