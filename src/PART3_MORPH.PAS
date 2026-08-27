@@ -717,6 +717,46 @@ end;
           See docs/08-part3-scene3-morph.md.
   -------------------------------------------------------------------------- }
 { --------------------------------------------------------------------------
+  Morph_CheckKey (1139:02e0) -- ASSEMBLER, AND IT RETURNS IN DX.
+
+  The scene tests for a key through its own routine and not through Crt's
+  KeyPressed directly: 1139:040a is a NEAR call and CALLF never appears in the
+  eight loops. So there is a routine of this unit's own in between.
+
+  TWO THINGS ABOUT IT ARE NOT PASCAL, and both were visible for weeks.
+
+  IT HAS NO STACK FRAME. 1139:02e0 is the far call itself -- no PUSH BP, no
+  MOV BP,SP, and a bare RET at 02f1 with no LEAVE. A compiled procedure gets
+  the frame whether or not it has locals; only `assembler` omits it.
+
+  AND IT ANSWERS IN DX. Turbo Pascal returns a Boolean in AL, a word in AX, a
+  LongInt or a pointer in DX:AX -- and nothing at all in DX alone. The
+  MOV DX,0 / MOV DX,1 pair here, and the OR DX,DX that Scene3 tests it with,
+  appear EXACTLY ONCE in the whole demo: this routine and its callers. Every
+  part carries the runtime's own AL form of the same shape, which is what made
+  the DX form look like a decoding mistake rather than a finding.
+
+  So it is the author's own calling convention, and the callers are asm because
+  nothing else can read it. That is why this and Scene3 had to change together:
+  making this `assembler` on its own leaves the callers testing AL, and the
+  measurement gets WORSE rather than better.
+
+  The declared result type stays Boolean because that is what the routine
+  MEANS; nothing reads AL, so nothing depends on Turbo Pascal's idea of where
+  the answer goes.
+  -------------------------------------------------------------------------- }
+function CheckKey : Boolean; assembler;
+asm
+        CALL    KeyPressed              { 1139:02e0 -- far, into Crt          }
+        OR      AL,AL                   { 02e5 -- Crt's answer IS in AL       }
+        JNE     @@Yes                   { 02e7                                }
+        MOV     DX,0                    { 02e9                                }
+        JMP     @@Out                   { 02ec                                }
+@@Yes:  MOV     DX,1                    { 02ee                                }
+@@Out:                                  { 02f1 is the RET Turbo Pascal adds   }
+end;
+
+{ --------------------------------------------------------------------------
   1139:01f9 -- DrawShape.  Reads CurShape, walks 765 points six bytes at a
   time and hands each to TransformPoint in BX, CX, DX, whose results go
   straight on to PlotPixel in DI and BX. Assembler in the original; the
@@ -890,46 +930,6 @@ end;
   body names Scene3's offset exactly, and ours said 03a2. A part's program
   segment is a list of every unit's entry-point offsets, and comparing it byte
   for byte is the only instrument here that reads them. }
-
-{ --------------------------------------------------------------------------
-  Morph_CheckKey (1139:02e0) -- ASSEMBLER, AND IT RETURNS IN DX.
-
-  The scene tests for a key through its own routine and not through Crt's
-  KeyPressed directly: 1139:040a is a NEAR call and CALLF never appears in the
-  eight loops. So there is a routine of this unit's own in between.
-
-  TWO THINGS ABOUT IT ARE NOT PASCAL, and both were visible for weeks.
-
-  IT HAS NO STACK FRAME. 1139:02e0 is the far call itself -- no PUSH BP, no
-  MOV BP,SP, and a bare RET at 02f1 with no LEAVE. A compiled procedure gets
-  the frame whether or not it has locals; only `assembler` omits it.
-
-  AND IT ANSWERS IN DX. Turbo Pascal returns a Boolean in AL, a word in AX, a
-  LongInt or a pointer in DX:AX -- and nothing at all in DX alone. The
-  MOV DX,0 / MOV DX,1 pair here, and the OR DX,DX that Scene3 tests it with,
-  appear EXACTLY ONCE in the whole demo: this routine and its callers. Every
-  part carries the runtime's own AL form of the same shape, which is what made
-  the DX form look like a decoding mistake rather than a finding.
-
-  So it is the author's own calling convention, and the callers are asm because
-  nothing else can read it. That is why this and Scene3 had to change together:
-  making this `assembler` on its own leaves the callers testing AL, and the
-  measurement gets WORSE rather than better.
-
-  The declared result type stays Boolean because that is what the routine
-  MEANS; nothing reads AL, so nothing depends on Turbo Pascal's idea of where
-  the answer goes.
-  -------------------------------------------------------------------------- }
-function CheckKey : Boolean; assembler;
-asm
-        CALL    KeyPressed              { 1139:02e0 -- far, into Crt          }
-        OR      AL,AL                   { 02e5 -- Crt's answer IS in AL       }
-        JNE     @@Yes                   { 02e7                                }
-        MOV     DX,0                    { 02e9                                }
-        JMP     @@Out                   { 02ec                                }
-@@Yes:  MOV     DX,1                    { 02ee                                }
-@@Out:                                  { 02f1 is the RET Turbo Pascal adds   }
-end;
 
 { --------------------------------------------------------------------------
   VGA_Set400Lines (1139:02f2)
