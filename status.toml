@@ -266,6 +266,18 @@ fingerprint = "94598e1abf4dbfbd"
 against = "work/split/NEUROSIS_003.exe"
 note = "Watched RUNPART 3 on 26 Aug 2026, the FIRST EVER RUN of part 003 as a real program. The maintainer reports it looking the same as ORIG3. Covers P3Tunnel losing its private SetModeX to ModeX's, P3Globe gaining the I-minus switch and four ordering corrections -- B, G, R declared backwards, greater-than-zero for not-equal-zero, Target as 256 triples, SrcOfs and DstOfs transposed -- two of three title showings gaining a keyboard guard before the BlockRead, and P3Stars making DegToRad far and moving Generate's body into the initialisation section. Part 003 is now aligned on every one of its 13,920 bytes."
 
+[observation."NEUR5"]
+harness = "NEUR5"
+tier = "part"
+outcome = "matches"
+achieved = "R3"
+observer = "maintainer"
+date = "2026-08-27"
+confirmed_at = "f1c3fb53e717"
+fingerprint = "552f77f5d3bf2221"
+against = "work/split/NEUROSIS_005.exe"
+note = "Watched RUNPART 5 on 27 Aug 2026, the FIRST EVER RUN of part 005 as a real program rather than through TPART5 and the P5Main driver unit. The maintainer's words were \"neur5.exe runs fine\", after an earlier report that the batch could not find it -- which was DOSBox-X's mounted-drive directory cache not holding a filename that first appeared while DOSBox was already running, not a defect in the build.\nREAD THE LIMIT ON THIS ONE. \"Runs fine\" is recorded as `matches` because the part ran to completion with nothing reported wrong, and that is what the observer said; a scene-by-scene comparison against ORIG5 was NOT stated, unlike the 26 Aug reports for parts 002, 003 and 006 which said \"looks the same as orig\". Do not cite this row as evidence that any particular scene was compared.\nWhat the run covers: NEUR5.PAS replacing P5MAIN.PAS and the generated harness, the program gaining $G+ and losing its explicit Halt(0), and two findings in P5S3 -- Inc(CX, DX_) in place of the assignment, and Frame as a Word rather than an Integer. Part 005 walks 11,440 of 11,440 with no unaligned span, every segment is the original's exact size, the initialised data image is identical, and its 224-byte program segment is BYTE-IDENTICAL."
+
 [observation."NEUR6"]
 harness = "NEUR6"
 tier = "part"
