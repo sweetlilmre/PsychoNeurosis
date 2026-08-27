@@ -2,7 +2,7 @@
 
 ## NEUROSIS.000 — the setup program
 
-`STARTUP.PAS` (name recovered from its Borland debug info). 70 functions.
+`NEUR0.PAS` (name recovered from its Borland debug info). 70 functions.
 
 This is the configuration front-end, and it is what **writes `NEUROSIS.CFG`**.
 That closes the loop on the launcher: `PSYCHO.EXE` runs this first, then hands
@@ -47,7 +47,7 @@ Also present: `Hit 'Y' or 'N'`, `Later, dudes!`, and the banner
 
 ## NEUROSIS.009 — the end screen
 
-`BYEBYE.PAS`. 38 functions, and the smallest part.
+`NEUR9.PAS`. 38 functions, and the smallest part.
 
 Its debug info gives the variable names directly:
 

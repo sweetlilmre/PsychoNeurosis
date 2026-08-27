@@ -9,7 +9,7 @@ container format; `NEUROSIS.000`–`.009` are ten separate programs.
 | File | Image | Appended payload | Role |
 |---|---:|---|---|
 | `PSYCHO.EXE` | 1,936 | — | launcher |
-| `NEUROSIS.000` | 12,880 | 4,546 B debug info | setup / detect (`STARTUP.PAS`) |
+| `NEUROSIS.000` | 12,880 | 4,546 B debug info | setup / detect (`NEUR0.PAS`) |
 | `NEUROSIS.001` | 38,528 | MOD *In awe of you.* | intro — `asphyxia.cel`, welcome scroller |
 | `NEUROSIS.002` | 38,832 | MOD *StarTrek Samples* | effects |
 | `NEUROSIS.003` | 72,240 | MOD *Techno Tick* | effects (largest) |
@@ -18,7 +18,7 @@ container format; `NEUROSIS.000`–`.009` are ten separate programs.
 | `NEUROSIS.006` | 55,984 | MOD *LaTeX LoVeR* | effects |
 | `NEUROSIS.007` | 20,112 | MOD *The Deth March* | FLI/FLC player — `lemend.flc` |
 | `NEUROSIS.008` | 31,711 | — | JCAB's **DemoVT** mod player (**LZEXE-packed**) |
-| `NEUROSIS.009` | 7,312 | 3,044 B debug info | end screen (`BYEBYE.PAS`) |
+| `NEUROSIS.009` | 7,312 | 3,044 B debug info | end screen (`NEUR9.PAS`) |
 
 ## How it fits together
 
@@ -43,8 +43,8 @@ resident player over **INT 2Fh** (one call in every effect part).
 
 Parts 000 and 009 shipped with Borland debug info (magic `0x52FB`):
 
-- `NEUROSIS.000` → `STARTUP.PAS` — `VGA`, `MEMAVAIL`, `MAXAVAIL`
-- `NEUROSIS.009` → `BYEBYE.PAS` — `IMAGEDATA`, `IMAGEDATA_WIDTH`, `IMAGEDATA_LENGTH`, `IMAGEDATA_DEPTH`
+- `NEUROSIS.000` → `NEUR0.PAS` — `VGA`, `MEMAVAIL`, `MAXAVAIL`
+- `NEUROSIS.009` → `NEUR9.PAS` — `IMAGEDATA`, `IMAGEDATA_WIDTH`, `IMAGEDATA_LENGTH`, `IMAGEDATA_DEPTH`
 
 The seven effect parts were built without debug info.
 

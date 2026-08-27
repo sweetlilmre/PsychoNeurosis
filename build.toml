@@ -109,13 +109,13 @@ flags = "/ML /Z"
 # Derived from the staged sources' own `uses` clauses. A hardcoded dependency
 # list gave "Error 15: File not found" the moment a part arrived that used
 # something not on it, and NAMES order stopped being a build order the day
-# TPART0 (uses Detect) was added above DETECT.PAS.
+# NEUR0 (uses Detect) was added above DETECT.PAS.
 mode = "uses"
 list = [
   "test/VIDMODE.PAS",
   "PSYCHO.PAS",
-  "BYEBYE.PAS",
-  "STARTUP.PAS",
+  "NEUR9.PAS",
+  "NEUR0.PAS",
   "DETECT.PAS",
   "VGA.PAS",
   "DEMOVT.PAS",
@@ -184,8 +184,8 @@ alongside = ["*.BAT"]
 [names]
 "test/VIDMODE.PAS" = ["VIDMODE.PAS", "VidMode", "VidMode"]
 "PSYCHO.PAS" = ["TPSYCHO.PAS", "Psycho", "Psycho"]
-"BYEBYE.PAS" = ["TPART9.PAS", "ByeBye", "ByeBye"]
-"STARTUP.PAS" = ["TPART0.PAS", "Startup", "Startup"]
+"NEUR9.PAS" = ["NEUR9.PAS", "NEUR9", "NEUR9"]
+"NEUR0.PAS" = ["NEUR0.PAS", "NEUR0", "NEUR0"]
 "DETECT.PAS" = ["DETECT.PAS", "Detect", "Detect"]
 "VGA.PAS" = ["VGA.PAS", "VGA", "VGA"]
 "DEMOVT.PAS" = ["DEMOVT.PAS", "DemoVT", "DemoVT"]

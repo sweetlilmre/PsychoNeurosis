@@ -2,7 +2,7 @@
   Psycho Neurosis (Asphyxia, 1994) -- NEUROSIS.009, the end screen.
 
   Read from bin/NEUROSIS.009; the chart is docs/30-byebye.md. The debug
-  info appended to the original names the source (BYEBYE.PAS, saved
+  info appended to the original names the source (NEUR9.PAS, saved
   4 Feb 1994), every variable, and -- through the line table -- the exact
   shape of the code: main is 98 bytes, and its core is the inline asm
   block below, one instruction per source line as the original had it.
@@ -27,7 +27,7 @@
   =========================================================================== }
 
 {$G+,S+}
-program ByeBye;
+program NEUR9;
 
 uses
   Crt;

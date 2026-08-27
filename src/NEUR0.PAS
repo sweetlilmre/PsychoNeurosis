@@ -2,7 +2,7 @@
   Psycho Neurosis (Asphyxia, 1994) -- NEUROSIS.000, the setup program.
 
   Read from bin/NEUROSIS.000; the chart is docs/31-startup.md. The appended
-  debug info names the source (STARTUP.PAS, saved 6 Feb 1994, 00:11 -- the
+  debug info names the source (NEUR0.PAS, saved 6 Feb 1994, 00:11 -- the
   night before the demo shipped), every routine, and every local.
 
   What it does: paints a shaded backdrop, walks up to five menus (sound
@@ -38,7 +38,7 @@
   =========================================================================== }
 
 {$G+,S+}
-program Startup;
+program NEUR0;
 
 uses
   Crt, Detect;

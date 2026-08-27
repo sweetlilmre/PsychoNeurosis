@@ -81,8 +81,8 @@ rtl  = 0x110c
 segs = [0x100b, 0x100f, 0x1099, 0x10fb]
 
 # THE THREE THAT ALREADY REBUILD BYTE-IDENTICAL, and they are here as a CHECK
-# ON THIS FILE rather than as work. artefact.py holds all three at R7 -- TPART0,
-# TPART9 and TPSYCHO reproduce their originals exactly -- so the coverage walk
+# ON THIS FILE rather than as work. artefact.py holds all three at R7 -- NEUR0,
+# NEUR9 and TPSYCHO reproduce their originals exactly -- so the coverage walk
 # has a KNOWN ANSWER for them, and anything below 100% is a defect in these
 # segment lists or in spans.py, never in the reconstruction. Nothing else in
 # this file can be checked that way, which is the whole reason they are here.
@@ -99,12 +99,12 @@ segs = [0x100b, 0x100f, 0x1099, 0x10fb]
 # job. A row here could only ever measure the original against itself.
 
 [part."000"]
-exe  = "TPART0.EXE"
+exe  = "NEUR0.EXE"
 rtl  = 0x1213
 segs = [0x1000, 0x11ad, 0x11b1]
 
 [part."009"]
-exe  = "TPART9.EXE"
+exe  = "NEUR9.EXE"
 rtl  = 0x1069
 segs = [0x1000, 0x1007]
 

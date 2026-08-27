@@ -76,7 +76,7 @@ This is Borland's own library code, not Asphyxia's — the reconstruction writes
 ### What the chart settles
 
 - **PSYCHO.EXE never runs parts 001–007.** It EXECs exactly three children: setup, DemoVT with `@neurosis.cfg`, and the end screen. The demo chain therefore lives *inside* `NEUROSIS.008` (DemoVT, third-party), which receives the config file as its command line. This sharpens `docs/01-binaries-and-loading.md`'s picture of how the ten files fit together.
-- **Setup's exit code is a protocol**: `1` = skip the demo but show the end screen, `2` = quit silently, anything else = run the demo. The reconstruction of `NEUROSIS.000` (`STARTUP.PAS`) must reproduce these `Halt` codes — this is a cross-artefact constraint the `STARTUP.PAS` ticket needs.
+- **Setup's exit code is a protocol**: `1` = skip the demo but show the end screen, `2` = quit silently, anything else = run the demo. The reconstruction of `NEUROSIS.000` (`NEUR0.PAS`) must reproduce these `Halt` codes — this is a cross-artefact constraint the `NEUR0.PAS` ticket needs.
 - **How much is ours**: Asphyxia's own code in this file is main's 122 bytes plus five string literals. Everything else is the compiler's.
 
 ## The reconstruction: byte-identical

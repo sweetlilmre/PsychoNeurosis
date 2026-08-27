@@ -31,7 +31,13 @@ built    = "run"                       # where a finished harness is installed
 # Only OUR harnesses. `run/` also holds copies of the 1994 binaries so the
 # demo can be run side by side, and comparing an original against itself
 # passes trivially and proves nothing.
-built_pattern = "TP*.EXE"
+# BOTH, and in this order: the scene harnesses and the real per-part
+# programs. NEUR*.EXE was missing while every part became a program of
+# its own, so ten routines were being located in STALE TPART*.EXE files
+# from builds that no longer run -- locks held up by binaries nothing
+# produces. Never add a pattern that matches the ORIGINALS in here: a
+# directory of originals passes against itself and proves nothing.
+built_pattern = ["TP*.EXE", "NEUR*.EXE"]
 
 [target]
 # Facts about the thing being reverse engineered, read out of it by a person.

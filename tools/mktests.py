@@ -324,7 +324,7 @@ HOOK = """
 # in the same commit that adds it.
 # TPART7 is gone from this set with its harness; NEUR7 is a real program and
 # prints nothing.
-TEXT_RTL = {"TPART0"}
+TEXT_RTL = {"NEUR0"}
 
 SAY_PROC = """{ PRINTS WITHOUT THE TEXT RTL, and that is the whole point of it. A single
   WriteLn anywhere in a harness puts a two-byte constant at the END of the

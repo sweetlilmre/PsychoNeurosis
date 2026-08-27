@@ -1,10 +1,10 @@
-# NEUROSIS.000 — STARTUP.PAS, charted
+# NEUROSIS.000 — NEUR0.PAS, charted
 
 Read from `bin/NEUROSIS.000` for [Chart NEUROSIS.000](https://github.com/sweetlilmre/PsychoNeurosis/issues/22). Supersedes `docs/20-parts000-009-setup-and-end.md` where they disagree ("70 functions" was a disassembly count including the RTL; the program has seven routines).
 
 ## G0 — the container
 
-17,426 bytes on disk = 12,880-byte load image + 4,546 bytes of Borland debug info, zero residue (`tddump.py`). Source **`STARTUP.PAS`, saved 1994-02-06 00:11:08** — twenty-nine hours before the demo shipped.
+17,426 bytes on disk = 12,880-byte load image + 4,546 bytes of Borland debug info, zero residue (`tddump.py`). Source **`NEUR0.PAS`, saved 1994-02-06 00:11:08** — twenty-nine hours before the demo shipped.
 
 ## G1 — identification
 
@@ -56,7 +56,7 @@ So **the chain of parts 001–007 is authored here**: setup writes it into `NEUR
 
 ## The reconstruction: byte-identical
 
-`src/STARTUP.PAS` + `src/DETECT.PAS` (a TASM object, `src/asm/DETECT.ASM`, linked `{$L}`) rebuild to a **load image byte-identical to the original's 12,880 bytes** — the third and last of the unread binaries at R7. The near-match iteration ran 569 → 98 → 22 → 9 → 1 → 0 diff runs, and each step recovered a fact about the 1994 source:
+`src/NEUR0.PAS` + `src/DETECT.PAS` (a TASM object, `src/asm/DETECT.ASM`, linked `{$L}`) rebuild to a **load image byte-identical to the original's 12,880 bytes** — the third and last of the unread binaries at R7. The near-match iteration ran 569 → 98 → 22 → 9 → 1 → 0 diff runs, and each step recovered a fact about the 1994 source:
 
 - **`YesNo` waits with `until ch in ['N','Y']`** — the single-load compare chain, not two equality tests.
 - **Every selection is a `case`** — the arrow handlers (`case ch of 'P','H'`), the Previous-Setup/Exit pair, and all five `forfile` assignments. An `if`/`else if` chain compiles a memory compare per arm; the original loads once.
@@ -66,4 +66,4 @@ So **the chain of parts 001–007 is authored here**: setup writes it into `NEUR
 - **`Detect` is a TASM object linked whole** — proven twice: the pure-Pascal unit lost the never-called `HasMouse` to the smart linker, and the original's `XOR AX,AX` is `33 C0`, TASM's operand order where BASM emits `31 C0`. TASM needs `.286P` for `SMSW`.
 - **The `uses` clause is `Crt, Detect`** — TP7 emits unit code segments in *reverse* uses order, measured when the two segments came out swapped.
 
-All fingerprints are recorded as new rows in the wiki's [near-match-diff](../kit/wiki/observations/near-match-diff/observation.md) table. The three `Detect` routines carry `@asm` markers (coverage 71 → 74); `asmverify.py` finds them in `TPART0.EXE` and matches all three end to end. The reconstructions build under the part-tier harness names — `TPART0` (setup) and `TPART9` (end screen), consistent with `TPART1..7` — while the sources keep the names the debug info recovered.
+All fingerprints are recorded as new rows in the wiki's [near-match-diff](../kit/wiki/observations/near-match-diff/observation.md) table. The three `Detect` routines carry `@asm` markers (coverage 71 → 74); `asmverify.py` finds them in `NEUR0.EXE` and matches all three end to end. The reconstructions build under the part-tier harness names — `NEUR0` (setup) and `NEUR9` (end screen), consistent with `TPART1..7` — while the sources keep the names the debug info recovered.

@@ -36,8 +36,8 @@ Goal: understand every effect, then reconstruct the original source.
 | 27 | [Part 006 working notes](27-part6-notes.md) | The credits part, read from the binary |
 | 28 | [Part 007 working notes](28-part7-notes.md) | The FLIC player, read instruction by instruction |
 | 29 | [PSYCHO.EXE charted](29-psycho-launcher.md) | The launcher: three EXECs, an exit-code protocol, byte-identical rebuild |
-| 30 | [BYEBYE.PAS charted](30-byebye.md) | The end screen, read mostly from its debug info; byte-identical rebuild |
-| 31 | [STARTUP.PAS charted](31-startup.md) | Setup: the demo chain is authored here; byte-identical rebuild |
+| 30 | [NEUR9.PAS charted](30-byebye.md) | The end screen, read mostly from its debug info; byte-identical rebuild |
+| 31 | [NEUR0.PAS charted](31-startup.md) | Setup: the demo chain is authored here; byte-identical rebuild |
 
 | 32 | [The tool disposition](32-tool-disposition.md) | Where every script goes as the kit absorbs the tooling; generated, and proven to cover the tree |
 
@@ -65,7 +65,7 @@ are listed at the foot of the individual documents and are all minor.
 | Part | File | Status |
 |---|---|---|
 | `PSYCHO.EXE` | launcher (`PSYCHO.PAS`) | **byte-identical rebuild** (`TPSYCHO`), guarded in `status.toml` |
-| `NEUROSIS.000` | setup (`STARTUP.PAS` + `DETECT`) | **byte-identical rebuild** (`TPART0`), guarded in `status.toml` |
+| `NEUROSIS.000` | setup (`NEUR0.PAS` + `DETECT`) | **byte-identical rebuild** (`NEUR0`), guarded in `status.toml` |
 | `NEUROSIS.001` | intro | reconstructed; observed `differs` at R2 — see the plan |
 | `NEUROSIS.002` | house + Enterprise | reconstructed; observed `differs` at R2 — see the plan |
 | `NEUROSIS.003` | "Techno Tick" | reconstructed; observed `differs` at R2 — see the plan |
@@ -74,7 +74,7 @@ are listed at the foot of the individual documents and are all minor.
 | `NEUROSIS.006` | credits / whooshtext | reconstructed; observed `differs` at R2, closest match |
 | `NEUROSIS.007` | FLIC player | reconstructed; observed **`matches` at R3** |
 | `NEUROSIS.008` | DemoVT (third-party) | LZEXE-packed, out of scope — see the `VangeliSTracker` repo |
-| `NEUROSIS.009` | end screen (`BYEBYE.PAS`) | **byte-identical rebuild** (`TPART9`), guarded in `status.toml` |
+| `NEUROSIS.009` | end screen (`NEUR9.PAS`) | **byte-identical rebuild** (`NEUR9`), guarded in `status.toml` |
 
 "See the plan" means the `[plan]` section of `status.toml` — five investigations, defect-first, reported by `kit/tools/pascal/plan.py`. Observations and rungs live in `status.toml` too; the register is the authority, this table is a snapshot from 22 Aug 2026.
 

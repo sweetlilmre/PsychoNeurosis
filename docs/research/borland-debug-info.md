@@ -65,7 +65,7 @@ All indexes into the symbol/scope/line tables are 1-based; 0 means none, and 0xF
 
 The two open-source readers each get one thing wrong, and both errors were settled by measurement, not by trusting either source — the project's "distrust the verifier" rule applying to *published* verifiers:
 
-- **Reko parses scopes before line numbers** ([`SymbolLoader.cs`](https://github.com/uxmal/reko/blob/master/src/ImageLoaders/MzExe/Borland/SymbolLoader.cs), `LoadDebugHeader`). On TP7 output that order reads garbage; with **lines first** the line table rises monotonically (`300@0000 301@0014 ... 340@005A` for BYEBYE.PAS) and the scope autos ranges exactly tile the symbol table by module (`(1,6) (7,53) (60,73)` = PROGRAM's 6 + Crt's 53 + System's 73 = 132). MEASURED.
+- **Reko parses scopes before line numbers** ([`SymbolLoader.cs`](https://github.com/uxmal/reko/blob/master/src/ImageLoaders/MzExe/Borland/SymbolLoader.cs), `LoadDebugHeader`). On TP7 output that order reads garbage; with **lines first** the line table rises monotonically (`300@0000 301@0014 ... 340@005A` for NEUR9.PAS) and the scope autos ranges exactly tile the symbol table by module (`(1,6) (7,53) (60,73)` = PROGRAM's 6 + Crt's 53 + System's 73 = 132). MEASURED.
 - **tdinfo-parser gives segment records 14 bytes** ([`tdinfo_structs.py`](https://github.com/ramikg/tdinfo-parser/blob/master/tdinfo_structs.py), `Padding(4)` after six words); Reko's 16-byte struct with correlation index/count is right. With 14 bytes every later table shears by 2 bytes per segment record and the type table decodes as noise; with 16 the block closes exactly: header 48 + symbols + modules + sources + lines + scopes + segments + correlations + types + name pool = appended size, **residue 0 bytes, in both files**. MEASURED.
 
 The fixed-8-byte-slot type walk (tdinfo-parser's model) also misreads TP7 types unless range records are given their second slot — Reko's variable reads with `++i` are correct there. With both corrections the TP7 type table decodes into textbook Pascal: `SCHAR Shortint -128..127`, `SINT Integer -32768..32767`, `UCHAR Byte 0..255`, `TPREAL Real size 6`, `PSTR STRING size 256`, `TFILE Text size 256`, and in `.009` a `PARRAY` of size 4,000 with index subrange `1..4000` — `IMAGEDATA`, the 80x25x2 text screen (MEASURED; the constant `IMAGEDATA_LENGTH = 0FA0h = 4000` in the same block agrees).
@@ -77,14 +77,14 @@ Run it yourself; the tool takes any MZ file on argv and has no project facts in 
     python kit/tools/substrate/tddump.py bin/NEUROSIS.000 bin/NEUROSIS.009
     python kit/tools/substrate/tddump.py --names-only bin/NEUROSIS.009
 
-### NEUROSIS.009 (BYEBYE.PAS)
+### NEUROSIS.009 (NEUR9.PAS)
 
 3 modules, 1 source file, 132 symbols, 25 line records, all decoded (MEASURED):
 
     module 1: PROGRAM   language=Pascal flags=0x04 symbols=(7,0)   srcfiles=(1,1) correlations=(1,1)
     module 2: Crt       language=Pascal flags=0x04 symbols=(60,0)  srcfiles=(0,0) correlations=(0,0)
     module 3: System    language=Pascal flags=0x04 symbols=(133,0) srcfiles=(0,0) correlations=(0,0)
-    source 1: BYEBYE.PAS  timestamp 0x1C4493E7 = 1994-02-04 18:31:14
+    source 1: NEUR9.PAS  timestamp 0x1C4493E7 = 1994-02-04 18:31:14
 
 One field does not read as documented: the module record's symbols pair is documented as (index, count), but TP7 writes (7,0), (60,0), (133,0) — each value is one past the module's last symbol (PROGRAM owns 1-6, Crt 7-59, System 60-132), so it behaves as an exclusive end index with the count unused. INFERRED from three consistent module records in each file; the scope table, which does carry honest (index, count) pairs, is the reliable way to partition symbols by module.
     segment 1: module=1 0000:0000 length=0x0062   (the program body: 98 bytes of code)
@@ -101,13 +101,13 @@ The program module's own symbols — the ones an RE session actually wants — a
     sym 5: 0000:0019 constant          IMAGEDATA_DEPTH  = 25
     sym 6: 0000:0FA0 constant          IMAGEDATA_LENGTH = 4000
 
-Constants store their value in the offset/segment fields (class 5; `MaxLongint` arrives as `7FFF:FFFF`). Symbols 7 through 132 are the Crt and System unit interfaces — `ClrScr`, `GotoXY`, `ReadKey`, `HeapOrg`, `SaveInt00`..`SaveInt75`, `Test8086`, and the full typedef set (`Integer`, `Byte`, `Real`, ...). The 25 line records map BYEBYE.PAS source lines 300-340 onto code offsets 0000-005A of segment 1, so the main body starts at line 300 of a file whose earlier lines are the IMAGEDATA typed constant.
+Constants store their value in the offset/segment fields (class 5; `MaxLongint` arrives as `7FFF:FFFF`). Symbols 7 through 132 are the Crt and System unit interfaces — `ClrScr`, `GotoXY`, `ReadKey`, `HeapOrg`, `SaveInt00`..`SaveInt75`, `Test8086`, and the full typedef set (`Integer`, `Byte`, `Real`, ...). The 25 line records map NEUR9.PAS source lines 300-340 onto code offsets 0000-005A of segment 1, so the main body starts at line 300 of a file whose earlier lines are the IMAGEDATA typed constant.
 
-### NEUROSIS.000 (STARTUP.PAS)
+### NEUROSIS.000 (NEUR0.PAS)
 
 4 modules (PROGRAM, **Detect**, Crt, System), 150 symbols, 284 line records covering source lines up to the main body, and — unlike `.009` — named program routines with their locals, because scopes 8-13 carry function symbols (MEASURED):
 
-    source 1: STARTUP.PAS  timestamp 0x1C460164 = 1994-02-06 00:11:08
+    source 1: NEUR0.PAS  timestamp 0x1C460164 = 1994-02-06 00:11:08
     sym 1: 0000:0039 static YesNo         scope  8: offset=0x0039 length=0x008A
     sym 2: 0000:00C3 static WriteStr      scope  9: offset=0x00C3 length=0x00AF
     sym 3: 0000:01B9 static detected      scope 10: offset=0x01B9 length=0x005D
@@ -122,9 +122,9 @@ Auto-class offsets are signed BP-relative (`loop1` at `FFFE` = BP-2), and a `pas
 
 ### New facts this decode adds to the record
 
-- **Source timestamps survive in the binaries**: BYEBYE.PAS was last saved 1994-02-04 18:31:14, STARTUP.PAS 1994-02-06 00:11:08 (DOS packed format, DOCUMENTED as "time stamp" in the source-file record; the decoding to date fields is standard DOS and the 1994 values are self-authenticating). Reconstruction sources can carry these as targets.
+- **Source timestamps survive in the binaries**: NEUR9.PAS was last saved 1994-02-04 18:31:14, NEUR0.PAS 1994-02-06 00:11:08 (DOS packed format, DOCUMENTED as "time stamp" in the source-file record; the decoding to date fields is standard DOS and the 1994 values are self-authenticating). Reconstruction sources can carry these as targets.
 - The unit link order and per-unit code sizes are in the segment table (Crt is 0x61F bytes in both, System 0x592 vs 0xD95 — `.000` links file I/O that `.009` never touches).
-- The "70 functions" (`.000`) and "38 functions" (`.009`) figures in `docs/20` are **not from this debug info** — the debug info names 6 program routines in STARTUP.PAS and none in BYEBYE.PAS (its main body only); those counts must come from disassembly of the whole image including the RTL. Not a contradiction, but the doc reads as if the debug info supplied them. INFERRED.
+- The "70 functions" (`.000`) and "38 functions" (`.009`) figures in `docs/20` are **not from this debug info** — the debug info names 6 program routines in NEUR0.PAS and none in NEUR9.PAS (its main body only); those counts must come from disassembly of the whole image including the RTL. Not a contradiction, but the doc reads as if the debug info supplied them. INFERRED.
 
 ## 5. What can read it, verified to source
 
