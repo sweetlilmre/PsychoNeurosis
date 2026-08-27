@@ -32,6 +32,15 @@ matched = 14
 [routine."DEMOVT.SetVolume"]
 matched = 28
 
+[routine."DETECT.HasMouse"]
+matched = 22
+
+[routine."DETECT.Is386"]
+matched = 20
+
+[routine."DETECT.IsProtMode"]
+matched = 7
+
 [routine."MODEX.SelectPlane"]
 matched = 20
 
@@ -50,6 +59,9 @@ matched = 24
 [routine."P1LOGO.BlitSprite"]
 matched = 20
 
+[routine."P1LOGO.BuildCell"]
+matched = 36
+
 [routine."P1LOGO.SaveUnder"]
 matched = 20
 
@@ -59,11 +71,32 @@ matched = 38
 [routine."P1MOSAIC.MosaicBlocks"]
 matched = 132
 
+[routine."P1STAR.StarStep"]
+matched = 49
+
+[routine."P1TITLE.BlitClipped"]
+matched = 121
+
+[routine."P1TITLE.BlurBuffer"]
+matched = 75
+
+[routine."P1TITLE.DrawRevealed"]
+matched = 234
+
+[routine."P1VECTOR.DrawPoint"]
+matched = 84
+
+[routine."P1VECTOR.DrawReflection"]
+matched = 85
+
 [routine."P2GARAGE.BlitBitmapX"]
 matched = 56
 
 [routine."P2GARAGE.DoorRaiseOneRow"]
 matched = 38
+
+[routine."P2SOLID.TriFill"]
+matched = 14
 
 [routine."P2VIEW.FillRect"]
 matched = 145
@@ -77,6 +110,9 @@ matched = 67
 [routine."P2VIEW.SetMode"]
 matched = 26
 
+[routine."P2VIEW.SetMode400"]
+matched = 87
+
 [routine."P3BLOCKS.BlockDown"]
 matched = 32
 
@@ -87,25 +123,25 @@ matched = 32
 matched = 121
 
 [routine."P3MORPH.ClearPage"]
-matched = 62
+matched = 171
 
 [routine."P3MORPH.DrawMorph"]
-matched = 56
+matched = 304
 
 [routine."P3MORPH.DrawShape"]
-matched = 92
+matched = 340
 
 [routine."P3MORPH.FlipPage"]
-matched = 29
+matched = 138
 
 [routine."P3MORPH.GetPalette768"]
 matched = 24
 
 [routine."P3MORPH.PlotPixel"]
-matched = 62
+matched = 402
 
 [routine."P3MORPH.Set400Lines"]
-matched = 12
+matched = 91
 
 [routine."P3MORPH.SetAngles"]
 matched = 18
@@ -138,7 +174,7 @@ matched = 30
 matched = 38
 
 [routine."P4LEMS.ScrollRender"]
-matched = 60
+matched = 90
 
 [routine."P4LEMS.VLine"]
 matched = 44
@@ -219,7 +255,7 @@ matched = 19
 matched = 28
 
 [routine."VGA.SetPalette768"]
-matched = 24
+matched = 40
 
 [routine."VGA.SetRGB"]
 matched = 27
