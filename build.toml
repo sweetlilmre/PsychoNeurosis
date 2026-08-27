@@ -165,7 +165,12 @@ identity = ["TP*.PAS"]
 # resolves INCLUDE relative to the current directory, and TPC looks for the
 # .OBJ next to the unit that links it.
 # The external harness rides along too: staged here, installed below.
-alongside = ["src/asm/*.ASM", "src/asm/*.INC", "src/dos/*.BAT"]
+# MKDAT.PAS rides along as SOURCE, not as a build target: it is the tool that
+# builds NEUROSIS.DAT, not part of the demo, and [order] must go on meaning
+# "the demo" because the ten artefacts are measured from what it produces.
+# MKDAT.BAT compiles it at the DOS prompt when somebody needs it.
+alongside = ["src/asm/*.ASM", "src/asm/*.INC", "src/dos/*.BAT",
+             "src/dos/*.PAS"]
 
 [stage.subdirs]
 GEN = "src/gen"
