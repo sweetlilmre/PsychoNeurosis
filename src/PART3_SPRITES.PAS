@@ -138,15 +138,20 @@ var
   { DS:$D83C, 360 x 4 bytes, immediately after Trig. X at +0, Y at +2. }
   Wobble : array[0..AngleWrap - 1] of record X, Y : Integer end;
 
+  { DS:$DDDC -- one loop counter shared by Load, Run and Scene7. It really is
+    a global in the original, not a local in each. DECLARED BEFORE Font, and
+    the two addresses in these notes are their own proof: $DDDC then $DDDE,
+    two bytes apart, so the counter sits immediately below the 1,550-byte
+    font and immediately above the end of Wobble ($D83C + 1,440 = $DDDC).
+    Declaring it after Font instead put it at $E3EA and moved twenty-four
+    references in Run and Scene7 by the whole width of Font. }
+  GI     : Integer;
+
   { DS:$DDDE -- the 5x5 font, read straight off the DAT. The compiler folds
     the lower bounds into the base, which is why the binary addresses it as
     [DI + $DAB8] with DI = Ord(Ch)*25 + Row*5 + Col:
         $DDDE - (32*25 + 1*5 + 1) = $DAB8. }
   Font   : array[FontFirst..FontLast, 1..FontCell, 1..FontCell] of Byte;
-
-  { DS:$DDDC -- one loop counter shared by Load, Run and Scene7. It really is
-    a global in the original, not a local in each. }
-  GI     : Integer;
 
   { DS:$E3EC -- the palette the scene fades UP to, read from the DAT. This is
     the scene's own buffer, not VGA.Palette: 125e:0347 (the BlockRead) and
@@ -262,7 +267,11 @@ var
   -------------------------------------------------------------------------- }
 procedure DrawChar(X, Y : Integer; S : String; Segment : Word);
 var
-  Advance, I, R, C : Integer;
+  { The order is the slots, and the slots are in the notes below: I is nearest
+    BP under the string temporary, Advance is furthest. Declaring Advance
+    first, which reads more naturally, gave it $102 and pushed the three loop
+    counters down one slot each -- nineteen wrong displacements. }
+  I, R, C, Advance : Integer;
 begin
   Advance := 0;                           { [BP-$108] -- the pen position }
   for I := 1 to Length(S) do              { [BP-$102], limit at [BP-$10A] }
@@ -487,8 +496,12 @@ end;
   -------------------------------------------------------------------------- }
 procedure FadeOut;
 var
-  I, J    : Integer;
-  R, G, B : Byte;
+  { J is the outer loop and it is nearest BP, so it is declared first; and the
+    byte trio is declared BACKWARDS, because GetRGB's three var parameters are
+    pushed R, G, B and the original pushes [BP-7], [BP-6], [BP-5] in that
+    order. Both readings come straight off 125e:040f and 125e:0427. }
+  J, I    : Integer;
+  B, G, R : Byte;
 begin
   WaitRetrace;                                   { 125e:040a -- once only }
   for J := 1 to FadeSteps do
@@ -520,7 +533,10 @@ var
     declare the same two locals without reading either. }
   Unread  : Word;                 { [BP-$02], never read }
   I       : Integer;              { [BP-$04] }
-  R, G, B : Byte;                 { [BP-$05], [BP-$06], [BP-$07] }
+  { Declared BACKWARDS: GetRGB's three var parameters are pushed R, G, B, and
+    the original LEAs [BP-7], [BP-6], [BP-5] in that order, so R is the
+    LOWEST of the three. Same as FadeOut above. }
+  B, G, R : Byte;                 { R at [BP-$07], G at [BP-$06], B at [BP-$05] }
   Spare   : Byte;                 { [BP-$08], never read }
 begin
   WaitRetrace;                                   { 125e:047e }
@@ -596,8 +612,13 @@ begin
     if KeyPressed then Exit;                     { 125e:0612 }
     Ang := (Ang + SpinStep) mod AngleWrap;       { 125e:061e }
     { 2 degrees a frame over 181 frames is one full turn, radius 60 }
-    X := Round(Sin(DegToRad(T * 2)) * OrbitRadius) + OrbitCX;   { 125e:0655 }
-    Y := Round(Cos(DegToRad(T * 2)) * OrbitRadius) + OrbitCY;   { 125e:0685 }
+    { TRUNC, not Round, and these are the only two Truncs in the part. The far
+      call at 125e:0650 names System:$31EE, which nothing else in NEUROSIS.003
+      calls; Round is System:$320D and has thirteen call sites, one of them the
+      star generator's own Round two segments away. Truncation biases the orbit
+      toward the centre by up to a pixel on each axis. }
+    X := Trunc(Sin(DegToRad(T * 2)) * OrbitRadius) + OrbitCX;   { 125e:0655 }
+    Y := Trunc(Cos(DegToRad(T * 2)) * OrbitRadius) + OrbitCY;   { 125e:0685 }
     ClearScreen(VirtScrSeg, 0);
     DrawRotated(Ang, Trig[Ang].S, Trig[Ang].C,
                 Wobble[Ang].X + X,

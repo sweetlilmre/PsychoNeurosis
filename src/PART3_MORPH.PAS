@@ -130,14 +130,17 @@ type
 {$I gen/P3SHAPE.INC}     { const ShapeSphere, ShapeCube, ShapeGrid : TShape }
 
 var
-  { The rotation's sines and cosines. COSINE FIRST IN EACH PAIR: the recorded
-    addresses are SinX $BE92 / CosX $BE90 and SinY $BE96 / CosY $BE94, so the
-    cosine is the lower of the two and the declarations were the wrong way
-    round. Z is the other way about, and that is not a slip -- $BE98 is SinZ
-    and $BE9A is CosZ. }
+  { The rotation's sines and cosines. COSINE FIRST IN EVERY PAIR, Z included.
+    An earlier note here claimed Z was the other way about, on a reading of
+    $BE98 as SinZ; the loader settles it. The sine table is at [BX+$2A8] and
+    the cosine table at [BX+$35C] -- fixed by the Y pair, which was already
+    right -- and 1139:002a stores the $2A8 lookup to $BE9A, 1139:0031 the $35C
+    lookup to $BE98. So $BE98 is CosZ. Declaring SinZ first swapped the two
+    stores and the two reloads at 1139:0139: four bytes, and a rotation with
+    sine and cosine exchanged on one axis. }
   CosX, SinX          : Integer;   { DS:$BE90, $BE92 }
   CosY, SinY          : Integer;   { DS:$BE94, $BE96 }
-  SinZ, CosZ          : Integer;   { DS:$BE98, $BE9A }
+  CosZ, SinZ          : Integer;   { DS:$BE98, $BE9A }
 
   AngX, AngY, AngZ    : Integer;   { DS:$BE9C, $BE9E, $BEA0 }
   StepX, StepY, StepZ : Integer;   { DS:$BEA2, $BEA4, $BEA6 }

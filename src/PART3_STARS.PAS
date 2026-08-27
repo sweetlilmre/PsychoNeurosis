@@ -217,7 +217,11 @@ begin
             + DivLong(Live^[Idx].X shl ProjShift, Live^[Idx].Z);
       SY := Live^[Idx].YOfs
             + DivLong(Live^[Idx].Y shl ProjShift, Live^[Idx].Z);
-      if (SX <> 0) and (SX < ScrW) and (SY <> 0) and (SY < ScrH) then
+      { > 0, not <> 0. SX and SY are Word, so the original's JBE at 10b8:00dd
+        and 10b8:00ea is the unsigned `> 0` -- a JZ is what `<> 0` gives and
+        the two agree on every value a Word can hold, which is why this cost
+        two bytes and no behaviour. }
+      if (SX > 0) and (SX < ScrW) and (SY > 0) and (SY < ScrH) then
         PutPixel(SX, SY, ((-Live^[Idx].Z) shr 6) + 1, Dest);
     end;
 end;
@@ -528,10 +532,19 @@ begin
     Live^[Idx].Z := -Idx;                         { 10b8:077b }
   end;
 
-  { 10b8:079c -- copied a record at a time, not in one 7,000-byte Move.
+  { 10b8:079c -- copied a record at a time, not in one 7,000-byte Move, and
+    the copy is a STRUCTURED ASSIGNMENT, not a Move call. The two compile to
+    the same three pushes and one far call; they differ only in WHICH runtime
+    routine they name. A structured assignment names a plain forward
+    CLD / REP MOVSB helper, 24 bytes; Move names the overlap-safe one that
+    compares SI against DI first. Writing Move here was worth 32 bytes in the
+    load image -- this was part 003's ONLY reference to that helper, so the
+    original never links it, its System segment is 24 bytes shorter, and after
+    paragraph rounding every byte of the 40 KB data image sat two paragraphs
+    early. Nothing in the user segments differed; the call operand did.
     Source is the reset template every recycled point is rebuilt from. }
   for Idx := 1 to NumPoints do
-    Move(Live^[Idx], Source^[Idx], RecSize);
+    Source^[Idx] := Live^[Idx];
 end.
 
 { ===========================================================================
