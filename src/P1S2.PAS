@@ -435,10 +435,16 @@ asm
         ADD     DI, 27                  { 02be  the first byte with four      }
                                         {         diagonal neighbours         }
         MOV     CX, 3900                { 02c1  26 x 150, the whole band      }
-        XOR     AX, AX                  { 02c4                                }
-        XOR     BX, BX                  { 02c6  BH stays zero for the whole   }
                                         {         loop, so BX is a widened BL }
 @@Pixel:
+        { THE LABEL COMES BEFORE THE TWO XORs, so AX and BX are re-zeroed
+          every pixel. 1082:02e4's LOOP goes back to 02c4, which is the
+          first XOR -- not to 02c8, the first MOV. Hoisting them out of the
+          loop, which is what the comment about BH staying zero invited,
+          moved the label four bytes and was the only difference left in
+          this routine. }
+        XOR     AX, AX                  { 02c4                                }
+        XOR     BX, BX                  { 02c6  BH stays zero for the whole   }
         MOV     BL, ES:[DI-27]          { 02c8  up and left                   }
         MOV     AX, BX                  { 02cc                                }
         MOV     BL, ES:[DI-25]          { 02ce  up and right                  }
@@ -603,8 +609,16 @@ begin
 
       so it sweeps from the top right down to the bottom left. The bank index
       is (Frame - 1), which the original writes as +$F3D0, i.e. -CometSize. }
-    BlitClipped(@CometBank^[Trunc(Frame)],       { 1082:0396 }
-                Count * 4, Trunc(CometPos), VirtScrSeg);
+    { Round, NOT Trunc, AT ALL THREE SITES IN THIS LOOP -- the frame, the comet's
+      Y and the glyph phase. Each one is a single far call into the runtime and
+      the offsets differ: 1082:0392, 03c0 and 03fb call System:$3268 where Trunc
+      compiles to $3249. Same length, one byte apart in the image, and a
+      different answer whenever the value is not exact -- Frame steps by 0.3, so
+      Trunc held each frame a step longer than the original does. Those three
+      bytes were the last of this unit; it is now byte-for-byte identical to
+      segment 1082. }
+    BlitClipped(@CometBank^[Round(Frame)],       { 1082:0396 }
+                Count * 4, Round(CometPos), VirtScrSeg);
 
     { Only the character currently animating is drawn here; Trunc(Phase) is
       its animation step, one of 1, 3, 5, 7, 9, 11, 13, 15. }
@@ -614,7 +628,7 @@ begin
       strict less-than. The two are the same test on an Integer; only one of
       them costs the extra byte, and it is the one that is there. }
     if (CharIdx > 0) and (CharIdx < Length(S) + 1) then
-      DrawChar(S[CharIdx], Trunc(Phase), CharIdx);
+      DrawChar(S[CharIdx], Round(Phase), CharIdx);
 
     Phase := Phase + 2.0;
     if Phase > 15.0 then
