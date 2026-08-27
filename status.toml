@@ -260,11 +260,11 @@ tier = "part"
 outcome = "matches"
 achieved = "R3"
 observer = "maintainer"
-date = "2026-08-26"
-confirmed_at = "c4043281e85d"
-fingerprint = "94598e1abf4dbfbd"
-against = "work/split/NEUROSIS_003.exe"
-note = "Watched RUNPART 3 on 26 Aug 2026, the FIRST EVER RUN of part 003 as a real program. The maintainer reports it looking the same as ORIG3. Covers P3Tunnel losing its private SetModeX to ModeX's, P3Globe gaining the I-minus switch and four ordering corrections -- B, G, R declared backwards, greater-than-zero for not-equal-zero, Target as 256 triples, SrcOfs and DstOfs transposed -- two of three title showings gaining a keyboard guard before the BlockRead, and P3Stars making DegToRad far and moving Generate's body into the initialisation section. Part 003 is now aligned on every one of its 13,920 bytes."
+date = "2026-08-27"
+confirmed_at = "5edfb71a71ba"
+fingerprint = "1dc7dcf45a83a38b"
+against = "ORIG3.EXE"
+note = "Watched beside ORIG3 with Morph_FadeStep's MOV DI at the original's $0300, the part byte-identical: runs and exits cleanly and looks identical to the original. This is the run that retired the FadeStep deviation."
 
 [observation."NEUR5"]
 harness = "NEUR5"
@@ -375,6 +375,15 @@ sha256 = "107ed64a6320c3416ae6c06182cdc1b429d9720c7690c5ac7f03859e2b99b3d0"
 achieved = "R7"
 target = "R7"
 measured_at = "00cb23684319"
+
+[artefact."NEUR3"]
+ours = "run/NEUR3.EXE"
+original = "work/split/NEUROSIS_003.exe"
+compare = "file"
+sha256 = "b2cc345a5c63ef3d9df5eaf36b247649248218ff76490d32a91d5f6d78cad691"
+achieved = "R7"
+target = "R7"
+measured_at = "5edfb71a71ba"
 
 [artefact."NEUR4"]
 ours = "run/NEUR4.EXE"

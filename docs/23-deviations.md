@@ -8,6 +8,13 @@ choice.
 Each entry says what the original does, what the reconstruction does instead,
 and what would have to change to close the gap.
 
+**Some entries are headed NOT a deviation**, and they are the useful ones to
+read first. Two kinds end up here: a difference somebody proposed and the
+binary refused, and a defect **in the original** that the reconstruction now
+faithfully reproduces. The second kind carries the recipe for fixing the bug and
+what fixing it would cost, so a real out-of-bounds write does not become
+invisible just because reproducing it is the right call today.
+
 ---
 
 ## Hand assembler is transcribed verbatim — but the frame is not the same
@@ -19,46 +26,113 @@ the surrounding stack frame: Turbo Pascal decides where locals sit, how much
 space a procedure reserves, and what lies immediately above and below.
 
 That distinction is invisible until a routine reads or writes outside its own
-storage — see the next entry, which is the only known instance so far.
+storage — see the next entry, which is the only known instance so far, and read
+it as a correction to this one rather than as an example of it. **Once every
+other byte of a part matches, the frame IS the same**, because the frame is made
+by instructions that are themselves being compared. `PART3_MORPH.FadeStep`
+writes three bytes outside its buffer; that hung the scene while part 003 still
+differed from the original elsewhere, and stopped hanging when it did not.
+
+So the rule this entry states is true of a part **under reconstruction** and
+stops being true of one that has converged. Which means the distinction is worth
+keeping for exactly as long as a part still differs, and no longer.
 
 ---
 
-## `PART3_MORPH.FadeStep` -- the fade loop runs off both ends of its buffer
+## NOT a deviation any more: `PART3_MORPH.FadeStep` runs off both ends of its buffer, and so do we
 
-**Original** (`1139:0365`). `ENTER $300` reserves a 768-byte palette buffer at
-`BP-$300`. The loop then does:
+**This was the last entry in this file to be retired, on 27 Aug 2026, and it is
+kept because the bug is real and somebody may want to fix it one day.** Part 003
+now rebuilds byte-for-byte identical to `NEUROSIS.003`, including these two
+bytes, and a watched run beside `ORIG3` confirmed it runs and exits cleanly and
+looks identical to the original.
+
+### The defect, which is the original's and is now also ours
+
+`1139:0365`. `ENTER $300` reserves a 768-byte palette buffer at `BP-$300`. The
+loop is:
 
 ```
 MOV DI,$300                     ; 768 -- one PAST the last byte
 @@: read/dec/write [BP+DI-$300] ; three times, DEC DI after each
-    JNS @@                      ; so DI also takes -1 and -2
+    JNS @@                      ; so DI also reaches $FFFF and $FFFE
 ```
 
 It touches indices **768 down to -2**: 771 bytes, of which only 0..767 are
-palette. Index 768 is `[BP]` -- the saved BP itself. Indices -1 and -2 are dead
-stack below the frame. The original survives it because `LEAVE` is
-`MOV SP,BP / POP BP`, so it reads BP before popping, and `Demo_Scene3` keeps
-nothing in BP.
+palette.
 
-**Reconstruction.** A plain `for I := 767 downto 0`.
+* **Index 768 is `[BP]` -- the saved BP itself**, pushed by `ENTER`. The write
+  is conditional (`OR AL,AL / JZ`) and *decrements*, so it fires only while that
+  byte is non-zero. `LEAVE` is `MOV SP,BP / POP BP`, so it pops BP **from
+  `[BP]`** and the decremented byte lands straight back in the register.
+* **Indices -1 and -2 are two bytes below the frame**, written on the last pass.
 
-**Effect on output: none, and provable rather than assumed.** Only
-`Pal[0..767]` is written to the DAC by `SetPalette768`. The three extra indices
-are stack bytes that nothing reads back, so the palette is bit-identical.
+**It is a genuine out-of-bounds write, three bytes of it, once per call.**
 
-**Why not reproduce the overrun.** Transcribing it literally reproduces the
-original's *arithmetic* but not its *behaviour*: the three writes land on Turbo
-Pascal's frame rather than the original's, and across the closing segment's 63
-calls they corrupted something that mattered -- the scene faded to black and
-hung. An earlier fix widened the array to `-2..768` so those writes had real
-storage; it worked, but left a strange declaration in the source purely to
-reproduce side effects that cannot be observed. The bounded loop is simpler and
-closer to what the routine is for.
+### Why it is harmless here, and every clause is measured
 
-The general point is worth stating once: transcribing assembler verbatim
-reproduces the instructions but **not** the stack frame. Turbo Pascal decides
-where locals sit and what lies above and below them, which is invisible until a
-routine reads or writes outside its own storage.
+* **It self-limits.** The write only fires on a non-zero byte and decrements it,
+  so after at most 255 calls the saved BP's low byte is zero and the write stops
+  for good. The caller's BP drifts at most 255 bytes downward, not without
+  bound. The closing segment makes 63 calls, so in practice the drift is at most
+  63 bytes.
+* **The caller never uses BP.** `Demo_Scene3` at `1139:03b4` is hand assembler
+  end to end: between the `CALL` at `1139:0560` and its `RETF` at `1139:0583`,
+  and through the whole region above the call, there is no `ENTER`, no
+  `PUSH BP`, no `LEAVE`, and not one BP-relative operand. The register `LEAVE`
+  restores is one nothing reads before the next Pascal frame re-establishes it.
+* **The two bytes below the frame are dead stack** that nothing reads back.
+* **Only `Pal[0..767]` reaches the DAC**, via `SetPalette768`, so the palette
+  itself is bit-identical either way.
+
+### Why the earlier attempt hung, which is the interesting part
+
+An earlier pass transcribed `$0300` literally and the scene **faded to black and
+hung**. That observation was real and was recorded here as proof the constant
+could not be reproduced. It was proof of something else: at that time the rest
+of part 003 was **not** byte-identical, so the frame these three writes landed
+on was Turbo Pascal's arrangement and not the original's. The note in this file
+even said so -- *"the three writes land on Turbo Pascal's frame rather than the
+original's"* -- and then drew the conclusion that the constant was the problem.
+
+**The constant was never the problem. The surrounding difference was.** Once
+every other byte of the part matched, the three writes landed exactly where the
+1994 code puts them and the hang did not come back. Byte-exactness fixed a
+behavioural defect, which is the strongest argument for it this project has
+produced.
+
+Two claims from the old entry are corrected rather than deleted, because both
+were reasoned from and both were wrong: that `LEAVE` "reads BP before popping"
+so the corrupted byte is not used (it pops **from** `[BP]`, so it is), and that
+an earlier widening of the array to `-2..768` was the only way to give those
+writes real storage (it changes `ENTER`, so it cannot be byte-exact by
+construction).
+
+### HOW TO FIX THE BUG, IF IT EVER MATTERS
+
+It has not been fixed, deliberately: fidelity is the goal and the write is
+provably harmless in this program. Should that ever change -- a different DOS
+host, a debugger that guards the frame, an emulator that faults on a write below
+SP -- this is the whole change:
+
+```
+src/PART3_MORPH.PAS, in FadeStep's asm block:
+    MOV  DI, $0300      ->      MOV  DI, $02FF
+```
+
+`$02FF` covers 767..0 in the same 256 passes, stays inside the buffer, and
+produces the same palette. **What it costs:**
+
+* **two bytes** of the load image, at `1139:0373`;
+* **part 003's byte-identity**, and with it the `[artefact.NEUR3]` row -- so
+  `artefact.py --check` would start reporting one failing artefact, which is a
+  ratchet falling and has to be an explicit decision, not a side effect;
+* and this entry would move back to being a real deviation, above.
+
+**Do not revert it on an argument.** It was reverted once on an argument that
+turned out to be wrong in two of its clauses, and it cost a session's worth of
+believing the two bytes were unreachable. If it goes back, a watched run says
+why.
 
 ---
 

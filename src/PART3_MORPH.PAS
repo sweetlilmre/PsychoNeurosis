@@ -1081,10 +1081,22 @@ begin
     byte for byte, so whatever it does now is what the shipped demo did. The
     two bytes cannot be a fidelity risk and a behaviour risk at the same time.
 
-    IF A WATCHED RUN CONTRADICTS THIS, the constant goes back to $02FF -- which
-    covers 767..0 in the same 256 passes, stays inside the buffer, and costs two
-    bytes -- and this note keeps the three readings above and gains a fourth
-    from the run. Do not revert it on an argument. }
+    THE RUN CONFIRMED IT, 27 Aug 2026: watched beside ORIG3, part 003 runs and
+    exits cleanly and looks identical to the original. Recorded as an
+    [observation.NEUR3] R3 row and an [artefact.NEUR3] byte-identity row.
+
+    AND THE EARLIER HANG WAS REAL -- it was just not this constant's fault. When
+    it was tried, the rest of part 003 still differed from the original, so
+    these three writes landed on Turbo Pascal's arrangement of the frame rather
+    than on the 1994 one. Byte-exactness fixed a behavioural defect, which is
+    the strongest argument for it this project has produced.
+
+    THE OUT-OF-BOUNDS WRITE IS STILL A GENUINE BUG, three bytes of it per call,
+    and it is documented as such in docs/23-deviations.md under "NOT a deviation
+    any more" -- with the one-line fix ($0300 -> $02FF) and what fixing it costs:
+    two bytes, part 003's byte-identity, and the [artefact.NEUR3] ratchet. It is
+    reproduced on purpose, not overlooked. Do not revert it on an argument: that
+    happened once, on reasoning that was wrong in two of its clauses. }
 
   WaitRetrace;                         { 1139:03a4 }
   SetPalette768(Pal);                  { 1139:03af }
