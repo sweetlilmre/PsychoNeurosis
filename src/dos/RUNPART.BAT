@@ -23,6 +23,15 @@ rem
 rem  A batch file rather than a Pascal launcher on purpose: DOS Exec would have
 rem  to stay resident while the part runs, and these parts want the memory.
 rem
+rem  IF A PART REPORTS "NEURn.EXE IS NOT IN THIS DIRECTORY" AND IT PLAINLY IS,
+rem  TYPE `rescan` (or press Ctrl-F4). DOSBox-X caches the file listing of a
+rem  mounted host drive, so a filename that appears while DOSBox is ALREADY
+rem  RUNNING is invisible to `if not exist` until the cache is flushed. A file
+rem  that was already there when DOSBox started is fine however often it is
+rem  rebuilt -- the content is read on open -- so this only ever bites the first
+rem  time a NEW part name exists. It bit NEUR5.EXE on 27 Aug 2026, the day part
+rem  005 stopped being a harness.
+rem
 rem  THIS FILE MUST BE CRLF. It was written with bare LF once and DOSBox's shell
 rem  mis-parsed the `if not exist` line below, reporting NEUR2.EXE as missing
 rem  while it sat in the same directory. .gitattributes marks .BAT as -text, so
