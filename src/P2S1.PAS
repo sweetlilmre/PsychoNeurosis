@@ -35,6 +35,13 @@
 
 unit P2S1;
 
+{$A-}   { NO VARIABLE ALIGNMENT. Run's counter is the decisive reading: ENTER 4
+          with one byte declared ahead of it puts an Integer at the ODD
+          [BP-$03], which 1008:069c, 06b3 and 06c7 all address, and A-plus
+          would have padded it to [BP-$04]. Nothing in this unit's DGROUP
+          shows it either way -- every block here is even-sized and
+          even-based -- so the frame is the only witness. }
+
 
 (* I/O CHECKING OFF. Under the default {$I+} Turbo Pascal emits a far CALL to
    the runtime's check after every I/O operation that can fail, and the
@@ -425,11 +432,19 @@ var
     longhand in the original, 1008:026c through 1008:02ba. With a `for K` loop
     the frame came out ENTER $0A against the original's $08 -- Col and the three
     channel bytes are five, rounded to six, plus two bytes of temporary. }
-  Col     : Integer;
-  R, G, B : Byte;
-  { TWO MORE BYTES, declared and never read. Col plus the three channel bytes
-    are five, which rounds to six, and the original opens ENTER $08. }
-  Spare   : Integer;
+  { THE ORDER IS THE SLOTS, and all six are read off 1008:024c and 1008:0258.
+    ENTER 8 gives [BP-2] through [BP-8]; the counter is the WORD at [BP-4],
+    the three channel bytes are [BP-7], [BP-6] and [BP-5] with R the LOWEST --
+    GetRGB's var parameters are pushed R, G, B and the original LEAs them in
+    that order -- and both [BP-2] and [BP-8] are never touched. So an unread
+    word comes first, the counter second, the trio BACKWARDS, and an unread
+    byte last. Written the natural way round -- Col, then R, G, B, then a
+    two-byte spare -- every one of the routine's 39 displacements was wrong
+    while the frame size and every instruction length stayed right. }
+  Spare1  : Integer;                 { [BP-$2], never touched }
+  Col     : Integer;                 { [BP-$4] }
+  B, G, R : Byte;                    { R at [BP-$7], G at [BP-$6], B at [BP-$5] }
+  Spare2  : Byte;                    { [BP-$8], never touched }
 begin
   for Col := 0 to 255 do
   begin
@@ -461,8 +476,12 @@ end;
   -------------------------------------------------------------------------- }
 procedure SceneFadeOut;
 var
+  { The byte trio BACKWARDS, as everywhere GetRGB's three var parameters are
+    passed: 1008:02ff LEAs [BP-9], then [BP-8], then [BP-7], and the pushes are
+    R, G, B, so R is the LOWEST slot and is declared LAST. The three Integers
+    were already right -- Col counts at [BP-4] and K at [BP-6]. }
   Pass, Col, K : Integer;
-  R, G, B      : Byte;
+  B, G, R      : Byte;
 begin
   for Pass := 1 to $40 do
   begin

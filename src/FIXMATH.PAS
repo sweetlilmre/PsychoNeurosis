@@ -104,10 +104,18 @@ end;
 
   The parameter is six bytes (RETF 6) arriving in DX:BX:AX, so it is a Borland
   Real; the result is four (the frame reserves and returns only AX and DX).
+
+  TRUNC, NOT ROUND, and the arithmetic and the binary agree. The half is
+  already added by hand -- adding 0.5 and then truncating IS rounding, and
+  rounding on top of it would round twice. 142a:005c calls System:$3249 and
+  the rounding entry is $3268, thirty-one bytes on; part 003's pair sits the
+  same distance apart, $31EE and $320D, which is how the two were told apart
+  without a runtime library listing. It is one byte of the load image and a
+  half-count on the last bit of every fixed-point conversion in the part.
   -------------------------------------------------------------------------- }
 function RealToFixed(X : Real) : LongInt;
 begin
-  RealToFixed := Round(X * FixedOne + RoundBias);
+  RealToFixed := Trunc(X * FixedOne + RoundBias);
 end;
 
 { 1483:0071 -- the TRUNCATING conversion: no bias, just a 32-bit shift right

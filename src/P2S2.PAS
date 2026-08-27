@@ -883,8 +883,16 @@ asm
 @@FlatTopOrder:           { <- FlatTopOrder                               }
   CMP  AX, CX             { X1 against X2, the flat edge                    }
   JG   @@FlatTopSwap      { X1 > X2, swap so X1 is the left end             }
-  JGE  @@Done             { equal -- zero-width, nothing to fill            }
+  JGE  @@DoneA            { equal -- zero-width, nothing to fill            }
   JMP  @@FlatTop          { already left-to-right                           }
+@@DoneA:                  { the BRIDGE, WRITTEN OUT ON PURPOSE. @@Done is  }
+  JMP  @@Done             { too far for a short jump from here, and left to }
+                          { itself BASM bridges the OTHER arm: it inverts   }
+                          { JGE to JL, sends that at @@FlatTop's bridge and }
+                          { falls through to @@Done. Same branch, same      }
+                          { behaviour, one byte different from 108b:04b6.   }
+                          { Naming the bridge keeps the original's shape --  }
+                          { JGE to a bridge, then JMP @@FlatTop.            }
 @@FlatTopSwap:            { <- FlatTopSwap                                }
   XCHG CX, AX             { swap X1 and X2                                  }
   JMP  @@FlatTop          { to FlatTop                                    }
@@ -896,8 +904,10 @@ asm
 @@IsFlatBot:              { <- IsFlatBot                                  }
   CMP  CX, X3             { X2 against X3, the flat edge                    }
   JG   @@FlatBotSwap      { X2 > X3, swap so X2 is the left end             }
-  JGE  @@Done             { equal -- zero-width                             }
+  JGE  @@DoneB            { equal -- zero-width                             }
   JMP  @@FlatBot          { already left-to-right                           }
+@@DoneB:                  { the same bridge again, for 108b:04ce            }
+  JMP  @@Done
 @@FlatBotSwap:            { <- FlatBotSwap                                }
   XCHG X3, CX             { swap X2 and X3                                  }
   JMP  @@FlatBot          { to FlatBot                                    }
