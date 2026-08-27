@@ -49,8 +49,8 @@ var
     to $9DDC.
 
     TWO HYPOTHESES ELIMINATED BY MEASUREMENT, so they need not be tried again:
-      {$A-} on THIS unit -- no effect at all, byte for byte. So TP7's $A does
-        not control where a unit's data block starts; P1S4 already carries $A-
+      $A- on THIS unit -- no effect at all, byte for byte. So TP7's $A does
+        not control where a unit's data block starts; P1S4 already carries $A-minus
         and it does not help either.
       Tail3 as TWO bytes instead of three, on the theory that our compiler's
         boundary pad supplies the third -- measurably WORSE, 53 differing bytes
