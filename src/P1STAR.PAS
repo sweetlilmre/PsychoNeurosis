@@ -17,6 +17,8 @@
   of it.
   ========================================================================== }
 unit P1STAR;
+{$A-}   { NO VARIABLE ALIGNMENT, and it does nothing on its own -- see the note
+          beside Star. It is one of three changes that only work together. }
 
 {$G+}   { 286 instructions, and this unit needs it: 12b2:0017 is IMUL DI,AX,9,
           which TP7 emits only under $G+. Without it the whole address
@@ -39,42 +41,36 @@ type
   end;
 
 var
-  { DS:$9DDB, stride 9 }
-  { OUR STAR ARRAY LANDS ONE BYTE HIGH AND THAT IS THIS UNIT'S WHOLE DIFFERENCE
-    -- SEVEN BYTES, EVERY ONE A DISPLACEMENT. 12b2:001a is ADD DI,$9DD2 in the
-    original and $9DD3 in ours, and the three folded bases go with it:
-    [BX-$6225] against [BX-$6224] and so on. The address is forced from below:
-    P1S4's Blob is 145 records of 51 bytes from DS:$80F5, ending at $9DD7, and
-    its Tail3 fills $9DD8..$9DDA, so Star belongs at the ODD $9DDB. Ours pads
-    to $9DDC.
+  { DS:$9DDB, stride 9 -- AND IT LANDS THERE NOW. This unit used to carry a
+    long note calling seven bytes an unreachable floor, on the reasoning that
+    our TP7 pads a unit's data block to a word boundary where the original's
+    did not, and that nothing in any source reaches a block's placement. Three
+    hypotheses had been eliminated one at a time and the conclusion drawn from
+    their failure. It was wrong, and all three failed for the same reason: each
+    was tried ALONE.
 
-    TWO HYPOTHESES ELIMINATED BY MEASUREMENT, so they need not be tried again:
-      $A- on THIS unit -- no effect at all, byte for byte. So TP7's $A does
-        not control where a unit's data block starts; P1S4 already carries $A-minus
-        and it does not help either.
-      Tail3 as TWO bytes instead of three, on the theory that our compiler's
-        boundary pad supplies the third -- measurably WORSE, 53 differing bytes
-        across part 001 to 188. Tail3 is three.
-    A THIRD MEASUREMENT PINS IT DOWN, and it makes this a floor rather than an
-    open question. Declaring a one-byte Probe immediately before Star moved Star
-    from $9DDC to $9DDE -- a jump of TWO, not one. So the Probe took $9DDC and
-    Star was then word-aligned past the odd $9DDD, which means our P1Star data
-    BLOCK begins at $9DDC and Star's own alignment is a separate, currently
-    harmless effect. The byte is the BLOCK's placement: P1S4's data ends at
-    $9DDA, the next free byte is the odd $9DDB, and our TP7 pads the following
-    unit's block to a word while the original's did not.
+    The block's start is still not reachable, but it does not have to be. What
+    Star needs is an ODD address, and it takes three changes AT ONCE:
 
-    Nothing in either unit's source reaches that. $A- controls variable
-    alignment -- it demonstrably works, since adding it to P1S1 is what put F at
-    the odd $563F -- and it does not move a block. Moving P1Star in the uses
-    clause would move the block, but the clause is also the code segment order,
-    which is exact.
+      P1S4's Tail3 becomes TWO bytes, so that unit's block ends at $9DD9 and
+        ours pads the next block to the EVEN $9DDA rather than to $9DDC;
+      this unit takes A-minus, so a word-sized type does not step past an odd
+        offset;
+      and Lead below takes the byte Tail3 gave up, at $9DDA.
 
-    SO THESE SEVEN BYTES ARE A FLOOR: one pad byte, its six folded consequences,
-    and three hypotheses eliminated by measurement rather than by argument. The
-    next thing that could move it is the .TPU's own data-segment alignment
-    record, which is not source-controllable, or a different patch level of
-    TP 7.00. }
+    Star then begins at $9DDB. Tail3 as two bytes alone had measured 53 bytes to
+    188; $A- alone had measured no change at all; a one-byte probe alone had
+    moved Star TWO bytes instead of one. Three results that each read as a
+    refutation, and all three were parts of the same answer. Part 001 went from
+    nine differing bytes to one.
+
+    WHAT TO TAKE FROM IT: a placement hypothesis cannot be tested one change at
+    a time when the compiler rounds. Rounding hides a one-byte move and doubles
+    it, so a single change either does nothing visible or overshoots, and both
+    readings look like proof. The total has to be held constant across the
+    experiment -- which is what moving Tail3's byte in here does. }
+  Lead  : Byte;                                     { DS:$9DDA, never read
+                                                      -- the byte Tail3 gave up }
   Star  : array[1..StarCount] of TStar;             { DS:$9DDB }
 
 procedure StarInit(C0, Ca, Cb, Speed : Byte);
