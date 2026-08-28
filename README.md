@@ -86,10 +86,10 @@ Then `dosbox-x -conf psycho.conf`.
 
 | card | port | IRQ | DMA | rate |
 |---|---|---|---|---|
-| Sound Blaster, mono or Pro stereo | `$220` | 7 | 1 | `28000` or lower |
-| Gravis UltraSound | `$240` | 5 | 3 | `28000` or lower |
+| Sound Blaster, mono or Pro stereo | `$220` | 7 | 1 | `40000` |
+| Gravis UltraSound | `$240` | 5 | 3 | `40000` |
 
-Both work. If the music still cuts out, drop the rate to `16000` or `8000`: the mixing is done in software, and at 10000 cycles a 486 has only so much to spare underneath a 320x200 effect.
+Both work, and `40000` -- the highest rate the setup offers -- is what was watched. If the music does cut out, dropping the rate is the thing to try: the mixing is done in software, and at 10000 cycles a 486 has only so much to spare underneath a 320x200 effect.
 
 That is all. The demo runs its seven parts in order and returns you to DOS.
 
@@ -209,7 +209,7 @@ R:  run     the load images and the scene harnesses
 
 Those are the values `interactive.conf` emulates — `sbbase`/`irq`/`dma` and `gusbase`/`gusirq`/`gusdma`. The setup asks all four of its questions for GUS as well; only the Silence option skips them. **Confirmed by a watched run on 28 Aug 2026**: with these answers both Sound Blaster and GUS play, which is the only instrument there is for a sound path.
 
-If it still breaks, the cheap discriminator is the mixing rate the setup offers last. Pick `/f:8000` or `/f:16000`. If a low rate survives where a high one does not, the emulated CPU cannot sustain the software mix and `[cpu] cycles` is the answer — it is set to 10000, which is low for a 486-era demo running a mixer under a 320×200 effect. **Raising it changes how fast the demo runs**, which is why it is left alone by default: the pacing work in `status.toml` was observed at this setting.
+If it still breaks, the cheap discriminator is the mixing rate the setup offers last. `/f:40000` is what has been watched working; drop to `/f:16000` or `/f:8000`. If a low rate survives where a high one does not, the emulated CPU cannot sustain the software mix and `[cpu] cycles` is the answer — it is set to 10000, which is low for a 486-era demo running a mixer under a 320×200 effect. **Raising it changes how fast the demo runs**, which is why it is left alone by default: the pacing work in `status.toml` was observed at this setting.
 
 One setting looks alarming and is not: `gus master volume = 0.00` is in **decibels**, so it is unity gain.
 
