@@ -113,6 +113,7 @@ flags = "/ML /Z"
 mode = "uses"
 list = [
   "test/VIDMODE.PAS",
+  "test/LOADPART.PAS",
   "PSYCHO.PAS",
   "NEUR9.PAS",
   "NEUR0.PAS",
@@ -199,4 +200,6 @@ alongside = ["RUNPART.BAT"]
 # subdirectory -- which is exactly what a "does this row do anything?" filter
 # has to account for, and the one that pruned this table did not.
 "test/VIDMODE.PAS" = ["VIDMODE.PAS", "VidMode", "VidMode"]
+# LOADPART, same reason: it lives in src/test/ and must stage flat.
+"test/LOADPART.PAS" = ["LOADPART.PAS", "LoadPart", "LoadPart"]
 "PSYCHO.PAS" = ["TPSYCHO.PAS", "Psycho", "Psycho"]
