@@ -254,3 +254,14 @@ TPSYCHO = "PSYCHO.EXE"
 # LOADPART, same reason: it lives in src/test/ and must stage flat.
 "test/LOADPART.PAS" = ["LOADPART.PAS", "LoadPart", "LoadPart"]
 "PSYCHO.PAS" = ["TPSYCHO.PAS", "Psycho", "Psycho"]
+
+# EXTRA DRIVES, so a session can reach what the build does not own. Paths are
+# relative to this file's directory and are resolved when the config is written,
+# so nothing here is a machine path.
+#
+# E: is the PACKAGED demo -- the parts as they shipped, with their music modules
+# and a NEUROSIS.DAT built from the manifest. The build never writes there;
+# tools/package.py does. So `E:` then `RUNPART 1` runs the real thing, while D:
+# stays the staging directory and run/ stays the load images the checks measure.
+[dosbox.mount]
+E = "dist"

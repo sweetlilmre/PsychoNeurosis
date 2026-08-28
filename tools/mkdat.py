@@ -23,7 +23,7 @@ change the data image of every part that included the file. Never emit a type.
 
     python tools/mkdat.py            build the blob and the include
     python tools/mkdat.py --check    verify both without writing
-    python tools/mkdat.py --out DIR  also write the blob into DIR
+    python tools/mkdat.py --out DIR [--out DIR2]   also write the blob there
 
 `--out` exists for the packaging step, which needs the blob as a FILE beside the
 parts that read it. Note what it does not do: it does not copy bin/NEUROSIS.DAT.
@@ -119,13 +119,15 @@ def render_inc(entries, total, manname):
 
 def main(argv):
     check = "--check" in argv
-    out = None
-    if "--out" in argv:
-        i = argv.index("--out")
-        if i + 1 >= len(argv):
-            print("  --out needs a directory")
-            return 2
-        out = pathlib.Path(argv[i + 1])
+    # REPEATABLE: the blob is needed in more than one place at once. run/ is
+    # where the scene harnesses are tested and every one of them reads it;
+    # dist/ is the packaged demo. Neither is a copy of bin/NEUROSIS.DAT -- both
+    # are built here from the manifest, which is the whole point.
+    outs = [pathlib.Path(argv[i + 1]) for i, a in enumerate(argv)
+            if a == "--out" and i + 1 < len(argv)]
+    if "--out" in argv and not outs:
+        print("  --out needs a directory")
+        return 2
     rows = read_manifest(MAN)
     blob, entries = build(rows, MAN.parent)
     ref = REF.read_bytes() if REF.exists() else None
@@ -163,7 +165,7 @@ def main(argv):
     if ref != blob:
         BLOB.write_bytes(blob)
         print("  wrote %s" % BLOB.relative_to(ROOT).as_posix())
-    if out is not None:
+    for out in outs:
         out.mkdir(parents=True, exist_ok=True)
         (out / "NEUROSIS.DAT").write_bytes(blob)
         print("  wrote %s/NEUROSIS.DAT -- %d bytes, built from the manifest"
