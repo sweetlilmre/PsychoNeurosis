@@ -536,19 +536,7 @@ end;
   which compiles to four separate loads of DX; the original loads it once and
   steps it with a single INC.
   -------------------------------------------------------------------------- }
-procedure SetRGB(Col, R, G, B : Byte); assembler;
-asm
-  MOV  DX, $3C8         { the DAC WRITE index register                      }
-  MOV  AL, Col          { which entry                                       }
-  OUT  DX, AL           { select it                                         }
-  INC  DX               { DX := $3C9, the DAC data register                 }
-  MOV  AL, R            { red, 0..63                                        }
-  OUT  DX, AL           { the DAC takes the three in order and latches      }
-  MOV  AL, G            { green                                             }
-  OUT  DX, AL           {   the entry after the third                       }
-  MOV  AL, B            { blue                                              }
-  OUT  DX, AL           {                                                   }
-end;
+{$I SETRGB.INC}
 
 { --------------------------------------------------------------------------
   12f8:007f -- read one DAC entry back. Index to $3C7, three reads from $3C9.
@@ -641,18 +629,7 @@ end;
   REP OUTSB is one instruction for the whole 768; the Pascal loop is several
   per byte and shows as a visible step on a fade.
   -------------------------------------------------------------------------- }
-procedure SetPalette768(P : Pointer); assembler;
-asm
-  PUSH DS               { DS is about to point at the caller's buffer       }
-  LDS  SI, P            { DS:SI := the 768-byte palette                     }
-  MOV  DX, $3C8         { the DAC WRITE index register                      }
-  MOV  AL, 0            { start at colour 0                                 }
-  OUT  DX, AL           { select it -- the DAC auto-increments from here    }
-  INC  DX               { DX := $3C9, the DAC data register                 }
-  MOV  CX, $300         { 768 bytes = 256 entries of R, G, B                }
-  REP  OUTSB            { write them all out from DS:SI                     }
-  POP  DS               { restore our data segment                          }
-end;
+{$I SETPAL.INC}
 
 { --------------------------------------------------------------------------
   1491:01DA -- out $3C7 := 0 then REP INSB 768 bytes into P^.

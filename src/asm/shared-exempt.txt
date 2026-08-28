@@ -1,34 +1,55 @@
 # Assembler that is duplicated between units and CANNOT become one text.
 #
-# Read by:  toolkit/pascal/shared_asm.py src --exempt=src/asm/shared-exempt.txt
+# Read by:  kit/tools/pascal/shared_asm.py src --exempt=src/asm/shared-exempt.txt
 #
 # The rule that tool enforces is that a routine the demo compiles into more
-# than one part lives in ONE include -- as BLITCLIP.INC in this directory does,
-# for the clipped sprite blit at 001 1107:0199 and 006 100f:0000. An entry here
-# is a case where that is impossible, with the reason, because whether two
-# identical bodies can share a text is a fact about their DECLARATIONS and no
-# tool can see it.
+# than one part lives in ONE include -- as BLITCLIP.INC, SETPAL.INC and
+# SETRGB.INC in this directory do. An entry here is a case where that is
+# impossible, with the reason, because whether two identical bodies can share a
+# text is a fact about their DECLARATIONS and no tool can see it.
 #
-# One UNIT.Routine per line. Not read by any DOS tool -- dosbuild.py stages
-# only .ASM and .INC out of this directory -- so it is plain utf-8 text.
+# One UNIT.Routine per line. Not read by any DOS tool -- build.toml's
+# `alongside` stages only .ASM and .INC out of this directory -- so it is plain
+# utf-8 text. An include that IS staged must be 8.3, stem and all: SETPAL.INC
+# began as SETPAL768.INC and TPC reported "File not found" on a file that was
+# sitting right beside it.
+#
+# FOUR ENTRIES WERE REMOVED FROM THIS FILE ON 28 Aug 2026 BECAUSE THEY WERE
+# WRONG, and the way they were wrong is the useful part. They read:
+#
+#     P1BALLS.SetPalette768   VGA.SetPalette768   VGA.SetRGB   P2View.SetRGB
+#
+# each with a note saying the declarations differed and so no one text could
+# carry them. The declarations did not differ. Compared as strings they were
+# the same line, character for character, in both pairs:
+#
+#     procedure SetPalette768(P : Pointer); assembler;
+#     procedure SetRGB(Col, R, G, B : Byte); assembler;
+#
+# What the notes had actually recorded was a difference in far-ness -- VGA's
+# copies are far because its INTERFACE declares them, P1BALLS's is near because
+# it is implementation-only -- and that is not in the shared line at all. The
+# surrounding unit decides it. Both pairs are now single includes and all ten
+# targets still rebuild byte-identical, which is the measurement that settles
+# it; before, the tool reported 0 duplicates while two real duplications sat
+# behind an exemption nobody had re-read.
+#
+# The lesson for the next entry: an exemption is a claim, and a claim about two
+# texts being different can be CHECKED. Diff them before writing the reason.
 
-# SetPalette768. The nine instructions are identical in parts 001, 003 and 004,
-# but the three declarations are not, and cannot be:
+# SetPalette768 in part 003's scene 3. The nine instructions are identical to
+# SETPAL.INC's, and the header is genuinely a different line, which is the one
+# case an include cannot express:
 #
-#     VGA.SetPalette768           004 11e3:0230   FAR, in the shared unit
-#     P3MORPH.SetPalette768       003 1139:0335   takes an untyped `var P`
-#     P1BALLS.SetPalette768       001 1107:0000   takes a `P : Pointer`
+#     SETPAL.INC              takes a `P : Pointer`
+#     P3MORPH.SetPalette768   003 1139:0335   takes an untyped `var P`
 #
-# An include carries the header, so there is no one text to share -- only the
-# same body reached three ways.
-P1BALLS.SetPalette768
+# Both compile to the same body -- an untyped `var` parameter and a Pointer are
+# both a 4-byte address on the stack, so `LDS SI, P` is the same encoding. Only
+# the declaration stands in the way, and an include carries the declaration.
+# BOTH SIDES OF THE PAIR, because an exemption names a pair and not a name:
+# shared_asm skips only when it finds both. Listing one and not the other
+# still reports, which is the right way round -- it means an exemption
+# cannot be half-written.
 P3MORPH.SetPalette768
-VGA.SetPalette768
-
-# SetRGB. Part 002 compiles the DAC poke TWICE -- VGA.SetRGB at linear $043A8
-# and P2View.SetRGB at $0426F -- and the reconstruction has to as well, because
-# P2SOLID calls the P2View copy eighteen times and a far call encodes the target's
-# offset. The bodies are identical and the declarations differ in the same way
-# SetPalette768's do, so there is no one text to share.
-VGA.SetRGB
-P2View.SetRGB
+SETPAL.SetPalette768

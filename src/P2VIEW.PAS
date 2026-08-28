@@ -495,19 +495,7 @@ end;
 
   which is the same five port writes, but reloads $3C9 each time where the
   original keeps DX and INCs it once. }
-procedure SetRGB(Col, R, G, B : Byte); assembler;
-asm
-  MOV  DX, $3C8         { the DAC WRITE index register                      }
-  MOV  AL, Col          { which entry                                       }
-  OUT  DX, AL           { select it                                         }
-  INC  DX               { DX := $3C9, the DAC data register                 }
-  MOV  AL, R            { red                                               }
-  OUT  DX, AL           {                                                   }
-  MOV  AL, G            { green                                             }
-  OUT  DX, AL           {                                                   }
-  MOV  AL, B            { blue                                              }
-  OUT  DX, AL           {                                                   }
-end;
+{$I SETRGB.INC}
 
 
 

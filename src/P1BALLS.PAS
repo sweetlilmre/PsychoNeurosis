@@ -96,19 +96,13 @@ uses VGA, Crt, DemoVT, FixMath, P1STAR;
   Scene 4 is the only part 001 scene with its own copy; the others go through
   VGA.SetPalette.
   -------------------------------------------------------------------------- }
-{ @asm 001 1107:0000 }
-procedure SetPalette768(P : Pointer); assembler;
-asm
-  PUSH DS                 { DS is about to point at the caller's buffer    }
-  LDS  SI, P              { DS:SI := the 768-byte palette                  }
-  MOV  DX, $3C8           { the DAC WRITE index register                   }
-  MOV  AL, 0              { start at colour 0                              }
-  OUT  DX, AL             { select it -- the DAC auto-increments from here }
-  INC  DX                 { DX := $3C9, the DAC data register              }
-  MOV  CX, $300           { 768 bytes = 256 entries of R, G, B             }
-  REP  OUTSB              { write them all out from DS:SI                  }
-  POP  DS                 { restore our data segment                       }
-end;
+{ @asm 001 1107:0000 +24 SetPalette768 }
+{ The marker NAMES the routine and gives its length, the way BLITCLIP.INC's
+  does below, because the body is no longer in this file for routines.py to
+  find under it. Without the name the lock silently disappeared: 85 locked
+  became 84 locked and 0 failing, which is a fall in COVERAGE and reads
+  like a pass. }
+{$I SETPAL.INC}
 
 const
   TrailRows  = 8;
