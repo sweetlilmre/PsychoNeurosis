@@ -48,7 +48,18 @@ built    = "run"                       # where a finished harness is installed
 # from builds that no longer run -- locks held up by binaries nothing
 # produces. Never add a pattern that matches the ORIGINALS in here: a
 # directory of originals passes against itself and proves nothing.
-built_pattern = ["TP*.EXE", "NEUR*.EXE"]
+# EXPLICIT, not a glob, and that is the whole point now. Our builds carry the
+# ORIGINALS' names, so "NEUROSIS.00*" would also match NEUROSIS.008 -- DemoVT,
+# third-party, which this reconstruction does not build and whose bytes no
+# instrument here should be locating routines in. A glob can include but not
+# exclude, so the nine we do build are listed.
+built_pattern = [
+  "TP*.EXE",                           # the scene harnesses
+  "NEUROSIS.000", "NEUROSIS.001", "NEUROSIS.002", "NEUROSIS.003",
+  "NEUROSIS.004", "NEUROSIS.005", "NEUROSIS.006", "NEUROSIS.007",
+  "NEUROSIS.009",                      # NOT .008 -- see above
+  "PSYCHO.EXE",
+]
 
 [target]
 # Facts about the thing being reverse engineered, read out of it by a person.

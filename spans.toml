@@ -37,37 +37,43 @@
 min_span = 16
 
 [part."001"]
-exe  = "NEUR1.EXE"
+exe  = "NEUROSIS.001"
+map  = "NEUR1.MAP"
 rtl  = 0x1543
 segs = [0x1012, 0x1082, 0x10e3, 0x1107, 0x12b2, 0x12c5, 0x1483, 0x1491, 0x14d0, 0x1532]
 
 [part."002"]
 # The real program, from src/NEUR2.PAS: no harness, no driver unit.
-exe  = "NEUR2.EXE"
+exe  = "NEUROSIS.002"
+map  = "NEUR2.MAP"
 rtl  = 0x14b1
 segs = [0x1008, 0x107c, 0x108b, 0x13f9, 0x140c, 0x142a, 0x1436, 0x144f]
 
 [part."003"]
 # The real program, from src/NEUR3.PAS: no harness, no driver unit.
-exe  = "NEUR3.EXE"
+exe  = "NEUROSIS.003"
+map  = "NEUR3.MAP"
 rtl  = 0x137b
 segs = [0x1015, 0x10b8, 0x1139, 0x1192, 0x119d, 0x11f3, 0x120f, 0x125e, 0x12f8, 0x1309, 0x136b]
 
 [part."005"]
 # The real program, from src/NEUR5.PAS: no harness, no driver unit.
-exe  = "NEUR5.EXE"
+exe  = "NEUROSIS.005"
+map  = "NEUR5.MAP"
 rtl  = 0x12d9
 segs = [0x100e, 0x1096, 0x1102, 0x124a, 0x1252, 0x1266, 0x12c8]
 
 [part."004"]
 # The real program: an eighty-byte call, as the original's segment 1000 is.
-exe  = "NEUR4.EXE"
+exe  = "NEUROSIS.004"
+map  = "NEUR4.MAP"
 rtl  = 0x1288
 segs = [0x1005, 0x11d9, 0x11e3, 0x1226]
 
 [part."006"]
 # The real program, from src/NEUR6.PAS: no harness, no driver unit.
-exe  = "NEUR6.EXE"
+exe  = "NEUROSIS.006"
+map  = "NEUR6.MAP"
 rtl  = 0x128a
 segs = [0x100f, 0x1095, 0x1118, 0x11bb, 0x11ee, 0x1217, 0x1279]
 
@@ -76,7 +82,8 @@ segs = [0x100f, 0x1095, 0x1118, 0x11bb, 0x11ee, 0x1217, 0x1279]
 # P7MAIN.PAS held as a unit, so the two segments the original does not have --
 # the harness program and the driver unit -- are gone and the runtime sits on
 # its own paragraph.
-exe  = "NEUR7.EXE"
+exe  = "NEUROSIS.007"
+map  = "NEUR7.MAP"
 rtl  = 0x110c
 segs = [0x100b, 0x100f, 0x1099, 0x10fb]
 
@@ -99,16 +106,20 @@ segs = [0x100b, 0x100f, 0x1099, 0x10fb]
 # job. A row here could only ever measure the original against itself.
 
 [part."000"]
-exe  = "NEUR0.EXE"
+exe  = "NEUROSIS.000"
+# The compiler names its map after the SOURCE, so it keeps the built name.
+map  = "NEUR0.MAP"
 rtl  = 0x1213
 segs = [0x1000, 0x11ad, 0x11b1]
 
 [part."009"]
-exe  = "NEUR9.EXE"
+exe  = "NEUROSIS.009"
+map  = "NEUR9.MAP"
 rtl  = 0x1069
 segs = [0x1000, 0x1007]
 
 [part."psycho"]
-exe  = "TPSYCHO.EXE"
+exe  = "PSYCHO.EXE"
+map  = "TPSYCHO.MAP"
 rtl  = 0x1019
 segs = [0x1000, 0x100b]

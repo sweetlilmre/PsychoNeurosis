@@ -207,6 +207,33 @@ GEN = "src/gen"
 # Python, because run/ is not wiped between builds and nothing noticed.
 alongside = ["RUNPART.BAT"]
 
+# THE ORIGINALS' OWN NAMES. Turbo Pascal names its executable after the source
+# and cannot be told otherwise, and `NEUROSIS.001` is not even an .EXE, so the
+# rename happens on the way out of the build rather than in the source tree --
+# the sources stay called what their units are called, which is what every
+# other instrument reads them by.
+#
+# THIS INSTALLS THE LOAD IMAGE AND NOTHING ELSE, which is not yet the shipped
+# file: each of parts 001-007 ships with a ProTracker module appended past its
+# image, so bin/NEUROSIS.001 is 135,991 bytes where the image is 38,528.
+# Appending it is a PACKAGING step with its own measurement, deliberately not
+# folded in here -- see docs/04-neurosis-dat.md. Measured while deciding that:
+# image + assets/partNNN/*.MOD is byte-identical to the shipped file for all
+# seven parts that have one.
+[install.as]
+NEUR0   = "NEUROSIS.000"
+NEUR1   = "NEUROSIS.001"
+NEUR2   = "NEUROSIS.002"
+NEUR3   = "NEUROSIS.003"
+NEUR4   = "NEUROSIS.004"
+NEUR5   = "NEUROSIS.005"
+NEUR6   = "NEUROSIS.006"
+NEUR7   = "NEUROSIS.007"
+NEUR9   = "NEUROSIS.009"
+# NEUROSIS.008 is absent on purpose: it is DemoVT, third-party, and this
+# reconstruction does not build it.
+TPSYCHO = "PSYCHO.EXE"
+
 # Reconstruction source -> 8.3 DOS name, unit identifier before and after. The
 # unit name inside a file is independent of the filename, but TP7 finds a unit
 # BY FILENAME, so `uses P3Sprite` must become `uses P3Sprite`.

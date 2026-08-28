@@ -23,7 +23,19 @@ rem
 rem  A batch file rather than a Pascal launcher on purpose: DOS Exec would have
 rem  to stay resident while the part runs, and these parts want the memory.
 rem
-rem  IF A PART REPORTS "NEURn.EXE IS NOT IN THIS DIRECTORY" AND IT PLAINLY IS,
+rem  THE PARTS CARRY THE ORIGINALS' NAMES NOW, so they are launched through
+rem  LOADPART rather than by name. COMMAND.COM decides what is executable by
+rem  extension alone -- .COM, .EXE, .BAT -- so `NEUROSIS.001` cannot be typed at
+rem  a prompt however valid an executable it is. LOADPART is a ten-line EXEC,
+rem  which is what the demo's own launcher does: PSYCHO.PAS EXECs
+rem  `Neurosis.000` by that name. See src/test/LOADPART.PAS.
+rem
+rem  WHAT IS INSTALLED HERE IS THE LOAD IMAGE, not yet the shipped file. Parts
+rem  001-007 each ship with a ProTracker module appended past the image, so
+rem  there is no music until the packaging step appends it. Measured: image plus
+rem  assets/partNNN/*.MOD is byte-identical to the shipped file for all seven.
+rem
+rem  IF A PART REPORTS "NEUROSIS.00n IS NOT IN THIS DIRECTORY" AND IT PLAINLY IS,
 rem  TYPE `rescan` (or press Ctrl-F4). DOSBox-X caches the file listing of a
 rem  mounted host drive, so a filename that appears while DOSBox is ALREADY
 rem  RUNNING is invisible to `if not exist` until the cache is flushed. A file
@@ -44,10 +56,10 @@ rem      RUNPART 4
 rem ===========================================================================
 
 if "%1" == "" goto usage
-if not exist NEUR%1.EXE goto nopart
+if not exist NEUROSIS.00%1 goto nopart
 if not exist NEUROSIS.DAT goto nodata
 
-NEUR%1.EXE
+LOADPART NEUROSIS.00%1
 
 rem Back to a readable prompt. Harmless if the part restored text mode itself,
 rem as part 007 does.
@@ -63,7 +75,7 @@ echo Run it from the folder holding the parts and NEUROSIS.DAT.
 goto end
 
 :nopart
-echo RUNPART: NEUR%1.EXE is not in this directory:
+echo RUNPART: NEUROSIS.00%1 is not in this directory:
 cd
 echo.
 echo          Every part has one: 1, 2, 3, 4, 5, 6 and 7.
