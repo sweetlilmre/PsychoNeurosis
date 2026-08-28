@@ -25,7 +25,7 @@ Nothing below this section is needed to *look* at it. You need DOSBox-X, twelve 
 
 **1. Get [DOSBox-X](https://dosbox-x.com/).** It is what every run in this repository was watched under, and the configuration below is written for it — `cputype = 486_prefetch` and `gustype` are DOSBox-X options and plain DOSBox will reject them. The demo itself runs under plain DOSBox; you would drop those two lines and use `cputype = 486`.
 
-**2. Copy the demo into a folder of its own.** From `bin/` you need twelve files:
+**2. Copy the demo into a folder of its own — do not run it from `bin/`.** The setup program writes `NEUROSIS.CFG` into whatever directory it is run from, and `bin/` is the 1994 release, which several checks in this repository compare against. Running the demo there silently rewrites one of its files; that has happened once already. From `bin/` you need twelve files:
 
 ```
 PSYCHO.EXE   NEUROSIS.000 .. NEUROSIS.009   NEUROSIS.DAT
