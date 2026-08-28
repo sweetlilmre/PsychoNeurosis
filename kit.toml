@@ -27,6 +27,7 @@ wiki     = "kit/wiki"                  # the field manual
 register  = "status.toml"              # the status register: the ratchet, the observations, the plan
 exempt   = "src/asm/shared-exempt.txt" # assembler duplicated between units that cannot become one text
 includes = "src/asm"                   # the shared assembler includes, compared against the units
+probes   = "probe"                     # single-question units a compiler answers; probecheck.py re-runs them
 # WITHOUT `includes` the duplicate check has a hole where its own fix
 # lives: a marker followed by {$I} is skipped as shared, so an include body
 # is compared against nothing and a unit holding its own copy pairs with
