@@ -53,3 +53,8 @@ probe/out/
 
 # DOSBox-X screen captures -- run artefacts, never deliverables
 tools/dosbox/capture/
+
+# The packaged demo, assembled by tools/package.py from run/ and assets/.
+# Every byte of it is either built here or copied from bin/, so it is output
+# and not source -- and it holds NEUROSIS.008, which is third-party.
+dist/

@@ -23,6 +23,13 @@ change the data image of every part that included the file. Never emit a type.
 
     python tools/mkdat.py            build the blob and the include
     python tools/mkdat.py --check    verify both without writing
+    python tools/mkdat.py --out DIR  also write the blob into DIR
+
+`--out` exists for the packaging step, which needs the blob as a FILE beside the
+parts that read it. Note what it does not do: it does not copy bin/NEUROSIS.DAT.
+The demo's data is built from assets/ through this manifest every time, so a
+packaged demo contains no byte this repository cannot regenerate -- and the
+comparison above proves the two are the same 1,718,189 bytes.
 
 WHY THIS IS PYTHON AND NOT A DOS PROGRAM. It was written as `src/dos/MKDAT.PAS`
 first, on the reasoning that a tool which builds one of the demo's inputs belongs
@@ -112,6 +119,13 @@ def render_inc(entries, total, manname):
 
 def main(argv):
     check = "--check" in argv
+    out = None
+    if "--out" in argv:
+        i = argv.index("--out")
+        if i + 1 >= len(argv):
+            print("  --out needs a directory")
+            return 2
+        out = pathlib.Path(argv[i + 1])
     rows = read_manifest(MAN)
     blob, entries = build(rows, MAN.parent)
     ref = REF.read_bytes() if REF.exists() else None
@@ -149,6 +163,11 @@ def main(argv):
     if ref != blob:
         BLOB.write_bytes(blob)
         print("  wrote %s" % BLOB.relative_to(ROOT).as_posix())
+    if out is not None:
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "NEUROSIS.DAT").write_bytes(blob)
+        print("  wrote %s/NEUROSIS.DAT -- %d bytes, built from the manifest"
+              % (out.as_posix(), len(blob)))
     return 0
 
 
