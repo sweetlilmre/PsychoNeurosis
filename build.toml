@@ -12,7 +12,19 @@ src     = "src"
 build   = "build"
 title   = "psycho build"
 drive   = "D"
-log     = "D:\\BUILD.LOG"
+# RELATIVE, and every path below is. The generated autoexec mounts the staging
+# directory, changes to it and calls BUILD.BAT from there, so the batch's
+# working directory IS this drive's root -- and build.py writes both files, so
+# they cannot disagree. The batch already depended on that: `del *.TPU` at the
+# top is relative, so a drive letter elsewhere bought nothing. build.py also
+# throws the prefix away to find this file on the host --
+# `log.split("\\")[-1]` -- so the one consumer of it never wanted it.
+#
+# The reason to remove it is that `drive` above and six paths here were six
+# copies of one fact: set drive = "E" and the mount would move while these
+# still said D:. MEASURED before changing, with a scratch config: exit 0, all
+# ten targets byte-identical, 102 products, 34 installed, selftest passing.
+log     = "BUILD.LOG"
 timeout = 180
 lint    = "kit/tools/pascal/paslint.py"
 
@@ -49,7 +61,7 @@ default = "tp700"
 # explain it live there, on the entry that actually builds the demo.
 dialect  = "tp7"
 binpath  = "C:\\TP701\\BIN"
-switches = "/ED:\\BIN /UD:\\BIN;D:;C:\\TP701\\UNITS /ID:;D:\\GEN;D:\\ASM /OD:\\BIN /$S- /GD"
+switches = "/EBIN /UBIN;.;C:\\TP701\\UNITS /I.;GEN;ASM /OBIN /$S- /GD"
 
 [compiler.tp700]
 # THE ONE THE DEMO IS BUILT WITH. See the [compiler] note above for the
@@ -85,18 +97,18 @@ binpath = "C:\\TP700\\BIN"
 # identical with it on -- and build/ is git-ignored, so the maps cost nothing.
 # CODE publics only, not unit variables, so a data hunt works from segment
 # LENGTHS rather than symbol names.
-switches = "/ED:\\BIN /UD:\\BIN;D:;C:\\TP700\\UNITS /ID:;D:\\GEN;D:\\ASM /OD:\\BIN /$S- /GD"
+switches = "/EBIN /UBIN;.;C:\\TP700\\UNITS /I.;GEN;ASM /OBIN /$S- /GD"
 
 [compiler.tp600]
 # For SETTLING a compiler-version question, not for building the demo.
 # TP6's install is FLAT: TPC.EXE sits in C:\TP600, not a BIN
 # subdirectory, and its own TPC.CFG beside it carries the unit path.
 dialect = "tp6"
-switches = "/ED:\\BIN /UD:\\BIN;D: /ID:;D:\\GEN;D:\\ASM /OD:\\BIN /$S- /$X+ /$G+"
+switches = "/EBIN /UBIN;. /I.;GEN;ASM /OBIN /$S- /$X+ /$G+"
 
 [compiler.tp601]
 dialect = "tp6"
-switches = "/ED:\\BIN /UD:\\BIN;D: /ID:;D:\\GEN;D:\\ASM /OD:\\BIN /$S- /$X+ /$G+"
+switches = "/EBIN /UBIN;. /I.;GEN;ASM /OBIN /$S- /$X+ /$G+"
 
 [assembler]
 # TP7's built-in assembler stops at the 286 ({$G+} is documented as "Generate
