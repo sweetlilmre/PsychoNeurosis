@@ -64,3 +64,8 @@ dist/
 # hand-tuned interactive.conf beside it can stay committed.
 tools/dosbox/MOUNTS.CFG
 tools/dosbox/*.bak
+
+# The interactive launcher. It holds this machine's paths deliberately -- the
+# emulator's directory and this checkout's -- which is exactly why it is not
+# tracked. It was, with those paths in it, until 28 Aug 2026.
+run.bat
