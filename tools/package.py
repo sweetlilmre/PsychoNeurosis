@@ -122,7 +122,8 @@ def build_dat():
     """NEUROSIS.DAT, built from the manifest into dist/. Never copied."""
     r = subprocess.run([sys.executable, str(ROOT / "tools/mkdat.py"),
                         "--out", str(DIST)],
-                       capture_output=True, text=True, cwd=str(ROOT))
+                       capture_output=True, text=True, encoding="utf-8",
+                       cwd=str(ROOT))
     sys.stdout.write("".join("    %s\n" % l
                              for l in r.stdout.strip().split("\n") if l))
     if r.returncode:

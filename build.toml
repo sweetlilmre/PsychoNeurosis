@@ -263,5 +263,31 @@ TPSYCHO = "PSYCHO.EXE"
 # and a NEUROSIS.DAT built from the manifest. The build never writes there;
 # tools/package.py does. So `E:` then `RUNPART 1` runs the real thing, while D:
 # stays the staging directory and run/ stays the load images the checks measure.
+[dosbox]
+# The hand-tuned DOSBox-X config to overlay, and where to write the overlay.
+# `build.py --interactive` writes MOUNTS.CFG and prints the command; the base
+# file keeps its few hundred settings and NOT ONE machine path, which is the
+# whole reason the two are separate files.
+base_conf = "tools/dosbox/interactive.conf"
+overlay   = "tools/dosbox/MOUNTS.CFG"
+land      = "E"
+
+# What the prompt says once the drives are there. Text only -- every path in it
+# is a DOS path the overlay has just created.
+banner = [
+  "",
+  "C: the compilers - TP701, TP700, TP601, TP600, and TASM",
+  "D: build - the staging directory, and BIN holds what it made",
+  "E: dist  - the packaged demo: parts with their music, and NEUROSIS.DAT",
+  "R: run   - the load images, the 22 scene harnesses, and NEUROSIS.DAT",
+  "",
+  "PSYCHO        the launcher, as it shipped",
+  "RUNPART n     one part, n = 1 to 7",
+  "LOADPART f    run a file DOS will not start by name",
+  "R: then TP1S1 one scene on its own",
+  "",
+]
+
 [dosbox.mount]
 E = "dist"
+R = "run"
