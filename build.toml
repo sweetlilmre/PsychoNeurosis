@@ -49,7 +49,7 @@ default = "tp700"
 # explain it live there, on the entry that actually builds the demo.
 dialect  = "tp7"
 binpath  = "C:\\TP701\\BIN"
-switches = "/ED: /UD:;C:\\TP701\\UNITS /ID:;D:\\GEN /$S- /GD"
+switches = "/ED:\\BIN /UD:\\BIN;D:;C:\\TP701\\UNITS /ID:;D:\\GEN;D:\\ASM /OD:\\BIN /$S- /GD"
 
 [compiler.tp700]
 # THE ONE THE DEMO IS BUILT WITH. See the [compiler] note above for the
@@ -85,18 +85,18 @@ binpath = "C:\\TP700\\BIN"
 # identical with it on -- and build/ is git-ignored, so the maps cost nothing.
 # CODE publics only, not unit variables, so a data hunt works from segment
 # LENGTHS rather than symbol names.
-switches = "/ED: /UD:;C:\\TP700\\UNITS /ID:;D:\\GEN /$S- /GD"
+switches = "/ED:\\BIN /UD:\\BIN;D:;C:\\TP700\\UNITS /ID:;D:\\GEN;D:\\ASM /OD:\\BIN /$S- /GD"
 
 [compiler.tp600]
 # For SETTLING a compiler-version question, not for building the demo.
 # TP6's install is FLAT: TPC.EXE sits in C:\TP600, not a BIN
 # subdirectory, and its own TPC.CFG beside it carries the unit path.
 dialect = "tp6"
-switches = "/ED: /ID:;D:\\GEN /$S- /$X+ /$G+"
+switches = "/ED:\\BIN /UD:\\BIN;D: /ID:;D:\\GEN;D:\\ASM /OD:\\BIN /$S- /$X+ /$G+"
 
 [compiler.tp601]
 dialect = "tp6"
-switches = "/ED: /ID:;D:\\GEN /$S- /$X+ /$G+"
+switches = "/ED:\\BIN /UD:\\BIN;D: /ID:;D:\\GEN;D:\\ASM /OD:\\BIN /$S- /$X+ /$G+"
 
 [assembler]
 # TP7's built-in assembler stops at the 286 ({$G+} is documented as "Generate
@@ -162,11 +162,23 @@ encoding = "ascii"
 # The generated test harnesses already carry conforming 8.3 names and matching
 # unit identifiers, so they map to themselves and adding one needs no edit here.
 identity = ["test/TP*.PAS"]
-# The 386 maths module and its include go in the build ROOT, not GEN: TASM
-# resolves INCLUDE relative to the current directory, and TPC looks for the
-# .OBJ next to the unit that links it.
-# The external harness rides along too: staged here, installed below.
-alongside = ["src/asm/*.ASM", "src/asm/*.INC", "src/dos/*.BAT"]
+# Only the DOS batch flattens into the build root now. The assembler modules and
+# the shared Pascal includes arrive as a DIRECTORY instead -- see `verbatim` --
+# so what the build was GIVEN and what it MADE are no longer in one heap.
+alongside = ["src/dos/*.BAT"]
+
+# src/asm copied as a folder, contents untouched. TASM is run from INSIDE it, so
+# DEMOMATH.ASM's `INCLUDE COSTAB.INC` resolves against its own directory exactly
+# as it did when these files were flattened into the root. The Pascal includes
+# here -- BLITCLIP, SETPAL, SETRGB -- are reached through the compiler, so the
+# switch lines below add D:\ASM to /I.
+verbatim = ["src/asm"]
+
+# Everything the build MAKES: .OBJ, .TPU, .MAP and .EXE. /E is TP's EXE AND TPU
+# output directory, /O its object search path and /U its unit search path, so
+# the products are written straight here and found here rather than being
+# copied afterwards.
+output = "BIN"
 
 [stage.subdirs]
 GEN = "src/gen"

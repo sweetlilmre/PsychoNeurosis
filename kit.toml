@@ -33,7 +33,11 @@ probes   = "probe"                     # single-question units a compiler answer
 # is compared against nothing and a unit holding its own copy pairs with
 # nobody. P3MORPH.SetPalette768 sat in the exempt file for weeks with an
 # exemption that could not fail.
-build    = "build"                     # where a build stages and leaves its output
+build    = "build"                     # where a build stages the sources it was GIVEN
+output   = "build/BIN"                # and where it puts what it MADE: .OBJ .TPU .MAP .EXE
+# The split is build.toml's `[stage] output = "BIN"`. Every instrument that reads a
+# PRODUCT resolves it through project.products(); the ones that read a staged SOURCE
+# still use `build`, which is why these are two answers and not one.
 built    = "run"                       # where a finished harness is installed
 # Only OUR harnesses. `run/` also holds copies of the 1994 binaries so the
 # demo can be run side by side, and comparing an original against itself
