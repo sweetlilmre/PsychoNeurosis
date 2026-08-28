@@ -19,6 +19,77 @@ The reusable half of the work lives in [`kit/`](kit), a submodule shared with a 
 
 ---
 
+## TL;DR — just watch the demo
+
+Nothing below this section is needed to *look* at it. You need DOSBox-X, twelve of the fifteen files in [`bin/`](bin), and about two minutes.
+
+**1. Get [DOSBox-X](https://dosbox-x.com/).** It is what every run in this repository was watched under, and the configuration below is written for it — `cputype = 486_prefetch` and `gustype` are DOSBox-X options and plain DOSBox will reject them. The demo itself runs under plain DOSBox; you would drop those two lines and use `cputype = 486`.
+
+**2. Copy the demo into a folder of its own.** From `bin/` you need twelve files:
+
+```
+PSYCHO.EXE   NEUROSIS.000 .. NEUROSIS.009   NEUROSIS.DAT
+```
+
+`NEUROSIS.CFG` is written by the setup program, so do not bother copying it. `PSYCHO.NFO` and `FILE_ID.DIZ` are the release notes.
+
+**3. Save this as `psycho.conf` next to it**, changing only the mount line:
+
+```ini
+[dosbox]
+machine  = svga_s3
+memsize  = 16
+
+[cpu]
+core    = normal
+cputype = 486_prefetch
+cycles  = 10000
+
+[dos]
+xms = true
+ems = true
+umb = true
+
+[mixer]
+rate      = 44100
+blocksize = 1024
+prebuffer = 50
+
+[sblaster]
+sbtype = sbpro2
+sbbase = 220
+irq    = 7
+dma    = 1
+
+[gus]
+gus     = true
+gustype = classic
+gusrate = 48000
+gusbase = 240
+gusirq  = 5
+gusdma  = 3
+
+[autoexec]
+mount C /the/folder/you/put/the/demo/in
+C:
+PSYCHO.EXE
+```
+
+Then `dosbox-x -conf psycho.conf`.
+
+**`cycles = 10000` with `486_prefetch` is not a guess** — every part of this demo has been watched at that setting and reported indistinguishable from the original. Faster is not better here: these are timing-sensitive effects written for a 486, and `cycles = max` makes several of them run wrong.
+
+**4. Answer the setup, and mind these four answers.** `PSYCHO.EXE` runs a setup program first, which asks for your sound card and then its hardware settings. **Its menu defaults do not match what DOSBox emulates, and accepting them is why the music plays for a moment and then stops.** Pick:
+
+| card | port | IRQ | DMA | rate |
+|---|---|---|---|---|
+| Sound Blaster, mono or Pro stereo | `$220` | 7 | 1 | `28000` or lower |
+| Gravis UltraSound | `$240` | 5 | 3 | `28000` or lower |
+
+Both work. If the music still cuts out, drop the rate to `16000` or `8000`: the mixing is done in software, and at 10000 cycles a 486 has only so much to spare underneath a 320x200 effect.
+
+That is all. The demo runs its seven parts in order and returns you to DOS.
+
 ## Building it
 
 You need a real Turbo Pascal. Nothing here emulates the compiler — the whole method rests on running the one the authors ran, so the build stages the sources into a directory, mounts it in DOSBox-X, and drives `TPC.EXE` over it.
