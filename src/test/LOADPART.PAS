@@ -44,6 +44,12 @@
   be clever about that: a file DOS cannot find is reported as DosError 2 and
   the message says so.
 
+  VERIFIED BY A WATCHED RUN, 28 Aug 2026: the maintainer ran the shipped
+  NEUROSIS.001 through it under DOSBox-X and part 001 ran and exited cleanly.
+  That is the only instrument there is for this -- a loader either hands the
+  child a correctly relocated image or it does not, and no static check on
+  either file can tell you which happened.
+
   WHAT IT DELIBERATELY DOES NOT DO. It does not set a video mode, restore one,
   or look for NEUROSIS.DAT. A part is entitled to leave the adapter as it
   pleases -- see VIDMODE.PAS and RUNPART.BAT for that reasoning -- and this
