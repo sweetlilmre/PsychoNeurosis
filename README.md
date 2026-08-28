@@ -46,9 +46,10 @@ cputype = 486_prefetch
 cycles  = 10000
 
 [dos]
-xms = true
-ems = true
-umb = true
+xms              = true
+ems              = true
+umb              = true
+minimum mcb free = 1
 
 [mixer]
 rate      = 44100
@@ -76,6 +77,8 @@ PSYCHO.EXE
 ```
 
 Then `dosbox-x -conf psycho.conf`.
+
+**`minimum mcb free = 1` is not optional**, and it is the one line worth understanding. Without it the setup program stops with *"You do not have enough memory to run this demo. You need: 4272 extra bytes free"* and goes no further. DOS reports free conventional memory from the first memory control block, and DOSBox-X's default leaves that block higher than a 1994 program expects; setting it to 1 hands back 11,008 bytes. Measured, not guessed: the setup wants `MemAvail` of at least 591,056 bytes, the configuration above without this line gives it 586,048, and with it 597,056. `shellhigh = true` adds another 3,216 if you want more headroom, but it is not needed.
 
 **`cycles = 10000` with `486_prefetch` is not a guess** — every part of this demo has been watched at that setting and reported indistinguishable from the original. Faster is not better here: these are timing-sensitive effects written for a 486, and `cycles = max` makes several of them run wrong.
 
