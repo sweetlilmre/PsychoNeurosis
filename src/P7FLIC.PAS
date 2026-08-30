@@ -93,23 +93,36 @@ type
     Depth    : Word;                      { 12 }
     Flags    : Word;                      { 14 }
     Speed    : LongInt;                   { 16 }
-    Reserved : array[20..79] of Byte;
-    OFrame1  : LongInt;                   { 80 }
-    Rest     : array[84..127] of Byte;
+    { The unread middle, spelled out with the FLC spec's own field names.
+      Nothing here is witnessed by the binary -- the player reads none of it --
+      but the offsets are the spec's and the total is the same 60 bytes. }
+    Reserved1 : Word;                     { 20 }
+    Created   : LongInt;                  { 22 }
+    Creator   : LongInt;                  { 26 }
+    Updated   : LongInt;                  { 30 }
+    Updater   : LongInt;                  { 34 }
+    AspectDx  : Word;                     { 38 }
+    AspectDy  : Word;                     { 40 }
+    Reserved2 : array[42..79] of Byte;
+    OFrame1   : LongInt;                  { 80 }
+    OFrame2   : LongInt;                  { 84 }
+    Reserved3 : array[88..127] of Byte;
   end;
 
   TFrameHdr = record
     Size   : LongInt;                     { 0 }
     Magic  : Word;                        { 4 }
     Chunks : Word;                        { 6 }
-    Pad    : array[8..15] of Byte;
+    Reserved : array[8..15] of Byte;      { the spec's name for these 8 bytes }
   end;
 
   { TWENTY-TWO BYTES, of which six are read. Play's own recorded offsets are
     what say so: Fr at [BP-$212] and Ch at [BP-$228], and locals go downward in
     declaration order, so Ch spans $228 to $213. Declared as six bytes it
     compiled to [BP-$218] and every reference in the routine was sixteen out.
-    The pad is never touched, exactly as TFrameHdr's is not. }
+    The pad is never touched, exactly as TFrameHdr's Reserved is not -- but
+    unlike that one it is not the format's: a FLIC chunk header ends at byte 6,
+    so these 16 bytes have no spec name and are the 1994 declaration's own. }
   TChunkHdr = record
     Size : LongInt;                       { 0 }
     Kind : Word;                          { 4 }
