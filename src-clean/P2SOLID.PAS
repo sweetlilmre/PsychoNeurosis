@@ -1415,10 +1415,10 @@ begin
   Tmp := O;                                   { Move of $B51 bytes }
   for F := 1 to Tmp.FaceCount do
   begin
-    { THE ACCUMULATOR IS THE DEPTH FIELD ITSELF and it is SIXTEEN BIT. The
-      reconstruction summed into a LongInt and divided that; the original adds
-      each vertex's D straight into Tmp.Face[F].Depth with a word ADD at
- and stores it back each time. }
+    { THE ACCUMULATOR IS THE DEPTH FIELD ITSELF, and it is SIXTEEN BIT. Each
+      vertex's depth is added straight into the field with a word add and
+      stored back; summing into a LongInt and dividing that at the end is not
+      the same arithmetic and not what is there. }
     Tmp.Face[F].Depth := 0;
     for K := 1 to Tmp.Face[F].Count do
       Tmp.Face[F].Depth := Tmp.Face[F].Depth

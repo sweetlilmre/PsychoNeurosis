@@ -62,8 +62,6 @@ begin
   SetVolume(SavedVol);
   VirtScrFree;
 
-  { NO Halt(0). `end.` already emits LEAVE / XOR AX,AX / LCALL System:0116 at
- and an explicit Halt(0) emits that sequence twice -- seven bytes
-    the original does not spend. P5MAIN.PAS carried one, with a comment pointing
-    at the address of the single copy the original has. }
+  { NO Halt(0) HERE. `end.` already emits the exit sequence, so an explicit
+    Halt(0) emits it twice -- seven bytes the original does not spend. }
 end.

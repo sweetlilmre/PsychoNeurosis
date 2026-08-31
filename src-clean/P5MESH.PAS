@@ -90,7 +90,6 @@ var
     surplus over the original is 384 bytes rather than 598, so there is a
     missing declaration in here as well as an oversized one. }
   HeightMap : array[0..MapSize - 1] of Byte;
-  { DS:$317e and DS:$497e }
   Grid   : array[0..GridVerts - 1] of TPoint3;
   Proj   : array[0..GridVerts - 1] of TProj;
   { the file record, BEFORE the two tables and not after }
