@@ -34,7 +34,7 @@ const
   BounceH     = 40;
 
 const
-  LensK   = 1.0;       { CS:$0000, added as a single: 1012:014b FADD CS:[0] }
+  LensK   = 1.0;       { added as a single: 1012:014b FADD CS:[0] }
   LensCut = 300;       { the disc: X*X + Y*Y <= 300 -- 1012:003b CMP AX,$12C }
   LensOfs = 400;       { the 20*20 term inside the square root }
   LensArc = 20;        { one quadrant: 1012:02a8 CMP WORD PTR [BP-8],$14 }

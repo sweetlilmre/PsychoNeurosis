@@ -551,10 +551,10 @@ procedure ShowWord(S : String);
   variables are Borland Reals held in the stack frame, and the four constants
   are FP operands in the code segment -- decoded with tools/fpconst.py:
 
-      CS:$02E7  single  2.0     added to Phase AND to CometX
-      CS:$02EB  single 15.0     Phase wrap
-      CS:$02EF  ext80   0.3     added to Frame
-      CS:$02F9  single 10.0     Frame wrap
+ single  2.0     added to Phase AND to CometX
+ single 15.0     Phase wrap
+ ext80   0.3     added to Frame
+ single 10.0     Frame wrap
 
   and the initial Real48 values in the frame are CometPos = -48.0, Frame = 1.0,
   Phase = 1.0. Nothing here is fixed point -- this really is the FP scene. }

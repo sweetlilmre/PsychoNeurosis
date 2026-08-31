@@ -15,7 +15,7 @@
   outlines. It is not. Banner_BuildPoints (1107:07a2) copies the same literal
   string eight times --
 
-      CS:$078B  'OOOOOOOOOOOOOOOOOO'   18 characters
+ 'OOOOOOOOOOOOOOOOOO'   18 characters
 
   -- into eight row buffers at DS:$6A33 stride $100, then walks them and emits
   one point per character. Eight rows of eighteen is exactly the 144.
@@ -116,9 +116,9 @@ const
   FontBias   = 32;                          { see DrawStep }
   AngleWrap  = 3600;                        { angles are TENTHS of a degree }
   BannerStep = 60;                          { $3C -- 6.0 degrees per column }
-  GridPoint  = 'OOOOOOOOOOOOOOOOOO';        { CS:$078B }
-  MarkerA    = '*';                         { CS:$079E }
-  MarkerB    = 'O';                         { CS:$07A0 }
+  GridPoint  = 'OOOOOOOOOOOOOOOOOO';
+  MarkerA    = '*';
+  MarkerB    = 'O';
 
   { The clip box the blitter reads from DS:$000C..$0013. }
   { DS:$000C..$0013 -- INITIALISED DATA, read straight out of the image:

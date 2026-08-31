@@ -537,7 +537,7 @@ procedure UpdateMotion;
     and closes RET 8 -- six bytes of Real parameter plus two of static
     link, which is what TP passes into a routine declared inside another.
     The body is FLD A, FLD Pi from CS:$06FA, FMULP, FDIV the single at
-    CS:$0704, then the result through the six-byte-Real temp at [BP-6].
+ then the result through the six-byte-Real temp at [BP-6].
 
     WRITING `Angle * Pi / 180` INLINE AT BOTH CALL SITES COMPILES, RUNS
     THE SAME, AND IS WRONG: the multiply and the divide are emitted twice

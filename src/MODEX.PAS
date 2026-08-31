@@ -1,23 +1,40 @@
 { ===========================================================================
   Psycho Neurosis (Asphyxia, 1994) -- the shared Mode-X unit.
 
-  ONE UNIT, LINKED BY THE PARTS THAT NEED IT. Segment 107c in part 002 and
+  MODE X: 320x200 in 256 colours with the four planes UNCHAINED, which is what
+  makes hardware panning possible. Four routines -- set the mode, build a row
+  offset table, select a plane, and move the visible window.
+
+  The point of unchaining is that video memory stops being one linear run of
+  bytes and becomes four interleaved planes, each addressed separately. That
+  costs you a plane select before every write, and buys two things the demo
+  needs: all 256K of VGA memory becomes reachable, so a canvas can be WIDER
+  than the screen, and the CRTC can then be told to show a window into it. Pan
+  by moving the window, not by redrawing.
+
+  So the unit divides in two. SetModeX and SelectPlane are about the hardware
+  arrangement; BuildRowTable and ShowFrame are about the canvas laid out inside
+  it -- LogicalWidth is how wide that canvas is, in bytes per row.
+
+  Parts differ in which routines they contain, because Turbo Pascal's smart
+  linker drops what a part never calls: part 003 never pans, so it carries no
+  ShowFrame.
+
+  [re] ONE UNIT, LINKED BY THE PARTS THAT NEED IT. Segment 107c in part 002 and
   1192 in part 003, and as with VGA and DemoVT the two are the same source
   with Turbo Pascal's smart linker dropping whatever a part never calls:
-
       #  routine          002        003
       1  BuildRowTable    107c:0000  1192:0000
       2  ShowFrame        107c:002a  --
       3  SetModeX         107c:006d  1192:002a
       4  SelectPlane      107c:00ca  1192:0087
-
   Part 003 never pans, so ShowFrame is absent and everything after it moves
   up by exactly its length -- $6D - $2A = $43, and 1192's SelectPlane sits
   $43 below 107c's. SetModeX is 93 bytes in both and the two are byte for
   byte identical apart from the one address the last instruction reads
   LogicalWidth from.
 
-  THAT COMPARISON FOUND A BUG. VGA.PAS used to carry its own transcription of
+  [re] THAT COMPARISON FOUND A BUG. VGA.PAS used to carry its own transcription of
   this routine as `SetMode`, read from part 003, and it was wrong in three
   places: it reloaded DX with an immediate twice where the original does
   DEC DX, and -- the one that matters -- it left out the REP STOSW that
@@ -25,29 +42,43 @@
   Part 003 scene 3 was therefore starting in whatever the previous scene had
   left in VRAM. That transcription is gone; this is the routine.
 
-  Mode X here is the unchained 256-colour mode: Chain-4 off so the four
-  planes are addressed separately, byte addressing rather than doubleword,
-  and CRTC Offset set from LogicalWidth to give a canvas wider than the
-  visible 320 so it can be panned.
   =========================================================================== }
 
-{$G+}   { 286 instructions: 107c:0039 is SHR AX,2 in ShowFrame. }
+{ 286 instructions are permitted; ShowFrame uses a two-bit shift. }
+{$G+}   { [re] 286 instructions: 107c:0039 is SHR AX,2 in ShowFrame. }
 
 unit ModeX;
 
 interface
 
 const
-  RowCount = 800;                       { $320 -- the table 107c:0000 fills }
+  { Rows in the offset table -- four times the 200 on screen, because the
+    canvas may be taller than the display as well as wider. }
+  RowCount = 800;                       { [re] $320 -- the table 107c:0000 fills }
 
 const
-  { DS:$0002 here, DS:$76B6 in part 003 -- the CRTC Offset value and the
+  { HOW WIDE THE CANVAS IS, in bytes per plane per row, and it is deliberately
+    writable. $50 is 80 bytes x 4 planes = 320 pixels, the same as the screen.
+    A scene that wants to pan raises it and gets a canvas wider than the
+    display: part 002 scene 1 sets $A0 for a 1280-pixel canvas, and part 003
+    puts it back to $50.
+
+    A TYPED CONSTANT, WHICH IS THE POINT -- in Turbo Pascal that means
+    initialised AND writable, so the value is in the file image and the code can
+    still store over it. `var` would give a writable variable with no initial
+    value, which is a different thing entirely.
+
+    Both BuildRowTable and SetModeX read it: one to compute row offsets, the
+    other to program the CRTC. Change it and rebuild the table, or the two
+    disagree about the layout.
+
+    [re] DS:$0002 here, DS:$76B6 in part 003 -- the CRTC Offset value and the
     multiplier BuildRowTable uses. A TYPED constant, so the compiled-in $50 is
     in the file image and the code can still write over it: Demo_Scene1 stores
     $A0 (1008:0727) to make that scene's canvas 1280 wide, and part 003's
     InitScene writes $50 back.
 
-    Declared `var` it was in BSS and stored NOTHING, which left a two-byte hole
+    [re] Declared `var` it was in BSS and stored NOTHING, which left a two-byte hole
     between the morph unit's shape tables and the sprite unit's captions and
     put every variable behind it two bytes low. `var` against `const X : T = v`
     is not variable against constant -- it is uninitialised against
@@ -55,27 +86,37 @@ const
   LogicalWidth : Byte = $50;
 
 var
-  { DS:$4B08 -- RowOfs[I] = LogicalWidth * I * 2. }
+  { The byte offset of the start of each canvas row, so drawing a pixel costs
+    a table lookup instead of a multiply. Built by BuildRowTable and stale the
+    moment LogicalWidth changes.
+
+    [re] DS:$4B08 -- RowOfs[I] = LogicalWidth * I * 2. }
   RowOfs : array[0..RowCount - 1] of Word;
 
+{ Fill RowOfs from the current LogicalWidth. Call after changing it. }
 procedure BuildRowTable;                       far;   { 107c:0000 }
-{ @asm 002 107c:002a }
+{ Point the CRTC at a window into the canvas -- this is the pan. }
+{ [re] @asm 002 107c:002a }
 procedure ShowFrame(X, Row : Integer);         far;   { 107c:002a }
-{ @asm 002 107c:006d }
+{ Put the VGA into unchained 256-colour mode and clear its memory. }
+{ [re] @asm 002 107c:006d }
 procedure SetModeX;                            far;   { 107c:006d }
-{ @asm 002 107c:00ca }
+{ Choose which of the four planes subsequent writes land in, 0..3. }
+{ [re] @asm 002 107c:00ca }
 procedure SelectPlane(P : Byte);               far;   { 107c:00ca }
 
 implementation
 
 { --------------------------------------------------------------------------
-  107c:0000
+  Fill in the row offset table: row I starts at LogicalWidth * I * 2 bytes.
 
-      for I := 0 to $31F do
+      for I := 0 to 799 do
         RowOfs[I] := (LogicalWidth * I) shl 1
 
-  The multiply is an 8-bit MUL of DS:$0002 by the loop counter, then SHL 1.
-  Sixteen bit, so it wraps past row 204; that is the original's behaviour.
+  THE ARITHMETIC IS SIXTEEN BIT AND IT WRAPS, past about row 204 at the default
+  width. That is the original's behaviour and not a defect to be widened: no
+  scene addresses a row that high, and the table's later entries are never
+  read.
   -------------------------------------------------------------------------- }
 procedure BuildRowTable;
 var
@@ -123,7 +164,7 @@ procedure ShowFrame(X, Row : Integer); assembler;
 asm
   MOV  BX, Row            { the row to start the display at                }
   SHL  BX, 1              { * 2, a word index into the row table           }
-  MOV  BX, [BX + OFFSET RowOfs]  { BX := RowOfs[Row] -- DS:$4B08           }
+  MOV  BX, [BX + OFFSET RowOfs]  { BX := RowOfs[Row], the row's byte offset }
   MOV  AX, X              { the horizontal position, in pixels             }
   SHR  AX, 2              { div 4 -- Mode X stores every 4th pixel in a    }
                           {   plane, so four pixels share one byte offset  }
@@ -156,8 +197,17 @@ asm
 end;
 
 { --------------------------------------------------------------------------
-  107c:006d -- unchained 256-colour mode with a wide logical line.
+  PUT THE VGA INTO UNCHAINED 256-COLOUR MODE, and give it a logical line
+  possibly wider than the screen.
 
+  Six register groups in order: start from BIOS mode 13h, turn off the three
+  bits that chain the planes together, enable all four planes for writing,
+  clear all 64K of video memory, switch the CRTC from doubleword to byte
+  addressing, and finally program the Offset register from LogicalWidth. The
+  clear is not optional -- without it a scene starts in whatever the previous
+  one left behind.
+
+  [re] 107c:006d -- unchained 256-colour mode with a wide logical line.
       INT $10, AX = $0013
       SEQ  $04 := (v and $F7) or $04      Chain-4 off, odd/even off
       GC   $05 := v and $EF               shift/odd-even off
@@ -247,7 +297,7 @@ asm
   MOV  AL, $13       { register $13 -- Offset, the logical line width     }
   OUT  DX, AL        { select it                                          }
   INC  DX            { DX := $3D5                                         }
-  MOV  AL, [LogicalWidth]  { DS:$0002 -- $50 normally, more for a panning }
+  MOV  AL, [LogicalWidth]  { $50 normally, more for a panning             }
                      {   scene: the visible 320 becomes a window on it    }
   OUT  DX, AL        { write it, and the mode is set                      }
 end;
@@ -277,7 +327,14 @@ end;
   DS:$0002 is initialised data, so it already holds $50 when the table is
   first built; a scene that wants a different width stores its own value and
   calls BuildRowTable again, which is what Demo_Scene1 does through SetModeX. }
-{ THE INITIALISATION ONLY CALLS BuildRowTable. It used to store $50 into
+{ THE UNIT INITIALISES ITSELF BY BUILDING THE ROW TABLE, and does nothing
+  else. It does NOT set LogicalWidth, because it does not need to: a typed
+  constant is already in the initialised data image before a single
+  instruction runs. So the table is correct for the default width from the
+  moment the unit loads, and a scene that changes the width calls
+  BuildRowTable again itself.
+
+  [re] It used to store $50 into
   LogicalWidth first, which is redundant -- LogicalWidth is a TYPED CONSTANT
   declared `: Byte = $50`, so the value is already in the initialised data image
   before a single instruction runs -- and the original does not do it. 107c:00e1
@@ -285,7 +342,7 @@ end;
   nothing else; ours had MOV BYTE PTR [$0002],$50 in the middle of it, five
   bytes re-storing a byte that was already correct.
 
-  IT WAS INVISIBLE TO THE COVERAGE WALK, which stops reading each segment when
+  [re] IT WAS INVISIBLE TO THE COVERAGE WALK, which stops reading each segment when
   fewer than ANCHOR bytes remain and so never examines the last nine -- exactly
   where an initialisation section sits. Found by comparing the segment tails
   directly. }

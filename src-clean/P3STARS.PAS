@@ -74,7 +74,7 @@ const
   RecSize      = 14;                    { bytes per working record }
   ArraySize    = NumPoints * RecSize;   { GetMem'd twice }
 
-  TubeRadius   = 40.0;      { CS:$05EE -- Single }
+  TubeRadius   = 40.0;      { Single }
   ProjShift    = 8;         { CX passed to RTL_Shl32: X*256 before the divide }
 
   ZStep        = 30;        { $1E per frame, toward the viewer }

@@ -94,9 +94,9 @@ const
   SwapAngle  = 180;          { $B4 -- above this the byte pair is written
                                the other way round; see DrawRotated }
 
-  TrigScale  = 64.0;         { CS:$011C -- 6-bit fixed point }
-  WobbleScale = 39.6;        { CS:$0120 -- the wobble amplitude, +-40 px }
-  WobbleBias = 65535.0;      { CS:$012A -- see the note in Load }
+  TrigScale  = 64.0;         { 6-bit fixed point }
+  WobbleScale = 39.6;        { the wobble amplitude, +-40 px }
+  WobbleBias = 65535.0;      { see the note in Load }
   WobblePhase = 225;         { $E1 -- the wobble table is read 225 deg on }
 
   { Sprites_Prepare, phase 1 -- the fly-in }
@@ -107,7 +107,7 @@ const
 
   { Sprites_Prepare, phase 2 -- the orbit }
   OrbitFrames = 180;         { $B4, so 181 frames of 2 degrees = one turn }
-  OrbitRadius = 60.0;        { CS:$054C }
+  OrbitRadius = 60.0;
   OrbitCX    = 140;          { $8C }
   OrbitCY    = 100;          { $64 }
 

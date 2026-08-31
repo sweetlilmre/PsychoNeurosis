@@ -1132,7 +1132,7 @@ begin
   Obj.Pos.Z := IntToFixed(1600);
 
   { Scale := (ScreenWidth / 2.0) * 10.0, as 16.16.
-    CS:$0868 = 2.0, CS:$086C = 10.0. }
+ = 2.0, CS:$086C = 10.0. }
   { RealToFixed, and MViewW is a WORD here where P1BALLS's is an
     Integer. The spill is the difference: `MOV [BP-8],AX / MOV [BP-6],DX` then
     FILD DWORD on the LongInt, which is how a Word reaches the x87. P1BALLS does

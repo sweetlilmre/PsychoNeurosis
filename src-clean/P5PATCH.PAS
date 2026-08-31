@@ -22,7 +22,7 @@
   `RotatePoint` and `Project` here are byte-identical to part 001's copies at
  -- 16, 24 and 7 bytes differ across the
   three and every one of them is a DGROUP or table displacement. The table at
-  CS:$03C5 is the same 901 entries of Round(cos(i/10 degrees) * 65536).
+ is the same 901 entries of Round(cos(i/10 degrees) * 65536).
 
   It also showed that the module has FIVE routines and not three: FixMul at
  and FixDiv at 1102:03a5 sit ahead of the table in both binaries.

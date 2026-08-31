@@ -2373,7 +2373,7 @@ begin
     the measurement still said no. The original reads MViewW from memory and
     widens it with `XOR DX,DX` (108b:1cb6, unsigned -- the Word typed constant
     at DS:$046A), does `FILD DWORD` on the spill, divides by the single 2.0 at
-    CS:$1baf, multiplies by the extended 0.9 at CS:$1bb3, and then pushes
+ multiplies by the extended 0.9 at CS:$1bb3, and then pushes
     DX/BX/AX into a far call -- a six-byte Real handed to a FUNCTION, which
     reads exactly like RealToFixed rather than Round(.. * 65536.0).
 

@@ -77,7 +77,7 @@ const
   TabSize  = Angles * GridRows * GridCols * 2;   { 59904 -- 100f:040b }
   CellSize = CellRows * GridCols;
   DataOfs  = DAT_P6_CMAP2;   { $1781E5 -- 100f:07f8 pushes $0017 then $81E5 }
-  Fix      = 8192.0;              { CS:$016f -- the tables are 16.13 }
+  Fix      = 8192.0;              { the tables are 16.13 }
   Bias     = $2000;               { and biased by 8192 so they stay positive }
 
 const

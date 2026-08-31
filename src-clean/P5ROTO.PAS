@@ -532,7 +532,7 @@ begin
   FillChar(Ptr(Seg(Texture^), TexRows * TexWide)^, $3800, 0);
 
   { the motion tables. The angle is in DEGREES: the divisor at
-    CS:$03c9 is the single 180.0 and the multiplicand at CS:$03cd is the
+ is the single 180.0 and the multiplicand at CS:$03cd is the
     ten-byte extended Pi. }
   for I2 := 0 to TabTop do
   begin
