@@ -40,6 +40,7 @@ Goal: understand every effect, then reconstruct the original source.
 | 31 | [NEUR0.PAS charted](31-startup.md) | Setup: the demo chain is authored here; byte-identical rebuild |
 
 | 32 | [The tool disposition](32-tool-disposition.md) | Where every script goes as the kit absorbs the tooling; generated, and proven to cover the tree |
+| 33 | [The documentation transform](33-documentation-transform.md) | Turning `src` into `src-clean`: the marks, the per-unit gate, and the wayfinder map that runs it |
 
 (24 is deliberately absent: it became the untracked local marker `continuation.md`.)
 
