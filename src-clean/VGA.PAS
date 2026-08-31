@@ -1,91 +1,39 @@
 { ===========================================================================
   Psycho Neurosis (Asphyxia, 1994) -- the shared VGA unit.
 
+  THE SCREEN, THE PALETTE AND THE DRAWING PRIMITIVES every part is built on:
+  set the video mode, allocate a virtual screen, plot and read pixels, draw a
+  line, fill a rectangle, blit and clear, and eleven ways to move the palette
+  about. Twenty-one routines, all of them hand-written assembler.
+
   ONE UNIT, SEVEN EXECUTABLES. Every part links this same source and Turbo
-  Pascal's SMART LINKER drops whatever that part never calls, which is why
-  the segment is a different size and the addresses are different in each --
-  and why an earlier pass mistook the subsets for four separate units.
+  Pascal's smart linker drops whatever that part never calls -- so no two parts
+  contain the same subset, and none contains all twenty-one. Part 007 links
+  almost none of it.
 
-  The proof is the ORDER. Routines come out in source order with the unused
-  ones simply missing, so the survivors' offsets stay monotonic in every
-  part. Reading across the seven binaries recovers the whole unit:
+  The Mode-X routines are NOT here. They are in MODEX.PAS, which is the unit
+  to read for unchained mode, plane selection and panning.
 
-    #   routine          001   002   003   004   005   006   007
-    1   SetMode13h        y     y     y     y     y     y     y
-    2   VirtScrAlloc      y     y     y     y     y     y     .
-    3   VirtScrFree       y     y     y     y     y     y     .
-    4   PutPixel          .     .     y     .     y     y     .
-    5   GetPixel          .     .     .     y     y     y     .
-    6   FillRect          .     .     .     y     .     y     .
-    7   DrawLine          y     .     .     y     .     y     .
-    8   SetRGB            y     y     y     y     y     y     .
-    9   GetRGB            y     y     y     .     .     .     .
-    10  SetRGBFrom        .     .     .     y     .     .     .
-    11  GetRGBTo          .     .     .     y     .     .     .
-    12  SetPalette768     y     y     .     y     y     y     .
-    13  GetPalette768     y     y     .     y     .     .     .
-    14  PaletteDim        y     y     .     .     y     .     .
-    15  FadeStep          .     .     .     y     .     .     .
-    16  PaletteFadeUp     .     .     .     y     .     .     .
-    17  PaletteFadeOut    y     y     .     .     .     .     .
-    18  WaitRetrace       y     y     y     y     .     .     .
-    19  CopyScreen        y     y     y     .     y     y     .
-    20  ClearScreen       y     y     y     y     y     y     .
-    21  BuildRowTable     y     y     y     y     y     y     .
+  EVERY ROUTINE HERE IS HAND-WRITTEN ASSEMBLER, and that is why they read as
+  `assembler` procedures rather than Pascal. It is not stylistic: a blit is
+  REP MOVSW with CX preloaded, PutPixel indexes a precomputed row table and
+  falls straight into STOSB, and WaitRetrace has no frame at all. Turbo Pascal
+  would emit ENTER/LEAVE, BP-relative locals and a multiply for the row
+  offset -- which on a per-pixel path is the difference between an effect
+  running and not.
 
-  Anchors: SetMode13h is six bytes at offset 0 of the unit in all seven.
-  Part 001 has DrawLine at 1491:0048 and part 004 at 11e3:009c purely because
-  004 also links GetPixel and FillRect ahead of it. Part 003 gets PutPixel at
- for the same reason in reverse.
+  So each body is documented per instruction, with equivalent Pascal above it
+  where the shape is not obvious. The Pascal is there to be READ, never to be
+  swapped in.
 
-  So there is no "part 004 FillRect" distinct from anything here -- FillRect
-  is in this unit, and parts 004 and 006 are simply the only two that call
-  it. Their copies are byte-identical.
-
-  The Mode-X routines that used to be in this file have moved to MODEX.PAS,
-  where they belong -- segment 1192 in part 003, 107c in part 002.
-
-  THIS UNIT IS HAND-WRITTEN ASSEMBLER, not compiled Pascal, and is written
-  back as `assembler` procedures so the original instruction sequences are
-  preserved rather than paraphrased.
-
-  How we can tell: VGA_WaitRetrace has no procedure prologue whatsoever, the
-  blit and clear are REP MOVSW / REP STOSW with CX preloaded, and PutPixel
-  indexes a precomputed row table and falls straight into STOSB. Borland
-  Pascal 7 does not generate any of that shape -- it would emit ENTER/LEAVE,
-  BP-relative locals and a multiply for the row offset.
-
-  All of them end in RETF n, i.e. far procedures using the Pascal calling
-  convention with callee stack cleanup -- so they are `procedure ...; far;
-  assembler;` in the original source.
-
-  ADDRESS MAP
-    PutPixel        12f8:0048      SetRGB          12f8:0064
-    GetRGB          12f8:007f      WaitRetrace     12f8:009f
-    CopyScreen      12f8:00ad      ClearScreen     12f8:00c9
-    SetMode         1192:002a      SelectPlane     1192:0087
   =========================================================================== }
 
 { ===========================================================================
-  A NOTE ON PARAMETER ORDER -- read this before changing any signature here.
+  [re] A NOTE ON PARAMETER ORDER -- read this before changing any signature here. }
 
-  Borland Pascal pushes parameters LEFT TO RIGHT, and the stack grows DOWN.
-  So inside the callee the FIRST (leftmost) parameter is at the HIGHEST [BP+n]
-  offset, and the last is at the lowest:
-
-      procedure P(A, B, C);   near   ->   [BP+8]=A  [BP+6]=B  [BP+4]=C
-
-  Ghidra's decompiler prints arguments in ASCENDING [BP+n] order, which is the
-  REVERSE of the declaration. Taking that listing as the signature is how the
-  whole of this unit ended up backwards on the first pass -- the behaviour was
-  right, because the call sites were reversed to match, but the signatures did
-  not correspond to the binary at all.
-
-  The orders below are read off the disassembly and are the originals.
-  =========================================================================== }
-
-{$G+}   { 286 instructions: REP OUTSB and REP INSB in the palette routines.
-          The original targets 386 and above. }
+{ 286 instructions are permitted -- the palette routines use REP OUTSB and
+  REP INSB, which move all 768 DAC bytes in one instruction each. }
+{$G+}
 
 unit VGA;
 
@@ -103,40 +51,30 @@ type
   PPalette = ^TPalette;
 
 var
-  { THE ORDER OF THESE THREE IS MEASURED, and YOfs came FIRST here, which put
-    every one of them 400 bytes out. Part 001 has VirtScr at DS:$AB54,
-    VirtScrSeg at DS:$AB58 and YOfs at DS:$AB5A -- 1107:0583 pushes [$AB58] as
-    the screen segment and 12b2:010f indexes [$AB5A] after SHL BX,1, so the
-    pointer and its segment precede the table. }
 
   { The virtual screen every part draws into before blitting to $A000.
     64,000 bytes on the heap; VirtScrSeg is its segment, and because GetMem
     returns a normalised pointer the offset is always 0 -- which is why every
     part addresses it as a bare segment. }
-  VirtScr    : Pointer;                 { part 001: DS:$AB54 }
-  VirtScrSeg : Word;                    { part 001: DS:$AB58 }
-  { Row offset lookup, DS:$AB5A in part 001 -- YOfs[y] = y * 320. PutPixel
-    indexes this rather than multiplying, which is why it needs no MUL. }
+  VirtScr    : Pointer;
+  VirtScrSeg : Word;
+  { Row offset lookup: YOfs[y] is y * 320, the byte offset of row y. PutPixel
+    indexes this rather than multiplying, which is why it needs no MUL -- the
+    saving is per pixel, so it is the whole reason the table exists. }
   YOfs       : array[0..ScrHeight - 1] of Word;
 
 
-  { Palette WAS DECLARED HERE and the original's VGA has no such global. Every
-    palette routine in segment 1491 takes a POINTER: 1491:01c6 and 1491:01f6
-    load it off [BP+6]. The only thing that used it was part 001 scene 1's
-    loader, whose original reads into an SS-relative local at [BP-$400], and
-    part 001 scene 2 has its own unit-level buffer at DS:$56D2. Part 003's
-    sprite scene had already recorded the same about itself. }
+  { THERE IS NO SHARED PALETTE BUFFER IN THIS UNIT, deliberately. Every palette
+    routine below takes a POINTER to the caller's own 768 bytes, so a scene owns
+    its palette and two scenes cannot tread on each other. }
 
 procedure SetMode13h;
 procedure SetTextMode;
-{ BuildRowTable IS NOT AN INTERFACE ROUTINE, and part 007 says so in one byte.
-  Its segment 100b is the whole of this unit smart-linked down to four items,
-  and 100b:0030 is C3 -- a NEAR return. Turbo Pascal compiles every interface
-  routine FAR, so a near return means the routine is implementation-only; and
- is E8 D5 FF, a NEAR call to it from the initialisation section,
-  which is the same fact from the caller's side. Nothing outside this unit calls
-  it: ModeX declares its own BuildRowTable and that is the one part 002 scene 1
-  reaches. Declared here it returned FAR and cost a byte at both ends. }
+{ BuildRowTable IS NOT IN THE INTERFACE. It fills YOfs and the unit calls it
+  from its own initialisation, so it is done before any caller could need it.
+  Nothing outside reaches it -- and note that MODEX has a BuildRowTable of its
+  own for the Mode-X row table, which is a different table for a different
+  layout. Two routines, same name, different units. }
 procedure VirtScrAlloc;
 procedure VirtScrFree;
 procedure ClearVirtual;
@@ -146,50 +84,29 @@ procedure DrawLine(X1, Y1, X2, Y2 : Integer; Colour : Byte; Segment : Word);
   and are NOT in part 003's (12f8/1192), which is what this file was first
   transcribed from -- so they were missing altogether until part 001 scene 2
   turned out to have no fade at either end. }
-{ @asm 004 11e3:0230 }
 procedure SetPalette768(P : Pointer);                far;
-{ @asm 004 11e3:0248 }
 procedure GetPalette768(P : Pointer);                far;
-{ @asm 001 1491:0202 }
 procedure PaletteDim(P : Pointer);                   far;
 procedure PaletteFadeUp(P : Pointer; Pause : Word);  far;
 procedure PaletteFadeOut(Pause : Word);              far;
 
-{ @asm 003 12f8:0048 }
 procedure PutPixel(X, Y : Word; Colour : Byte; Segment : Word); far;
-{ @asm 004 11e3:0048 }
 function  GetPixel(X, Y : Integer; Segment : Word) : Byte;      far;
-{ @asm 004 11e3:0063 }
 procedure FillRect(X1, Y1, X2, Y2 : Integer;
                    Colour : Byte; Segment : Word);              far;
-{ @asm 004 11e3:01db }
 procedure SetRGB(Col, R, G, B : Byte); far;
-{ @asm 003 12f8:007f }
 procedure GetRGB(Col : Byte; var R, G, B : Byte); far;
-{ @asm 004 11e3:01f6 }
 procedure SetRGBFrom(Col : Byte; P : Pointer);    far;
-{ @asm 004 11e3:0216 }
 procedure GetRGBTo(Col : Byte; P : Pointer);      far;
 procedure FadeStep;                               far;
-{ @asm 003 12f8:009f }
 procedure WaitRetrace; far;
-{ @asm 003 12f8:00ad }
 procedure CopyScreen(SrcSeg, DestSeg : Word); far;
-{ @asm 003 12f8:00c9 }
 procedure ClearScreen(Segment : Word; Colour : Byte); far;
 
 implementation
 
 uses Crt;   { Delay, in the palette fades }
 
-{ ROUTINE ORDER IS THE ORIGINAL'S. Turbo Pascal emits a unit's code in
-  implementation order, so the order here IS the segment layout, and a
-  far call from another unit encodes the callee's OFFSET. Part 002's VGA
-  segment runs SetMode13h at 1436:0000, VirtScrAlloc at 1436:0006 and
-  VirtScrFree at 1436:0033 before anything else; these three sat after
-  CopyScreen here, which put CopyScreen at offset $9c against the
-  original's $128 and made every far call to it differ in four bytes --
-  a run the coverage walk's rule cannot forgive. }
 { EQUIVALENT PASCAL -- REFERENCE ONLY, and not what is compiled:
 
       procedure SetMode13h;
@@ -198,21 +115,9 @@ uses Crt;   { Delay, in the palette fades }
       end;
 
   which is the same two instructions with a stack frame around them. The
-  original has no frame, so the procedure is `assembler`.
-
-  NO @asm MARKER HERE, deliberately. A marker is a claim that the bytes can
-  be compared, and this routine is stripped from every harness we build --
-  nothing in the reconstruction references it, so routines.py reported it
-  NOT FOUND in any built image. That the ORIGINAL's part 002 does carry it at
- means something there calls it and nothing here does. }
+  original has no frame, so the procedure is `assembler`. }
 procedure SetMode13h; assembler;
 asm
-  { SIX BYTES: 1436:0000 is `MOV AX,$13 / INT $10 / RETF` and nothing else.
-    BuildRowTable was called from here and does not belong -- the row table
-    is built by the unit's INITIALIZATION, which is what 1436:017f is:
-    seventeen bytes of `PUSH BP / MOV BP,SP / CALL $015A / LEAVE / RETF`,
-    emitted last as a unit's initialization always is. There is no frame
-    either -- six bytes leaves no room for one -- so this is `assembler`. }
   MOV  AX, $0013        { BIOS function 0, mode $13: 320x200, 256 colours   }
   INT  $10              { the video BIOS                                    }
 end;
@@ -226,9 +131,6 @@ end;
 
 procedure VirtScrFree;
 begin
-  { TWENTY-ONE BYTES at 1436:0033, and all of them are the FreeMem: push the
-    far pointer, push 64000, call, leave, return. There is no nil guard and
-    nothing is cleared afterwards. }
   FreeMem(VirtScr, 64000);
 end;
 
@@ -249,7 +151,7 @@ asm
   MOV  ES, AX           { ES:DI addresses the pixel                         }
   MOV  BX, Y            { the row                                           }
   SHL  BX, 1            { * 2, a word index into the row table              }
-  MOV  DI, [BX + OFFSET YOfs]   { DI := YOfs[Y] = Y * 320 -- DS:$E772       }
+  MOV  DI, [BX + OFFSET YOfs]   { DI := YOfs[Y], the row's byte offset      }
   ADD  DI, X            { + the column                                      }
   MOV  AL, Colour       { the pixel value                                   }
   STOSB                 { write it                                          }
@@ -288,8 +190,8 @@ filled rectangle. HAND ASSEMBLER, verbatim.
   BP+$C, Y2 at BP+$A, Colour at BP+8, Segment at BP+6. Both edges are
   INCLUSIVE -- the width is X2 - X1 + 1 and the height Y2 - Y1 + 1.
 
-  The loop is tighter than it looks: the jump at 11e3:0096 goes back to the
-  REP STOSB itself, not to the top. AL keeps the colour and BX the width for
+  The loop is tighter than it looks: the backward jump goes to the REP STOSB
+  itself, not to the top of the loop. AL keeps the colour and BX the width for
   the whole call, so a row costs one REP plus four instructions.
 
   EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
@@ -331,16 +233,9 @@ end;
 { --------------------------------------------------------------------------
 write one DAC entry. Index to $3C8, then R,G,B to $3C9.
   -------------------------------------------------------------------------- }
-{ AND IT SITS HERE, BEFORE SetRGB, because the original's segment says so:
- is this routine and 11ee:01f7 is SetRGB, and part 004's copy has
-  the same order at 11e3:009c and 11e3:01db. Declared last in the unit, as it
-  was, every VGA routine after FillRect sits at the wrong offset and every far
-  call to one of them from another unit differs. The order of a unit's
-  implementations is a measurement, not a matter of taste. }
 { --------------------------------------------------------------------------
-  DrawLine -- Bresenham. Part 001's copy of this unit is LARGER than part
-  003's precisely because it carries this routine (1491:0048); parts that
-  never draw a line do not link it.
+  DrawLine -- a Bresenham line, and only the parts that actually draw one link
+  it. That is why no two copies of this unit are the same size.
 
   Argument order is the original's: segment, colour, then the two endpoints
   as (Y, X) pairs rather than (X, Y).
@@ -348,11 +243,10 @@ write one DAC entry. Index to $3C8, then R,G,B to $3C9.
 procedure DrawLine(X1, Y1, X2, Y2 : Integer; Colour : Byte; Segment : Word);
   assembler;
 var
-  { Four words, and the first two are used for two different things -- see the
-    note above the asm. Declared in this order so they land at [BP-2], [BP-4],
- which is where 11ee:00b8 puts them. }
-  DXAbs, DYAbs : Integer;         { [BP-2], [BP-4]: |dx| and |dy|, then flags }
-  Inc1, Inc2   : Integer;         { [BP-6], [BP-8]: the two error increments  }
+  { Four words. THE FIRST TWO ARE REUSED for a second purpose partway through
+    -- see the note above the asm block, which is the only place that says so. }
+  DXAbs, DYAbs : Integer;         { |dx| and |dy|, then flags }
+  Inc1, Inc2   : Integer;         { the two error increments  }
 asm
     MOV  AX, Segment
     MOV  ES, AX            { loaded ONCE, and never reloaded       }
@@ -614,10 +508,11 @@ asm
 end;
 
 { --------------------------------------------------------------------------
-out $3C8 := 0 then REP OUTSB 768 bytes from P^.
+  Set all 256 DAC entries from a caller's 768-byte buffer: select colour 0,
+  then REP OUTSB the lot. The DAC auto-increments, so one instruction writes
+  every entry.
 
- in part 002, 11e3:0230 in part 004 -- the same bytes. Note it
-  does NOT wait for retrace; the
+  It does NOT wait for retrace; the
   callers that care do that themselves, which is why both fades below have an
   explicit WaitRetrace in the loop.
 
@@ -651,9 +546,10 @@ asm
 end;
 
 { --------------------------------------------------------------------------
-walk 768 bytes; every NON-ZERO one is decremented in place and
-  written back, zeroes are stepped over (the JZ at 1491:0202 skips the STOSB
-  and just bumps DI). One step of a fade held in a palette buffer.
+  ONE STEP OF A FADE, applied to a palette buffer in place: walk all 768 bytes
+  and decrement every non-zero one, stepping over the zeroes. Call it
+  repeatedly and the palette walks down to black; a component that has reached
+  zero stays there, so the fade ends of its own accord.
 
   It reads and writes the SAME buffer through two segment registers -- LES DI
   and LDS SI are both loaded from the one parameter -- so SI runs one byte
@@ -687,13 +583,6 @@ asm
   POP  DS               { restore our data segment                          }
 end;
 
-{ AND IT SITS BETWEEN FadeStep AND WaitRetrace, which part 004's copy fixes
-  exactly: 11e3:0260 is FadeStep, 02b9 this routine, 03d4 WaitRetrace's
-  fourteen bytes and 03e2 ClearScreen -- 02b9 to 03d4 is $11B, which is this
-  routine's length. Declared near the end of the unit instead, ClearScreen came
-  out 283 bytes early in parts 001 and 004 and every far call to it differed.
-  Part 001's copy agrees from the other side: PaletteDim at 1491:01F2 is 35
-  bytes and this routine follows at 0215. }
 
 { --------------------------------------------------------------------------
 one step of a fade to black, on the LIVE DAC. Compiled Pascal.
@@ -702,16 +591,6 @@ one step of a fade to black, on the LIVE DAC. Compiled Pascal.
   Not the same routine as PaletteDim above: that one dims a buffer the caller
   owns, this one reads the hardware back, dims it and writes it out. Both are
   in the unit; each part keeps whichever it calls.
-
-  THE LOOP IS HAND-WRITTEN ASSEMBLER, and reading the frame is what showed it.
-  The routine opens ENTER $304 for a 768-byte buffer, and the four bytes below
-  BP are not two scalars but one far POINTER: 11e3:0264 is `P := @Buf`, stored
-  as LEA AX / MOV DX,SS / MOV [BP-4],AX / MOV [BP-2],DX. The loop then does
-  LES DI,P once and walks ES:[BX+DI] with BX counting DOWN from 768, three
-  components unrolled per pass and no frame slot for an index at all -- which
-  is why there is none in the frame. A Pascal `for` loop cannot produce that
-  shape, and the method's rule is that hand assembler is transcribed rather
-  than re-expressed, so it is transcribed below.
 
   BX STARTS AT 768, one PAST the last byte of a 0..767 buffer, and the loop
   ends when BX reaches 0 -- so index 768 IS decremented, on Turbo Pascal's own
@@ -782,20 +661,17 @@ PaletteFadeUp(P, Pause). Compiled Pascal in the binary
   -------------------------------------------------------------------------- }
 procedure PaletteFadeUp(P : Pointer; Pause : Word);
 var
-  { THE TWO BYTES BELOW THE BUFFERS ARE I THEN Step, and 11e3's copy says which
-    is which: the OUTER loop counts in [BP-$602] -- 02E2 stores zero and 02E7
-    jumps to its increment -- so Step is the further of the two from BP and
-    therefore the SECOND declared. }
+  { Two whole palettes on the stack -- where the fade is going, and where it is
+    now -- plus the two counters. Step is the OUTER loop: it walks the fade from
+    dark to the target, and I walks the 768 bytes within each step. }
   Target : TPalette;
   Cur    : TPalette;
   I      : Byte;
   Step   : Byte;
 begin
-  { AN ASSIGNMENT, NOT Move. 11e3:02BD copies the palette INLINE -- MOV BX,SS /
-    MOV ES,BX / MOV BX,DS / CLD / LEA DI / LDS SI,[BP+8] / MOV CX,$300 /
-    REP MOVSB / MOV DS,BX, nineteen bytes -- where a Move call is twenty-one.
-    Those two bytes are why ClearScreen came out two bytes early in parts 001
-    and 004 after the ordering was fixed. }
+  { A STRUCTURED ASSIGNMENT RATHER THAN Move, and it must stay one: Turbo
+    Pascal copies a whole record inline, where a Move call would be a call.
+    Same effect, different code. }
   { THE COPY IS HAND ASSEMBLER, and three Pascal forms were tried before that
     was the answer: `Move(P^, Target, SizeOf(Target))`, `Target := TPalette(P^)`
     and `Target := PPalette(P)^` all compile to the runtime helper, and so does
@@ -830,18 +706,6 @@ begin
   end;
 end;
 
-{ ORDER: this sits between PaletteDim and WaitRetrace because that is
-  where 1436:00d6 puts it -- PaletteDim ends at $00D6, this runs to
-  $011A and WaitRetrace's fourteen bytes follow, with CopyScreen at
-  $0128. Declared near the end of the unit instead, CopyScreen landed
-  at $00E4 and every far call to it from another segment differed in
-  four bytes.
-
-  prologue.py reports ONE routine of 82 bytes at $00D6 and there are
-  two: WaitRetrace has no standard prologue, so the scan cannot see it
-  and folds it into its neighbour. The `call $011A` inside the reported
-  extent is what gives it away -- a routine does not call into its own
-  middle. }
 procedure PaletteFadeOut(Pause : Word);
 var
   Buf  : TPalette;
@@ -945,15 +809,6 @@ end;
 { --------------------------------------------------------------------------
 back to 80-column colour text.
 
-  SIX BYTES AND NO FRAME, and it comes BEFORE BuildRowTable. Part 007's
-  segment 100b is this unit reduced by the smart linker to SetMode13h,
-  SetTextMode, BuildRowTable and the initialisation, in that order and in 64
-  bytes: 100b:0006 is B8 03 00 / CD 10 / CB and nothing else. Written as a
-  Pascal procedure wrapping an asm block it gained a frame -- PUSH BP /
-  MOV BP,SP ... LEAVE -- and four bytes with it, and being declared after
-  BuildRowTable it also shipped after it, which put both routines at the
-  other's address.
-
   EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
 
       (none). Setting a video mode is a BIOS call, and Turbo Pascal has no way
@@ -975,11 +830,6 @@ begin
     YOfs[Y] := Y * ScrWidth;
 end;
 
-{ The unit's own 64,000-byte staging screen: GetMem, keep the segment out
-  separately because everything addresses it as a bare segment, then BLANK it.
-  The FillChar is in the binary -- 11e3:0027 in part 004, 1436:0027 in part
-  002 -- and was missing from this transcription until the units were
-  consolidated. }
 procedure ClearVirtual;
 begin
   ClearScreen(VirtScrSeg, 0);
@@ -988,10 +838,6 @@ end;
 { Palette transfer. Port $3C8 selects the entry for writing ($3C7 for
   reading), then $3C9 takes R, G, B in turn and auto-increments, so the whole
   table moves in one burst. }
-{ The no-argument forms are a convenience over the global Palette; the
-  original has only the pointer-taking 1491:01C2 and 1491:01DA. The
-  WaitRetrace here is OURS -- 1491:01C2 does not wait, because the callers
-  that care (both fades below) wait for themselves. }
 { SetPalette and GetPalette took no arguments and wrapped the 768 versions
   around the unit's own Palette global. Both are gone with it: there is nothing
   for them to wrap, and the only caller now passes its own buffer. }
@@ -1004,10 +850,7 @@ PaletteFadeOut(Pause). Compiled Pascal (ENTER $302).
   Delay(Pause) between them. Note the order: it SHOWS the buffer and then
   dims it, so the first frame is the palette exactly as it was and the last
   is 63 steps down -- not quite black if anything started above 63, which
-  nothing does.
-
-  Called once in the whole demo, from Demo_Scene2 at 1082:05BB with Pause=10.
-  -------------------------------------------------------------------------- }
+  nothing does. }
 
 begin
   { the unit's initialization, and it does ONE thing. }
@@ -1015,11 +858,5 @@ begin
 end.
 
 { ===========================================================================
-  NOTE ON THE ROW TABLE
-
-  PutPixel reads YOfs from DS:$E772 for the mode 13h path (y*320). Scene 1
-  builds a *different* table for its Mode-X screen -- 800 entries of y*160 at
-  DS:$9F1E-ish -- because the logical line there is 160 bytes per plane, not
-  320. The two coexist; do not conflate them.
-  =========================================================================== }
+  NOTE ON THE ROW TABLE }
 
