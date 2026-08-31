@@ -28,8 +28,7 @@
 
   =========================================================================== }
 
-{ ===========================================================================
-  [re] A NOTE ON PARAMETER ORDER -- read this before changing any signature here. }
+{ =========================================================================== }
 
 { 286 instructions are permitted -- the palette routines use REP OUTSB and
   REP INSB, which move all 768 DAC bytes in one instruction each. }

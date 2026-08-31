@@ -311,17 +311,17 @@ procedure RotatePoint(var X, Y, Z : LongInt);             external; { 12c5:19DF 
 procedure Project(var X, Y, Z : LongInt);                 external; { 12c5:1B2D }
 
 { --------------------------------------------------------------------------
-  1483:0000 -- Math_IntToReal is MISNAMED. It converts an Integer to 16.16
+  Math_IntToReal WAS A MISLEADING NAME. It converts an Integer to 16.16
   FIXED POINT:  MOV AX,[BP+6] ; CWD ; MOV CX,16 ; XOR BX,BX ; <shift> -> DX:AX
 
   That is why the point records are TWELVE bytes -- three 32-bit fixed values
   -- and not the eighteen three 6-byte Borland Reals would need.
   -------------------------------------------------------------------------- }
-{ IntToFixed and the two conversions back come from FixMath (segment 1483).
+{ [re] IntToFixed and the two conversions back come from FixMath (segment 1483).
   This scene had local copies, and its FixedToInt was the ROUNDING one -- but
   12C5:0268 calls 1483:0071, which TRUNCATES. The calls below say so. }
 
-{ [transcribed] Vector_Run's object copy, 12c5:088b and 12c5:098a -- integer
+{ [re] [transcribed] Vector_Run's object copy, 12c5:088b and 12c5:098a -- integer
   triples out of DGROUP, IntToFixed into the 12-byte records. It does NOT
   touch the translation; Vector_Run sets that separately, once. }
 procedure LoadObject(Coords : Pointer; Count : Integer);
@@ -342,9 +342,9 @@ begin
 end;
 
 { --------------------------------------------------------------------------
-  12c5:1b2d -- Project(var X, Y, Z)
+  Project(var X, Y, Z) -- perspective divide and screen offset
 
-  Byte-for-byte the same routine as scene 4's 1107:1a04. The divisor is
+  [re] Byte-for-byte the same routine as scene 4's 1107:1a04. The divisor is
   [BP+4], the LAST declared parameter, and 12c5:01b0 calls it (X, Y, Z) --
   so it divides by Z, the ordinary way round. (An earlier note here claimed it
   divided by X. That was Ghidra printing arguments in ascending [BP+n] order,
@@ -360,27 +360,28 @@ end;
   -------------------------------------------------------------------------- }
 
 { --------------------------------------------------------------------------
-  12c5:02e3 -- Obj_TransformAll(Obj, A1, A2, A3), which fans out to 12c5:01b0
-  once per point. Per point: rotate (12c5:19df), add the translation, project,
+  Obj_TransformAll(Obj, A1, A2, A3), which fans out to TransformPoint
+
+  [re] once per point. Per point: rotate (12c5:19df), add the translation, project,
   then store TWO six-byte screen records:
 
-      Scr[I]           X,  $85 - sy       12c5:0244 / 12c5:024b
+      [re] Scr[I]           X,  $85 - sy       12c5:0244 / 12c5:024b
       Scr[I + Count]   X,  sy + $85 + 1   12c5:0290 / 12c5:029a
 
   A mirror pair about row 133.5 -- the floor, exactly where Vector_Load's
   gradient turns around. Both carry D = Trunc(Z) for the depth sort.
   -------------------------------------------------------------------------- }
 { --------------------------------------------------------------------------
-  12c5:01b0 -- TransformPoint, and it is A ROUTINE OF ITS OWN.
+  TransformPoint, and it is A ROUTINE OF ITS OWN.
 
-  This body was INLINED here, in ObjTransformAll's loop. A note further down
+  [re] This body was INLINED here, in ObjTransformAll's loop. A note further down
   this file already said 12c5:02e3 "fans out to 12c5:01b0" and the code did
   not do it; ten spans traced to this address.
 
-  THE PARAMETER LIST IS RECOVERED FROM THE CALL SITE, not guessed. RET $1E, so
+  [re] THE PARAMETER LIST IS RECOVERED FROM THE CALL SITE, not guessed. RET $1E, so
   30 bytes of parameters, and 12c5:0366..0393 pushes exactly that:
 
-    ES:DI = Obj^ + I*12 - 12    4   [BP+1E]   the point, BY VALUE
+    [re] ES:DI = Obj^ + I*12 - 12    4   [BP+1E]   the point, BY VALUE
     [bp+8] [bp+6] [bp+4] CWD   12   [BP+1A] [BP+16] [BP+12]
     three cached LongInts      12   [BP+0E] [BP+0A] [BP+06]
     [bp-2]                      2   [BP+04]   the loop index
@@ -388,7 +389,7 @@ end;
   Pascal convention pushes left to right, so the first parameter declared is
   the one pushed first and it sits at the HIGHEST offset. Hence this order.
 
-  A1, A2, A3 ARE PASSED AND NEVER READ -- the routine touches [BP+04], +06,
+  [re] A1, A2, A3 ARE PASSED AND NEVER READ -- the routine touches [BP+04], +06,
   +08, +0A, +0C, +0E, +10 and +1E and nothing in between. The three angles
   were already consumed by the SinCos calls before the loop, so they are dead
   here. They are transcribed anyway: they are three of the thirty bytes, and
@@ -397,7 +398,7 @@ end;
   The caller widens each angle with CWD, so the parameters are LongInt while
   the arguments are Integer.
   -------------------------------------------------------------------------- }
-{ SortAll IS DEFINED HERE, BEFORE TransformPoint, AND THE ORIGINAL'S SEGMENT
+{ [re] SortAll IS DEFINED HERE, BEFORE TransformPoint, AND THE ORIGINAL'S SEGMENT
   ORDER IS WHY. 12c5:0190 is SortAll and 12c5:01b0 TransformPoint -- thirty-two
   bytes apart, SortAll first -- and definition order is segment order. Defined
   after ObjTranslate instead, every routine from here to 12c5:0a60 came out at
@@ -405,7 +406,7 @@ end;
   put ours' first routine at the original's 01b0 and the original's first at
   ours' 0256.
 
-  NOTHING ELSE SAW IT. The part walks 100.0% of every byte, every segment is the
+  [re] NOTHING ELSE SAW IT. The part walks 100.0% of every byte, every segment is the
   original's exact size, the program segment is byte-identical -- because Scene5
   at 12c5:0a89 and the unit initialisation are BOTH past the disturbance, so the
   two offsets the main body names were right either way. progseg --prologues=12c5
@@ -419,7 +420,7 @@ procedure SortAll(Arr : PScrArr);
   12c5:0621 calls it as MOV DI,$A5F6 / PUSH DS / PUSH DI / CALL 0x190, which
   for a near call puts the offset at [BP+4] and the segment at [BP+6].
 
-  DepthSort IS NESTED INSIDE IT, and that is the whole point: 12c5:0024 is
+  [re] DepthSort IS NESTED INSIDE IT, and that is the whole point: 12c5:0024 is
   MOV DI,[BP+4] and 0027 is LES DI, SS:[DI+4] -- a static link followed to
   this routine's Pointer parameter. Its own layout is [BP+8] = Lo, [BP+6] =
   Hi, [BP+4] = the link, and RET 6 accounts for two Integers plus the link.
@@ -429,7 +430,7 @@ procedure SortAll(Arr : PScrArr);
   var
     I, J, P : Integer;      { [BP-2], [BP-4], [BP-6] }
     T       : TScreenPt;    { [BP-0C]..[BP-07] -- the swap temp }
-    { TWO MORE BYTES, DECLARED AND NEVER READ. The frame is ENTER $0E and the
+    { [re] TWO MORE BYTES, DECLARED AND NEVER READ. The frame is ENTER $0E and the
       four above it reach only $0C; nothing in the routine touches [BP-0E] or
       [BP-0D]. Omitting them left the prologue one byte wrong and that was the
       ONLY byte wrong in the first 64 -- everything else matched once the
@@ -447,7 +448,7 @@ procedure SortAll(Arr : PScrArr);
         begin
           T := Arr^[I];  Arr^[I] := Arr^[J];  Arr^[J] := T;
         end;
-        { ASSIGNMENTS, NOT Inc AND Dec. 12c5:0051 is MOV AX,[BP-2] / INC AX /
+        { [re] ASSIGNMENTS, NOT Inc AND Dec. 12c5:0051 is MOV AX,[BP-2] / INC AX /
         MOV [BP-2],AX -- seven bytes -- where Inc(I) is a three-byte INC WORD
         PTR. Ghidra reads the same statements as `local = local + 1`. Four
         sites: the two while bodies and these two. }
@@ -467,17 +468,17 @@ procedure TransformPoint(P          : TPoint3;
                          TX, TY, TZ : LongInt;
                          I          : Integer);
 var
-  { BOTH ARE LONGINT, and that is measured twice over. 12c5:0222 is
+  { [re] BOTH ARE LONGINT, and that is measured twice over. 12c5:0222 is
     MOV AX,[BP-0C] / CWD / MOV [BP-10],AX / MOV [BP-0E],DX -- a sign-extend
     into a FOUR-byte slot, which an Integer local would not need -- and every
     expression built on them is done in 32 bits: 12c5:024d is SUB AX,[BP-14]
     / SBB DX,[BP-12] and 12c5:029a is ADD AX,$85 / ADC DX,0. Declared as
     Integer, the whole routine is 24 bytes short and the arithmetic is 16-bit.
 
-    Sx is [BP-10] and Sy is [BP-14], so Sx is the first local declared. }
+    [re] Sx is [BP-10] and Sy is [BP-14], so Sx is the first local declared. }
   Sx, Sy : LongInt;
 
-  { TWENTY BYTES DECLARED AND NEVER REFERENCED. ENTER $28 is 40 bytes; the
+  { [re] TWENTY BYTES DECLARED AND NEVER REFERENCED. ENTER $28 is 40 bytes; the
     twelve-byte value copy of P plus these two LongInts account for 20, and
     the routine touches no offset below [BP-14] at any width. So the 1994
     source declared 20 bytes more here and used none of it.
@@ -491,13 +492,13 @@ var
     local here is one. }
   Dead1, Dead2, Dead3, Dead4, Dead5 : LongInt;
 begin
-  { P IS the twelve-byte copy at [BP-0C], so there are no coordinate locals to
+  { [re] P IS the twelve-byte copy at [BP-0C], so there are no coordinate locals to
     load it into -- the copy the compiler makes for a value parameter is what
     the rest of the routine works on, and 12c5:01c9 pushes @P.X, @P.Y, @P.Z
     straight out of the frame. }
   RotatePoint(P.X, P.Y, P.Z);                     { 12c5:01d7 }
 
-  { NOT Inc(). 12c5:01da is MOV AX,[BP-0C] / MOV DX,[BP-0A] / ADD AX,[BP+0E]
+  { [re] NOT Inc(). 12c5:01da is MOV AX,[BP-0C] / MOV DX,[BP-0A] / ADD AX,[BP+0E]
     / ADC DX,[BP+10] / MOV [BP-0C],AX / MOV [BP-0A],DX -- eighteen bytes that
     load the target into a register pair, add, and store back. Inc(P.X, TX)
     compiles to the read-modify-write form instead, MOV AX,[BP+0E] / MOV
@@ -537,13 +538,13 @@ end;
 
 procedure ObjTransformAll(AObj : PObj; A1, A2, A3 : Integer);
 var
-  { ENTER $12 is 18 bytes and the arithmetic closes WITHOUT a spare, once the
+  { [re] ENTER $12 is 18 bytes and the arithmetic closes WITHOUT a spare, once the
     `with` below is counted. A `with` on a pointer dereference costs FOUR bytes
     of frame -- it computes AObj^.Pos once into a hidden far-pointer temp, which
     is the whole reason 12c5:031a is a single ADD DI,$4B0 -- so the counter, the
     three LongInts and that temp are 2 + 12 + 4 = 18 exactly.
 
-    This note used to read "the counter, three LongInts and the for-loop's own
+    [re] This note used to read "the counter, three LongInts and the for-loop's own
     two-byte limit temp account for 16, so two bytes here are declared and never
     read", and declared a Spare on that basis. The `with`'s cost was not known
     when it was written; with it counted there is no room for a spare, and
@@ -560,7 +561,7 @@ begin
   { 12c5:0317..0344 -- the translation is read ONCE, before the loop, into
     three locals, and those are what get passed per point. Reading PosX, PosY
     and PosZ inside the loop is the same answer and not the same code. }
-  { A `with`, AND THE ONE ADD SAYS SO. 12c5:031a is ADD DI,$4B0 and the three
+  { [re] A `with`, AND THE ONE ADD SAYS SO. 12c5:031a is ADD DI,$4B0 and the three
     fields are then read at ES:[DI], [DI+4] and [DI+8] with no further
     displacement -- the record's address computed ONCE for three reads. Naming
     AObj^.Pos at each field folds the $4B0 into every displacement instead,
@@ -577,14 +578,14 @@ begin
 end;
 
 { --------------------------------------------------------------------------
-  12c5:03a2 -- Obj_Translate(Obj, D1, D2, D3)
+  Obj_Translate(Obj, D1, D2, D3)
 
   Reads straight off the three blocks: D1 goes to object+$4B0 (X), D2 to +$4B4
   (Y), D3 to +$4B8 (Z), each ADDED, each via IntToFixed. It accumulates.
   -------------------------------------------------------------------------- }
 procedure ObjTranslate(AObj : PObj; DX_, DY_, DZ_ : Integer);
 var
-  { P IS AT [BP-5], WHICH IS ODD, AND A FOUR-BYTE POINTER DECLARED FIRST WOULD
+  { [re] P IS AT [BP-5], WHICH IS ODD, AND A FOUR-BYTE POINTER DECLARED FIRST WOULD
     BE AT [BP-4]. So one byte is declared ahead of it and never touched: the
     frame is ENTER $06 -- 1 + 4 = 5, rounded to 6 -- and 12c5:03ad stores DI at
     [BP-5] with 12c5:03b0 storing ES at [BP-3]. An earlier note here blamed the
@@ -592,7 +593,7 @@ var
     address, it only stops one being padded to an even one. }
   Spare : Byte;                           { [BP-$1], never touched }
 begin
-  { A `with`, AND NOT A DECLARED POINTER, and two bytes separate them. Both
+  { [re] A `with`, AND NOT A DECLARED POINTER, and two bytes separate them. Both
     spellings put a four-byte address at [BP-5] and both give ENTER $06, so the
     frame cannot tell them apart -- the LOAD can. 12c5:03a9 is
 
@@ -606,11 +607,11 @@ begin
     same four bytes at the same offset, two bytes longer, and it was the last
     difference in this segment.
 
-    The Spare byte above is still needed: a `with` temp alone would sit at
+    [re] The Spare byte above is still needed: a `with` temp alone would sit at
     [BP-4]. }
   with AObj^.Pos do
   begin
-    { The ORDER of the operands is visible here: 12c5:03b6 calls IntToFixed and
+    { [re] The ORDER of the operands is visible here: 12c5:03b6 calls IntToFixed and
       then does ADD AX,ES:[DI], so the call is the LEFT operand and the field
       is added to its result. Written the other way round the compiler loads
       the field first and the two disagree. }
@@ -621,7 +622,7 @@ begin
 end;
 
 { --------------------------------------------------------------------------
-  12c5:0000 -- DepthSort(Lo, Hi), nested inside 12c5:0190
+  DepthSort(Lo, Hi), nested inside SortAll
 
   The same Hoare quicksort as scene 4's, over the six-byte screen records and
   keyed on D -- but scene 5 sorts ASCENDING where scene 4 sorts descending.
@@ -634,20 +635,20 @@ end;
   the reflection -- and RenderObject calls it before drawing anything. It was
   missing here entirely.
   -------------------------------------------------------------------------- }
-{ Load IS DEFINED HERE, BETWEEN ObjTranslate AND DrawPoint, AND THE SEGMENT
+{ [re] Load IS DEFINED HERE, BETWEEN ObjTranslate AND DrawPoint, AND THE SEGMENT
   SAYS SO. 12c5:0413 opens ENTER $482 -- 1,154 bytes, which is the 768-byte
   palette buffer at [BP-$481] plus the rest -- and then runs Assign against the
   string at CS:$0406, Reset, Seek to $0003BB02 and two BlockReads, of $34 bytes
   into DS:$A5C2 and $300 into that local. That is this routine and nothing else.
 
-  Defined near the end of the file instead, its 279 bytes were missing from
+  [re] Defined near the end of the file instead, its 279 bytes were missing from
   between 12c5:03a2 and 12c5:052a and every routine after ObjTranslate was
   displaced. Definition order is segment order. }
 
 { --------------------------------------------------------------------------
-  Vector_Load (12c5:0413) -- NEUROSIS.DAT $03BB02:
+  Vector_Load -- what it reads out of NEUROSIS.DAT:
 
-      52   the point sprite (a 2-byte W,H header and 50 pixels) -> DS:$A5C2
+      [re] 52   the point sprite (a 2-byte W,H header and 50 pixels) -> DS:$A5C2
       768  palette
 
   Then it paints the backdrop the objects fly over:
@@ -659,14 +660,14 @@ end;
   -------------------------------------------------------------------------- }
 procedure Load;
 var
-  { ENTER $482 IS 1,154 BYTES AND EVERY PART OF IT IS PINNED, because Pal's
+  { [re] ENTER $482 IS 1,154 BYTES AND EVERY PART OF IT IS PINNED, because Pal's
     base is the one local address the routine names. Only two slots are
     referenced in the whole routine: [BP-1], which 12c5:0495 sets to $64 and
     12c5:049b INCs -- a BYTE, and the counter of `for I := 100 to 255` -- and
     [BP-$481], which 12c5:045b and 12c5:046d LEA for the BlockRead and then for
     SetPalette768.
 
-    First declared is nearest BP, so I is first at [BP-1]. Working forward:
+    [re] First declared is nearest BP, so I is first at [BP-1]. Working forward:
     1 + 256 + 128 + 768 = 1,153, which puts Pal's base at exactly [BP-$481].
     That is the check -- no other arrangement of those sizes lands there, and
     ENTER rounds 1,153 up to the even 1,154.
@@ -679,7 +680,7 @@ var
   I      : Byte;                        { [BP-1] }
   Spare1 : String;                      { [BP-$101], 256, never read }
   Spare2 : String[127];                 { [BP-$181], 128, never read }
-  { The palette IS a local -- 12c5:046d LEAs [BP-$481] straight into
+  { [re] The palette IS a local -- 12c5:046d LEAs [BP-$481] straight into
     SetPalette768 (1491:01c2) and nothing keeps a copy. }
   Pal    : array[0..767] of Byte;       { [BP-$481] }
 begin
@@ -701,9 +702,9 @@ begin
 end;
 
 { --------------------------------------------------------------------------
-  12c5:052a -- the point sprite. HAND ASSEMBLER, transcribed verbatim.
+  The point sprite. HAND ASSEMBLER, transcribed verbatim.
 
-  IT IS ASSEMBLER AND THE PROLOGUE IS HOW YOU KNOW, twice over. 12c5:052a is
+  [re] IT IS ASSEMBLER AND THE PROLOGUE IS HOW YOU KNOW, twice over. 12c5:052a is
   PUSH BP / MOV BP,SP and NOTHING ELSE -- no ENTER, so no locals at all -- while
   ours declared seven and opened ENTER $02 after Turbo Pascal had folded most of
   them into registers. A routine that clips a sprite, walks two nested loops and
@@ -717,7 +718,7 @@ end;
 
   THE REGISTERS, because the transcription is unreadable without them:
 
-      ES:DI   destination, and DS:SI the sprite -- swapped at 12c5:0573
+      [re] ES:DI   destination, and DS:SI the sprite -- swapped at 12c5:0573
       CX      the sprite's width, from its own first byte
       DX      the rows still to draw, from its second
       BX      first the row, then the width again as the row-step correction
@@ -749,7 +750,7 @@ end;
   it off either edge wraps onto the neighbouring row. That is behaviour, not an
   omission, and the reconstruction has to keep it.
   -------------------------------------------------------------------------- }
-{ @asm 001 12c5:052a +0 DrawPoint }
+{ [re] @asm 001 12c5:052a +0 DrawPoint }
 procedure DrawPoint(Src : Pointer; X, Y : Integer; Segment : Word); assembler;
 asm
         PUSH    DS                      { 12c5:052d                          }
@@ -813,12 +814,12 @@ asm
 end;
 
 { --------------------------------------------------------------------------
-  12c5:05a2 -- the REFLECTION blit. HAND ASSEMBLER, transcribed verbatim.
+  The REFLECTION blit. HAND ASSEMBLER, transcribed verbatim.
 
   The same routine as DrawPoint above, byte for byte, with exactly two changes
   and both of them are visible in the listing:
 
-    * the clip is the OTHER SIDE of the mirror line. DrawPoint drops rows above
+    [re] * the clip is the OTHER SIDE of the mirror line. DrawPoint drops rows above
       Y = 0 and stops at 133; this drops rows above 133 and stops at 199, so the
       two together tile the screen at the horizon.
     * 12c5:0607 is ADD AL,$10 in front of the STOSB -- every pixel written
@@ -846,7 +847,7 @@ end;
         Inc(D, 320 - W);
       end;
   -------------------------------------------------------------------------- }
-{ @asm 001 12c5:05a2 +0 DrawReflection }
+{ [re] @asm 001 12c5:05a2 +0 DrawReflection }
 procedure DrawReflection(Src : Pointer; X, Y : Integer; Segment : Word); assembler;
 asm
         PUSH    DS                      { 12c5:05a5                          }
@@ -910,16 +911,16 @@ asm
 @@Done: POP     DS                      { 0618                               }
 end;
 
-{ [transcribed] 12c5:061d -- sort both halves, draw the reflections, then the
+{ [re] [transcribed] 12c5:061d -- sort both halves, draw the reflections, then the
   points with their Y pulled up seven rows (12c5:06ab). }
 procedure RenderObject;
 var
-  { A BYTE, NOT AN INTEGER. 12c5:0688 is MOV BYTE PTR [BP-1],AL and 068d is
+  { [re] A BYTE, NOT AN INTEGER. 12c5:0688 is MOV BYTE PTR [BP-1],AL and 068d is
     INC BYTE PTR [BP-1], so the counter is one byte; and the for limit's
     temporary is a byte too -- 12c5:067b loads PtCount into [BP-5] and 0683
     compares AL against that slot. ENTER $0A then decomposes as the counter,
     the temporary, and the four bytes a `with` gets for the record's address. }
-  { AND FOUR MORE BYTES THAT NOTHING READS. The note above says ENTER $0A and
+  { [re] AND FOUR MORE BYTES THAT NOTHING READS. The note above says ENTER $0A and
     then accounts for SIX -- one counter, one byte of for-limit temporary, four
     for the `with` -- which is its own refutation; prologue.py read ours as $06
     against the original's $0A. Both loops use a `with` and Turbo Pascal reuses
@@ -927,7 +928,7 @@ var
     is not where the four go. Nothing below the address pair at [BP-$9] is
     referenced at any width. }
   I     : Byte;                                   { [BP-$1] }
-  { THREE BYTES, NOT FOUR, AND THE COMPILER'S OWN TEMPORARIES MEASURE IT. The
+  { [re] THREE BYTES, NOT FOUR, AND THE COMPILER'S OWN TEMPORARIES MEASURE IT. The
     frame is ENTER $0A either way, so its size proves nothing -- what does is
     WHERE the temporaries land. The original puts the for limit at [BP-$5] and
     the address pair at [BP-$9]/[BP-$7]; a four-byte Spare fills [BP-$2]..[BP-$5]
@@ -938,7 +939,7 @@ var
 begin
   SortAll(@Scr);                                  { 12c5:0626 }
 
-  { A `with` IN BOTH LOOPS, and the two bytes at 12c5:06a3 say so: PUSH DS /
+  { [re] A `with` IN BOTH LOOPS, and the two bytes at 12c5:06a3 say so: PUSH DS /
     POP ES puts the segment in ES before the address pair is stored at [BP-9],
     and every field then goes through LES DI,[BP-9]. Naming Scr[I] at each
     field recomputes I * 6 and the fold for every one of them. }
@@ -953,24 +954,24 @@ begin
     end;
 end;
 
-{ FadeToWhite IS DEFINED BEFORE Animate: 12c5:06d0 against Animate's 12c5:075e.
+{ [re] FadeToWhite IS DEFINED BEFORE Animate: 12c5:06d0 against Animate's 12c5:075e.
   Defined after it, the two came out swapped -- mapping our routines onto the
   original by content put ours at 07f4 where the original has 06d0. }
 
 { --------------------------------------------------------------------------
-  12c5:06d0 -- FadeToWhite
+  FadeToWhite
 
   Forty passes. Each waits for retrace, then walks colours 1..255 doing
   GetRGB / bump every channel that is still below $3F / SetRGB. So the whole
   palette climbs to white before the wipe.
 
-  The source had a "DrawStatic" here -- a redraw of the last frame. There is
+  [re] The source had a "DrawStatic" here -- a redraw of the last frame. There is
   no such call in Vector_Run; this is what 12c5:0a1e actually reaches.
   -------------------------------------------------------------------------- }
 procedure FadeToWhite;
 var
   Pass, Col : Integer;
-  { B, G, R, BACKWARDS, for the reason part 003's P3Globe records twice: locals
+  { [re] B, G, R, BACKWARDS, for the reason part 003's P3Globe records twice: locals
     go down from BP in declaration order, so the first byte named gets [BP-$5]
     and the last [BP-$7] -- and 12c5:06f1 passes the address of [BP-$7] FIRST to
     GetRGB, so R is the lowest of the three. Declared the natural way round, all
@@ -993,27 +994,27 @@ begin
 end;
 
 { --------------------------------------------------------------------------
-  Vector_Animate (12c5:075e)
+  Vector_Animate
 
   Three angles run at once:
 
-      Spin    DS:$AAD0   += 20 per frame, RESET to 0 past 3590   2.0 deg
+      [re] Spin    DS:$AAD0   += 20 per frame, RESET to 0 past 3590   2.0 deg
       Local   [BP-7]     += 3  per frame                         degrees
       Orbit   DS:$AAD2   += 10 per frame                         degrees
 
-  Spin is reset on entry (12c5:0764) and drives all three rotation axes with
+  [re] Spin is reset on entry (12c5:0764) and drives all three rotation axes with
   the same value, so the object tumbles about the diagonal. Local is reset too
   (12c5:0769). ORBIT IS NOT -- Vector_Run seeds it before each call, and
   Animate carries on from there.
 
-  The three translation deltas, read off 12c5:07b8..12c5:0828 with the float
+  [re] The three translation deltas, read off 12c5:07b8..12c5:0828 with the float
   constants at CS:$0752, $0756, $075A:
 
       [$AACA] := Round(Cos(Local * Pi / 180) *   5.0)
       [$AACC] := Round(Sin(Orbit * Pi / 180) *  20.0)
       [$AACE] := Round(Sin(Local * Pi / 180) * 500.0)
 
-  and 12c5:083d pushes them in that order into Obj_Translate, which maps them
+  [re] and 12c5:083d pushes them in that order into Obj_Translate, which maps them
   to X, Y, Z respectively. THE PREVIOUS VERSION HAD X AND Z SWAPPED: it put
   the 500 on X and the 5 on Z, so the object slid across the screen instead of
   rushing toward and away from the camera. That is the wrong motion.
@@ -1025,7 +1026,7 @@ end;
   No delay and no retrace wait anywhere in the loop: on the original the two
   64,000-byte screen copies were the frame rate.
   -------------------------------------------------------------------------- }
-{ THE FRAME IS ENTER $08 (12c5:075e) AND IT TAKES FOUR DECLARATIONS TO FILL,
+{ [re] THE FRAME IS ENTER $08 (12c5:075e) AND IT TAKES FOUR DECLARATIONS TO FILL,
   not two. What gives it away is that every local sits on an ODD offset --
   [BP-3] and [BP-7] -- which only happens if a ONE-BYTE local was declared
   first and pushed everything after it out of alignment. Turbo Pascal does not
@@ -1089,11 +1090,11 @@ begin
 end;
 
 { ===========================================================================
-  Scene 5 -- vector objects and wipe              Demo_Scene5  12c5:0a89
+  Scene 5 -- vector objects and wipe
   =========================================================================== }
 
 { --------------------------------------------------------------------------
-  Vector_Run (12c5:0870)
+  Vector_Run
 
   Two objects in turn. The start position is set ONCE, before the globe, and
   is NOT reset before the logo -- so the logo begins wherever the globe's
@@ -1107,7 +1108,7 @@ end;
   The source had Pos zeroed inside LoadObject, so the object sat at the origin
   with no depth at all and the perspective divide had nothing to work with.
 
-  ASSETS  Compiled into the executable, not in NEUROSIS.DAT:
+  [re] ASSETS  Compiled into the executable, not in NEUROSIS.DAT:
             assets/part001/VECGLOBE.BIN    DS:$01A8, 36 points
             assets/part001/VECLOGOA.BIN   DS:$001C, 48 points
   -------------------------------------------------------------------------- }
@@ -1117,7 +1118,7 @@ var
     three Integers and a Pointer -- which is what this said -- and the BODY
     refutes that:
 
-      [BP-$06] is the for-loop's LIMIT temp. 12c5:087d is
+      [re] [BP-$06] is the for-loop's LIMIT temp. 12c5:087d is
       MOV AX,[$AAC8] / DEC AX / MOV [BP-6],AX -- PtCount minus one, evaluated
       once before the loop, which is what a `for` does with a non-constant
       limit. It is not a declared Word.
@@ -1128,14 +1129,14 @@ var
       The record's address is taken ONCE, which three separate
       `Obj.Pt[I].X :=` statements do not do.
 
-    AND THERE IS NO Src POINTER AT ALL. 12c5:08b3 is
+    [re] AND THERE IS NO Src POINTER AT ALL. 12c5:08b3 is
     PUSH WORD PTR [DI+$1A8] -- an ABSOLUTE displacement, so the coordinate
     table is named directly. A table reached through a pointer variable would
     load the pointer into a register first. `Src := @VecGlobe` was inferred to
     explain a slot that turns out to be a compiler temp. }
   I      : Integer;                       { [BP-$02] }
   W      : Word;                          { [BP-$04] -- the slide-out counter }
-  { AND THAT IS THE WHOLE VAR BLOCK: two words, and ENTER $0A is 4 declared plus
+  { [re] AND THAT IS THE WHOLE VAR BLOCK: two words, and ENTER $0A is 4 declared plus
     6 of COMPILER TEMPORARIES. The frame's own ORDER proves the point pointer is
     not declared. Temps are allocated below every declared local, so a declared
     P would sit at [BP-$08] with the for-limit temp beneath it at [BP-$0A]. The
@@ -1151,10 +1152,10 @@ var
     A Spare was then added to push P down to the measured offset, which made the
     frame $0E against the original's $0A. }
 begin
-  { INLINE, both times. 12c5:0874 sets PtCount from an immediate and then runs
+  { [re] INLINE, both times. 12c5:0874 sets PtCount from an immediate and then runs
     the point loop in Vector_Run's own frame -- there is no call.
 
-    THE LOOP IS ZERO-BASED, AND ONLY THE Pt SUBSCRIPT CARRIES THE +1. 12c5:0893
+    [re] THE LOOP IS ZERO-BASED, AND ONLY THE Pt SUBSCRIPT CARRIES THE +1. 12c5:0893
     is MOV AX,[BP-2] / INC AX / IMUL DI,AX,0C for the destination record, so the
     counter is one less than the point number there. But 12c5:08a6 scales the
     SAME counter by six for the source table with NO increment, and 12c5:08b3 is
@@ -1163,7 +1164,7 @@ begin
     contributes nothing to the fold, so its LOW BOUND IS ZERO and the source is
     `VecGlobe[I, n]`.
 
-    This note used to read "both subscripts carry the +1 ... folding to
+    [re] This note used to read "both subscripts carry the +1 ... folding to
     base + I*6", which is arithmetically true of a one-based table and produced
     the wrong code: `VecGlobe[I + 1, n]` folds to $1A2, one 6-byte element low,
     and Turbo Pascal pays for the difference with an INC AX on every point. The
@@ -1179,12 +1180,16 @@ begin
     end;
 
 
-  { 12c5:0918 stores an ALREADY-ZERO AX twice with no call before it, so X is
+  { THE STARTING POSITION. X IS A DIRECT ZERO -- not IntToFixed(0), which would
+    be a call -- while Y and Z do go through the conversion. Same values either
+    way; different code.
+
+    [re] 12c5:0918 stores an ALREADY-ZERO AX twice with no call before it, so X is
     a direct zero. Y and Z below really do go through IntToFixed -- 12c5:091e
     pushes -70 and 12c5:092c pushes 1600. }
-  Obj.Pos.X := 0;                              { 12c5:0918 }
-  Obj.Pos.Y := IntToFixed(-70);                { 12c5:091e }
-  Obj.Pos.Z := IntToFixed(1600);               { 12c5:092c }
+  Obj.Pos.X := 0;
+  Obj.Pos.Y := IntToFixed(-70);
+  Obj.Pos.Z := IntToFixed(1600);
 
   { 12c5:093b -- Scale := (ScreenWidth / 2.0) * 10.0, as 16.16.
     CS:$0868 = 2.0, CS:$086C = 10.0. }
@@ -1215,7 +1220,7 @@ begin
   Delay(1000);                                 { 12c5:0a21 }
 
   { --------------------------------------------------------------------
-    12c5:0a29 -- the wipe.
+    The wipe.
 
         W := 0
         repeat
@@ -1263,7 +1268,7 @@ begin
       REP  MOVSB            { and the picture follows, starting at row W/320 }
       POP  DS               { restore our data segment                      }
     end;
-    { LONGHAND: 12c5:0a4e is MOV AX,[BP-4] / ADD AX,$280 / MOV [BP-4],AX --
+    { [re] LONGHAND: 12c5:0a4e is MOV AX,[BP-4] / ADD AX,$280 / MOV [BP-4],AX --
       loaded, added in the register, stored back -- where `Inc` on a local emits
       ADD WORD PTR in place. }
     W := W + 640;
@@ -1271,7 +1276,7 @@ begin
 end;
 
 { --------------------------------------------------------------------------
-  12c5:0a60 -- the work-buffer setup, a routine of its own in the binary.
+  The work-buffer setup, a routine of its own in the binary.
 
   GetMem straight off (no nil test -- Scene5 frees it on the way out, so a
   second run allocates again), and the buffer is CLEARED before anything
@@ -1291,9 +1296,9 @@ begin
 end;
 
 { --------------------------------------------------------------------------
-  12c5:0a89 -- Demo_Scene5.
+  Demo_Scene5.
 
-      while KeyPressed do ReadKey      12c5:0a8c -- its own flush, inline
+      [re] while KeyPressed do ReadKey      12c5:0a8c -- its own flush, inline
       ClearScreen($A000, 0)            12c5:0a9c
       AllocWork                        12c5:0aa6 -> 0a60
       Load                             12c5:0aa9 -> 0413
@@ -1317,7 +1322,7 @@ begin
   FreeMem(Work, 64000);
 end;
 
-{ AN EMPTY INITIALISATION SECTION, AND THE ORIGINAL GIVES EVERY UNIT ONE. 12c5:0ac1
+{ [re] AN EMPTY INITIALISATION SECTION, AND THE ORIGINAL GIVES EVERY UNIT ONE. 12c5:0ac1
   is PUSH BP / MOV BP,SP / LEAVE / RETF -- five bytes, doing nothing -- and the
   main body opens with a chain of far calls that runs one per unit. The chain is
   twelve calls at 1000:0000..003b in the 1994 binary and was SEVEN in ours,
