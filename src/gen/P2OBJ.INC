@@ -7,7 +7,7 @@
       count, index1 .. indexN, colour        (count + 2 words)
 
   Indices are stored zero-based and incremented on load. Faces have 3, 4, 6
-  or 8 vertices. Scene2_Intro (108b:1bbd) is the loader.
+  or 8 vertices.
 
   See assets/part002/obj_*.png -- five projections of each, because a model
   is often unrecognisable from the obvious X/Y view.
@@ -17,7 +17,7 @@
 const
 
 
-  { the USS Enterprise -- vertices DS:$0004 }
+  { the USS Enterprise -- vertices }
   NVertEnterprise = 75;
   NFaceEnterprise = 55;
   VertEnterprise : array[0..224] of Integer = (
@@ -47,7 +47,7 @@ const
     80, -20, -100, 80, -20, 0, 50, -25, 0,
     50, -25, -100, 80, -25, -100, 80, -25, 0
   );
-  { 55 faces the loader reads, 338 words in DGROUP -- DS:$01C6 }
+  { 55 faces the loader reads, 338 words }
   FaceEnterprise : array[0..337] of Integer = (
     4, 62, 66, 63, 59, 112, 4, 70, 74, 71, 67, 112,
     4, 66, 65, 64, 63, 112, 4, 73, 72, 71, 74, 112,

@@ -28,7 +28,9 @@ Asphyxia's first megademo, 1994. Borland Pascal 7 plus hand-written assembler, r
 
 **This target has no checks of its own any more.** `paslint` and `encaudit` were the last two and they are the kit's, on its list in [`kit/WORKING.md`](kit/WORKING.md) -- neither says anything about this demo, and both had a constant where a project's answer belonged. Moving `paslint` fixed a check that could not fail: its source directory was hardcoded, so in the sibling repository it reported *0 problems in 0 files* and passed. Run the kit's list and nothing else.
 
-**The Pascal sources are LF on disk** despite the CRLF rule, because `.gitattributes` marks them `-text` and they were authored that way; Turbo Pascal reads them regardless. Do not "fix" this in bulk -- it would rewrite every source file for no measured gain.
+**The hand-written Pascal sources are LF on disk** despite the CRLF rule, because `.gitattributes` marks them `-text` and they were authored that way; Turbo Pascal reads them regardless. Do not "fix" this in bulk -- it would rewrite every source file for no measured gain.
+
+**But the GENERATED includes are CRLF** -- everything under `src/gen/` and `src/asm/COSTAB.INC`, because the emitters write them that way. So the tree has both, split by who wrote the file. This matters to any script that edits a source by matching a multi-line anchor: the anchor simply does not match, and it fails SILENTLY, one file at a time. It cost eight edits in one batch on 1 Sep 2026, and the give-away was that the single-line anchors in the same batch all worked -- a one-line anchor has no newline in it. Normalise before matching and write back with whatever the file had, which is what `clean.py` does.
 
 ## The state of this working tree, as of 23 Aug 2026
 

@@ -1,13 +1,12 @@
 { Part 003 scene 7 -- the member captions, 40 lines.
 
-  array[1..4, 1..10] of String[255], DS:$76B8, stride $100. Ten lines per
-  member, in the same order as the four rotating portraits.
-  TWO-DIMENSIONAL, and 125e:0741 is why. The original indexes it as
-  Captions[N, Row][Col]: IMUL DI,[BP+4],$0A00 for the member, a separate
-  Row*256, and Col added last. A flat array[1..40] indexed
-  Captions[(N-1)*10 + Row] emits a DEC and an IMUL by 10 instead -- the same
-  address by a different route, because the displacement absorbs the
-  difference, so the bytes never match. Same 10,240 bytes either way.
+  array[1..4, 1..10] of String[255], stride $100. Ten lines per member, in
+  the same order as the four rotating portraits.
+
+  TWO-DIMENSIONAL, not flat: the two subscripts are applied separately, so the
+  displacement absorbs the low bounds. A flat array of 40 indexed
+  Captions[(N-1)*10 + Row] reaches the same address by a different route and
+  emits different code. Same 10,240 bytes either way.
 
 
   STRING[255], AND THE STRIDE THIS TABLE IS READ WITH IS WHY. A Borland

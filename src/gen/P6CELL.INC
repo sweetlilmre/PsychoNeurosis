@@ -1,6 +1,6 @@
 { Part 006 scene 2 -- the whoosh board.
 
-  array[1..27, 1..16, 1..8] of Byte, DS:$000A. Each band is one letter cell
+  array[1..27, 1..16, 1..8] of Byte. Each band is one letter cell
   block; the value is the CELL TYPE drawn at that grid position (1 = letter,
   0 = nothing; Whoosh_Load pre-fills the whole board with 2 = background).
 

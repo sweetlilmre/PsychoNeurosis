@@ -1,7 +1,7 @@
 { Part 001 scene 5 -- the two 3-D vector objects.
 
-  Compiled into DGROUP as signed integer (X, Y, Z) triples and converted to
-  Real at load time by Math_IntToReal (1483:0000) into 12-byte records.
+  Compiled in as signed integer (X, Y, Z) triples and converted to Real at
+  load time into 12-byte records.
 
   VecLogoA is flat (Z = 0 throughout) -- the circled "A" logo mark.
   VecGlobe is three orthogonal rings, +/-50 on every axis.

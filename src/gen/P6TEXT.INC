@@ -1,7 +1,7 @@
 { Part 006 scene 4 -- the credits text.
 
-  A Borland `array[1..99] of String[255]` at DS:$0D8A, 256 bytes
-  per element, which is why the stride in DGROUP is $100. Only the first
+  A Borland `array[1..99] of String[255]` -- 256 bytes per element, which is
+  why the stride is $100. Only the first
   79 lines carry text in the load image; the rest fall past its end
   and are blank at run time, so they are blank here.
 
