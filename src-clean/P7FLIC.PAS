@@ -236,7 +236,7 @@ begin
   @@Op:
     LODSW                  { <- 100f:006b comes back HERE          }
     TEST AH, 0C0h          { top two bits set => a line skip       }
-    JNZ  @@Skip            { -> 100f:005b                          }
+    JNZ  @@Skip
     MOV  CX, AX            { otherwise AX is the packet count      }
   @@Packet:
     LODSB                  { <- 100f:004d and 100f:0057 LOOP HERE  }
@@ -244,7 +244,7 @@ begin
     ADD  DI, AX            { skip that many BYTES                  }
     LODSB                  { the signed word count                 }
     TEST AL, 80h
-    JZ   @@Literal         { -> 100f:0051. POSITIVE is the literal
+    JZ   @@Literal         { POSITIVE is the literal
                                           copy here -- the opposite way round
                                           from BRUN below.                    }
     PUSH CX
@@ -256,14 +256,14 @@ begin
     REP  STOSW
     POP  CX
     LOOP @@Packet
-    JMP  @@EndLine         { -> 100f:006d                          }
+    JMP  @@EndLine
   @@Literal:
     PUSH CX
     MOV  CX, AX
     REP  MOVSW
     POP  CX
     LOOP @@Packet
-    JMP  @@EndLine         { -> 100f:006d                          }
+    JMP  @@EndLine
   @@Skip:
     PUSH DX
     NOT  AX
@@ -276,13 +276,13 @@ begin
     POP  DX
     ADD  DI, AX
     MOV  BX, DI            { the skipped-to line is the new start   }
-    JMP  @@Op              { -> 100f:002e, NOT to @@Line: the line
+    JMP  @@Op              { NOT to @@Line: the line
                                         counter is not spent by a skip         }
   @@EndLine:
     POP  CX
     MOV  DI, BX
     ADD  DI, 140h
-    LOOP @@Line            { -> 100f:002b                          }
+    LOOP @@Line
     POP  DS
   end;
 end;
@@ -340,20 +340,20 @@ begin
     XOR  AH, AH
     MOV  CX, AX
     CMP  CX, 0
-    JZ   @@Blank           { -> 100f:00d0                          }
+    JZ   @@Blank
   @@Packet:
     XOR  AH, AH            { <- 100f:00c1 LOOPs HERE               }
     LODSB
     ADD  DI, AX            { skip                                  }
     LODSB
     TEST AL, 80h
-    JNZ  @@Run             { -> 100f:00b6                          }
+    JNZ  @@Run
     PUSH CX
     XOR  AH, AH
     MOV  CX, AX
     REP  MOVSB
     POP  CX
-    JMP  @@Next            { -> 100f:00c1                          }
+    JMP  @@Next
   @@Run:
     PUSH CX
     NEG  AL
@@ -369,7 +369,7 @@ begin
     ADD  DI, 140h
     MOV  DX, DI
     LOOP @@Line
-    JMP  @@Done            { -> 100f:00d9                          }
+    JMP  @@Done
   @@Blank:
     ADD  DI, 140h          { a line with no packets at all         }
     MOV  DX, DI
@@ -597,14 +597,14 @@ begin
   @@Line:
     MOV  DX, BX            { bytes still owed on this line        }
     CMP  CX, 0
-    JBE  @@Done            { -> 100f:02ca                          }
+    JBE  @@Done
     LODSB                  { the packet count -- READ AND DROPPED }
   @@Packet:
     CMP  DX, 0             { <- 100f:02ba and 100f:02c6 come HERE }
-    JBE  @@EndLine         { -> 100f:02c8                          }
+    JBE  @@EndLine
     LODSB
     TEST AL, 80h
-    JZ   @@Run             { -> 100f:02bc. NEGATIVE is the literal
+    JZ   @@Run             { NEGATIVE is the literal
                                           copy here -- the opposite way round
                                           from SS2 and LC above.             }
     NEG  AL
@@ -686,9 +686,9 @@ begin
     STI
     MOV  AX, DI
     TEST AL, 1             { a timer interrupt pending...         }
-    JZ   @@Store           { -> 100f:030f                          }
+    JZ   @@Store
     CMP  BX, 0FFh          { ...and the counter has just wrapped  }
-    JA   @@Store           { -> 100f:030f                          }
+    JA   @@Store
     INC  DX                { so 0040:6C is one behind. Fix it.    }
   @@Store:
     MOV  WORD PTR @Result, BX     { the low half              }

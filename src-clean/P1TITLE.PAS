@@ -185,7 +185,7 @@ begin
   { THE FILE IS OPENED BY THE CALLER, not here. 1082:0572..0597 is Assign,
     Reset and Seek in Scene2's own body, and 1082:059c is the near call to this
     routine afterwards -- so Load is entered with the file already positioned. }
-  BlockRead(F, Pal, 768);                         { -> DS:$56D2 }
+  BlockRead(F, Pal, 768);
   BlockRead(F, CometBank^, SizeOf(TCometBank));
   ClearScreen($A000, 0);
   { THROUGH THE POINTER, NOT THROUGH THE SEGMENT. 1082:0076 is

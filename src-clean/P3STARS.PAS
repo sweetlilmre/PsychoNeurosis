@@ -475,7 +475,7 @@ begin
   WaypointIdx := 4;             { dead: RunScene sets it to 50
                                   before ever reading it. Kept because it is
                                   there. }
-  BlockRead(F, Waypoints[1], DataSize);        { -> DS:$B250 }
+  BlockRead(F, Waypoints[1], DataSize);
   Close(F);
 
   InitPalette;

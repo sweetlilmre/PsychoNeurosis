@@ -1,7 +1,7 @@
 { ===========================================================================
   Psycho Neurosis (Asphyxia, 1994) -- NEUROSIS.002, the program itself.
 
-  THIS IS THE MAIN BODY, NOT A UNIT CALLED BY A HARNESS. Segment 1000 is 128
+  [re] THIS IS THE MAIN BODY, NOT A UNIT CALLED BY A HARNESS. Segment 1000 is 128
   bytes; the body starts at 1000:0032.
 
       1000:0035   SetMode13h        1436:0000, which is the same physical
@@ -19,7 +19,11 @@
   the generated TPART2.PAS that called it -- 64 and 496 bytes of segment the
   original does not have.
 
-  THE DRAIN IS INLINE, NOT A FlushKeys CALL. 1000:0044 to 0053 is sixteen
+  THE KEYBOARD DRAIN IS WRITTEN INLINE at every site rather than as a
+  procedure. Each scene can end on a keypress, and the drain throws that key
+  away so the next scene does not see it and skip itself.
+
+  [re] THE DRAIN IS INLINE, NOT A FlushKeys CALL. 1000:0044 to 0053 is sixteen
   bytes where a call would be five, and part 003 taught this the expensive way:
   with the call its program came out 272 bytes against 336 and removing the
   harness bought nothing at all, because a program segment of the wrong SIZE
@@ -31,7 +35,7 @@
   the adapter in mode 13h for whatever PSYCHO.EXE ran next, so RUNPART.BAT
   restores it with VIDMODE.
 
-  THE USES CLAUSE IS THE LINK ORDER, REVERSED, and it is the harness's clause
+  [re] THE USES CLAUSE IS THE LINK ORDER, REVERSED, and it is the harness's clause
   followed by P2MAIN's. P2SOLID BEFORE ModeX BEFORE P2GARAGE is load-bearing: the
   original's order is P2GARAGE (1008), ModeX (107c), P2SOLID (108b), DemoVT (13f9),
   P2View (140c), FixMath (142a), VGA (1436), Crt (144f), and ModeX lands second
@@ -39,7 +43,9 @@
   in the clause put it sixth. Checked against build/NEUR2.MAP.
   =========================================================================== }
 
-{$G+}   { 286, AND A PROGRAM IS A FILE -- nothing inherits $G from its units.
+{ 286 instructions are permitted. This setting is PER FILE and a program is a
+  file, so nothing here inherits it from the units. }
+{$G+}   { [re] 286, AND A PROGRAM IS A FILE -- nothing inherits $G from its units.
           Without it an immediate argument comes out MOV AX,imm / PUSH AX rather
           than PUSH imm8, and the frame teardown POP BP rather than LEAVE. }
 

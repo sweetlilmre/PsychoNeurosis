@@ -7,7 +7,11 @@
   shape of the code: main is 98 bytes, and its core is the inline asm
   block below, one instruction per source line as the original had it.
 
-  The sign-off screen is an 80x25 text page with attributes, compiled in
+  THE SIGN-OFF SCREEN: an 80x25 text page, character and attribute, written
+  straight to video memory and then held until a key is pressed. The page
+  itself is a generated table -- see the include below.
+
+  [re] The sign-off screen is an 80x25 text page with attributes, compiled in
   as a typed constant (src/gen/P9IMG.INC, tools/emit_byebye.py). The asm
   scrolls it up into view from the bottom: each pass copies the image's
   last (25-Row+1) rows to the TOP of text video memory, so the picture
@@ -15,13 +19,13 @@
   runs, so the image's own first row is never drawn -- the original does
   the same.
 
-  Directives are measured, not style (docs/30-byebye.md, "Build flags"):
+  [re] Directives are measured, not style (docs/30-byebye.md, "Build flags"):
   $G+ because the author's PUSHA and PUSH imm are 286 encodings, and
   $S+ because main calls __StackCheck at 1069:02CD -- the original was
   built with stack checking ON, unlike the demo parts, and dosbuild's
   /$S- must be overridden here in-source for the bytes to match.
 
-  DGROUP (10C3)
+  [re] DGROUP (10C3)
     DS:$0002  ImageData             DS:$0FF0  P
     DS:$0FF4  Flag (declared in the original, never referenced -- kept)
   =========================================================================== }
@@ -48,7 +52,7 @@ begin
   P := @ImageData;
 
   { Equivalent Pascal, reference only -- the assembler below is the
-    original's, transcribed verbatim (1000:0025..0050):
+    original's, transcribed verbatim:
 
       for Row := 25 downto 1 do
       begin

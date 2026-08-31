@@ -354,7 +354,7 @@ begin
   Assign(F, 'neurosis.dat');
   Reset(F, 1);
   Seek(F, DataOfs);
-  BlockRead(F, Font, FontSize);                  { -> DS:$DDDE }
+  BlockRead(F, Font, FontSize);
 
   { the rotation table, 6-bit fixed point }
   for I := 0 to AngleWrap - 1 do
@@ -384,7 +384,7 @@ begin
   for GI := 1 to NumSprites do                   { the global }
     BlockRead(F, Sprite[GI]^, SpriteSize);
 
-  BlockRead(F, TargetPal, 768);                  { -> DS:$E3EC }
+  BlockRead(F, TargetPal, 768);
 
   for I := 0 to 255 do
     SetRGB(I, 0, 0, 0);                          { start from black }

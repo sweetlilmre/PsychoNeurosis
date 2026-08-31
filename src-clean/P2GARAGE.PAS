@@ -655,17 +655,17 @@ begin
   ShowFrame(0, 0);
   Delay($7D0);
 
-  MusicDetect;                             { -> 13f9:0000 }
-  MusicCue;                                { -> 13f9:0085 }
-  SyncPattern(5, 1);                       { -> 13f9:00ca }
+  MusicDetect;
+  MusicCue;
+  SyncPattern(5, 1);
 
   for X := 0 to PanEnd do
   begin
-    MusicPoll;                             { -> 13f9:0040 }
+    MusicPoll;
     ShowFrame(X, 0);
   end;
 
-  MusicStart;                              { -> 13f9:004e }
+  MusicStart;
   Delay($7D0);
 
   for X := 1 to NumStars do

@@ -1,10 +1,6 @@
 { ===========================================================================
   Psycho Neurosis (Asphyxia, 1994) -- NEUROSIS.007, the program itself.
 
-  THIS IS THE MAIN BODY, NOT A UNIT CALLED BY A HARNESS. Segment 1000, offsets
-  $00..$bb: everything up to 1000:001d is Turbo Pascal's unit initialisation
-  chain and the program starts at 1000:001e.
-
   It replaces P7MAIN.PAS, which held the same code as a unit with a RunPart7
   entry, plus TPART7.PAS, the generated harness that called it. Those two
   segments have no counterpart in the original -- its main body IS the program
@@ -12,32 +8,17 @@
   every far call into it differed. That was 10 of part 007's 12 unaligned
   bytes.
 
-  THE USES CLAUSE IS THE LINK ORDER, REVERSED. Turbo Pascal's link walk is a
-  reverse DFS post-order starting at the PROGRAM, so the last unit to finish
-  comes first in code. The original's segments are VGA (100b), P7FLIC (100f),
-  Crt (1099) and DemoVT (10fb), so VGA has to finish last and DemoVT first.
-  Checked against build/NEUR7.MAP, not assumed.
-
   Part 007 is the last part of the demo, and it is the only one that tidies up
   after itself: after going back to text mode it issues INT 10h AH=1 with
   CX=$FF09, which hides the text cursor. Nothing else in Psycho Neurosis does
   that.
 
   There is no VirtScrAlloc here -- the FLI player writes straight to $A000, so
-  part 007 never allocates a virtual screen.
+  part 007 never allocates a virtual screen. }
 
-  DEVIATION: the original keeps SetMode13h and SetTextMode in a two-routine
-  unit of its own at segment 100b (1000:00b0 and 1000:00b6 in the listing).
-  The reconstruction takes them from the shared VGA unit instead; they are the
-  same three instructions.
-
-  DGROUP
- the volume as we found it   DS:$0067  the fade's copy of it
-  =========================================================================== }
-
-{$G+}   { 286, AND A PROGRAM IS A FILE -- nothing inherits $G from its units.
-          Without it an immediate argument comes out MOV AX,imm / PUSH AX rather
-          than PUSH imm8, and the frame teardown POP BP rather than LEAVE. }
+{ 286 instructions are permitted. This setting is PER FILE and a program is a
+  file, so nothing here inherits it from the units. }
+{$G+}
 
 program Neur7;
 
@@ -49,14 +30,14 @@ var
 
 { and it ends in Halt(0), exactly as the original's does. }
 begin
-  SetMode13h;                     { -> 100b:0000 }
+  SetMode13h;
 
-  MusicDetect;                    { -> 10fb:0000 }
-  MusicFunc3;                     { -> 10fb:006a }
-  MusicCue;                       { -> 10fb:0093 }
-  MusicStart;                     { -> 10fb:004e }
+  MusicDetect;
+  MusicFunc3;
+  MusicCue;
+  MusicStart;
 
-  Scene1;                         { -> 100f:084c }
+  Scene1;
 
   while KeyPressed do ReadKey;
 
@@ -70,9 +51,9 @@ begin
     Delay(10);
   until V = 0;
 
-  MusicStop;                      { -> 10fb:005c }
-  SetVolume(SavedVol);            { -> 10fb:00d8 }
-  SetTextMode;                    { -> 100b:0006 }
+  MusicStop;
+  SetVolume(SavedVol);
+  SetTextMode;
 
   { AH=1 sets the cursor shape, and a start line above the end
     line turns the cursor off. The demo is over; leave DOS looking clean. }

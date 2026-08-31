@@ -1,47 +1,23 @@
 { ===========================================================================
   Psycho Neurosis (Asphyxia, 1994) -- NEUROSIS.002, the program itself.
 
-  THIS IS THE MAIN BODY, NOT A UNIT CALLED BY A HARNESS. Segment 1000 is 128
-  bytes; the body starts at 1000:0032.
-
- SetMode13h        1436:0000, which is the same physical
-                                    bytes as 142a:00c0 -- the two segments
-                                    overlap, so FixMath already has it
- VirtScrAlloc      1436:0006
- Demo_Scene1       1008:0724
- flush the keyboard, INLINE
- Demo_Scene2       108b:2454
- flush the keyboard, INLINE
- VirtScrFree       1436:0033
- Halt(0)
-
   It replaces P2MAIN.PAS, which held this as a unit with a RunPart2 entry, and
   the generated TPART2.PAS that called it -- 64 and 496 bytes of segment the
   original does not have.
 
-  THE DRAIN IS INLINE, NOT A FlushKeys CALL. 1000:0044 to 0053 is sixteen
-  bytes where a call would be five, and part 003 taught this the expensive way:
-  with the call its program came out 272 bytes against 336 and removing the
-  harness bought nothing at all, because a program segment of the wrong SIZE
-  moves the runtime exactly as an extra one does.
+  THE KEYBOARD DRAIN IS WRITTEN INLINE at every site rather than as a
+  procedure. Each scene can end on a keypress, and the drain throws that key
+  away so the next scene does not see it and skip itself.
 
   Note what is NOT here: no music start or stop, and no palette fade. Each
   scene drives the tracker itself -- Scene1 detects and cues it, Scene2 starts
   it and ramps the volume down at the end. And no SetTextMode: part 002 left
   the adapter in mode 13h for whatever PSYCHO.EXE ran next, so RUNPART.BAT
-  restores it with VIDMODE.
+  restores it with VIDMODE. }
 
-  THE USES CLAUSE IS THE LINK ORDER, REVERSED, and it is the harness's clause
-  followed by P2MAIN's. P2SOLID BEFORE ModeX BEFORE P2GARAGE is load-bearing: the
-  original's order is P2GARAGE (1008), ModeX (107c), P2SOLID (108b), DemoVT (13f9),
-  P2View (140c), FixMath (142a), VGA (1436), Crt (144f), and ModeX lands second
-  only because nothing names it directly -- P2GARAGE pulls it in there. Naming it
-  in the clause put it sixth. Checked against build/NEUR2.MAP.
-  =========================================================================== }
-
-{$G+}   { 286, AND A PROGRAM IS A FILE -- nothing inherits $G from its units.
-          Without it an immediate argument comes out MOV AX,imm / PUSH AX rather
-          than PUSH imm8, and the frame teardown POP BP rather than LEAVE. }
+{ 286 instructions are permitted. This setting is PER FILE and a program is a
+  file, so nothing here inherits it from the units. }
+{$G+}
 
 program Neur2;
 
@@ -49,16 +25,16 @@ uses Crt, VGA, FixMath, P2View, DemoVT, P2SOLID, ModeX, P2GARAGE;
 
 { and it ends in Halt(0), exactly as the original's does. }
 begin
-  SetMode13h;                     { -> 1436:0000 }
-  VirtScrAlloc;                   { -> 1436:0006 }
+  SetMode13h;
+  VirtScrAlloc;
 
-  Scene1;                         { -> 1008:0724 }
+  Scene1;
   while KeyPressed do ReadKey;
 
-  Scene2;                         { -> 108b:2454 }
+  Scene2;
   while KeyPressed do ReadKey;
 
-  VirtScrFree;                    { -> 1436:0033 }
+  VirtScrFree;
   { NO Halt(0). `end.` already emits the exit -- LEAVE / XOR AX,AX /
     LCALL System:0116 -- so an explicit Halt(0) puts that sequence in TWICE,
     once for the statement and once for the end of the body. Seven bytes, and

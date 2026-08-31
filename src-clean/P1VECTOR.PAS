@@ -469,7 +469,7 @@ begin
     original has already computed in full. }
   Scr[I].X := Integer(Sx);                     { the object }
   Scr[I].Y := Integer(Horizon - Sy);
-  Scr[I].D := FixedToIntTrunc(P.Z);   { -> 1483:0071 }
+  Scr[I].D := FixedToIntTrunc(P.Z);
 
   Scr[I + PtCount].X := Integer(Sx);           { and its reflection }
   { TWO adds, ADD AX,$85 then ADD AX,1, not one ADD AX,$86.

@@ -1,7 +1,7 @@
 { ===========================================================================
   Psycho Neurosis (Asphyxia, 1994) -- NEUROSIS.006, the program itself.
 
-  THIS IS THE MAIN BODY, NOT A UNIT CALLED BY A HARNESS. Segment 1000, offsets
+  [re] THIS IS THE MAIN BODY, NOT A UNIT CALLED BY A HARNESS. Segment 1000, offsets
   $00..$ef: everything up to 1000:0028 is Turbo Pascal's unit initialisation
   chain and the program starts at 1000:002d.
 
@@ -14,7 +14,7 @@
   the four, but the main body calls 1095 first. Segment number tells you the
   link order, not the running order.
 
-  THE USES CLAUSE IS THE LINK ORDER, REVERSED, and P6TILES BEFORE P6WHOOSH IS
+  [re] THE USES CLAUSE IS THE LINK ORDER, REVERSED, and P6TILES BEFORE P6WHOOSH IS
   LOAD-BEARING -- this note comes from P6MAIN and it still applies. The
   original's variable region opens with P6TILES's Cells at DS:$70EE and its block
   ends at $737D, exactly where P6WHOOSH's Path begins at $737E; its constants open
@@ -27,11 +27,13 @@
   ran under PSYCHO.EXE and part 006 left the adapter in mode 13h for whatever
   came next. RUNPART.BAT restores it with VIDMODE.
 
-  DGROUP
+  [re] DGROUP
     DS:$70ec  the volume as we found it   DS:$70ed  the fade's copy of it
   =========================================================================== }
 
-{$G+}   { 286, AND A PROGRAM IS A FILE -- nothing inherits $G from its units.
+{ 286 instructions are permitted. This setting is PER FILE and a program is a
+  file, so nothing here inherits it from the units. }
+{$G+}   { [re] 286, AND A PROGRAM IS A FILE -- nothing inherits $G from its units.
           Without it an immediate argument comes out MOV AX,imm / PUSH AX rather
           than PUSH imm8, and the frame teardown POP BP rather than LEAVE. }
 

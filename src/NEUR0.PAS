@@ -15,7 +15,10 @@
     1  end screen only       (the Exit menu option)
     2  quit silently         (not enough memory)
 
-  TWO ORIGINAL DEFECTS ARE PRESERVED DELIBERATELY, per docs/31:
+  TWO OF THE ORIGINAL'S DEFECTS ARE PRESERVED DELIBERATELY, and neither is to
+  be fixed: this program is what the 1994 setup did, defects included.
+
+  [re] TWO ORIGINAL DEFECTS ARE PRESERVED DELIBERATELY, per docs/31:
     - IsVGA computes its answer into AX inside the asm block and never
       assigns the function result, so the value returned is whatever sits
       at [BP-1] -- the high byte of a return segment pushed earlier, which
@@ -33,7 +36,7 @@
   Detect, IMUL r,r,imm in WriteStr) and $S+ (every routine calls the
   stack check) -- see docs/31, "Build flags".
 
-  DGROUP: no program globals; everything lives on the stack, laid out by
+  [re] DGROUP: no program globals; everything lives on the stack, laid out by
   the declaration orders below, which are the debug info's.
   =========================================================================== }
 

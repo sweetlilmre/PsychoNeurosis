@@ -1,7 +1,7 @@
 { ===========================================================================
   Psycho Neurosis (Asphyxia, 1994) -- NEUROSIS.007, the program itself.
 
-  THIS IS THE MAIN BODY, NOT A UNIT CALLED BY A HARNESS. Segment 1000, offsets
+  [re] THIS IS THE MAIN BODY, NOT A UNIT CALLED BY A HARNESS. Segment 1000, offsets
   $00..$bb: everything up to 1000:001d is Turbo Pascal's unit initialisation
   chain and the program starts at 1000:001e.
 
@@ -12,7 +12,7 @@
   every far call into it differed. That was 10 of part 007's 12 unaligned
   bytes.
 
-  THE USES CLAUSE IS THE LINK ORDER, REVERSED. Turbo Pascal's link walk is a
+  [re] THE USES CLAUSE IS THE LINK ORDER, REVERSED. Turbo Pascal's link walk is a
   reverse DFS post-order starting at the PROGRAM, so the last unit to finish
   comes first in code. The original's segments are VGA (100b), P7FLIC (100f),
   Crt (1099) and DemoVT (10fb), so VGA has to finish last and DemoVT first.
@@ -26,16 +26,18 @@
   There is no VirtScrAlloc here -- the FLI player writes straight to $A000, so
   part 007 never allocates a virtual screen.
 
-  DEVIATION: the original keeps SetMode13h and SetTextMode in a two-routine
+  [re] DEVIATION: the original keeps SetMode13h and SetTextMode in a two-routine
   unit of its own at segment 100b (1000:00b0 and 1000:00b6 in the listing).
   The reconstruction takes them from the shared VGA unit instead; they are the
   same three instructions.
 
-  DGROUP
+  [re] DGROUP
     DS:$0066  the volume as we found it   DS:$0067  the fade's copy of it
   =========================================================================== }
 
-{$G+}   { 286, AND A PROGRAM IS A FILE -- nothing inherits $G from its units.
+{ 286 instructions are permitted. This setting is PER FILE and a program is a
+  file, so nothing here inherits it from the units. }
+{$G+}   { [re] 286, AND A PROGRAM IS A FILE -- nothing inherits $G from its units.
           Without it an immediate argument comes out MOV AX,imm / PUSH AX rather
           than PUSH imm8, and the frame teardown POP BP rather than LEAVE. }
 

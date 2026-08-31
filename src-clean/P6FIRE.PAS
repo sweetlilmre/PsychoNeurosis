@@ -507,7 +507,7 @@ begin
     for I := 1 to GridW do
     begin
       if Random < 0.4 then                       { JBE }
-        Tmp := Random(2) * 255;                  { -> [BP-$04] }
+        Tmp := Random(2) * 255;
       Grid[99, I] := Tmp;                        { EVERY column }
     end;
 

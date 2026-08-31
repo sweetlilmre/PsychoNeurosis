@@ -1,14 +1,14 @@
 { ===========================================================================
   Psycho Neurosis (Asphyxia, 1994) -- NEUROSIS.005, the program itself.
 
-  THIS IS THE MAIN BODY, NOT A UNIT CALLED BY A HARNESS. It replaces
+  [re] THIS IS THE MAIN BODY, NOT A UNIT CALLED BY A HARNESS. It replaces
   P5MAIN.PAS, which held this code as a unit with a RunPart5 entry, and the
   generated TPART5.PAS that called it. Neither has a counterpart in the 1994
   binary -- the original's main body IS its program -- and carrying them put
   Turbo Pascal's runtime on a different paragraph. Part 005 was the last part
   still built this way.
 
-  THE PROGRAM SEGMENT IS 224 BYTES, 1000:0000..00df. Offsets $00..$28 are the
+  [re] THE PROGRAM SEGMENT IS 224 BYTES, 1000:0000..00df. Offsets $00..$28 are the
   unit-initialisation chain, nine far calls, and the body starts at 1000:002d.
 
       1000:0030   SetMode13h        1252:0000
@@ -26,11 +26,15 @@
       1000:00cd   VirtScrFree       1252:0033
       1000:00d3   the exit
 
-  MODE BEFORE ALLOC, which is the usual order and NOT part 001's: 1000:0030
+  MODE BEFORE ALLOC, which is the usual order -- part 001 is the odd one out
+  and allocates first. Worth knowing before assuming the two parts share a
+  startup sequence.
+
+  [re] which is the usual order and NOT part 001's: 1000:0030
   sets mode 13h and 1000:0035 allocates. Part 001 does it the other way round,
   so neither order can be assumed from the other.
 
-  BOTH THE FADE'S VARIABLES ARE GLOBALS AND BOTH ARE BYTES. 1000:0092 is
+  [re] BOTH THE FADE'S VARIABLES ARE GLOBALS AND BOTH ARE BYTES. 1000:0092 is
   MOV BYTE PTR [$2D7C],AL, an absolute store, so they are not locals; and the
   fade reads GetVolume TWICE a turn, storing it into V both times, with
   1000:00b8 testing the second value. There is no test before the first turn,
@@ -41,14 +45,21 @@
   for whatever PSYCHO.EXE ran next; RUNPART.BAT restores it with VIDMODE.
   =========================================================================== }
 
-{$G+}   { 286, AND A PROGRAM IS A FILE -- nothing inherits $G from its units.
+{ 286 instructions are permitted. This setting is PER FILE and a program is a
+  file, so nothing here inherits it from the units. }
+{$G+}   { [re] 286, AND A PROGRAM IS A FILE -- nothing inherits $G from its units.
           1000:00b1 is PUSH $0A for Delay's argument and 1000:00d2 is LEAVE;
           without $G+ those become MOV AX,$000A / PUSH AX and POP BP, which is
           two bytes too many. Part 001's program taught this. }
 
 program Neur5;
 
-{ THE USES CLAUSE IS THE LINK ORDER, REVERSED, and it is the harness's clause
+{ THE UNITS ARE NAMED IN REVERSE ORDER HERE, and that is deliberate: Turbo
+  Pascal walks the clause depth first, so the unit named FIRST finishes first
+  and lands LAST in the executable. The clause is the link order backwards, and
+  sorting it into scene order would change the layout of the whole program.
+
+  [re] THE USES CLAUSE IS THE LINK ORDER, REVERSED, and it is the harness's clause
   followed by P5Main's. DemoVT (12c8), Crt (1266) and VGA (1252) are named first
   and so land LAST in code. FixMath (124a) is NOT named -- nothing names it
   directly and the scene that needs it pulls it in there, which is where the
@@ -61,7 +72,7 @@ program Neur5;
   reversed, with 5,182 of 11,648 initialised bytes differing; as written below
   P5MESH lands first and the four trailing units are exact.
 
-  THE COVERAGE WALK CANNOT TELL THOSE APART. It reported 10,980 of 11,440
+  [re] THE COVERAGE WALK CANNOT TELL THOSE APART. It reported 10,980 of 11,440
   aligned, the same number to the byte, for a build whose three scene units were
   in reverse order, because it locates a segment by CONTENT. Only dgimage.py and
   the segment sizes see it. }
