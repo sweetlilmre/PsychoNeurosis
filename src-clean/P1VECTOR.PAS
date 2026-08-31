@@ -183,12 +183,6 @@ const
   { = 320, so the horizontal centre is 160.
  = 0, so the vertical centre is ZERO.
 
-    That zero is not a mistake to be tidied away. With it, sy = -round(Y/Z*S),
-    and the caller's mirror at 12c5:0248 turns that into
-
-        object      133 + round(Y/Z*S)
-        reflection  134 - round(Y/Z*S)
-
     so the 133/134 line does ALL the vertical placement and the object hangs
     above it by however far the projection says. Substituting ScrHeight here
     -- the obvious thing to assume, and what this file once did -- lifts the
@@ -213,11 +207,12 @@ const
     because every later byte of the image depends on it. }
   MirrorOfs : Word = ScrWidth * Horizon;            { = $A640 }
 
-{ the scene's own screen copy, 16,000 DWORDS in one REP MOVSD.
-  386 code, so it cannot be an asm block; and it sits five bytes AFTER the
-  unit's initialisation stub at 12c5:0AC1, which Turbo Pascal emits last, so it
-  cannot have come from the Pascal at all. Linked FIRST of the two objects
-  because its code lands before DEMOMATH's. See src/asm/COPY32.ASM. }
+{ THE SCENE'S OWN SCREEN COPY, in dwords rather than words -- half the bus
+  cycles of the shared VGA unit's version, which is why this scene carries its
+  own. See src/asm/COPY32.ASM.
+
+  LINKED FIRST OF THE TWO OBJECTS, and the order decides where each object's
+  code lands in the segment. }
 {$L COPY32.OBJ}
 procedure Copy32(Src, Dest : Word);                       external;
 
@@ -227,12 +222,9 @@ procedure RotatePoint(var X, Y, Z : LongInt);             external;
 procedure Project(var X, Y, Z : LongInt);                 external;
 
 { --------------------------------------------------------------------------
-  Math_IntToReal WAS A MISLEADING NAME. It converts an Integer to 16.16
-  FIXED POINT:  MOV AX,[BP+6] ; CWD ; MOV CX,16 ; XOR BX,BX ; <shift> -> DX:AX
-
-  That is why the point records are TWELVE bytes -- three 32-bit fixed values
-  -- and not the eighteen three 6-byte Borland Reals would need.
-  -------------------------------------------------------------------------- }
+  A POINT RECORD IS TWELVE BYTES -- three 32-bit fixed values -- and not the
+  eighteen that three six-byte Borland Reals would need. Everything in this
+  scene is 16.16, which is what makes that possible. }
 
 procedure LoadObject(Coords : Pointer; Count : Integer);
 type
@@ -277,11 +269,8 @@ end;
   -------------------------------------------------------------------------- }
 
 procedure SortAll(Arr : PScrArr);
-{ SORT-ONLY, and it takes the array BY POINTER. Ghidra's
-  decompilation of this address is two DepthSort calls and a return, nothing
-  else, so the drawing loops below it belong to RenderObject and not here.
- calls it as MOV DI,$A5F6 / PUSH DS / PUSH DI / CALL 0x190, which
-  for a near call puts the offset at [BP+4] and the segment at [BP+6]. }
+{ SORT ONLY -- the drawing loops belong to RenderObject, not here. It takes
+  the array by pointer. }
   procedure DepthSort(Lo, Hi : Integer);
   var
     I, J, P : Integer;
@@ -757,13 +746,7 @@ procedure VectorRun;
 var
   { ENTER $A is ten bytes and only TWO of them are declared. The frame reads as
     three Integers and a Pointer -- which is what this said -- and the BODY
-    refutes that:
-
- is a DECLARED four-byte POINTER to the point being filled.
- computes IMUL DI,AX,0C / ADD DI,$A0FA, stores DI and ES into
-      it, and then every field write goes LES DI,[BP-$0A] / MOV ES:[DI],AX.
-      The record's address is taken ONCE, which three separate
-      `Obj.Pt[I].X :=` statements do not do. }
+    refutes that: }
   I      : Integer;
   W      : Word;                          { the slide-out counter }
 begin
@@ -784,12 +767,7 @@ begin
   Obj.Pos.Y := IntToFixed(-70);
   Obj.Pos.Z := IntToFixed(1600);
 
-  { Scale := (ScreenWidth / 2.0) * 10.0, as 16.16.
- = 2.0, CS:$086C = 10.0. }
-  { RealToFixed, and MViewW is a WORD here where P1BALLS's is an
-    Integer. The spill is the difference: `MOV [BP-8],AX / MOV [BP-6],DX` then
-    FILD DWORD on the LongInt, which is how a Word reaches the x87. P1BALLS does
-    FILD WORD straight off the variable. Same expression, two declarations. }
+  { THE PROJECTION SCALE, (screen width / 2) * 10 in 16.16. }
   MScale := RealToFixed(MViewW / 2.0 * 10.0);
 
   OrbitAngle := -2042;

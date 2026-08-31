@@ -267,7 +267,7 @@ const
   { DS:$0280 = 320, so the horizontal centre is 160.
     DS:$0282 = 0, so the vertical centre is ZERO.
 
-    That zero is not a mistake to be tidied away. With it, sy = -round(Y/Z*S),
+    [re] That zero is not a mistake to be tidied away. With it, sy = -round(Y/Z*S),
     and the caller's mirror at 12c5:0248 turns that into
 
         object      133 + round(Y/Z*S)
@@ -297,11 +297,16 @@ const
     because every later byte of the image depends on it. }
   MirrorOfs : Word = ScrWidth * Horizon;            { DS:$0284 = $A640 }
 
-{ 12c5:0AC6 -- the scene's own screen copy, 16,000 DWORDS in one REP MOVSD.
-  386 code, so it cannot be an asm block; and it sits five bytes AFTER the
-  unit's initialisation stub at 12c5:0AC1, which Turbo Pascal emits last, so it
-  cannot have come from the Pascal at all. Linked FIRST of the two objects
-  because its code lands before DEMOMATH's. See src/asm/COPY32.ASM. }
+{ THE SCENE'S OWN SCREEN COPY, in dwords rather than words -- half the bus
+  cycles of the shared VGA unit's version, which is why this scene carries its
+  own. See src/asm/COPY32.ASM.
+
+  LINKED FIRST OF THE TWO OBJECTS, and the order decides where each object's
+  code lands in the segment.
+
+  [re] 12c5:0AC6. 386 code, so it cannot be an asm block; and it sits five bytes
+  AFTER the unit's initialisation stub at 12c5:0AC1, which Turbo Pascal emits
+  last, so it cannot have come from the Pascal at all. }
 {$L COPY32.OBJ}
 procedure Copy32(Src, Dest : Word);                       external;
 
@@ -311,11 +316,12 @@ procedure RotatePoint(var X, Y, Z : LongInt);             external; { 12c5:19DF 
 procedure Project(var X, Y, Z : LongInt);                 external; { 12c5:1B2D }
 
 { --------------------------------------------------------------------------
-  Math_IntToReal WAS A MISLEADING NAME. It converts an Integer to 16.16
-  FIXED POINT:  MOV AX,[BP+6] ; CWD ; MOV CX,16 ; XOR BX,BX ; <shift> -> DX:AX
+  A POINT RECORD IS TWELVE BYTES -- three 32-bit fixed values -- and not the
+  eighteen that three six-byte Borland Reals would need. Everything in this
+  scene is 16.16, which is what makes that possible.
 
-  That is why the point records are TWELVE bytes -- three 32-bit fixed values
-  -- and not the eighteen three 6-byte Borland Reals would need.
+  [re] Math_IntToReal WAS A MISLEADING NAME. It converts an Integer to 16.16
+  FIXED POINT:  MOV AX,[BP+6] ; CWD ; MOV CX,16 ; XOR BX,BX ; <shift> -> DX:AX
   -------------------------------------------------------------------------- }
 { [re] IntToFixed and the two conversions back come from FixMath (segment 1483).
   This scene had local copies, and its FixedToInt was the ROUNDING one -- but
@@ -414,7 +420,10 @@ end;
   is the signal to map by content instead. }
 
 procedure SortAll(Arr : PScrArr);
-{ 12c5:0190 -- SORT-ONLY, and it takes the array BY POINTER. Ghidra's
+{ SORT ONLY -- the drawing loops belong to RenderObject, not here. It takes
+  the array by pointer.
+
+  [re] 12c5:0190 -- SORT-ONLY, and it takes the array BY POINTER. Ghidra's
   decompilation of this address is two DepthSort calls and a return, nothing
   else, so the drawing loops below it belong to RenderObject and not here.
   12c5:0621 calls it as MOV DI,$A5F6 / PUSH DS / PUSH DI / CALL 0x190, which
@@ -1123,7 +1132,7 @@ var
       once before the loop, which is what a `for` does with a non-constant
       limit. It is not a declared Word.
 
-      [BP-$0A] is a DECLARED four-byte POINTER to the point being filled.
+      [re] [BP-$0A] is a DECLARED four-byte POINTER to the point being filled.
       12c5:0897 computes IMUL DI,AX,0C / ADD DI,$A0FA, stores DI and ES into
       it, and then every field write goes LES DI,[BP-$0A] / MOV ES:[DI],AX.
       The record's address is taken ONCE, which three separate
@@ -1191,9 +1200,11 @@ begin
   Obj.Pos.Y := IntToFixed(-70);
   Obj.Pos.Z := IntToFixed(1600);
 
-  { 12c5:093b -- Scale := (ScreenWidth / 2.0) * 10.0, as 16.16.
+  { THE PROJECTION SCALE, (screen width / 2) * 10 in 16.16.
+
+    [re] 12c5:093b. Scale := (ScreenWidth / 2.0) * 10.0, as 16.16.
     CS:$0868 = 2.0, CS:$086C = 10.0. }
-  { 12c5:0947 -- RealToFixed, and MViewW is a WORD here where P1BALLS's is an
+  { [re] 12c5:0947 -- RealToFixed, and MViewW is a WORD here where P1BALLS's is an
     Integer. The spill is the difference: `MOV [BP-8],AX / MOV [BP-6],DX` then
     FILD DWORD on the LongInt, which is how a Word reaches the x87. P1BALLS does
     FILD WORD straight off the variable. Same expression, two declarations. }

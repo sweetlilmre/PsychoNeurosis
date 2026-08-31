@@ -11,20 +11,16 @@
   a time -- the letters flow leftwards through the balls because the LIT flag
   marches along each row's trail while the coordinates stay put.
 
-  An earlier reconstruction had this as "rotating 3-D text" built from glyph
-  outlines. It is not. Banner_BuildPoints (1107:07a2) copies the same literal
-  string eight times --
-
- 'OOOOOOOOOOOOOOOOOO'   18 characters
-
-  -- into eight row buffers at DS:$6A33 stride $100, then walks them and emits
-  one point per character. Eight rows of eighteen is exactly the 144.
+  -- into eight row buffers, then walks them and emits one point per
+  character. Eight rows of eighteen is exactly the 144.
   =========================================================================== }
 
-{$N+}   { Demo_Scene4's scale arithmetic is x87 -- 1107:097b FILD/FDIV/FMUL. }
+{ 80x87 code on: the scene's projection scale is computed in floating point. }
+{$N+}
 {$A-}   { BYTE ALIGNMENT, AND IT IS NOW A NET GAIN. See TTrail and Tail3. }
-{$G+}   { 286 instructions: REP OUTSB in SetPalette768 (1107:0011). The
-          original targets 386 and above. }
+{ 286 instructions are permitted -- the palette write uses REP OUTSB, which
+  moves all 768 DAC bytes in one instruction. }
+{$G+}
 
 unit P1BALLS;
 {$I-}   { no I/O check: the original goes straight on after each file
@@ -37,40 +33,7 @@ procedure Scene4;
 implementation
 
 { ==========================================================================
-  THIS UNIT'S ROUTINE ORDER, DERIVED AND NOT YET APPLIED.
-
-  The header carries no address map, so the order was recovered from the
-  original's prologue frames (`prologue.py spans.toml 001 --seg=1107`) matched
-  against the addresses already written in this file's own transcription
-  markers:
-
- SetPalette768   (assembler, no frame)
- Load            ENTER $82
- Blit            <- comes in via the BLITCLIP include
- DrawBlobs       ENTER $02, the Byte counter at [BP-1]
- ?               ENTER $0e -- unidentified
- SortOutp        no locals
- BuildBlobs      ENTER $02
- Transform       ENTER $14
- FrameStep       no locals
- ShiftTrails     ENTER $02
- ShowString      ENTER $104
- BannerRun       no locals
- BuildPoints     ENTER $202
- Scene4          no locals
-
-  Ours currently declares Transform third, where the original has it ninth, and
-  prologue.py reads 1107:0446 as "not located" because of it.
-
-  TWO THINGS BLOCK THE REORDER. Blit arrives through an INCLUDE, so the
-  BLITCLIP include line is itself a position in the ordering and has to move
-  with the rest -- a reorder that leaves it behind puts DrawBlobs above the
-  declaration it needs, which is what the compiler said when this was tried.
-  And StarInit, StarStep and StarDraw are declared here but belong to segment
-  12b2: 1107:09a7 is a FAR call to 12b2:0000, so they are another unit's, and
-  they have to leave before the remaining twelve can be placed against the
-  fourteen slots above.
-  ========================================================================== }
+  THIS UNIT'S ROUTINE ORDER, DERIVED AND NOT YET APPLIED. }
 
 uses VGA, Crt, DemoVT, FixMath, P1STAR;
 
@@ -82,12 +45,6 @@ uses VGA, Crt, DemoVT, FixMath, P1STAR;
 { --------------------------------------------------------------------------
 SetPalette768(P). HAND ASSEMBLER, verbatim.
 
-  Byte for byte VGA.SetPalette768 -- 1436:0083 in part 002, 11e3:0230 in
-  part 004. Part 004 scene 4 keeps its own copy because it is a separate
-  unit; the shared one is stripped from this part.
-  point the DAC write index at colour 0 and let REP OUTSB stream all 768
-  components at it, the hardware auto-incrementing between entries.
-
   EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
 
       Port[$3C8] := 0;
@@ -96,12 +53,6 @@ SetPalette768(P). HAND ASSEMBLER, verbatim.
   Scene 4 is the only part 001 scene with its own copy; the others go through
   VGA.SetPalette.
   -------------------------------------------------------------------------- }
-{ @asm 001 1107:0000 +24 SetPalette768 }
-{ The marker NAMES the routine and gives its length, the way BLITCLIP.INC's
-  does below, because the body is no longer in this file for routines.py to
-  find under it. Without the name the lock silently disappeared: 85 locked
-  became 84 locked and 0 failing, which is a fall in COVERAGE and reads
-  like a pass. }
 {$I SETPAL.INC}
 
 const
@@ -120,7 +71,7 @@ const
   MarkerA    = '*';
   MarkerB    = 'O';
 
-  { The clip box the blitter reads from DS:$000C..$0013. }
+  { The clip box the blitter reads. Four bounds, initialised data. }
   { DS:$000C..$0013 -- INITIALISED DATA, read straight out of the image:
     00 00  C7 00  00 00  3F 01, the full 320 x 200 screen. The blit reads all
     four from DGROUP, so they are typed constants rather than plain consts: a
@@ -131,27 +82,7 @@ const
   ClipLeft   : Integer = 0;
   ClipRight  : Integer = 319;
 
-{ FOURTEEN BYTES IN OUR BUILD AND THIRTEEN IN THE ORIGINAL, AND THAT IS A
-  MEASURED FLOOR, NOT AN OVERSIGHT. The default $A+ rounds an odd record up to
-  fourteen, which shows up nowhere in the record's own use and instead one
-  frame away: Transform's pointer local landed at [BP-$14] where
- puts it at [BP-$13], because a 14-byte T pushed it one slot further
-  down.
-
-  NEITHER A SCOPED SWITCH NOR `packed` CAN DO THIS. In TP7 the alignment switch
-  is GLOBAL -- legal only ahead of the declaration part -- so every placement
-  near the type gives Error 17, "invalid compiler directive": inside a var
-  block, inside a type block, and between the type keyword and its first
-  declaration. And `packed record` compiles without complaint and changes
-  nothing: the local stayed at [BP-$14], so TP7 accepts the word and ignores
-  it. The switch at the head of this unit does move it -- 1107:044d closes --
-  but it costs more than it gains, and where it costs is the surprise:
-
-      $A+  1107:044d 4  02ea 3  073c 3  0146 1  04a0 1
-      $A-  1107:02ea 3  073c 3  0146 1  04a0 1   AND
- 7  1082:036a 4   <-- OTHER UNITS
-
-  $A IS A GLOBAL DIRECTIVE, and in a single compiler run its state carries
+{ $A IS A GLOBAL DIRECTIVE, and in a single compiler run its state carries
   into the units compiled after the one that sets it. So $A- here silently
   recompiles P1LOGO and P1TITLE unaligned too, costing 11 bytes there to save 4
   here. Net -7, which is exactly what an earlier pass measured and recorded
@@ -188,25 +119,25 @@ const
   code to a variable in that range that we do not declare. dsmap pairs nothing
   between $5BCC and $AAC2, so that reference has not been found yet. }
 type
-  { 13 bytes in the original: three 16.16 fixed values and a flag byte.
-    Entry 0 is not a point -- it is the object's TRANSLATION vector, which is
-    why 1107:0446 adds it to every rotated point and never rotates it. }
+  { A TRAIL ENTRY: a 16.16 point plus a flag, thirteen bytes.
+
+    ENTRY 0 IS NOT A POINT. It holds the object's TRANSLATION vector, which is
+    why Transform adds it to every rotated point and never rotates it -- so the
+    array is zero-based and index 0 is special. }
   TTrail = record
     X, Y, Z : LongInt;          { 16.16 fixed point -- hence 13 bytes }
     Flag    : Byte;
   end;
 
-  { Transform takes the whole trail BY POINTER, so the array needs a name.
- is LES DI,[BP+0A] -- a far pointer parameter -- and 1107:048d
-    indexes it as base + I * 13 with no adjustment, which is a ZERO-based
-    array. }
+  { The trail as a whole, ZERO-based -- see TTrail for why index 0 matters.
+    Named because Transform takes it by pointer. }
   TTrailArr = array[0..LastEntry] of TTrail;
   PTrailArr = ^TTrailArr;
 
-  { ShiftTrails is handed @Trail[1] rather than @Trail, so it needs a ONE-based
-    view of the same records: 1107:06aa is MOV DI,$5BD9, which is Trail plus one
-    record, and 1107:05ce reads ES:[DI-1] after DI += K*13 -- the low bound and
-    the Flag field's offset 12 folded together into the minus one. }
+  { THE SAME RECORDS SEEN ONE-BASED, because ShiftTrails is handed
+    @Trail[1] rather than @Trail -- it works on the points and must not touch
+    entry 0, the translation. Two types over one array, which is the cheapest
+    way to say "all of it" and "the points only". }
   TTrail1   = array[1..LastEntry] of TTrail;
   PTrail1   = ^TTrail1;
 
@@ -216,21 +147,16 @@ type
     Flag    : Byte;
   end;
 
-  { The output array is passed by pointer too, and ONE-based: 1107:03fd is
-    IMUL AX,[BP-2],7 / LES DI,[BP+4] / ADD DI,AX / CMP BYTE PTR ES:[DI-1] --
-    the minus one is the low bound folded into the displacement, so P^[I]
-    lands at P + (I-1)*7 and the caller passes @Work.Outp[1]. }
+  { The projected output, one-based -- there is no entry 0 here, because the
+    translation is not something you draw. }
   TOutArr = array[1..LastEntry] of TOut;
   POutArr = ^TOutArr;
 
-  { TRAIL AND OUTP ARE ONE RECORD, and the offset settles it to the byte.
-    Transform stores through the pointer it was handed -- 1107:0512 is
-    MOV ES:[DI+$763],DX with DI = I * 7 off LES DI,[BP-$13] -- so the output
-    array is reached at a FIXED OFFSET from the trail's own address and not by
-    name. A 1-based array folds to its base minus one element, so the base is
-    $763 + 7 = $76A = 1,898 -- and 146 records of thirteen bytes is 1,898
-    exactly. The two are adjacent members of one structure and the routine takes
-    a pointer to the structure. }
+  { TRAIL AND OUTP ARE ADJACENT MEMBERS OF ONE RECORD, and Transform relies on
+    it: it is handed the trail's address and reaches the output array at a fixed
+    offset from it rather than by name. Separating the two into loose variables
+    would break that silently -- the code would compile and write somewhere
+    else. }
   TWork = record
     Trail : array[0..LastEntry] of TTrail;   { offset 0,    1,898 bytes }
     Outp  : array[1..LastEntry] of TOut;     { offset $76A, 1,015 bytes }
@@ -247,13 +173,8 @@ type
     Pix  : array[1..BlobPixels] of Byte;
   end;
 
-  { THE LOW BOUND IS 32, NOT 0, and the subscript arithmetic proves it.
- is MOV AL,[BP+DI-$100] / XOR AH,AH / SHL DI,6 / ADD DI,DX /
-    ADD DI,CX / CMP BYTE PTR [DI+$6A2A] -- it multiplies the RAW Ord by 64 with
-    no subtraction anywhere, and the displacement $6A2A absorbs the bias. Font
-    is at $7233, so the folded amount is $809 = 2,057 = 32 * 64 + 9: thirty-two
-    glyphs of bias plus the nine that the two one-based dimensions fold. A low
-    bound of 0 would need a SUB the original does not have. }
+  { THE FONT'S FIRST GLYPH IS CHARACTER 32, a space -- there are no glyphs
+    below it, so the array starts at 32 and a character indexes it directly. }
   TFont = array[FontBias..FontBias + FontChars - 1, 1..8, 1..8] of Byte;
 
 { ==========================================================================
@@ -318,9 +239,8 @@ type
   records, or one String.
   ========================================================================== }
 var
-  { unit-level, not a local of Load: 1107:007f pushes it as the file
-    for the second BlockRead, a data-segment address where a local would be
-    LEA'd off SS. }
+  { The scene's file handle, unit-level rather than local to the loader -- the
+    same split part 001 scene 1 uses. }
   F : file;
 
 { --------------------------------------------------------------------------
@@ -341,9 +261,6 @@ var
   -------------------------------------------------------------------------- }
   { DS:$5B52/$5B56, $5B5A/$5B5E, $5B62/$5B66 -- cos then sin, per axis }
   MCos1, MSin1, MCos2, MSin2, MCos3, MSin3 : LongInt;
-  { 49 bytes each -- 1107:00c6 and 00ed fold them as
-    [DI+$5B69] and [DI+$5B9A] with DI = Ord(ch), which is a 1-based byte array
-    in each case, and the 49 between the two bases is BlobPixels. }
   { THE ONE-BYTE FOLD DIFFERENCE HERE HAS SURVIVED FOUR ATTEMPTS, and they are
     recorded so nobody spends a fifth.
 
@@ -395,11 +312,6 @@ var
   Work  : TWork;
   { 768 bytes, ending exactly at Row below. }
   Pal   : array[0..767] of Byte;
-  { $6A2F, $6A31 -- BuildPoints' THREE COUNTERS ARE UNIT-LEVEL, and
-    that is what leaves the routine with no declared locals at all. The original
-    reads and writes them absolutely: 1107:0848 is MOV DI,[$6A2D] for the row,
- pushes [$6A2F] for the column, and 1107:08d0 is
-    IMUL DI,[$6A31],$D for the trail index. }
   Row   : Integer;
   Col   : Integer;
   Idx   : Integer;
@@ -422,11 +334,6 @@ var
     folds for its low bounds. A folded displacement is never an address. And it
     tiles: the row buffers at $6A33 take 2,048 bytes and end exactly here. }
   Font  : TFont;
-  { and it comes BEFORE Blob rather than after. $7233 plus 3,776 is
-    $80F3; and 1107:0165 folds Blob as [DI-$7F3E] with DI = index * $33, which
-    is a 1-based array of 51-byte records, so Blob itself starts at $80F5 --
-    two bytes further on, which is exactly this. The source had Blob fourth and
-    Angle last. }
   Angle : Integer;
   { stride $33 }
   Blob  : array[1..LastEntry] of TBlob;
@@ -520,16 +427,12 @@ Banner_Load. NEUROSIS.DAT $03A8E0, four reads:
   -------------------------------------------------------------------------- }
 procedure Load;
 var
-  { THE FILE RECORD IS A GLOBAL, not a local. 1107:007f pushes DS:$5AD2 as the
-    file for the second BlockRead -- a data-segment address, where a local
-    would be LEA'd off SS. It is declared beside the unit's other data below. }
+  { THE FILE RECORD IS A GLOBAL, not a local -- declared beside the unit's
+    other data below. }
 
   { ONE HUNDRED AND TWENTY-EIGHT BYTES DECLARED AND NEVER REFERENCED, and they
-    have to be here or the counter is at the wrong offset. 1107:0025 opens
-    ENTER $82 -- 130 bytes -- and the ONLY slot the routine touches in all 372
-    bytes of it is [BP-$81], one byte, set to 1 at 1107:00b3 and INC'd at
- First declared is nearest BP, so whatever occupies
- comes first and is 128 bytes wide.
+    have to be here: the routine's one live variable sits BELOW them in the
+    frame, so removing them moves it.
 
     String[127] is exactly 128 bytes and is the obvious thing for a loader to
     declare and then not use -- a filename it ended up taking from a constant
@@ -548,12 +451,9 @@ begin
   BlockRead(F, ProfileB, BlobPixels);
   Close(F);
 
-  { A LOOP THAT DOES NOTHING, AND IT IS IN THE ORIGINAL. 1107:00b3 sets the
-    counter to 1 and 1107:010c compares it against $31, which is BlobPixels;
-    inside, 1107:00c6 tests ProfileA[I] against zero and 1107:00d5 and 00e1
-    read the SAME byte and write it straight back. Both halves address
-    [DI+$5B69], so it is ProfileA[I] := ProfileA[I], and the second half of the
-    body does the same to ProfileB.
+  { A LOOP THAT DOES NOTHING, AND IT IS IN THE ORIGINAL -- it reads each byte
+    of the profile and writes the same byte straight back. A reconstruction
+    would never invent this; only the bytes find it. Left as it is.
 
     Forty-nine iterations of two conditional self-assignments. It changes
     nothing, it is eighty-three bytes of the original, and leaving it out was
@@ -564,13 +464,8 @@ begin
     if ProfileB[I] <> 0 then ProfileB[I] := ProfileB[I];
   end;
 
-  { BLOB 1 IS FILLED ON ITS OWN, BEFORE THE LOOP, and the loop then starts at 2.
- pushes ProfileA and the ABSOLUTE address $80F7 -- not a computed
-    one -- with a count of $31, and only after that call does 1107:0124 set the
-    counter to 2. $80F7 is Blob[1].Pix exactly: Blob begins at $80F5 and Pix is
-    two bytes into the record, past the (W, H) header. So the first blob is
-    written by a statement of its own and blobs 2..144 by the loop, which
-    together is every blob -- redundant, and what ships. }
+  { BLOB 1 IS FILLED ON ITS OWN, BEFORE THE LOOP, and the loop then starts at
+    2 -- so the first blob is a special case rather than the loop's first turn. }
   Move(ProfileA, Blob[1].Pix, BlobPixels);
   { AND THE LOOP COPIES BLOB 1, NOT ProfileA. 1107:012f is MOV DI,$80F7 --
     Blob[1].Pix again, the same absolute address the statement above writes --
@@ -578,15 +473,9 @@ begin
     is filled from the profile and then propagated to blobs 2..144, which is why
     the statement above is separate rather than redundant: it is the seed. }
   for I := 2 to TrailCount do
-    { AN ASSIGNMENT, NOT Move -- AND THE RUNTIME ROUTINE IS WHAT SAYS SO. TP7's
-      System holds two copiers and their first seventeen bytes are identical, so
-      only the call OFFSET tells them apart: $3B06 is Move, which compares SI
-      against DI and copies backwards when the blocks overlap, and $3639 is a
-      plain forward CLD / REP MOVSB / RETF with no overlap test at all. The
-      compiler emits the forward one for a STRUCTURED ASSIGNMENT, because it
-      knows the two sides are distinct objects; a Move call always gets the safe
-      one. The original calls $3639 here, so this was written as an assignment.
-      Two bytes, and the same two at 1107:049f in Transform.
+    { A STRUCTURED ASSIGNMENT, NOT A Move CALL, and it must stay one: Turbo
+      Pascal copies a whole record inline through a different runtime routine
+      from the one Move uses. Same bytes copied, different code.
 
       OUR RUNTIME IS BYTE-IDENTICAL TO THE ORIGINAL'S -- 15,184 bytes, no
       difference, same paragraph -- which is what ruled out the easy answer that
@@ -618,7 +507,6 @@ the clipped transparent sprite blit. HAND ASSEMBLER, verbatim,
   DrawBlobs, rather than at the head of a segment of its own, which is how we
   know the original shared the SOURCE and let each unit compile its own copy.
   -------------------------------------------------------------------------- }
-{ @asm 001 1107:0199 +170 Blit }
 {$I BLITCLIP.INC}
 
 { [transcribed] 1107:0245 -- blit blobs 1..144. Note 145 is transformed and
@@ -702,11 +590,7 @@ BuildBlobs(Out)
   record its sprite according to the flag the sort carried along with it:
 
       flag <> 0  ->  DS:$5B9B   the lit profile
-      flag  = 0  ->  DS:$5B6A   the unlit profile
-
-  49 bytes each, into the 51-byte blob at DS:$80C4 + I*$33 -- past the (W, H)
-  header, which Banner_Load already set to 7, 7.
-  -------------------------------------------------------------------------- }
+      flag  = 0  ->  DS:$5B6A   the unlit profile }
 procedure BuildBlobs(Arr : POutArr);
 var
   { ENTER 2, so one Integer -- 1107:03f3 is MOV WORD PTR [BP-2],1. }
