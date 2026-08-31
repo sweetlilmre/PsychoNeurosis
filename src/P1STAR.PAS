@@ -1,7 +1,7 @@
 { ==========================================================================
   P1STAR -- part 001 scene 4's starfield, segment 12b2.
 
-  These three routines were transcribed into P1BALLS and measured wrong there for
+  [re] These three routines were transcribed into P1BALLS and measured wrong there for
   as long as they stayed: 1107:09a7 is a FAR call to 12b2:0000, and a routine
   in the calling unit cannot be reached by one. The far call is the whole
   evidence -- within a single segment Turbo Pascal emits PUSH CS plus a near
@@ -11,7 +11,7 @@
   The uses clause of P1INTRO runs in REVERSE segment order, so this unit is
   named there between P1VECTOR and P1BALLS.
 
-  `Star` comes with them. It sits at DS:$9DDB in the original, immediately
+  [re] `Star` comes with them. It sits at DS:$9DDB in the original, immediately
   after P1BALLS's data, which is what a unit linked directly after P1BALLS
   contributes -- so the address is evidence for this split rather than a cost
   of it.
@@ -20,7 +20,9 @@ unit P1STAR;
 {$A-}   { NO VARIABLE ALIGNMENT, and it does nothing on its own -- see the note
           beside Star. It is one of three changes that only work together. }
 
-{$G+}   { 286 instructions, and this unit needs it: 12b2:0017 is IMUL DI,AX,9,
+{ 286 instructions are permitted -- the star record's stride needs a
+  multiply the 8086 cannot do in one instruction. }
+{$G+}   { [re] 286 instructions, and this unit needs it: 12b2:0017 is IMUL DI,AX,9,
           which TP7 emits only under $G+. Without it the whole address
           computation comes out as a shift-and-add and 12b2:0017..0043 reads as
           a 44-byte difference -- which is what a new unit gets for not
@@ -95,7 +97,7 @@ implementation
   -------------------------------------------------------------------------- }
 procedure StarInit(C0, Ca, Cb, Speed : Byte);
 var
-  { ENTER 6, AND IT IS TWO BYTES PLUS A `with`. 12b2:0009 sets [BP-1] to 1 and
+  { [re] ENTER 6, AND IT IS TWO BYTES PLUS A `with`. 12b2:0009 sets [BP-1] to 1 and
     12b2:000f INCs it, so the counter is a Byte; 12b2:004a stores Random(3)'s
     result into [BP-2] and 12b2:004d reads it straight back for the case, which
     is a second Byte and not a compiler temporary -- a temporary is not read
@@ -103,7 +105,7 @@ var
     ES into [BP-6], which is the four bytes a `with` gets for the record's
     address. 1 + 1 + 4 = 6.
 
-    IT IS A `with` AND NOT A POINTER, and the two bytes at 12b2:001e are what
+    [re] IT IS A `with` AND NOT A POINTER, and the two bytes at 12b2:001e are what
     separate them: PUSH DS / POP ES puts the segment in ES before the pair is
     stored, which is what `with` over a DGROUP record does. Assigning
     @Star[I] to a declared pointer moves DS through AX instead, and leaves no
@@ -117,7 +119,7 @@ begin
     begin
       X := Random(319);                 { 12b2:0026, PUSH $13F,  field +0 }
       Y := Random(199);                 { 12b2:0034, PUSH $C7,   field +2 }
-      { AND Spare := 0 IS INSIDE EACH BRANCH, not before the case. 12b2:0067,
+      { [re] AND Spare := 0 IS INSIDE EACH BRANCH, not before the case. 12b2:0067,
         008a and their third are three separate XOR AX,AX / MOV ES:[DI+6],AX,
         one per arm; hoisting it above the case emits it once. }
       Band := Random(3);                { 12b2:0043 }
@@ -129,8 +131,8 @@ begin
     end;
 end;
 
-{ [transcribed] 12b2:00c0 -- StarStep. X := X + DX, wrapping on 0 and 319. }
-{ HAND ASSEMBLER, TRANSCRIBED VERBATIM. 12b2:00c0 has no prologue at all -- it
+{ Advance one star: X := X + DX, wrapping at either edge of the screen. }
+{ [re] HAND ASSEMBLER, TRANSCRIBED VERBATIM. 12b2:00c0 has no prologue at all -- it
   goes straight into MOV BX,0 and ends with a bare RETF -- so no frame and no
   locals; the star count lives in CX and DEC CX / JNE closes the loop; and BX
   walks the array by NINE, the record's size, rather than being multiplied up
@@ -150,7 +152,7 @@ end;
         Star[I].X := X;
       end;
   -------------------------------------------------------------------------- }
-{ @asm 001 12b2:00c0 +0 StarStep }
+{ [re] @asm 001 12b2:00c0 +0 StarStep }
 procedure StarStep; assembler;
 asm
         MOV     BX, 0                   { 12b2:00c0  a byte offset, not an   }
@@ -184,7 +186,7 @@ end;
   count loaded once with `MOV CX,$5A`, where a Pascal `for` would compare
   against a limit. And the write is a bare STOSB with ES:DI walked by hand.
 
-  It is FAR: 12b2:011d is RETF 2, one Word of parameter.
+  [re] It is FAR: 12b2:011d is RETF 2, one Word of parameter.
 
   BX carries the byte offset into the star array and advances by 9 -- the
   record size -- so the three loads are one displacement apart from the array
@@ -214,7 +216,7 @@ asm
   MOV  DI, [BX + OFFSET Star]      { .X, offset 0                            }
   MOV  BX, [BX + OFFSET Star + 2]  { .Y, offset 2 -- BX now the row          }
   SHL  BX, 1                    { * 2, a word index into the row table       }
-  ADD  DI, [BX + OFFSET YOfs]   { + YOfs[Y] = Y * 320 -- DS:$AB5A           }
+  ADD  DI, [BX + OFFSET YOfs]   { + the row's byte offset                   }
   STOSB                         { one byte, and DI advances (unused)         }
   MOV  BX, DX                   { the offset back                            }
   ADD  BX, 9                    { next star, one record on                   }
@@ -223,7 +225,7 @@ asm
 end;
 
 
-{ AN EMPTY INITIALISATION SECTION, AND THE ORIGINAL HAS ONE. 12b2:0120 is
+{ [re] AN EMPTY INITIALISATION SECTION, AND THE ORIGINAL HAS ONE. 12b2:0120 is
   PUSH BP / MOV BP,SP / LEAVE -- a routine with a frame and no body, which is
   what Turbo Pascal emits for `begin end.` at the foot of a unit. A bare `end.`
   emits nothing there at all. }

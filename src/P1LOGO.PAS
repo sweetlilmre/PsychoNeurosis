@@ -17,8 +17,9 @@ unit P1LOGO;
           call, with no near CALL to the RTL's check routine. }
 
 {$G+}   { 286: every framed routine in 1012 opens ENTER, e.g. Bounce_Run
-          1012:03e3 ENTER $54. }
-{$N+}   { the unit init's arithmetic is x87 -- 1012:0142 FILD. }
+          the bouncer loop's frame. }
+{ 80x87 code on: the lens table is built in floating point. }
+{$N+}   { [re] the unit init's arithmetic is x87 -- 1012:0142 FILD. }
 
 interface
 
@@ -34,13 +35,13 @@ const
   BounceH     = 40;
 
 const
-  LensK   = 1.0;       { CS:$0000, added as a single: 1012:014b FADD CS:[0] }
-  LensCut = 300;       { the disc: X*X + Y*Y <= 300 -- 1012:003b CMP AX,$12C }
+  LensK   = 1.0;       { the lens's strength                              }
+  LensCut = 300;       { the disc: a pixel is inside if X*X + Y*Y <= 300 }
   LensOfs = 400;       { the 20*20 term inside the square root }
-  LensArc = 20;        { one quadrant: 1012:02a8 CMP WORD PTR [BP-8],$14 }
+  LensArc = 20;        { the lens's radius in pixels, one quadrant       }
 
 const
-  { WORD, not Integer, and the frame size is what proves it. 1012:0135 widens
+  { [re] WORD, not Integer, and the frame size is what proves it. 1012:0135 widens
     the product with `XOR DX,DX` -- unsigned -- and 1012:015e widens the bare
     LensR the same way into a LongInt temporary before `FILD DWORD`. An
     Integer would go to the x87 through `FILD WORD` with no temporary at all,
@@ -48,7 +49,7 @@ const
   LensR : Word = 40;      { DS:$0002 -- read, never folded; see above }
 
 type
-  { THE ROW IS 1641 BYTES, NOT 1600, and it is the same index range as the
+  { [re] THE ROW IS 1641 BYTES, NOT 1600, and it is the same index range as the
     lens table -- which is the point: LensTab[I] is used as a subscript into a
     bouncer's saved cell, so the two must have the same bound. BuildCell
     settles the size: 1012:036a is IMUL DI,[BP+4],$669 -- 1641 -- and
@@ -62,7 +63,7 @@ type
     same reason: LensTab[I] subscripts both. And it tiles -- Cell at $4FD6 plus
     1641 is $563F, which is where the file record is. }
   TCell     = array[0..BounceW * (BounceH + 1)] of Byte;
-  { 1641 words, not 1600, and the extra 41 are not slack -- BuildLens walks a
+  { [re] 1641 words, not 1600, and the extra 41 are not slack -- BuildLens walks a
     QUADRANT and mirrors, so it also writes row 20 and column 20, whose index
     is (20+20)*40 + (20+20) = 1640. Two measurements agree: the unit init at
     1012:0008 clears 3282 bytes (`PUSH $0CD2` at 1012:000d), and in the
@@ -79,11 +80,11 @@ var
     header asks the loader for 16,704 bytes more uninitialised space than our
     build did.
 
-    BuildCell is the proof. 1012:03a2 is MOV BX,[BP-4] / ADD BX,AX / MOV AL,[BX]
+    [re] BuildCell is the proof. 1012:03a2 is MOV BX,[BP-4] / ADD BX,AX / MOV AL,[BX]
     -- a DS-relative byte read at an offset computed from the bouncer number.
     A heap block cannot be reached that way; it would need the pointer loaded
     into a segment register first. }
-  { UNDER STARTS AT DS:$02EA AND THAT IS ITS REAL ADDRESS, NOT A FOLD. The note
+  { [re] UNDER STARTS AT DS:$02EA AND THAT IS ITS REAL ADDRESS, NOT A FOLD. The note
     that stood here for weeks had it the other way round -- it called $02EA "the
     FOLD of a 1-based first subscript" and gave Under a real base of $0953, then
     invented a one-byte `Spare0` at $0952 to make that work. Both were wrong, and
@@ -92,7 +93,7 @@ var
     from there is exact: $4304 + 3,282 = $4FD6 (Cell), + 1,641 = $563F (F),
     + 128 = $56BF, one byte of padding, $56C0 where P1TITLE begins.
 
-    The fold is the OTHER number. Under is `array[1..10, 0..1640]`, so a
+    [re] The fold is the OTHER number. Under is `array[1..10, 0..1640]`, so a
     reference to Under[i,j] folds to base minus 1,641, and 746 - 1641 = -895 --
     which is exactly the displacement at 1012:036f that the lens-base ticket has
     been quoting all along. Real base $02EA, fold -895. One number, read twice,
@@ -112,7 +113,7 @@ var
   LensTab : TLensTab;                   { DS:$4304, 3,282 bytes }
   { DS:$4FD6 -- the single working cell the lens gathers into. }
   Cell    : TCell;                      { DS:$4FD6, 1,641 bytes }
-  { DS:$563F -- THE FILE RECORD IS A GLOBAL. 1012:05d8 pushes DS:$563F to
+  { [re] DS:$563F -- THE FILE RECORD IS A GLOBAL. 1012:05d8 pushes DS:$563F to
     BlockRead and 1012:067b pushes the same address to Assign, in a DIFFERENT
     routine -- so the file is opened by one routine and read by another, the
     same split part 001 scene 2 turned out to have. }
@@ -136,14 +137,13 @@ var
                          the corner is invisible. There is no transparency
                          test anywhere: the blit is a flat REP MOVSB.
 
-      X*X + Y*Y <= 300   the lens proper. Read off the x87 at 1012:0116:
+      X*X + Y*Y <= 300   the lens proper:
 
                              Scale := R / (R + Sqrt(R*R - (X*X + Y*Y - 400)) + K)
                              SX    := Round(Scale * X)
                              SY    := Round(Scale * Y)
 
-                         with R = 40 (the word at DS:$0002) and K = 1.0 (the
-                         single at CS:$0000), so
+                         with R = 40 and K = 1.0, so
 
                              Scale = 40 / (41 + Sqrt(2000 - (X*X + Y*Y)))
 
@@ -155,10 +155,10 @@ var
   twenty-one values, not twenty -- and every iteration writes FOUR entries,
   one per sign pairing, with SX and SY carrying the same signs as X and Y:
 
-      Lens[( Y+20)*40 + ( X+20)] := ( SY+20)*40 + ( SX+20)   1012:01d8
-      Lens[(-Y+20)*40 + (-X+20)] := (-SY+20)*40 + (-SX+20)   1012:0208
-      Lens[(-Y+20)*40 + ( X+20)] := (-SY+20)*40 + ( SX+20)   1012:0240
-      Lens[( Y+20)*40 + (-X+20)] := ( SY+20)*40 + (-SX+20)   1012:0274
+      Lens[( Y+20)*40 + ( X+20)] := ( SY+20)*40 + ( SX+20)
+      Lens[(-Y+20)*40 + (-X+20)] := (-SY+20)*40 + (-SX+20)
+      Lens[(-Y+20)*40 + ( X+20)] := (-SY+20)*40 + ( SX+20)
+      Lens[( Y+20)*40 + (-X+20)] := ( SY+20)*40 + (-SX+20)
 
   A previous reconstruction walked -20..19 once instead, on the argument that
   the formula is symmetric so one full pass is the same thing. For the 1600
@@ -167,12 +167,12 @@ var
   why the table is 1641 words and why the loop bound above is 20 and not 19.
   It is also four times less square root: 441 evaluations instead of 1600.
 
-  Two Real locals, not one. The frame is ENTER $1C (1012:0004) = 28 bytes:
+  [re] Two Real locals, not one. The frame is ENTER $1C (1012:0004) = 28 bytes:
   four Integers, two six-byte Reals, and two LongInt temporaries the compiler
   needs to reach `fild dword`. S is at [BP-$0E] and Scale at [BP-$14], and S
   is read exactly once, which is what says it is a variable and not a temp.
 
-  LensR IS READ FROM MEMORY, so it cannot be an untyped constant here.
+  [re] LensR IS READ FROM MEMORY, so it cannot be an untyped constant here.
   1012:012e is `MOV AX,[$0002]` / `MUL WORD PTR [$0002]` -- had 40 been an
   untyped constant the compiler would have folded it to `MOV AX,1600`. The
   word at DS:$0002 in the shipped binary is initialised data and reads 40.
@@ -185,7 +185,7 @@ var
   SX, SY, Y, X : Integer;
   S, Scale     : Real;
 begin
-  { THE COLUMN TERM COMES FIRST IN THE SOURCE, and the two DX loads are what
+  { [re] THE COLUMN TERM COMES FIRST IN THE SOURCE, and the two DX loads are what
     say so. 1012:0043 computes (Y + 20) * 40 into AX, moves it to DX, and only
     then computes (X + 20) -- so the ROW term is evaluated first and parked.
     Turbo Pascal evaluates the operands of `+` right to left when both need the
@@ -200,7 +200,7 @@ begin
     begin
       if X * X + Y * Y > LensCut then
       begin
-        { OUTSIDE THE DISC -- the pixel maps to itself, and the original does
+        { [re] OUTSIDE THE DISC -- the pixel maps to itself, and the original does
           not route that through SX and SY. 1012:0043 reads [BP-6] and [BP-8]
           straight into the index arithmetic, so the identity case carries its
           own four stores rather than falling into a shared tail. }
@@ -211,11 +211,11 @@ begin
       end
       else
       begin
-        { the sum is RECOMPUTED here, not held: the frame has room for four
+        { [re] the sum is RECOMPUTED here, not held: the frame has room for four
           Integers and there are four, so the original has no D2 variable.
           1012:0116 repeats the two MULs the test at 1012:002b already did. }
         S     := Sqrt(LensR * LensR - (X * X + Y * Y - LensOfs)) + LensK;
-        { S + LensR, AND NOT LensR + S -- THIRTY-NINE BYTES OF THIS UNIT TURNED ON IT.
+        { [re] S + LensR, AND NOT LensR + S -- THIRTY-NINE BYTES OF THIS UNIT TURNED ON IT.
           Turbo Pascal evaluates the operands of `+` RIGHT TO LEFT when both need the
           accumulator, so the term it evaluates FIRST is the one written SECOND. The
           note at the head of this routine states that rule for the index expressions
@@ -224,7 +224,7 @@ begin
           into a LongInt temporary for FILD. So LensR is evaluated second, so LensR is
           written second.
         
-          Written LensR + S the two groups come out in the opposite order -- 29 bytes in
+          [re] Written LensR + S the two groups come out in the opposite order -- 29 bytes in
           ONE run at 1012:016d..018a, the whole of this unit's remaining difference, with
           every routine length still matching because nothing changes size. Addition is
           commutative and the arithmetic is identical either way; only the comparison
@@ -244,7 +244,7 @@ end;
 { --------------------------------------------------------------------------
   1012:0366 -- gather the working cell through the lens table. HAND ASSEMBLER.
 
-  THE LOOP COUNTER IS CX AND IT NEVER TOUCHES MEMORY -- 1012:03b3 is DEC CX and
+  [re] THE LOOP COUNTER IS CX AND IT NEVER TOUCHES MEMORY -- 1012:03b3 is DEC CX and
   03b4 compares it against -1 -- which Turbo Pascal does not do for a `for`
   variable, ever. And the three table ADDRESSES are kept in frame slots and
   added to an index each time round, rather than folded into each reference,
@@ -260,7 +260,7 @@ end;
                which is ten rows of 1641 -- so Under has ten of them
       [BP-$7]  a Byte, zeroed at the top of every iteration
 
-  TWO OF THE THREE TESTS IN THE BODY DO NOTHING, and they are in the original.
+  [re] TWO OF THE THREE TESTS IN THE BODY DO NOTHING, and they are in the original.
   1012:0391 compares the lens entry against the index and, when they differ,
   sets the bias byte to zero -- which it already is, because 1012:0384 zeroed
   it at the top of the same iteration. 1012:0399 compares the entry against
@@ -275,7 +275,7 @@ end;
       for I := 1599 downto 0 do
         Cell[I] := Under[N, LensTab[I]];
   -------------------------------------------------------------------------- }
-{ @asm 001 1012:02bc }
+{ [re] @asm 001 1012:02bc }
 procedure SaveUnder(X, Y : Integer; Dest : Pointer; Segment : Word); assembler;
 asm
   PUSH DS                 { DS becomes the screen's segment below           }
@@ -320,8 +320,8 @@ asm
 end;
 
 { --------------------------------------------------------------------------
-  The ten bouncing sprites -- Bounce_Run 1012:03e3, with the blit at
-  1012:0311 and the matching save at 1012:02bc.
+  The ten bouncing sprites -- Bounce_Run, with a paired blit and save so each
+  sprite restores the background it covered.
 
   Transcribed. An earlier reconstruction had the right IDEA -- save the
   background, draw, restore in reverse -- but the wrong numbers:
@@ -332,7 +332,7 @@ end;
   * save and restore are the SAME routine, just with source and destination
     swapped -- restoring is a blit out of the saved-background buffer.
 
-  The save slots are 1,641 bytes apart ($669) at DS:$FC81 + N * $669, which is
+  [re] The save slots are 1,641 bytes apart ($669) at DS:$FC81 + N * $669, which is
   more than the 1,600 a 40 x 40 block needs; the slack is not used.
 
   Erasing in REVERSE order is what makes overlapping sprites restore
@@ -351,7 +351,7 @@ end;
         Inc(LongInt(P), 40);
       end;
   -------------------------------------------------------------------------- }
-{ @asm 001 1012:0311 }
+{ [re] @asm 001 1012:0311 }
 procedure BlitSprite(X, Y : Integer; Src : Pointer; Segment : Word); assembler;
 asm
   PUSH DS                 { DS becomes the source buffer's segment below    }
@@ -411,14 +411,13 @@ end;
                          the corner is invisible. There is no transparency
                          test anywhere: the blit is a flat REP MOVSB.
 
-      X*X + Y*Y <= 300   the lens proper. Read off the x87 at 1012:0116:
+      X*X + Y*Y <= 300   the lens proper:
 
                              Scale := R / (R + Sqrt(R*R - (X*X + Y*Y - 400)) + K)
                              SX    := Round(Scale * X)
                              SY    := Round(Scale * Y)
 
-                         with R = 40 (the word at DS:$0002) and K = 1.0 (the
-                         single at CS:$0000), so
+                         with R = 40 and K = 1.0, so
 
                              Scale = 40 / (41 + Sqrt(2000 - (X*X + Y*Y)))
 
@@ -430,10 +429,10 @@ end;
   twenty-one values, not twenty -- and every iteration writes FOUR entries,
   one per sign pairing, with SX and SY carrying the same signs as X and Y:
 
-      Lens[( Y+20)*40 + ( X+20)] := ( SY+20)*40 + ( SX+20)   1012:01d8
-      Lens[(-Y+20)*40 + (-X+20)] := (-SY+20)*40 + (-SX+20)   1012:0208
-      Lens[(-Y+20)*40 + ( X+20)] := (-SY+20)*40 + ( SX+20)   1012:0240
-      Lens[( Y+20)*40 + (-X+20)] := ( SY+20)*40 + (-SX+20)   1012:0274
+      Lens[( Y+20)*40 + ( X+20)] := ( SY+20)*40 + ( SX+20)
+      Lens[(-Y+20)*40 + (-X+20)] := (-SY+20)*40 + (-SX+20)
+      Lens[(-Y+20)*40 + ( X+20)] := (-SY+20)*40 + ( SX+20)
+      Lens[( Y+20)*40 + (-X+20)] := ( SY+20)*40 + (-SX+20)
 
   A previous reconstruction walked -20..19 once instead, on the argument that
   the formula is symmetric so one full pass is the same thing. For the 1600
@@ -442,12 +441,12 @@ end;
   why the table is 1641 words and why the loop bound above is 20 and not 19.
   It is also four times less square root: 441 evaluations instead of 1600.
 
-  Two Real locals, not one. The frame is ENTER $1C (1012:0004) = 28 bytes:
+  [re] Two Real locals, not one. The frame is ENTER $1C (1012:0004) = 28 bytes:
   four Integers, two six-byte Reals, and two LongInt temporaries the compiler
   needs to reach `fild dword`. S is at [BP-$0E] and Scale at [BP-$14], and S
   is read exactly once, which is what says it is a variable and not a temp.
 
-  LensR IS READ FROM MEMORY, so it cannot be an untyped constant here.
+  [re] LensR IS READ FROM MEMORY, so it cannot be an untyped constant here.
   1012:012e is `MOV AX,[$0002]` / `MUL WORD PTR [$0002]` -- had 40 been an
   untyped constant the compiler would have folded it to `MOV AX,1600`. The
   word at DS:$0002 in the shipped binary is initialised data and reads 40.
@@ -455,7 +454,7 @@ end;
   matches, the address does not, and that is the whole of the difference.
   -------------------------------------------------------------------------- }
 
-{ @asm 001 1012:0366 +0 BuildCell }
+{ [re] @asm 001 1012:0366 +0 BuildCell }
 procedure BuildCell(N : Integer); assembler;
 var
   CellOfs : Word;                       { [BP-$2] }
@@ -508,7 +507,7 @@ end;
 { Draw order per frame, from Bounce_Run: save the background, build the lens
   cell from it, blit it. Erasing is the same blit with the saved background as
   the source -- which is why the erase pass runs in REVERSE order. }
-{ DrawSprite AND EraseSprite ARE NOT PROCEDURES IN THE ORIGINAL, and the index
+{ [re] DrawSprite AND EraseSprite ARE NOT PROCEDURES IN THE ORIGINAL, and the index
   is what says so. 1012:0466 computes @Under[I] as IMUL DI,[BP-$52],$669 then
   ADD DI,-895, and [BP-$52] is BOUNCE_RUN's loop counter -- a slot in the frame
   of the routine doing the looping, not a parameter of a called one. A
@@ -516,14 +515,14 @@ end;
   written out inline in the loop body, and the same goes for the erase. }
 
 { ===========================================================================
-  Scene 1 -- logo and bouncing sprites            Demo_Scene1  1012:0678
+  Scene 1 -- logo and bouncing sprites
   =========================================================================== }
 
 const
   BounceMinX  = 21;   BounceMaxX = 299;
   BounceMinY  = 21;   BounceMaxY = 179;
-  BounceFrames = 300;      { $12C -- 1012:05b1, the scene's whole lifetime }
-  ScrollFrom   = 140;      { $8C  -- 1012:05a7, after which it slides out }
+  BounceFrames = 300;      { the scene's whole lifetime, in frames       }
+  ScrollFrom   = 140;      { after this frame the logo slides out        }
   ScrollStep   = 2;        { pixels per frame }
 
 { --------------------------------------------------------------------------
@@ -556,7 +555,7 @@ const
         Inc(D, 320);
       end;
   -------------------------------------------------------------------------- }
-{ @asm 001 1012:03bd }
+{ [re] @asm 001 1012:03bd }
 { NOT `assembler`. The original opens PUSH BP / MOV BP,SP and closes LEAVE,
   a stack frame it neither needs nor uses -- which is what a plain Pascal
   procedure whose body happens to be one asm block compiles to. Declared
@@ -584,7 +583,7 @@ end;
 end;
 
 { --------------------------------------------------------------------------
-  Demo_Scene1 (1012:0678)
+  Demo_Scene1
 
   ASSETS  NEUROSIS.DAT $000000, 64,768 bytes:
             assets/part001/LOGOPAL.PAL    768 B
@@ -593,7 +592,7 @@ end;
           See docs/14-part001-intro.md.
   -------------------------------------------------------------------------- }
 { --------------------------------------------------------------------------
-  1012:03e3 -- Bounce_Run.
+  Bounce_Run.
 
   ITS FRAME IS ENTER $54 AND THAT IS THE WHOLE DECLARATION LIST: 2 + 4 * 20 is
   82, and 84 with the two bytes of padding. So the file record and the frame
@@ -606,7 +605,7 @@ end;
   -------------------------------------------------------------------------- }
 procedure BounceRun;
 var
-  { THE COUNTER IS LAST, not first: 1012:03e7 writes 1 to [BP-$52], and the
+  { [re] THE COUNTER IS LAST, not first: 1012:03e7 writes 1 to [BP-$52], and the
     arrays are addressed [BP+DI-$16], -$2A, -$3E and -$52, which are their
     bases less the two bytes the compiler folds out of a 1-based subscript.
     So BDX sits nearest BP and I sits at the bottom.
@@ -614,7 +613,7 @@ var
     Which array is which came from the BOUNDS TESTS rather than any name: the
     one checked against 299 is X and the one against 179 is Y.
 
-    Four arrays and the counter sum to 82 and the routine opens ENTER $54, which
+    [re] Four arrays and the counter sum to 82 and the routine opens ENTER $54, which
     is 84 -- AND THE TWO REMAINING BYTES ARE THE FRAME COUNTER. This note used
     to say "two more bytes sit below I and nothing reads them" while Frame was
     declared as a unit-level var on the grounds that the frame had no room for
@@ -623,7 +622,7 @@ var
     CMP [BP-$54],$12C -- the scroll threshold and the scene's lifetime -- so
     [BP-$54] is Frame and it is a LOCAL.
 
-    AND IT IS A `for` LOOP, WHICH THE BOTTOM TEST SETTLES: 1012:05b1 tests for
+    [re] AND IT IS A `for` LOOP, WHICH THE BOTTOM TEST SETTLES: 1012:05b1 tests for
     EQUALITY against $12C and jumps to the LEAVE, then JMPs back, with no
     increment between the last statement and the test. Equality plus a
     head-of-loop increment is what Turbo Pascal emits for `for`; a
@@ -675,10 +674,10 @@ var
     displacement will emit the original's -895 by itself once these bytes are
     found. Converting the loop to a local before that will always cost the same
     47. }
-  BDX    : array[1..NumBouncers] of Integer;   { base [BP-$14] }
-  BDY    : array[1..NumBouncers] of Integer;   { base [BP-$28] }
-  BX     : array[1..NumBouncers] of Integer;   { base [BP-$3C] }
-  BY     : array[1..NumBouncers] of Integer;   { base [BP-$50] }
+  BDX    : array[1..NumBouncers] of Integer;   { base one per bouncer }
+  BDY    : array[1..NumBouncers] of Integer;   { base one per bouncer }
+  BX     : array[1..NumBouncers] of Integer;   { base one per bouncer }
+  BY     : array[1..NumBouncers] of Integer;   { base one per bouncer }
   I      : Integer;                            { [BP-$52] }
   Frame  : Integer;                            { [BP-$54], the `for` variable }
 begin
@@ -690,14 +689,14 @@ begin
     BY[I]  := Random(150) + 30;
   end;
 
-  { THE LENS TABLE IS BUILT HERE, and no screen copy precedes the loop.
+  { [re] THE LENS TABLE IS BUILT HERE, and no screen copy precedes the loop.
     1012:043f is CALL 4 -- a near call to the routine at 1012:0004, whose
     ENTER $1C is BuildLens's frame -- and 1012:0442 sets the counter to 1
     immediately after. Ours emitted CopyScreen(VirtScrSeg, $A000) there
     instead; the loop copies the screen every frame in any case. }
   BuildLens;                            { 1012:043f }
 
-  { A `for` LOOP IS WHAT THE ORIGINAL HAS, and it cannot be written yet. 1012:05b1
+  { [re] A `for` LOOP IS WHAT THE ORIGINAL HAS, and it cannot be written yet. 1012:05b1
     is CMP [BP-$54],$12C / JE to the exit and 05b8 is JMP back -- with NO
     increment between the last statement and the test, which is what a `for`
     loop's top-of-body increment leaves behind. But the counter has to be the
@@ -717,7 +716,7 @@ begin
 
     for I := 1 to NumBouncers do
     begin
-      { PLAIN ASSIGNMENTS, NOT Inc, AND THE SUBSCRIPT IS RECOMPUTED THREE TIMES
+      { [re] PLAIN ASSIGNMENTS, NOT Inc, AND THE SUBSCRIPT IS RECOMPUTED THREE TIMES
         BECAUSE OF IT. 1012:04ed loads BX[I] into AX, 04f5 adds BDX[I], and
         04f8 reloads I and shifts it AGAIN before storing at 04fd -- three
         separate MOV DI,[BP-$52] / SHL DI,1 pairs for one statement. Inc folds
@@ -725,7 +724,7 @@ begin
         which is why the two of them cost eighteen. }
       BX[I] := BX[I] + BDX[I];
       BY[I] := BY[I] + BDY[I];
-      { four separate tests in the original, 1012:0518..1012:058b -- X and Y
+      { [re] four separate tests in the original, 1012:0518..1012:058b -- X and Y
         are checked against their own low and high bounds independently }
       if BX[I] < BounceMinX then BDX[I] := -BDX[I];
       if BX[I] > BounceMaxX then BDX[I] := -BDX[I];
@@ -743,7 +742,7 @@ begin
   end;                                        { 1012:05b1 }
 end;
 
-{ TWO PARAMETERS, NEITHER OF WHICH THE BODY READS, and ENTER $482 is what
+{ [re] TWO PARAMETERS, NEITHER OF WHICH THE BODY READS, and ENTER $482 is what
   found them. 1012:065a closes with RET 8, so eight bytes of arguments; the
   caller at 1012:0696 pushes CS and $066B -- a code-segment string constant
   reading 'asphyxia.cel' -- and then the two words of VirtScr. And 1012:05c8 is
@@ -751,12 +750,12 @@ end;
   which is Turbo Pascal copying a STRING VALUE PARAMETER into the frame. That
   copy is 256 bytes of the 1,154, and nothing in the routine ever reads it.
 
-  THE FRAME THEN CLOSES EXACTLY: 256 for the string copy, 768 for the palette
+  [re] THE FRAME THEN CLOSES EXACTLY: 256 for the string copy, 768 for the palette
   at [BP-$400], two for the counter at [BP-$402], and 128 below that which
   nothing touches -- a file record's worth, the ninth in this target. The
   routine's real file is the global at DS:$563F.
 
-  AND THE PALETTE IS NOT UPLOADED WITH SetPalette768. 1012:060e walks 0..255
+  [re] AND THE PALETTE IS NOT UPLOADED WITH SetPalette768. 1012:060e walks 0..255
   and calls the VGA unit's per-entry SetRGB three arguments at a time, reading
   Pal FLAT as I*3, I*3+1 and I*3+2 -- the run-time additions are there in the
   instructions (1012:0632 and 0645 are INC AX), so this one really is a flat
@@ -764,7 +763,7 @@ end;
   no Seek either; the caller's Reset has already left the file at zero. }
 procedure LoadLogo(Name : String; Dest : Pointer);
 var
-  { THE PALETTE IS A LOCAL, and it was VGA's global. 1012:05dd is
+  { [re] THE PALETTE IS A LOCAL, and it was VGA's global. 1012:05dd is
     LEA DI,[BP-$400] / PUSH SS / PUSH DI / PUSH $300 / BlockRead -- an
     SS-relative buffer, so 768 bytes of frame and not a unit variable anywhere.
 
@@ -781,7 +780,7 @@ begin
     SetRGB(I, Pal[I * 3], Pal[I * 3 + 1], Pal[I * 3 + 2]);
 end;
 
-{ THE SAVE COMES FIRST AND THE BLIT SECOND, and the two were the other way
+{ [re] THE SAVE COMES FIRST AND THE BLIT SECOND, and the two were the other way
   round here for as long as this file has existed. The direction of the far
   pointer settles it and takes one instruction to read: 1012:02c0 is
   LES DI,[BP+6], so at 02bc the POINTER is the destination and the screen the
@@ -791,9 +790,11 @@ end;
   round put each one at the other's address and every byte of both measured as
   different while both were correct. }
 { --------------------------------------------------------------------------
-  1012:02bc -- SaveUnder(X, Y, Dest, Segment). HAND ASSEMBLER, verbatim.
+  SaveUnder(X, Y, Dest, Segment). HAND ASSEMBLER, verbatim.
 
-  Copies the 40 x 40 block centred on (X, Y) out of Segment into Dest. The
+  Copies the 40 x 40 block centred on (X, Y) out of Segment into Dest.
+
+  [re] The
   matching write is 1012:0311 below; the two are the same routine with the
   source and destination swapped.
 
@@ -816,8 +817,10 @@ end;
   The scene: load, draw the frame, then hand over to BounceRun.
   -------------------------------------------------------------------------- }
 procedure Scene1;
-{ NO LOCALS AT ALL, and a local `F : file` here is what blanked this scene to a
-  flat red screen. 1012:0678 is PUSH BP / MOV BP,SP with no ENTER, and all three
+{ [re] NO LOCALS AT ALL, and a local `F : file` here is what blanked this scene to a
+  flat red screen.
+
+  [re] 1012:0678 is PUSH BP / MOV BP,SP with no ENTER, and all three
   file calls -- Assign at 067b, Reset at 068a, Close at 06a6 -- address DS:$563F,
   which is the UNIT-LEVEL F that LoadLogo reads from. With a local F this routine
   opened one file and LoadLogo read another that was never opened; with I/O
@@ -825,25 +828,25 @@ procedure Scene1;
   stack and the virtual screen was never loaded. }
 
 begin
-  { NO BuildLens HERE. 1012:0678 is PUSH BP / MOV BP,SP and then straight to
+  { [re] NO BuildLens HERE. 1012:0678 is PUSH BP / MOV BP,SP and then straight to
     067b, the Assign -- nothing between. The lens table is built by BounceRun
     instead; 1012:043f is CALL 4, and 1012:0004 opens ENTER $1C, which is
     BuildLens's frame. }
   Assign(F, 'neurosis.dat');
   Reset(F, 1);
-  { BOTH ARGUMENTS ARE IGNORED INSIDE, and both are passed anyway --
+  { [re] BOTH ARGUMENTS ARE IGNORED INSIDE, and both are passed anyway --
     1012:0696 pushes the string and 1012:069b the two words of VirtScr. }
   LoadLogo('asphyxia.cel', VirtScr);    { 1012:06a3 }
   Close(F);
 
   { Two black vertical lines down the right edge -- the artwork evidently
     has rubbish in its last two columns. }
-  { TOP TO BOTTOM, not bottom to top: 1012:06b0 pushes $13F, 0, $13F, $C7 --
+  { [re] TOP TO BOTTOM, not bottom to top: 1012:06b0 pushes $13F, 0, $13F, $C7 --
     Y1 is zero and Y2 is 199. Same line either way; different bytes. }
   DrawLine(319, 0, 319, 199, 0, VirtScrSeg);
   DrawLine(318, 0, 318, 199, 0, VirtScrSeg);
 
-  { THE LOGO IS SHOWN BEFORE THE BOUNCERS START, and this line was missing.
+  { [re] THE LOGO IS SHOWN BEFORE THE BOUNCERS START, and this line was missing.
     1012:06dc is PUSH [$AB58] / PUSH $A000 / LCALL 1491:0382 -- CopyScreen from
     the virtual screen to video memory -- and 1012:06e8 is the CALL to BounceRun
     after it. Twelve bytes, and the whole of P1LOGO's remaining shortfall. Without
@@ -853,7 +856,7 @@ begin
   BounceRun;                            { 1012:06e8 }
 end;
 
-{ AN EMPTY INITIALISATION SECTION, AND THE ORIGINAL GIVES EVERY UNIT ONE. 1012:06ed
+{ [re] AN EMPTY INITIALISATION SECTION, AND THE ORIGINAL GIVES EVERY UNIT ONE. 1012:06ed
   is PUSH BP / MOV BP,SP / LEAVE / RETF -- five bytes, doing nothing -- and the
   main body opens with a chain of far calls that runs one per unit. The chain is
   twelve calls at 1000:0000..003b in the 1994 binary and was SEVEN in ours,
