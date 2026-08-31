@@ -96,11 +96,33 @@ Three, and the third is a decision this effort has to make in its first ticket r
     .venv/Scripts/python.exe kit/tools/pascal/build.py cleanbuild.toml
     .venv/Scripts/python.exe kit/tools/pascal/ratchet.py status.toml
 
-### Three things to settle before the first unit, not during it
+### Four things to settle before the first unit, not during it
 
-* **`cleanbuild.toml` does not exist yet.** It is `build.toml` with `src = "src-clean"` — and also with every other path that names `src` rewritten: `[stage] alongside`, `verbatim = ["src/asm"]`, and `[stage.subdirs] GEN = "src/gen"`. Miss one and the clean build silently stages the *original* sources for that group and passes.
-* **`src` is not flat.** It has `asm/`, `gen/`, `dos/` and `test/` beneath it. Confirm `clean.py` walks subdirectories the way this tree needs, before batching work that assumes it.
-* **The Pascal sources are LF on disk here**, because `.gitattributes` marks them `-text`. DemoVT's are CRLF. Any tool or script that round-trips a file must preserve what it found; do not let the transform become a bulk line-ending change.
+Measured 31 Aug 2026. The first two are **kit defects and block everything**; both are backward-safe to fix, because this tree's shape is the one the kit has not met before.
+
+**1. `clean.py` is flat, and silently so.** Its loop is `for f in sorted(src.iterdir())` with `if not f.is_file(): continue` — so `src/asm`, `src/gen`, `src/dos` and `src/test` are not copied at all, and nothing says so. A clean build from today's `src-clean` would have no assembler and no includes. DemoVT's `src` is flat, which is why this has never shown. Recursing with relative paths preserved is a no-op there.
+
+**2. `clean.py` forces CRLF on output** — its final write is `new.replace(chr(10), chr(13) + chr(10))`, applied unconditionally. These sources are **LF** on disk, because `.gitattributes` marks them `-text`. So `src-clean` would differ from `src` by line ending in every file, making every diff between the two trees noise. Preserving what each input had is again a no-op for DemoVT, whose inputs are CRLF.
+
+Both are `re-kit` changes, so both are **two acts** per `kit/WORKING.md`: commit in the submodule, then move this repo's pin — and re-verify the sibling tree still regenerates and still builds byte-identical before the pin moves.
+
+**3. The three non-source subdirectories need three different answers.** This is a decision, not a lookup, and it wants a `wayfinder:grilling` ticket before any batching:
+
+| | | |
+|---|---|---|
+| `src/asm` | 4 `.ASM`, 4 `.INC`, ~450 lines | **In scope.** Hand-written assembler, so the verbatim rule and the equivalent-Pascal requirement apply in full. Ticket 2. |
+| `src/gen` | 12 `.INC`, **4,622 lines** | Generated data tables — vector objects, shapes, sine tables, cell maps. Almost certainly **copied verbatim with one header each** saying what the table is and which carver in `tools/` writes it. Documenting 4,622 lines of coordinates per line would be absurd; leaving them undocumented and unexplained would not. |
+| `src/test` | 24 `.PAS`, **2,504 lines** | The per-scene harnesses. Not part of any of the ten artefacts, so **out of scope for the destination** — but they are the thing a reader runs to see one scene, which is an argument for a final low-priority ticket rather than exclusion. |
+| `src/dos` | 1 `.BAT` | Verbatim. |
+
+**4. `cleanbuild.toml` does not exist yet**, and cannot be written until 3 is decided. It is `build.toml` with `src = "src-clean"` — *and every other path that names `src` rewritten*: `[stage] alongside`, `verbatim = ["src/asm"]`, and `[stage.subdirs] GEN = "src/gen"`. Miss one and the clean build silently stages the **original** sources for that group and passes.
+
+### The day-one number
+
+    tagcheck src/*.PAS src/asm/*.ASM src/asm/*.INC
+    → 1388 untagged paragraph(s) carry apparatus across 48 file(s)
+
+**1,388, measured 31 Aug 2026, before any unit was touched.** Put it in the map. DemoVT's equivalent was 885 across 34 files and going 885 → 0 was the only honest progress measure in that whole effort.
 
 ## The work is a wayfinder map and its tickets
 
@@ -179,7 +201,7 @@ The full table with hit counts is in the sibling document. These are the ones th
 | **Comments that do not nest** | A `{ }` inside a `{ }` in an equivalent-Pascal block, three times. Caught by a brace-depth scan; never by reading. |
 | **Shell heredocs and backslashes** | Four times, once **silently**: `\b` became a literal `\x08`, the pattern compiled, and matched nothing forever. **Fix:** any script containing a regex goes through a file, never a heredoc. |
 | **Editing a generated file** | `src/gen` exists in this tree. Find out what writes it *before* editing anything under it, and edit the generator and its outputs in one commit. |
-| **Bulk line-ending change** | New here: sources are LF by `.gitattributes`, and a careless tool will rewrite all 48 files. Preserve what you found. |
+| **Bulk line-ending change** | New here: sources are LF by `.gitattributes`, and a careless tool will rewrite every source in the tree. Preserve what you found. |
 | **Changing the kit** | The kit is a submodule. Per `kit/WORKING.md` that is **two acts, never one** — commit in `re-kit`, then move this repo's pin. `clean.py` and `tagcheck.py` will both need work during this effort; expect the pin to move several times. |
 
 ## What to do differently, from the last run
