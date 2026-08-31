@@ -4,10 +4,10 @@
 
   WHY IT EXISTS. The demo ran under PSYCHO.EXE, which launched each part in
   turn, so a part is entitled to leave the adapter however the next one wants
-  it. Part 004 does exactly that: its program calls SetMode13h at 1000:001c
-  and never calls SetTextMode, because NEUROSIS.005 was going to run next.
-  Running one part on its own is not how any of them were invoked, and a part
-  that ends in mode 13h leaves the DOS prompt unreadable.
+  it. Part 004 does exactly that -- it sets mode 13h and never sets text mode
+  back, because part 005 was going to run next. Running one part on its own is
+  not how any of them were invoked, and a part that ends in mode 13h leaves the
+  DOS prompt unreadable.
 
   So the tidying up lives out here, in RUNPART.BAT, rather than being added to
   a part where the original has none. That is the same reasoning that moved the
