@@ -2,12 +2,8 @@
   SETRGB.INC -- write one DAC entry, HAND ASSEMBLER, verbatim.
 
   ONE TEXT, INCLUDED BY EVERY UNIT THAT NEEDS IT, the same way BLITCLIP.INC is.
-  Part 002 compiles these ten instructions TWICE, in two different units:
-
-      part 002  140c:01af  P2VIEW.PAS   linear $0426f
-      part 002  12f8:0000  VGA.PAS      linear $043a8
-      part 003  12f8:0048  VGA.PAS
-      part 004  11e3:0048  VGA.PAS
+  Part 002 compiles these ten instructions TWICE, into two different units --
+  P2VIEW and VGA -- and parts 003 and 004 once each, into VGA.
 
   The duplication in part 002 is not an accident to be tidied away. P2SOLID
   calls the P2VIEW copy EIGHTEEN times and a far call encodes its target's

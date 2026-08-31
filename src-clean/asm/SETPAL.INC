@@ -2,22 +2,15 @@
   SETPAL.INC -- the 768-byte DAC palette write, HAND ASSEMBLER, verbatim.
 
   ONE TEXT, INCLUDED BY EVERY UNIT THAT NEEDS IT, the same way BLITCLIP.INC is.
-  The demo compiles these nine instructions into more than one part, each part
-  getting its own copy in its own segment:
-
-      part 001  1107:0000  P1BALLS.PAS   scene 4's own copy
-      part 001  1491:0202  VGA.PAS       the shared unit's
-      part 002  1436:0083  VGA.PAS
-      part 004  11e3:0230  VGA.PAS
-
-  Byte for byte and instruction for instruction between them.
+  Four units compile these nine instructions into their own code segment -- the
+  shared VGA unit in parts 001, 002 and 004, plus part 001 scene 4's own copy in
+  P1BALLS.PAS -- and every copy is identical, because they are all this file.
 
   THE HEADER IS PART OF THE SHARED TEXT, and it can be because near and far
   are decided by the SURROUNDING unit, not by this line: in VGA.PAS the
   interface declaration makes it far, in P1BALLS.PAS it is an
   implementation-only routine and near, and the same text compiles correctly in
-  both. That is the whole reason this file can exist -- it was assumed for a
-  long time that it could not, and see shared-exempt.txt for what that cost.
+  both. That is the whole reason this file can exist.
 
   P3MORPH's copy is NOT included from here. Its parameter is an untyped `var P`
   rather than a `P : Pointer`, so its header is genuinely a different line --

@@ -1,31 +1,23 @@
 (* ===========================================================================
   BLITCLIP.INC -- the clipped transparent sprite blit, HAND ASSEMBLER, verbatim.
 
-  ONE TEXT, INCLUDED BY EVERY UNIT THAT NEEDS IT. The demo compiles this same
-  blitter into more than one part, each part getting its own copy in its own
-  segment:
+  ONE TEXT, INCLUDED BY EVERY UNIT THAT NEEDS IT. Two units compile this same
+  blitter into their own code segment: P1BALLS for part 001 scene 4's grid of
+  144 balls, and P6TILES for part 006's tumbling cell grid.
 
-      part 001  1107:0199  P1BALLS.PAS   scene 4's grid of 144 balls
-      part 006  100f:0000  P6TILES.PAS   the tumbling cell grid
-
-  Byte for byte and instruction for instruction between the two -- part 001's
-  addresses are part 006's plus $199. In part 001 it sits BETWEEN Banner_Load
-  ($0025) and DrawBlobs ($0245), inside the scene 4 unit's own code rather
-  than at the head of a segment of its own, so the original was not a shared
-  UNIT: it was shared source text compiled into each unit separately, which is
-  what an include does and what this file is.
+  IT WAS NEVER A SHARED UNIT, and that is worth knowing because it looks like
+  one. In part 001 the blitter sits in the middle of the scene 4 unit's own
+  code rather than at the head of a segment of its own -- so it was shared
+  source TEXT compiled into each unit separately, which is what an include
+  does and what this file is.
 
   A shared unit would also be wrong on the bytes: one copy in one segment
   turns the other callers' near calls into far ones.
 
-  THE INCLUDE CARRIES THE WHOLE PROCEDURE, header and all, because TP7 refuses
-  a {$I} INSIDE an asm block -- "Error 118: Include files are not allowed
-  here", measured 23 Aug 2026. At declaration level it is fine. Each including
-  unit writes the marker, because the address is the part's, and names the
-  routine in the marker so asmverify still byte-checks it:
-
-      { @asm 001 1107:0199 +170 Blit }
-      {$I BLITCLIP.INC}
+  THE INCLUDE CARRIES THE WHOLE PROCEDURE, header and all, because Turbo Pascal
+  refuses an include INSIDE an asm block -- "Error 118: Include files are not
+  allowed here". At declaration level it is fine, so the file starts at the
+  procedure header and the including unit writes one line.
 
   WHAT THE INCLUDING UNIT MUST PROVIDE:
 

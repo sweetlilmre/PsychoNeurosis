@@ -1,27 +1,21 @@
 ; ============================================================================
 ; STARMATH.ASM -- Psycho Neurosis (Asphyxia, 1994)
 ;
-; Part 003 scene 2's two 386 long-integer helpers, at 10B8:07DB and 10B8:07F4.
-; Transcribed instruction for instruction.
+; TWO 32-BIT INTEGER HELPERS for part 003 scene 2's star field: multiply and
+; divide, each done in three 386 instructions instead of a call into Turbo
+; Pascal's 16-bit runtime routines. `DivLong` is why the scene needs a 386 at
+; all -- it is on the projection path for every point of every frame.
 ;
-; WHY THIS IS AN OBJECT MODULE AND NOT AN asm BLOCK, and the evidence is the
-; POSITION rather than the instructions. Turbo Pascal 7's built-in assembler
-; stops at the 80286 -- it rejects MOV EAX,[BP+8] outright -- so 386 code has
-; to arrive through {$L file.OBJ} and `external`, exactly as DEMOMATH.ASM does
-; for the fixed-point maths. But the placement is what proves it here: both
-; routines sit AFTER the unit's initialisation section, which ends at 10B8:07DA.
-; Turbo Pascal emits a unit's initialisation code last, and nothing can be
-; declared after it -- so code beyond it did not come from the Pascal source at
-; all. A linked object's code is appended to the unit's segment, which is the
-; only way to be there.
+; They are an object module because Turbo Pascal 7's built-in assembler stops
+; at the 80286 and rejects `MOV EAX,[BP+8]` outright, so 386 code has to arrive
+; through a linked object and `external`, exactly as DEMOMATH.ASM does for the
+; fixed-point maths.
 ;
-; AND IT EXPLAINS WHY MulLong SURVIVES UNCALLED. Nothing in part 003 calls it:
-; the four call sites in segment 10B8 all go to DivLong, and no far call to
-; either address appears anywhere in the image. An unused private Pascal
-; routine is smart-linked away; an external OBJ is linked WHOLE, per module and
-; not per procedure. So a dead routine in the object file ships, and one in the
-; Pascal does not. Part 005 scene 3's source records the same rule from the
-; other direction.
+; NOTHING CALLS MulLong. It ships anyway, because an object file is linked
+; WHOLE -- per module, not per procedure -- where an unused private Pascal
+; routine would be smart-linked away. So a dead routine in an object survives
+; and a dead routine in the Pascal does not, and a reader hunting for MulLong's
+; caller will not find one.
 ;
 ; BOTH ARE 32-BIT, NOT FIXED POINT, and that is the difference from FixMul and
 ; FixDiv in DEMOMATH.ASM. Those two shift by 16 to keep a 16.16 result out of a
@@ -45,7 +39,20 @@ CODE    SEGMENT BYTE PUBLIC USE16 'CODE'
 ; ----------------------------------------------------------------------------
 ; MulLong -- function MulLong(A, B : LongInt) : LongInt;
 ;
+; Multiply two 32-bit integers. Plain LongInt arithmetic -- NOT the 16.16 fixed
+; point of DEMOMATH.ASM's FixMul, which is the easy mistake to make when
+; reading the two files together.
+;
 ;   A   [BP+08h]    B   [BP+04h]
+;
+; EQUIVALENT PASCAL, REFERENCE ONLY -- and here the Pascal really is equivalent.
+; It is replaced only because Turbo Pascal compiles it to a far call into the
+; runtime's 16-bit multiply, where this is three 386 instructions:
+;
+;       function MulLong(A, B : LongInt) : LongInt;
+;       begin
+;         MulLong := A * B
+;       end;
 ;
 ; THE RESULT IS PUT BACK TOGETHER, not shifted. IMUL leaves the full 64-bit
 ; product in EDX:EAX and Turbo Pascal returns a LongInt in DX and AX as two
@@ -69,7 +76,18 @@ MulLong ENDP
 ; ----------------------------------------------------------------------------
 ; DivLong -- function DivLong(A, B : LongInt) : LongInt;
 ;
+; Divide one 32-bit integer by another, and THIS is the routine the scene
+; needs a 386 for: it sits on the projection path for every point of every
+; frame, where a runtime call would cost far more than the divide.
+;
 ;   A   [BP+08h]    B   [BP+04h]
+;
+; EQUIVALENT PASCAL, REFERENCE ONLY:
+;
+;       function DivLong(A, B : LongInt) : LongInt;
+;       begin
+;         DivLong := A div B
+;       end;
 ;
 ; ESI IS NOT SAVED. The divisor is loaded into it and the routine returns with
 ; it clobbered, which is legal for Turbo Pascal -- SI is not one of the
