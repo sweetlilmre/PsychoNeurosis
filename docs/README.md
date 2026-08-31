@@ -41,6 +41,7 @@ Goal: understand every effect, then reconstruct the original source.
 
 | 32 | [The tool disposition](32-tool-disposition.md) | Where every script goes as the kit absorbs the tooling; generated, and proven to cover the tree |
 | 33 | [The documentation transform](33-documentation-transform.md) | Turning `src` into `src-clean`: the marks, the per-unit gate, and the wayfinder map that runs it |
+| 34 | [The documentation transform, as it actually ran](34-documentation-transform-run.md) | The record of carrying 33 out: the counts, all eleven expired premises by name, the hazard table with this run's hit counts, and why `[reading]` was never used |
 
 (24 is deliberately absent: it became the untracked local marker `continuation.md`.)
 
