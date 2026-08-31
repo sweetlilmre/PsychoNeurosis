@@ -7,7 +7,7 @@
   This is the OTHER video unit in part 002, and it is nothing like ModeX.
   Scene 2 runs unchained 320 x 400 with two pages stacked in the same 64K:
 
-      page 0   offset $0000        DS:$A696
+      [re] page 0   offset $0000        DS:$A696
       page 1   offset $4B00        DS:$A698     ($4B00 = 19,200 = 80 * 240)
       current  DS:$A69A            what Plot and FillRect write through
 
@@ -18,11 +18,14 @@
 
 unit P2View;
 
-(* 286 CODE ON. Every routine in segment 140c ends `LEAVE / RETF` -- 140c:01de
+(* 286 CODE ON, so every routine here closes with one LEAVE instead of two
+   instructions.
+
+   [re] Every routine in segment 140c ends `LEAVE / RETF` -- 140c:01de
    is C9 CB -- and LEAVE is a 286 instruction that Turbo Pascal emits only
    under the G-plus switch; the G-minus epilogue is POP BP / RETF.
 
-   prologue.py reads this segment as G-minus and it is NOT WRONG so much as
+   [re] prologue.py reads this segment as G-minus and it is NOT WRONG so much as
    BLIND here: it decides by counting ENTER against PUSH BP, and NO routine in
    this unit declares a local, so both switches emit PUSH BP / MOV BP,SP and
    there is no ENTER for either to produce. With no locals the entry tells you
@@ -63,12 +66,12 @@ var
   Crtc : TCrtcTable;
 
 const
-  { DS:$0CE6..$0CEB -- SIX BYTES OF INITIALISED DATA NOTHING REFERENCES, and
+  { [re] DS:$0CE6..$0CEB -- SIX BYTES OF INITIALISED DATA NOTHING REFERENCES, and
     they are the whole of part 002's data-image shortfall. The original's image
     is 3,408 bytes; without these it is 3,398, which pads to 3,408 -- so this
     one declaration accounts for all sixteen bytes the file was short.
 
-    The values are 0, $4B00, 0 -- Page0Base, Page1Base and a zero, the same
+    [re] The values are 0, $4B00, 0 -- Page0Base, Page1Base and a zero, the same
     three words the BSS trio above holds at run time. A search of the whole
     part finds NO instruction addressing $0CE6, $0CE8 or $0CEA: the two
     apparent hits at 108b:13af and 14b1:0f48 are `E8 0C` inside near-CALL
@@ -82,25 +85,25 @@ const
 
   { DS:$0CEC -- which of the two pages is being drawn into. Initialised data;
     the compiled-in value is 1. The renderers toggle it after every flip. }
-  { WORD, not Integer. The page swap at the end of every renderer is
+  { [re] WORD, not Integer. The page swap at the end of every renderer is
     `INC AX / XOR DX,DX / MOV CX,2 / DIV CX` at 108b:0c8e -- zero-extend
     and an UNSIGNED divide, which is what `mod` on a Word compiles to.
     Declared Integer it came out `CWD` and `IDIV`, and that was the only
     difference left in all three renderer tails. }
   PageIndex : Word = 1;
 
-{ @asm 002 140c:0045 }
+{ [re] @asm 002 140c:0045 }
 procedure SetMode400;                                        far;   { 140c:009c }
-{ @asm 002 140c:00b1 }
+{ [re] @asm 002 140c:00b1 }
 procedure Plot(X, Y : Integer; Colour : Byte);               far;   { 140c:00b1 }
-{ @asm 002 140c:00f4 }
+{ [re] @asm 002 140c:00f4 }
 procedure FlipPage(StartAddr : Word);                        far;   { 140c:00f4 }
-{ @asm 002 140c:011e }
+{ [re] @asm 002 140c:011e }
 procedure FillRect(X1, Y1, X2, Y2 : Integer;
                    Page : Word; Colour : Byte);              far;   { 140c:011e }
 procedure SetRGB(Col, R, G, B : Byte);                       far;   { 140c:01af }
 
-{ The two nibble masks the planar span writers need. Scene 2's triangle filler
+{ [re] The two nibble masks the planar span writers need. Scene 2's triangle filler
   at 108b:0461 reads its own copies from DS:$0676 and DS:$067A, which hold the
   same four bytes each as this unit's tables at DS:$0CF0 and DS:$0CF4. }
 function LeftMaskOf(X : Integer) : Byte;
@@ -151,9 +154,11 @@ begin
 end;
 
 { --------------------------------------------------------------------------
-  140c:0045
+  Put the VGA into unchained 256-colour mode.
 
-      INT $10, AX = $0013
+  [re] 140c:0045
+
+  [re] INT $10, AX = $0013
       SEQ  $04 := $06          chain-4 off and odd/even off in one write
       SEQ  $00 := $01          synchronous reset
       MISC ($3C2) := $E3       clocks and polarity for 400 lines
@@ -236,7 +241,7 @@ asm
   POP  DS                 {                                                 }
 end;
 
-{ 140c:009c -- fill the table at DS:$A69C, then set the mode from it. }
+{ Fill the row table, then set the mode from it. }
 procedure SetMode400;
 begin
   FillCrtcTable(Crtc);
@@ -357,7 +362,7 @@ end;
   RETF $C, six words. Highest first: X1 at BP+$10, Y1 at BP+$E, X2 at BP+$C,
   Y2 at BP+$A, Page at BP+8, Colour at BP+6.
 
-  IT USES BP AS A SCRATCH REGISTER. At 140c:017d, once every parameter has
+  [re] IT USES BP AS A SCRATCH REGISTER. At 140c:017d, once every parameter has
   been read out of the frame, BP is loaded with the per-row skip (80 - CX - 1)
   and stays there to the end. That is why the routine pushes BP at the top
   and pops it at the bottom, and why nothing below that point can refer to a
@@ -501,7 +506,7 @@ end;
 
 { 140c:01ca -- the unit's initialisation. }
 begin
-  { THREE STORES AND NOTHING ELSE. 140c:01ca is `XOR AX,AX / MOV [$A696],AX
+  { [re] THREE STORES AND NOTHING ELSE. 140c:01ca is `XOR AX,AX / MOV [$A696],AX
     / MOV WORD PTR [$A698],$4B00 / MOV AX,[$A696] / MOV [$A69A],AX`. There is
     no PageIndex assignment: DS:$0CEC arrives carrying 1 as INITIALISED DATA,
     which is a typed constant, not a var written here. }
