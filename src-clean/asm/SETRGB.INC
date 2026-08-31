@@ -44,5 +44,5 @@ asm
   MOV  AL, G            { green                                              }
   OUT  DX, AL           {   the entry after the third                        }
   MOV  AL, B            { blue                                               }
-  OUT  DX, AL           {                                                    }
+  OUT  DX, AL
 end;

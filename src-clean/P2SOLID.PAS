@@ -39,7 +39,7 @@ unit P2SOLID;
 (* DATA ALIGNMENT OFF, and the frame layout is what says so.
 
    In Obj_SortFaces 108b:0e03 the original puts its whole-object local Tmp at
-   [BP-$0B51] -- an ODD offset -- and opens ENTER $1136. Under TP7's dollar-A-
+an ODD offset -- and opens ENTER $1136. Under TP7's dollar-A-
    plus default the same declarations land Tmp at [BP-$0B52] and the frame at
    $1138: the compiler word-aligns each local, and TObj is an odd 2897 bytes,
    so it pads. There were TWO such gaps, which is why the locals above Tmp
@@ -801,13 +801,13 @@ var
       if LongInt(X2 - X1) * (Y3 - Y1) = LongInt(X3 - X1) * (Y2 - Y1) then
         Exit;                           { collinear                         }
       if LongInt(X2 - X1) * (Y3 - Y1) > LongInt(X3 - X1) * (Y2 - Y1) then
-      begin                             { A then C on the right }
+      begin                             { 108b:0595 -- A then C on the right }
         L := X1; R := X1; Y := Y1; Idx := 0; EL := 0; ER := 0;
         while Y < Y2 do Walk(L, R, 'B', 'A');
         while Y < Y3 do Walk(L, R, 'B', 'C');
       end
       else
-      begin                             { A then C on the left  }
+      begin                             { 108b:0653 -- A then C on the left  }
         L := X1; R := X1; Y := Y1; Idx := 0; EL := 0; ER := 0;
         while Y < Y2 do Walk(L, R, 'A', 'B');
         while Y < Y3 do Walk(L, R, 'C', 'B');
@@ -815,7 +815,7 @@ var
       { and 108b:0715 / 108b:07fb are the Y1=Y2 and Y2=Y3 cases, which need
         only one loop each and start L and R on the two ends of the flat edge }
 
-      for Y := Y3 downto Y1 + 1 do      { BACKWARDS            }
+      for Y := Y3 downto Y1 + 1 do      { 108b:08dd -- BACKWARDS            }
       begin
         Dec(Idx, 2);
         R := Span[Idx + 1];  if R > ClipXMax then R := ClipXMax;

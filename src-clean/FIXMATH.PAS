@@ -40,7 +40,7 @@ unit FixMath;
 
 (* STACK CHECKING ON, AND THIS UNIT IS THE ONLY ONE THAT HAS IT. Every entry
   point in the original opens `MOV AX,<frame size>` then a far CALL to
-  14b1:0530 BEFORE `SUB SP,n` -- 142a:0037 for RealToFixed, 142a:0074 for
+ BEFORE `SUB SP,n` -- 142a:0037 for RealToFixed, 142a:0074 for
   FixedToInt, 142a:0003 for IntToFixed -- which is what Turbo Pascal emits
   under {$S+}. build.toml passes /$S- on the command line for the whole
   project, so this unit has to say otherwise for itself.
