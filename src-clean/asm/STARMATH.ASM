@@ -55,15 +55,15 @@ CODE    SEGMENT BYTE PUBLIC USE16 'CODE'
 ; this is a 32-bit multiply, not the 16.16 one in DEMOMATH.ASM.
 ; ----------------------------------------------------------------------------
 MulLong PROC    NEAR
-        push    bp                      ; 10B8:07DB
-        mov     bp,sp                   ; 10B8:07DC
-        mov     eax,[bp+08h]            ; 10B8:07DE  A
-        mov     edx,[bp+04h]            ; 10B8:07E2  B
-        imul    edx                     ; 10B8:07E6  EDX:EAX := A * B
-        mov     edx,eax                 ; 10B8:07E9
-        shr     edx,16                  ; 10B8:07EC  DX := bits 16..31
-        pop     bp                      ; 10B8:07F0
-        ret     8                       ; 10B8:07F1
+        push    bp
+        mov     bp,sp
+        mov     eax,[bp+08h]            ; A
+        mov     edx,[bp+04h]            ; B
+        imul    edx                     ; EDX:EAX := A * B
+        mov     edx,eax
+        shr     edx,16                  ; DX := bits 16..31
+        pop     bp
+        ret     8
 MulLong ENDP
 
 ; ----------------------------------------------------------------------------
@@ -80,16 +80,16 @@ MulLong ENDP
 ; ESI does not touch it. The 66h-prefixed CWD in the original IS CDQ.
 ; ----------------------------------------------------------------------------
 DivLong PROC    NEAR
-        push    bp                      ; 10B8:07F4
-        mov     bp,sp                   ; 10B8:07F5
-        mov     eax,[bp+08h]            ; 10B8:07F7  A
-        mov     esi,[bp+04h]            ; 10B8:07FB  B
-        cdq                             ; 10B8:07FF  EDX:EAX := A sign-extended
-        idiv    esi                     ; 10B8:0801  EAX := A div B
-        mov     edx,eax                 ; 10B8:0804
-        shr     edx,16                  ; 10B8:0807  DX := bits 16..31
-        pop     bp                      ; 10B8:080B
-        ret     8                       ; 10B8:080C
+        push    bp
+        mov     bp,sp
+        mov     eax,[bp+08h]            ; A
+        mov     esi,[bp+04h]            ; B
+        cdq                             ; EDX:EAX := A sign-extended
+        idiv    esi                     ; EAX := A div B
+        mov     edx,eax
+        shr     edx,16                  ; DX := bits 16..31
+        pop     bp
+        ret     8
 DivLong ENDP
 
 CODE    ENDS

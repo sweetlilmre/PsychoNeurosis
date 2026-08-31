@@ -100,13 +100,13 @@ CODE    SEGMENT BYTE PUBLIC USE16 'CODE'
 ; from EDX. The 16.16 result assembles itself.
 ; ----------------------------------------------------------------------------
 FixMul  PROC    NEAR
-        push    bp                      ; 1102:0391
-        mov     bp,sp                   ; 1102:0392
-        mov     eax,[bp+08h]            ; 1102:0394  A
-        imul    dword ptr [bp+04h]      ; 1102:0398  EDX:EAX := A * B
-        shr     eax,16                  ; 1102:039C  AX := bits 16..31
-        pop     bp                      ; 1102:03A0    and DX is bits 32..47
-        ret     8                       ; 1102:03A1
+        push    bp
+        mov     bp,sp
+        mov     eax,[bp+08h]            ; A
+        imul    dword ptr [bp+04h]      ; EDX:EAX := A * B
+        shr     eax,16                  ; AX := bits 16..31
+        pop     bp                      ; and DX is bits 32..47
+        ret     8
 FixMul  ENDP
 
 ; ONE BYTE OF PADDING, AND IT IS IN THE ORIGINAL. FixMul is 19 bytes, so FixDiv
@@ -134,16 +134,16 @@ FixMul  ENDP
 ; SHLD so that DX:AX is the 16.16 answer.
 ; ----------------------------------------------------------------------------
 FixDiv  PROC    NEAR
-        push    bp                      ; 1102:03A5
-        mov     bp,sp                   ; 1102:03A6
-        mov     edx,[bp+08h]            ; 1102:03A8  A
-        xor     eax,eax                 ; 1102:03AC
-        shrd    eax,edx,16              ; 1102:03AF  EDX:EAX := A shl 16
-        sar     edx,16                  ; 1102:03B4    sign-correct the top
-        idiv    dword ptr [bp+04h]      ; 1102:03B8
-        shld    edx,eax,16              ; 1102:03BC  DX := quotient bits 16..31
-        pop     bp                      ; 1102:03C1
-        ret     8                       ; 1102:03C2
+        push    bp
+        mov     bp,sp
+        mov     edx,[bp+08h]            ; A
+        xor     eax,eax
+        shrd    eax,edx,16              ; EDX:EAX := A shl 16
+        sar     edx,16                  ; sign-correct the top
+        idiv    dword ptr [bp+04h]
+        shld    edx,eax,16              ; DX := quotient bits 16..31
+        pop     bp
+        ret     8
 FixDiv  ENDP
 
         INCLUDE COSTAB.INC
@@ -182,7 +182,7 @@ SinCos  PROC    NEAR
         mov     bx,[bp+0Ch]             ; the angle, tenths of a degree
         and     bx,bx                   ; negative?
         jns     short @@Wrapped         ;   no -- go and test the upper end
-        nop                             ; 1107:180E -- see the padding note
+        nop                             ;see the padding note
         nop
 @@AddTurn:
         add     bx,3600                 ; wrap up one whole turn
@@ -195,11 +195,11 @@ SinCos  PROC    NEAR
         jg      short @@SubTurn         ;   yes -- take one off and retest
         cmp     bx,1800                 ; bottom half of the circle?
         ja      short @@Lower           ;   no, it is 1801..3600
-        nop                             ; 1107:1828
+        nop
         nop
         cmp     bx,900                  ; first quadrant?
         ja      short @@Quad2           ;   no, it is 901..1800
-        nop                             ; 1107:1830
+        nop
         nop
 
 ; --- quadrant 1, 0..900: cos and sin both positive ---
@@ -208,7 +208,7 @@ SinCos  PROC    NEAR
         neg     bx                      ; index backwards from entry 900
         mov     edx,cs:[bx+offset CosTab+3600]   ; S := T[900-a]
         jmp     short @@Store
-        nop                             ; 1107:1845
+        nop
 
 ; --- quadrant 2, 901..1800: cos negative, sin positive ---
 @@Quad2:
@@ -226,8 +226,8 @@ SinCos  PROC    NEAR
         neg     bx
         add     bx,3600                 ; BX := 3600 - a
         cmp     bx,900                  ; which of the two quadrants?
-        ja      short @@Quad3           ;   1801..2700
-        nop                             ; 1107:186E
+        ja      short @@Quad3
+        nop
         nop
 
 ; --- quadrant 4, 2701..3600: cos positive, sin negative ---

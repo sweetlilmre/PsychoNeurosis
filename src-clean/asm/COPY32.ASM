@@ -40,22 +40,22 @@ CODE    SEGMENT BYTE PUBLIC USE16 'CODE'
         PUBLIC  Copy32
 
 Copy32  PROC    NEAR
-        push    bp                      ; 12C5:0AC6
+        push    bp
         mov     bp,sp                   ; 0AC7  8B EC -- TASM's encoding
-        push    es                      ; 0AC9
-        push    ds                      ; 0ACA
+        push    es
+        push    ds
         mov     ax,[bp+04h]             ; 0ACB  Dest
-        mov     es,ax                   ; 0ACE
+        mov     es,ax
         mov     ax,[bp+06h]             ; 0AD0  Src
-        mov     ds,ax                   ; 0AD3
+        mov     ds,ax
         xor     di,di                   ; 0AD5  33 FF -- TASM's encoding
-        xor     si,si                   ; 0AD7
+        xor     si,si
         mov     cx,3E80h                ; 0AD9  16,000 dwords = 64,000 bytes
         rep     movsd                   ; 0ADC  F3 66 A5
-        pop     ds                      ; 0ADF
-        pop     es                      ; 0AE0
-        pop     bp                      ; 0AE1
-        ret     4                       ; 0AE2
+        pop     ds
+        pop     es
+        pop     bp
+        ret     4
 Copy32  ENDP
 
 CODE    ENDS
