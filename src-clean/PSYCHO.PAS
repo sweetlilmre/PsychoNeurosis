@@ -28,20 +28,6 @@
   stays resident while its child runs, so the launcher asks for the smallest
   heap it can and leaves the rest of the machine for the demo.
 
-  [re] Read from bin/PSYCHO.EXE (1,936 bytes); the chart is
-  docs/29-psycho-launcher.md and every routine below it is Borland's own
-  Dos unit, so this file is the whole reconstruction. The original's own
-  code is main at 1000:0036 -- 122 bytes -- plus five string literals.
-
-  [re] The $M directive below is measured, not style: the binary's MZ header
-  has minalloc = maxalloc = 166 paragraphs, the smallest footprint that
-  still loads -- an EXEC parent must leave RAM for its children.
-
-  [re] DGROUP (106d)
-    DS:$0050  the child's exit code       DS:$0052  DosError
-    DS:$0054  Exec's saved SP             DS:$0056  Exec's saved SS
-    DS:$0258  SwapVectors' 19-entry saved-vector table
-
   =========================================================================== }
 
 { The two early exits are written as gotos rather than as nested ifs, which
@@ -49,16 +35,10 @@
   forward past the work it skips, and the three EXEC calls stay at one
   level. Reading the sequence top to bottom is the point of the shape. }
 
-{ [re] The gotos are the original's: TP7 compiles "if X then goto L" to the
-  JNZ-over-JMP at 1000:0064 and 1000:006d, and the byte comparison against
-  the binary only closes with this shape -- a nested if reorders the tests
-  and shortens the jumps, moving every relocation after it by four bytes. }
 
 { 286 instruction encodings are permitted. The demo requires a 386 in any
   case -- Detect.Is386 is the first thing setup asks. }
-{$G+}   { [re] measured: the original closes main with LEAVE (C9), a 286
-          encoding -- with $G- TP7 emits POP BP (5D) there instead, the
-          one byte of 1,936 that then differs }
+{$G+}
 {$M $800,0,0}
 program Psycho;
 
@@ -69,21 +49,21 @@ label
   RunEnd, Done;
 
 var
-  Code : Byte;   { setup's exit code, low byte  }   { [re] DS:$0050 }
+  Code : Byte;   { setup's exit code, low byte  }
 
 begin
   SwapVectors;
-  Exec('Neurosis.000', '');            { 1000:0043 -- the setup program }
+  Exec('Neurosis.000', '');            { the setup program }
   SwapVectors;
-  Code := Lo(DosExitCode);             { 1000:0057 -- AH=4Dh, low byte  }
+  Code := Lo(DosExitCode);             { AH=4Dh, low byte  }
   if Code = 1 then goto RunEnd;        { skip the demo, keep the ending }
   if Code = 2 then goto Done;          { quit silently                  }
   SwapVectors;
-  Exec('neurosis.008', '@neurosis.cfg');       { 1000:0080 -- DemoVT    }
+  Exec('neurosis.008', '@neurosis.cfg');       { DemoVT    }
   SwapVectors;
 RunEnd:
   SwapVectors;
-  Exec('neurosis.009', '');            { 1000:0099 -- the end screen    }
+  Exec('neurosis.009', '');            { the end screen    }
   SwapVectors;
 Done:
 end.

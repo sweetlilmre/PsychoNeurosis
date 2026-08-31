@@ -17,16 +17,6 @@
   references. So the mouse probe ships unused, and a reader looking for its
   caller will not find one.
 
-  [re] Three hand-written detection probes, 49 bytes at segment 11ad, named
-  by the appended debug info (docs/31-startup.md). The code is a TASM object
-  (src/asm/DETECT.ASM) linked whole with $L, which is what the original
-  did -- two measured tells: HasMouse is in the binary although nothing
-  calls it (an object links whole; Pascal smart-links per routine and
-  drops it), and XOR AX,AX is encoded 33 C0, TASM's operand order, where
-  TP7's built-in assembler emits 31 C0.
-
-  [re] No initialisation section: the original's entry calls only Crt's.
-
   =========================================================================== }
 
 unit Detect;
@@ -44,19 +34,16 @@ implementation
 { True on a 386 or better. The demo needs one: its fixed-point maths is
   386 code, which is why that maths is a separate TASM object rather than
   inline assembler. }
-{ [re] @asm 000 11ad:0000 }
 function Is386 : Boolean; external;
 
 { True if the processor is already running in protected mode -- under a
   memory manager or a DOS box rather than on the bare machine. The demo
   drives the hardware directly and cannot run there. }
-{ [re] @asm 000 11ad:0014 }
 function IsProtMode : Boolean; external;
 
 { True if a mouse driver is installed. Nothing in the demo calls this; it
   ships because the object it belongs to is linked whole. See the unit
   header. }
-{ [re] @asm 000 11ad:001b }
 function HasMouse : Boolean; external;
 
 end.
