@@ -2,6 +2,12 @@
 # so nothing here survives a build of anything else.
 build/
 
+# The same, for the build of src-clean. A SEPARATE staging directory on
+# purpose: sharing one means a clean build that REFUSED leaves the previous
+# build's staged sources in place, and the next thing to read them cannot tell.
+# src-clean itself is TRACKED -- it is the deliverable, not scratch.
+build-clean/
+
 # A writable copy of bin/ plus the built harnesses. Reproduce it with
 #   cp bin/* run/   and a build; dosbuild.py installs the .EXEs into it.
 run/
