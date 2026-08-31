@@ -1,12 +1,18 @@
 ; ============================================================================
 ; DEMOMATH.ASM -- Psycho Neurosis (Asphyxia, 1994)
 ;
-; The three 386 fixed-point maths routines the demo's 3-D scenes share, and
+; THE DEMO'S 3-D MATHS, and every 3-D scene goes through this file: multiply,
+; divide, sine and cosine, rotate a point about three axes, and project one
+; onto the screen. Five routines and one table, all 386, all 16.16 fixed point.
+;
+; It is assembled once and linked into three separate units, so parts 001, 002
+; and 005 each end up carrying their own copy of the code and of the table.
+;
+; [re] The three 386 fixed-point maths routines the demo's 3-D scenes share, and
 ; the cosine table they read. Transcribed instruction for instruction from the
 ; binaries; this file is assembled once and linked into three units with
 ; {$L DEMOMATH.OBJ}, which is what the original does -- the same code appears
 ; three times, once per unit's code segment:
-;
 ;     part 001 scene 4   1107:1804  SinCos   1107:18B6  RotatePoint
 ;                        1107:1A04  Project  table at CS:$09F0
 ;     part 001 scene 5   12C5:192D  SinCos   12C5:19DF  RotatePoint
@@ -19,8 +25,9 @@
 ; and the shipped help file has no mention of the 386, of EAX, or of SHRD. It
 ; rejects `MOV EAX, EBX` outright. So 386 code has to come in through
 ; {$L file.OBJ} and `external`, which is TP7's documented route for exactly
-; this, and the binary shows that is what the original did:
+; this.
 ;
+; [re] and the binary shows that is what the original did:
 ;   * 1107:180E, 1828, 1830 and 186E are NOP NOP immediately after a forward
 ;     conditional jump. That is TASM's jump-sizing padding -- it reserves four
 ;     bytes for a Jcc near (a .386 encoding) and pads when the short form
@@ -52,7 +59,14 @@
 ; height, not the centre. Part 001 scene 5 really does set MViewH to 0 -- see
 ; the note there; it is not a mistake to be tidied away.
 ;
-; THE NOPs IN SinCos ARE DELIBERATE. They are the 1994 assembler's forward-jump
+; THE NOPs IN SinCos ARE NOT DEAD SPACE and must not be tidied away. They are
+; forward-jump padding, and every jump in this file is written `short`
+; explicitly for the same reason: an assembler that sizes its own jumps decides
+; where the padding lands, which makes the emitted bytes a function of how many
+; passes it takes rather than of what this file says. Written out by hand, the
+; output is the same every time.
+;
+; [re] THE NOPs IN SinCos ARE DELIBERATE. They are the 1994 assembler's forward-jump
 ; padding: it reserved the near form of a forward branch and, on finding the
 ; short form fitted, filled the slack rather than moving anything. TASM 4.1
 ; pads in the same places but not in all the same ones, so every jump here is
@@ -60,6 +74,7 @@
 ; makes the output deterministic instead of a function of the assembler's pass
 ; count -- and it is what makes the three routines come out byte for byte
 ; identical to the original, which tools/asmverify.py checks.
+;
 ; ============================================================================
 
 ; .386 enables the instruction set. USE16 on the segment is what keeps the
@@ -92,7 +107,20 @@ CODE    SEGMENT BYTE PUBLIC USE16 'CODE'
 ; ----------------------------------------------------------------------------
 ; FixMul -- function FixMul(A, B : LongInt) : LongInt;
 ;
+; Multiply two 16.16 fixed-point numbers. This is the operation the whole file
+; exists for: a 16.16 product needs the MIDDLE 32 bits of a 64-bit result, and
+; Turbo Pascal's own LongInt multiply throws the top half away long before it
+; gets there.
+;
 ;   A   [BP+08h]    B   [BP+04h]        both 16.16
+;
+; EQUIVALENT PASCAL, REFERENCE ONLY -- this is not what is assembled, and it
+; cannot be: no Pascal expression reaches a 64-bit intermediate here.
+;
+;       function FixMul(A, B : LongInt) : LongInt;
+;       begin
+;         FixMul := (Int64(A) * B) shr 16     { the middle 32 bits }
+;       end;
 ;
 ; NO SHIFT PAIR IS NEEDED. IMUL leaves the 64-bit product in EDX:EAX, and Turbo
 ; Pascal returns a LongInt in DX:AX -- two SEPARATE registers. So shifting EAX
@@ -109,25 +137,42 @@ FixMul  PROC    NEAR
         ret     8                       ; 1102:03A1
 FixMul  ENDP
 
-; ONE BYTE OF PADDING, AND IT IS IN THE ORIGINAL. FixMul is 19 bytes, so FixDiv
+; EVERY ROUTINE HERE STARTS ON AN EVEN OFFSET, and `EVEN` before each is what
+; guarantees it: it emits one NOP where the offset is odd and nothing where it
+; is already even, so the alignment is stated once and the assembler works out
+; whether it costs anything. FixMul is 19 bytes, which is the odd one.
+;
+; [re] ONE BYTE OF PADDING, AND IT IS IN THE ORIGINAL. FixMul is 19 bytes, so FixDiv
 ; would start at an ODD offset in this object -- and every one of the three
 ; binaries this file is linked into has a NOP there instead: 12c5:0af8, and the
 ; same byte in part 001 scene 4 and part 002 scene 2. EVEN emits exactly that
 ; 90 and nothing when the offset is already even, which is why it is written as
 ; an alignment directive rather than a bare `nop`.
 ;
-; IT WAS WORTH 3,391 BYTES. Without it every byte of part 001 scene 5 from
+; [re] IT WAS WORTH 3,391 BYTES. Without it every byte of part 001 scene 5 from
 ; 12c5:0af8 to the end of the segment was one place out -- the whole
 ; hand-assembler tail and all three external routines -- and the same one-byte
 ; drift showed in scene 4 and in part 002 as a row progseg labels
 ; "past the init -- .OBJ". A coverage walk cannot see it, because it locates
 ; each segment by content and one byte of slide still matches almost everything.
+;
         EVEN
 
 ; ----------------------------------------------------------------------------
 ; FixDiv -- function FixDiv(A, B : LongInt) : LongInt;
 ;
+; Divide one 16.16 fixed-point number by another. The difficulty is the mirror
+; of FixMul's: the dividend has to be widened BEFORE the divide, or the
+; quotient comes out whole and the fraction is gone.
+;
 ;   A   [BP+08h]    B   [BP+04h]        both 16.16
+;
+; EQUIVALENT PASCAL, REFERENCE ONLY:
+;
+;       function FixDiv(A, B : LongInt) : LongInt;
+;       begin
+;         FixDiv := (Int64(A) shl 16) div B
+;       end;
 ;
 ; A is widened to 48 bits in EDX:EAX by SHRD/SAR -- that is A shifted left 16
 ; without losing the top -- divided, and the quotient put back together with
@@ -151,9 +196,26 @@ FixDiv  ENDP
 ; ----------------------------------------------------------------------------
 ; SinCos -- procedure SinCos(A : Integer; var C, S : LongInt);
 ;
+; Sine and cosine of one angle, both from a single quarter-turn table. Storing
+; a whole turn would cost four times the space for no new information, so the
+; quadrant is worked out first and the one quadrant read forwards or backwards
+; with the signs adjusted.
+;
 ;   A       [BP+0Ch]    the angle in TENTHS of a degree
 ;   var C   [BP+08h]    receives the cosine, 16.16
 ;   var S   [BP+04h]    receives the sine
+;
+; EQUIVALENT PASCAL, REFERENCE ONLY -- the quadrant table below is the real
+; documentation; this says only what shape the routine has:
+;
+;       procedure SinCos(A : Integer; var C, S : LongInt);
+;       begin
+;         while A <    0 do Inc(A, 3600);      { wrap into one turn }
+;         while A > 3600 do Dec(A, 3600);
+;         case A div 900 of                    { pick the quadrant, then }
+;           ...                                {   read CosTab forwards  }
+;         end                                  {   or backwards, signed  }
+;       end;
 ;
 ; The angle is first wrapped into 0..3600 by repeated add/subtract rather than
 ; a modulo -- exact here because callers never step by more than a few degrees
@@ -170,11 +232,12 @@ FixDiv  ENDP
 ; COSINE -- checked against RotatePoint below, which needs it in the cosine
 ; position for the matrix to come out orthogonal.
 ; ----------------------------------------------------------------------------
-; EVEN before this one too -- see the note above FixDiv. Every routine in this
+; [re] EVEN before this one too -- see the note above FixDiv. Every routine in this
 ; object starts at an EVEN offset in the original: taking FixMul's address as
 ; the segment base, FixDiv is at 20, SinCos at 3,656, RotatePoint at 3,834 and
 ; Project at 4,168. EVEN costs nothing where the offset is already even, so it
 ; is written before each and the assembler decides.
+;
         EVEN
 SinCos  PROC    NEAR
         push    bp
@@ -261,9 +324,29 @@ SinCos  ENDP
 ; ----------------------------------------------------------------------------
 ; RotatePoint -- procedure RotatePoint(var X, Y, Z : LongInt);
 ;
+; Turn one point about all three axes, in place. Call SinCos three times first
+; to load MCos1..MSin3 -- this routine does no trigonometry of its own, it only
+; applies what is already there, which is what makes it cheap enough to run per
+; vertex.
+;
 ;   var X   [BP+0Ch]
 ;   var Y   [BP+08h]
 ;   var Z   [BP+04h]
+;
+; EQUIVALENT PASCAL, REFERENCE ONLY -- the three pairs below are the whole
+; algorithm and the assembler is a transcription of them:
+;
+;       procedure RotatePoint(var X, Y, Z : LongInt);
+;       var Y1, Z1, X2, Z2 : LongInt;
+;       begin
+;         Y1 := FixMul(Y,  MCos1) + FixMul(Z,  MSin1);
+;         Z1 := FixMul(Z,  MCos1) - FixMul(Y,  MSin1);
+;         X2 := FixMul(X,  MCos2) - FixMul(Z1, MSin2);
+;         Z2 := FixMul(Z1, MCos2) + FixMul(X,  MSin2);
+;         X  := FixMul(X2, MCos3) + FixMul(Y1, MSin3);
+;         Y  := FixMul(Y1, MCos3) - FixMul(X2, MSin3);
+;         Z  := Z2
+;       end;
 ;
 ; Three concatenated 2-D rotations in 16.16, using the six values SinCos left
 ; in MCos1..MSin3:
@@ -276,11 +359,12 @@ SinCos  ENDP
 ; ECX is Y, EDI is Z, ESI is the term being built -- and only the six IMULs
 ; touch memory. There is no clipping and no depth test; Project does that.
 ; ----------------------------------------------------------------------------
-; EVEN before this one too -- see the note above FixDiv. Every routine in this
+; [re] EVEN before this one too -- see the note above FixDiv. Every routine in this
 ; object starts at an EVEN offset in the original: taking FixMul's address as
 ; the segment base, FixDiv is at 20, SinCos at 3,656, RotatePoint at 3,834 and
 ; Project at 4,168. EVEN costs nothing where the offset is already even, so it
 ; is written before each and the assembler decides.
+;
         EVEN
 RotatePoint PROC NEAR
         push    bp
@@ -390,9 +474,22 @@ RotatePoint ENDP
 ; ----------------------------------------------------------------------------
 ; Project -- procedure Project(var X, Y, Z : LongInt);
 ;
+; Turn a rotated 3-D point into a screen pixel: divide by depth, scale, and
+; offset to the middle of the view. This is the last step before something is
+; drawn, and it is where the perspective comes from -- dividing by Z is what
+; makes distant things small.
+;
 ;   var X   [BP+0Ch]    in: rotated X.  out: SCREEN X, zero-extended
 ;   var Y   [BP+08h]    in: rotated Y.  out: SCREEN Y, zero-extended
 ;   var Z   [BP+04h]    the divisor, left alone
+;
+; EQUIVALENT PASCAL, REFERENCE ONLY:
+;
+;       procedure Project(var X, Y, Z : LongInt);
+;       begin
+;         X := FixMul(FixDiv(X, Z), MScale) + MViewW div 2;
+;         Y := MViewH div 2 - FixMul(FixDiv(Y, Z), MScale)
+;       end;
 ;
 ;       sx := Round(X / Z * MScale) + MViewW div 2
 ;       sy := MViewH div 2 - Round(Y / Z * MScale)
@@ -414,11 +511,12 @@ RotatePoint ENDP
 ; Integer, which puts the sign back. That is the original's behaviour and the
 ; reason its clipping tests read the way they do.
 ; ----------------------------------------------------------------------------
-; EVEN before this one too -- see the note above FixDiv. Every routine in this
+; [re] EVEN before this one too -- see the note above FixDiv. Every routine in this
 ; object starts at an EVEN offset in the original: taking FixMul's address as
 ; the segment base, FixDiv is at 20, SinCos at 3,656, RotatePoint at 3,834 and
 ; Project at 4,168. EVEN costs nothing where the offset is already even, so it
 ; is written before each and the assembler decides.
+;
         EVEN
 Project PROC    NEAR
         push    bp
