@@ -44,7 +44,7 @@ var
     are a separate hole -- initialised data the original has ahead of
     PageIndex that we do not, and which has to be found rather than filled
     with the nearest variables to hand. }
-  PageBase  : array[0..1] of Word;    { $A698 }
+  PageBase  : array[0..1] of Word;
   WritePage : Word;
 
   { and it follows the three above: $A69A + 2. SetMode400 fills this

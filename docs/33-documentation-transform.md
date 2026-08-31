@@ -84,13 +84,13 @@ Three, and the third is a decision this effort has to make in its first ticket r
 1. **Rewrite every header in the batch purpose-first.** First sentence says what the thing is *for*. Read the unit's scene document first.
 2. **Tag the apparatus — extend, never replace.** Carry the text you found into a tagged paragraph **verbatim**. Rewriting a block is how measurements get deleted; that happened four times on DemoVT, once destroying 52 measured addresses at a stroke.
 3. **Scan for comment syntax the compiler will not warn about.** Pascal `{ }` do not nest. A brace-depth pass over the file, not a careful read.
-4. **Regenerate the derived tree** — `clean.py src src-clean`, which verifies not one line of code differs.
+4. **Regenerate the derived tree** — `clean.py src src-clean --exclude asm/shared-exempt.txt`, which verifies not one line of code differs. The excluded file is `asmcheck`'s list of differences it is told to accept: an instrument's own input, documenting nothing about the program, and no tag can reach it because it is not a comment. Without the flag it is copied verbatim into the deliverable.
 5. **`tagcheck.py` clean on the batch** — 0 untagged paragraphs carrying apparatus.
 6. **Build both trees** — `build.toml` and `cleanbuild.toml`, separately.
 7. **`ratchet.py` reports R7 on every affected artefact, from both builds.** This is the check that reads what the compiler read.
 8. **Commit the batch, push, and close the ticket with what you learned** — including any expired premise the pass turned up, by name.
 
-    .venv/Scripts/python.exe kit/tools/pascal/clean.py src src-clean
+    .venv/Scripts/python.exe kit/tools/pascal/clean.py src src-clean --exclude asm/shared-exempt.txt
     .venv/Scripts/python.exe kit/tools/pascal/tagcheck.py src-clean/<unit>
     .venv/Scripts/python.exe kit/tools/pascal/build.py build.toml
     .venv/Scripts/python.exe kit/tools/pascal/build.py cleanbuild.toml

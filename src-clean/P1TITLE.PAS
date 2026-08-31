@@ -522,7 +522,7 @@ begin
  is CB, a FAR return, which is Scene2's own epilogue; ours emitted
     C3 because a near local Unload ended there instead. }
   FreeMem(CometBank, SizeOf(TCometBank));  { $79E0 = 31,200 }
-  FreeMem(Backdrop,  64000);               { $FA00 }
+  FreeMem(Backdrop,  64000);
   FreeMem(FontBuf,   SizeOf(TFontBuf));    { $3B00 = 15,104 }
   FreeMem(WorkBuf,   SizeOf(TWorkBuf));
 end;

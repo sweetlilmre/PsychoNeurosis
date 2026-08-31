@@ -85,7 +85,7 @@ type
     written out computes all three corrections at run time, and wrapping that in
     a function costs a far call per pixel on top. }
   TDoor = record
-    W, H : Byte;                                { $0D47 }
+    W, H : Byte;
     Pix  : array[1..DoorH, 1..DoorW] of Byte;
   end;
   TStar = record

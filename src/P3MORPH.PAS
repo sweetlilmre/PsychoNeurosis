@@ -10,7 +10,12 @@
 
   THE SHAPE DATA IS NOT IN NEUROSIS.DAT. It is compiled into the executable as
   typed constants in DGROUP, which is why Scene 3 never appears in the DAT
-  access map. Layout:
+  access map. It holds a sine table of 450 entries in 16.14 fixed point, which
+  serves as the cosine table as well when read 90 entries in, and then the
+  shape data in slots of 4800 bytes -- 800 points of six bytes each, of which
+  only the first 765 of a slot are ever drawn.
+
+  [re] Layout in DGROUP:
 
     DS:$02A8   sine table, 450 entries of 16.14 fixed point
                (cos is the same table read 90 entries in -- hence the $035C
@@ -28,7 +33,7 @@
   symmetric ranges also confirm the 6-byte record is three signed words in
   X, Y, Z order.
 
-  ADDRESS MAP
+  [re] ADDRESS MAP
     Demo_Scene3       1139:03b4    Morph_InitScene       1139:02fe
     Morph_SetAngles   1139:0000    Morph_StepAngles      1139:0035
     Morph_TransformPoint 1139:0096 ModeX_PlotPixel       1139:01bb
@@ -38,7 +43,9 @@
     VGA_SetPalette768 1139:0335    VGA_GetPalette768     1139:034d
   =========================================================================== }
 
-{$G+}   { 286 instructions: 1139:01d9 is SHR DI,2, and a shift by an
+{ 286 instructions are permitted: the Mode-X plotter divides X by four with
+  a shift by two, which only a 286 and later can encode in one instruction. }
+{$G+}   { [re] 286 instructions: 1139:01d9 is SHR DI,2, and a shift by an
           immediate other than 1 is a 286 encoding. The original
           targeted 286+, so enabling this is faithful, not a shortcut. }
 
@@ -82,8 +89,8 @@ const
     perspective divide. The original really does shift; there is simply no
     signed shift operator in Turbo Pascal to write it with. }
   FixedOne   = 16384;      { 1 shl FixedBits }
-  ScreenCentreX = 160;     { $A0 -- 1139:019c }
-  ScreenCentreY = 200;     { $C8 -- 1139:01ac, half of 400 rows }
+  ScreenCentreX = 160;     { half of 320 columns }
+  ScreenCentreY = 200;     { half of 400 rows }
 
   PageWidth  = 320;        { visible page }
   PageHeight = 400;        { double-scan disabled -- see VGA_Set400Lines }
@@ -130,8 +137,12 @@ type
 {$I gen/P3SHAPE.INC}     { const ShapeSphere, ShapeCube, ShapeGrid : TShape }
 
 var
-  { The rotation's sines and cosines. COSINE FIRST IN EVERY PAIR, Z included.
-    An earlier note here claimed Z was the other way about, on a reading of
+  { The rotation's sines and cosines, COSINE FIRST IN EVERY PAIR -- Z as well
+    as X and Y, which is easy to get wrong because nothing in the rotation
+    itself distinguishes them. Exchanging a pair on one axis compiles, runs,
+    and rotates that axis backwards.
+
+    [re] An earlier note here claimed Z was the other way about, on a reading of
     $BE98 as SinZ; the loader settles it. The sine table is at [BX+$2A8] and
     the cosine table at [BX+$35C] -- fixed by the Y pair, which was already
     right -- and 1139:002a stores the $2A8 lookup to $BE9A, 1139:0031 the $35C
@@ -145,17 +156,25 @@ var
   AngX, AngY, AngZ    : Integer;   { DS:$BE9C, $BE9E, $BEA0 }
   StepX, StepY, StepZ : Integer;   { DS:$BEA2, $BEA4, $BEA6 }
 
-  { SIX BYTES OF SCRATCH, and the name they used to carry was wrong. The
-    original uses $BEA8 and $BEAA as DX SPILLS -- 1139:0111 and 015b are
+  { SIX BYTES OF SCRATCH THAT MUST STAY. Two of the three words are working
+    storage TransformPoint spills its shifted high halves into; the third is
+    never touched. Removing any of them moves every variable declared above,
+    so they are declared even though only two are used.
+
+    [re] The original uses $BEA8 and $BEAA as DX SPILLS -- 1139:0111 and 015b are
     `MOV [$BEA8],DX`, 1139:0132 and 017c read it back, and 00c7/00e8 do the
     same with $BEAA -- so they are working storage for a routine between
     SetAngles and DrawShape, not the shape offsets this once called them.
     $BEAC is never referenced at all.
 
-    They are still declared, because the original really has six bytes here and
-    removing them moves every variable above. What they are FOR is now read
-    correctly; what the routine that spills into them is doing is not yet. }
-  { AND TWO OF THE THREE ARE TransformPoint's T2 AND T1. 1139:00c5 stores DX to
+    [re] What they are FOR is now read correctly; what the routine that spills
+    into them is doing is not yet. }
+  { T2 IS DECLARED BEFORE T1, and the order is not cosmetic: consecutive
+    variables take consecutive ascending addresses, and these two are reached
+    by address rather than by name from the assembler above. Swapping the names
+    swaps the two words TransformPoint spills into.
+
+    [re] 1139:00c5 stores DX to
     $BEAA and 1139:010f to $BEA8 -- the two scratch words the routine keeps its
     shifted high halves in -- and this unit was declaring them TWICE: three
     unreferenced Scratch words here at the right addresses, and a separate
@@ -164,8 +183,8 @@ var
     $BEC8, and every reference from $C506 up carried the four bytes -- which is
     the +4 dsmap has been reporting across fifty-three sites in this part.
 
-    T2 first, because declaration order runs upward and 1139:010f is the store
-    to the lower address. $BEAC really is never referenced. }
+    [re] T2 first, because declaration order runs upward and 1139:010f is the
+    store to the lower address. $BEAC really is never referenced. }
   T2, T1    : Integer;                   { DS:$BEA8, $BEAA }
   Scratch3  : Word;                      { DS:$BEAC, never referenced }
 
@@ -197,7 +216,7 @@ var
   initialised image identical. }
 
 { --------------------------------------------------------------------------
-  1139:034d -- GetPalette768(var P)
+  GetPalette768(var P)
 
   Hand assembler. The whole DAC comes back in a single REP INSB rather than a
   counted loop, which is why there is no loop here to transcribe.
@@ -207,32 +226,32 @@ var
       Port[$3C7] := 0;
       for I := 0 to 767 do B[I] := Port[$3C9];
   -------------------------------------------------------------------------- }
-{ @asm 003 1139:0000 ? }
+{ [re] @asm 003 1139:0000 ? }
 procedure SetAngles; assembler;
 asm
   ADD  BX, BX                          { BX := AngX * 2, a word index        }
   MOV  AX, [BX + OFFSET SinTab]        { AX := sin(AngX)          tbl $02A8  }
-  MOV  [SinX], AX                      { -> DS:$BE92                         }
+  MOV  [SinX], AX                      { into the X pair TransformPoint reads}
   MOV  AX, [BX + OFFSET SinTab + 180]  { +90 entries = cos(AngX)  tbl $035C  }
-  MOV  [CosX], AX                      { -> DS:$BE90                         }
+  MOV  [CosX], AX                      {   and the matching cosine           }
 
   MOV  BX, CX                          { the Y angle arrived in CX           }
   ADD  BX, BX                          { BX := AngY * 2                      }
   MOV  AX, [BX + OFFSET SinTab]        { AX := sin(AngY)                     }
-  MOV  [SinY], AX                      { -> DS:$BE96                         }
+  MOV  [SinY], AX                      { into the Y pair                     }
   MOV  AX, [BX + OFFSET SinTab + 180]  { AX := cos(AngY)                     }
-  MOV  [CosY], AX                      { -> DS:$BE94                         }
+  MOV  [CosY], AX                      {   and the matching cosine           }
 
   MOV  BX, DX                          { the Z angle arrived in DX           }
   ADD  BX, BX                          { BX := AngZ * 2                      }
   MOV  AX, [BX + OFFSET SinTab]        { AX := sin(AngZ)                     }
-  MOV  [SinZ], AX                      { -> DS:$BE9A                         }
+  MOV  [SinZ], AX                      { into the Z pair                     }
   MOV  AX, [BX + OFFSET SinTab + 180]  { AX := cos(AngZ)                     }
-  MOV  [CosZ], AX                      { -> DS:$BE98                         }
+  MOV  [CosZ], AX                      {   and the matching cosine           }
 end;
 
 { --------------------------------------------------------------------------
-  1139:0035 -- StepAngles.  Advance each axis, wrap into 0..360, then hand
+  StepAngles.  Advance each axis, wrap into 0..360, then hand
   all three to SetAngles in BX, CX and DX.
 
   The wrap is two compares rather than a modulo. That is exact only because
@@ -245,7 +264,7 @@ end;
       AngZ := Wrap(AngZ + StepZ);
       SetAngles(AngX, AngY, AngZ);
   -------------------------------------------------------------------------- }
-{ @asm 003 1139:0035 }
+{ [re] @asm 003 1139:0035 }
 procedure StepAngles; assembler;
 asm
   MOV  BX, [AngX]                { BX := the X angle                        }
@@ -261,7 +280,7 @@ asm
   MOV  [AngX], BX                { store back, and leave it in BX           }
 
   MOV  CX, [AngY]                { the Y angle, kept in CX                  }
-  ADD  CX, [StepY]               { advance it -- DS:$BEA4                   }
+  ADD  CX, [StepY]               { advance it                               }
   CMP  CX, 0                     { negative?                                }
   JGE  @@YNotNeg                 {   no                                     }
   ADD  CX, 360                   {   yes: wrap up one turn                  }
@@ -270,10 +289,10 @@ asm
   JLE  @@YDone                   {   no                                     }
   SUB  CX, 360                   {   yes: wrap down one turn                }
 @@YDone:                         { <- joins here                            }
-  MOV  [AngY], CX                { store back -- DS:$BE9E -- and keep in CX }
+  MOV  [AngY], CX                { store back -- and keep in CX             }
 
   MOV  DX, [AngZ]                { the Z angle, kept in DX                  }
-  ADD  DX, [StepZ]               { advance it -- DS:$BEA6                   }
+  ADD  DX, [StepZ]               { advance it                               }
   CMP  DX, 0                     { negative?                                }
   JGE  @@ZNotNeg                 {   no                                     }
   ADD  DX, 360                   {   yes: wrap up one turn                  }
@@ -282,14 +301,13 @@ asm
   JLE  @@ZDone                   {   no                                     }
   SUB  DX, 360                   {   yes: wrap down one turn                }
 @@ZDone:                         { <- joins here                            }
-  MOV  [AngZ], DX                { store back -- DS:$BEA0 -- and keep in DX }
+  MOV  [AngZ], DX                { store back -- and keep in DX             }
 
   CALL SetAngles                 { BX, CX, DX now hold the three angles     }
 end;
 
 { --------------------------------------------------------------------------
-  Morph_TransformPoint (1139:0096)
-
+  Morph_TransformPoint
   Three successive 2-D rotations in 16.14 fixed point, then a perspective
   divide. Each product is a 32-bit multiply shifted right by 14.
 
@@ -299,7 +317,7 @@ end;
 { --------------------------------------------------------------------------
   The rotation's fixed-point scaling, as the original writes it.
 
-  After each IMUL the 32-bit product sits in DX:AX, and 1139:00bd does
+  [re] After each IMUL the 32-bit product sits in DX:AX, and 1139:00bd does
 
       SHL AX,1 / RCL DX,1        twice, then keeps DX
 
@@ -315,7 +333,7 @@ end;
   is not what the code does and rounds the other way on negatives.
   -------------------------------------------------------------------------- }
 { --------------------------------------------------------------------------
-  1139:0096 -- TransformPoint.  X in BX, Y in CX, Z in DX; SX out in DI,
+  TransformPoint.  X in BX, Y in CX, Z in DX; SX out in DI,
   SY out in BX.  Hand assembler in the original and kept as such: it is
   reached by CALL with the registers already loaded, which is not a calling
   convention Turbo Pascal can express, and its fixed-point scaling is the
@@ -343,23 +361,25 @@ end;
   its `shr` on a LongInt is a LOGICAL shift, where SHL/RCL keeping DX is an
   arithmetic one.
   -------------------------------------------------------------------------- }
-{ @asm 003 1139:0096 ? }
+{ [re] @asm 003 1139:0096 ? }
 procedure TransformPoint; assembler;
 var
-  LX, LY, LZ : Integer;            { [BP-2], [BP-4], [BP-6] -- and THAT IS
-                                     ALL: the original's frame is ENTER 6,
-                                     three words. T1 and T2 are not locals,
-                                     they are the DGROUP globals below --
-                                     1139:00b8 is MOV [BEAA],DX, a memory
-                                     store, not MOV [BP-8],DX. }
+  { THREE LOCALS AND NO MORE. T1 and T2 are unit-level variables, not locals
+    of this routine -- the assembler below reaches them as memory rather than
+    through the frame, so declaring them here would give the routine a fourth
+    and fifth word it never had.
+
+    [re] [BP-2], [BP-4], [BP-6] -- the original's frame is ENTER 6, three
+    words. 1139:00b8 is MOV [BEAA],DX, a memory store, not MOV [BP-8],DX. }
+  LX, LY, LZ : Integer;
 asm
   MOV  LX, BX                      { the caller left X in BX                 }
   MOV  LY, CX                      { Y in CX                                 }
   MOV  LZ, DX                      { Z in DX -- all three now in the frame   }
 
   { ---- first axis: rotate Y and Z about X ---- }
-  MOV  CX, [CosX]                  { CX := cos(AngX), 16.14  -- DS:$BE90     }
-  MOV  BX, [SinX]                  { BX := sin(AngX)         -- DS:$BE92     }
+  MOV  CX, [CosX]                  { CX := cos(AngX), 16.14                  }
+  MOV  BX, [SinX]                  { BX := sin(AngX)                         }
   MOV  AX, LY                      { AX := Y                                 }
   IMUL CX                          { DX:AX := Y * cos, 32 bits signed        }
   MOV  SI, AX                      { stash the low half                      }
@@ -391,8 +411,8 @@ asm
   MOV  LY, DX                      { Y := (Y*cos + Z*sin) >> 14              }
 
   { ---- second axis: rotate Z and X about Y ---- }
-  MOV  CX, [CosY]                  { CX := cos(AngY)         -- DS:$BE94     }
-  MOV  BX, [SinY]                  { BX := sin(AngY)         -- DS:$BE96     }
+  MOV  CX, [CosY]                  { CX := cos(AngY)                         }
+  MOV  BX, [SinY]                  { BX := sin(AngY)                         }
   MOV  AX, LZ                      { AX := the Z from the first rotation     }
   IMUL BX                          { DX:AX := Z * sin                        }
   MOV  SI, AX                      { stash it                                }
@@ -423,8 +443,8 @@ asm
   MOV  LX, DX                      { X := (X*cos - Z*sin) >> 14              }
 
   { ---- third axis: rotate X and Y about Z ---- }
-  MOV  CX, [CosZ]                  { CX := cos(AngZ)         -- DS:$BE98     }
-  MOV  BX, [SinZ]                  { BX := sin(AngZ)         -- DS:$BE9A     }
+  MOV  CX, [CosZ]                  { CX := cos(AngZ)                         }
+  MOV  BX, [SinZ]                  { BX := sin(AngZ)                         }
   MOV  AX, LY                      { AX := Y                                 }
   IMUL BX                          { DX:AX := Y * sin                        }
   MOV  SI, AX                      { stash it                                }
@@ -455,11 +475,11 @@ asm
   MOV  LX, DX                      { X := (X*cos + Y*sin) >> 14              }
 
   { ---- perspective: the one real divide in the whole frame path ---- }
-  MOV  BX, [ViewDist]              { BX := 2500              -- DS:$BEB4     }
+  MOV  BX, [ViewDist]              { BX := 2500                              }
   SUB  BX, LZ                      { BX := the point's distance from the eye }
   CMP  BX, 0                       { has it gone behind us?                  }
   JL   @@Behind                    {   yes -- there is no projection for it  }
-  MOV  CX, [ProjScale]             { CX := 256               -- DS:$BEB2     }
+  MOV  CX, [ProjScale]             { CX := 256                               }
   MOV  AX, LX                      { AX := the rotated X                     }
   SUB  AX, [XCentre]               { measure it from the object's own centre }
   IMUL CX                          { DX:AX := that * 256, 32 bits            }
@@ -480,7 +500,7 @@ asm
 end;
 
 { --------------------------------------------------------------------------
-  1139:01bb -- PlotPixel.  X in DI, Y in BX.  Clips to 0..319 by 0..399,
+  PlotPixel.  X in DI, Y in BX.  Clips to 0..319 by 0..399,
   looks the row up, selects the plane from X and 3, and stores colour $0E.
 
   EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
@@ -491,7 +511,7 @@ end;
         Mem[$A000 : (X shr 2) + RowOfs[Y] + PageOfs] := $0E;
       end;
   -------------------------------------------------------------------------- }
-{ @asm 003 1139:01bb }
+{ [re] @asm 003 1139:01bb }
 procedure PlotPixel; assembler;
 asm
   CMP  DI, 0            { X off the left?                                    }
@@ -503,7 +523,7 @@ asm
   CMP  BX, 399          { Y below it? ($18F -- 400 lines, not 200)           }
   JG   @@Out            {   drop it                                          }
   SHL  BX, 1            { BX := Y * 2, a word index into the row table       }
-  MOV  BX, [BX + OFFSET RowOfs]   { BX := RowOfs[Y] -- DS:$BEC6, Y*160       }
+  MOV  BX, [BX + OFFSET RowOfs]   { BX := RowOfs[Y], Y*160                   }
   MOV  CX, DI           { keep a copy of X: the plane number comes from it   }
   SHR  DI, 2            { X div 4 -- Mode X puts every 4th pixel in a plane, }
                         {   so the byte offset within the row is X shr 2     }
@@ -523,7 +543,7 @@ asm
 end;
 
 { --------------------------------------------------------------------------
-  1139:02a2 -- ClearPage.  Blanks the half of each row belonging to the back
+  ClearPage.  Blanks the half of each row belonging to the back
   page. Hand assembler: a REP STOSW per row with a fixed skip between them.
 
   Note it runs 399 rows, not 400 -- the last row of the page is never
@@ -539,11 +559,11 @@ end;
         Inc(P, 80);
       end;
   -------------------------------------------------------------------------- }
-{ @asm 003 1139:01f9 }
+{ [re] @asm 003 1139:01f9 }
 procedure DrawShape; assembler;
 asm
-  MOV  SI, [CurShape]              { DS:$BEBA -- the shape's DGROUP offset   }
-  MOV  WORD PTR [Count], 765       { $2FD points -- DS:$BEC4                 }
+  MOV  SI, [CurShape]              { the shape's DGROUP offset               }
+  MOV  WORD PTR [Count], 765       { 765 points in every shape               }
 @@Point:                           { <- once per point                       }
   PUSH SI                          { TransformPoint clobbers SI, so save it  }
   MOV  BX, [SI]                    { BX := X, the first word of the record   }
@@ -558,7 +578,7 @@ asm
 end;
 
 { --------------------------------------------------------------------------
-  1139:021d -- DrawMorph.
+  DrawMorph.
 
       if MorphStep > MorphSteps then CurShape := MorphTo ; DrawShape
       else  blend 765 points and Inc(MorphStep)
@@ -579,21 +599,21 @@ end;
           for k = 1, 2, 3));
       Inc(MorphStep);
   -------------------------------------------------------------------------- }
-{ @asm 003 1139:021d ? }
+{ [re] @asm 003 1139:021d ? }
 procedure DrawMorph; assembler;
 asm
-  MOV  BX, [MorphStep]             { DS:$BEB8 -- how far through the blend   }
-  CMP  BX, [MorphSteps]            { DS:$BEB6 -- 45 steps in all             }
+  MOV  BX, [MorphStep]             { how far through the blend               }
+  CMP  BX, [MorphSteps]            { 45 steps in all                         }
   JLE  @@Blend                     { still blending: go and interpolate      }
   MOV  BX, [MorphTo]               { finished: the destination shape wins    }
-  MOV  [CurShape], BX              { -> DS:$BEBA                             }
+  MOV  [CurShape], BX              { CurShape is what DrawShape reads        }
   CALL DrawShape                   { and draw it straight, no blending       }
   JMP  @@Done                      { nothing else to do this frame           }
 
 @@Blend:                           { <- the interpolating case               }
-  MOV  WORD PTR [Count], 765       { $2FD points -- DS:$BEC4                 }
-  MOV  SI, [MorphFrom]             { DS:$BEBC -- the shape being left        }
-  MOV  DI, [MorphTo]               { DS:$BEBE -- the shape being approached  }
+  MOV  WORD PTR [Count], 765       { 765 points in every shape               }
+  MOV  SI, [MorphFrom]             { the shape being left                    }
+  MOV  DI, [MorphTo]               { the shape being approached              }
 @@Point:                           { <- once per point                       }
   PUSH DI                          { both walkers are clobbered by the calls }
   PUSH SI                          {   below, so save them                   }
@@ -625,13 +645,18 @@ asm
   IDIV WORD PTR [MorphSteps]       { / 45                                    }
   ADD  AX, [SI]                    { + source = the blended Z                }
   MOV  DX, AX                      { DX is where TransformPoint wants Z      }
-  { A THIRD ADVANCE, AND IT IS DEAD. 1139:0283 is ADD SI,2 / ADD DI,2
+  { A THIRD ADVANCE, AND IT IS DEAD -- the POP SI / POP DI after the two
+    calls below restore both walkers whatever this does. It is kept because
+    the original has it: three identical blocks, each ending with a register
+    store and a step, rather than two steps and a bare store.
+
+    [re] 1139:0283 is ADD SI,2 / ADD DI,2
     immediately before the two calls, and the POP SI / POP DI after them puts
     both walkers back regardless -- so stepping them here changes nothing. It is
     what the original does: three identical blocks, each ending with the
     register store and the step, rather than two steps and a bare store. }
-  ADD  SI, 2                       { 1139:0283                               }
-  ADD  DI, 2                       { 1139:0286                               }
+  ADD  SI, 2                       { dead, as the paragraph above says       }
+  ADD  DI, 2                       {                                         }
 
   CALL TransformPoint              { rotate and project: out in DI and BX    }
   CALL PlotPixel                   { plot it straight from those registers   }
@@ -648,13 +673,13 @@ asm
 end;
 
 { --------------------------------------------------------------------------
-  Morph_FadeStep (1139:0365)
+  Morph_FadeStep
   Read the whole DAC back, decrement every non-zero component by one, wait
   for retrace and write it out again -- a one-step fade toward black, called
   once per frame during the closing segment.
   -------------------------------------------------------------------------- }
 
-{ @asm 003 1139:02a2 }
+{ [re] @asm 003 1139:02a2 }
 procedure ClearPage; assembler;
 asm
   MOV  DI, [PageOfs]    { DI := 0 or 80 -- which half of the row to clear    }
@@ -674,11 +699,11 @@ asm
 end;
 
 { --------------------------------------------------------------------------
-  ModeX_FlipPage (1139:02c3)
+  ModeX_FlipPage
   Show the page we just drew, then make the other one current.
   -------------------------------------------------------------------------- }
 { --------------------------------------------------------------------------
-  1139:02c3 -- FlipPage.  Points the CRTC at the page just drawn, then swaps
+  FlipPage.  Points the CRTC at the page just drawn, then swaps
   PageOfs so the next frame draws into the other one.
 
   The two pages are the left and right halves of a 640-pixel logical line, so
@@ -690,7 +715,7 @@ end;
       Port[$3D4] := $0D;  Port[$3D5] := Lo(PageOfs);
       PageOfs := 80 - PageOfs;
   -------------------------------------------------------------------------- }
-{ @asm 003 1139:02c3 }
+{ [re] @asm 003 1139:02c3 }
 procedure FlipPage; assembler;
 asm
   MOV  BX, [PageOfs]    { BX := the offset of the page just drawn            }
@@ -708,27 +733,32 @@ asm
 end;
 
 { --------------------------------------------------------------------------
-  Morph_DrawShape (1139:01f9) -- draw one shape straight.
+  Morph_DrawShape -- draw one shape straight.
 
-  ASSETS  The shapes are compiled into the EXE, not in NEUROSIS.DAT.
-          Extracted from DGROUP to:
-            assets/part003/SHPSPHER.BIN / .png    DS:$0636
-            assets/part003/SHPCUBE.BIN   / .png    DS:$5136
-            assets/part003/SHPGRID.BIN   / .png    DS:$63F6
+  ASSETS  The shapes are compiled into the program itself, not held in
+          NEUROSIS.DAT with the rest of the demo's data. Copies are kept at
+            assets/part003/SHPSPHER.BIN / .png
+            assets/part003/SHPCUBE.BIN  / .png
+            assets/part003/SHPGRID.BIN  / .png
           765 points x 6 bytes, three signed words (X, Y, Z).
           The .png files are previews rendered with the constants below.
           See docs/08-part3-scene3-morph.md.
   -------------------------------------------------------------------------- }
 { --------------------------------------------------------------------------
-  Morph_CheckKey (1139:02e0) -- ASSEMBLER, AND IT RETURNS IN DX.
+  Morph_CheckKey -- ASSEMBLER, AND IT RETURNS IN DX.
 
-  The scene tests for a key through its own routine and not through Crt's
-  KeyPressed directly: 1139:040a is a NEAR call and CALLF never appears in the
+  The scene tests for a key through a routine of its own rather than calling
+  Crt's KeyPressed directly.
+
+  [re] 1139:040a is a NEAR call and CALLF never appears in the
   eight loops. So there is a routine of this unit's own in between.
 
   TWO THINGS ABOUT IT ARE NOT PASCAL, and both were visible for weeks.
 
-  IT HAS NO STACK FRAME. 1139:02e0 is the far call itself -- no PUSH BP, no
+  IT HAS NO STACK FRAME, which is why it is written `assembler` here: a
+  compiled procedure gets one whether it needs it or not.
+
+  [re] 1139:02e0 is the far call itself -- no PUSH BP, no
   MOV BP,SP, and a bare RET at 02f1 with no LEAVE. A compiled procedure gets
   the frame whether or not it has locals; only `assembler` omits it.
 
@@ -760,7 +790,7 @@ asm
 end;
 
 { --------------------------------------------------------------------------
-  1139:01f9 -- DrawShape.  Reads CurShape, walks 765 points six bytes at a
+  DrawShape.  Reads CurShape, walks 765 points six bytes at a
   time and hands each to TransformPoint in BX, CX, DX, whose results go
   straight on to PlotPixel in DI and BX. Assembler in the original; the
   register hand-off between the three is the whole reason.
@@ -771,7 +801,7 @@ end;
       for I := 1 to 765 do
         PlotPixel(TransformPoint(S^[I,1], S^[I,2], S^[I,3]));
   -------------------------------------------------------------------------- }
-{ @asm 003 1139:02f2 }
+{ [re] @asm 003 1139:02f2 }
 procedure Set400Lines; assembler;
 asm
   MOV  DX, $3D4     { $3D4 is the CRTC index register                        }
@@ -784,7 +814,7 @@ asm
 end;
 
 { --------------------------------------------------------------------------
-  1139:0000 -- SetAngles.  AngX in BX, AngY in CX, AngZ in DX.
+  SetAngles.  AngX in BX, AngY in CX, AngZ in DX.
 
   Hand assembler, reached by a plain CALL from StepAngles with the angles
   already in registers. One table serves both functions: cos(a) is sin(a+90),
@@ -798,7 +828,10 @@ end;
       SinY := SinTab[AngY];  CosY := SinTab[AngY + 90];
       SinZ := SinTab[AngZ];  CosZ := SinTab[AngZ + 90];
   -------------------------------------------------------------------------- }
-{ HAND ASSEMBLER, and the frame is what proves it. 1139:0334 is a bare `C3`:
+{ HAND ASSEMBLER, and it has to be written that way: Turbo Pascal gives every
+  Pascal procedure a stack frame, and this routine has none.
+
+  [re] 1139:0334 is a bare `C3`:
   no LEAVE, no POP BP, and therefore no prologue either. Turbo Pascal emits a
   frame for EVERY Pascal procedure whatever its contents -- measured in
   probe/ZEROSTOR.PAS, where a procedure with no parameters and no locals still
@@ -806,7 +839,7 @@ end;
   (`... C9`). An `assembler` procedure with neither is the only shape that has
   none.
 
-  IT ALSO EXPLAINS THE ZERO STORES. 1139:0310, 031c and 0322 write zero as
+  [re] IT ALSO EXPLAINS THE ZERO STORES. 1139:0310, 031c and 0322 write zero as
   `MOV WORD PTR [x],0`, six bytes, where Pascal writes `XOR AX,AX / MOV [x],AX`,
   five. The probe eliminated every source-level explanation for that -- the
   compiler version, Word against Integer, a named `= 0` constant, interleaving
@@ -837,28 +870,30 @@ asm
 end;
 
 { --------------------------------------------------------------------------
-  Demo_Scene3 (1139:03b4)
-
+  Demo_Scene3
   Eight scripted segments of 45 frames (63 for the last). Odd segments hold a
   shape, even segments morph to the next one. The closing segment also fades.
   -------------------------------------------------------------------------- }
-{ AND IT IS DECLARED AFTER Scene3, at 1139:0670, which is why only a forward
-  declaration can go here. Placing the body before Scene3 puts Scene3 at the
-  wrong offset and every one of its eight blocks with it -- 476 bytes, the
-  largest single span in this target, and all of it downstream of one
-  declaration's position. }
+{ ONLY A FORWARD DECLARATION MAY GO HERE. The body belongs after Scene3, and
+  moving it above would shift Scene3 and all eight of its blocks along with it.
+  Definition order is code order, so this is a real constraint rather than a
+  matter of taste.
+
+  [re] It is declared after Scene3, at 1139:0670. Placing the body before
+  Scene3 puts Scene3 at the wrong offset -- 476 bytes, the largest single span
+  in this target, and all of it downstream of one declaration's position. }
 { --------------------------------------------------------------------------
-  Demo_Scene3 (1139:03b4) -- HAND ASSEMBLER, and the whole procedure is.
+  Demo_Scene3 -- HAND ASSEMBLER, and the whole procedure is.
 
   THREE MEASUREMENTS SAY SO, and two of them had been made and disbelieved.
 
-  1. NO PROLOGUE AND NO EPILOGUE. 1139:03b4 goes straight into a CALL and the
+  [re] 1. NO PROLOGUE AND NO EPILOGUE. 1139:03b4 goes straight into a CALL and the
      routine ends at 0583 with a bare RETF. A compiled Turbo Pascal procedure
      opens PUSH BP / MOV BP,SP and closes LEAVE / RETF even with no locals at
      all -- probe/DECLOOP.PAS has seven such procedures and every one of them
      carries the frame. Only `assembler` omits it.
 
-  2. DEC FOLLOWED STRAIGHT BY JNE. 1139:0414 is DEC WORD PTR [Frames] / JNE,
+  [re] 2. DEC FOLLOWED STRAIGHT BY JNE. 1139:0414 is DEC WORD PTR [Frames] / JNE,
      six bytes. Turbo Pascal re-reads the variable: DEC, then CMP ...,0, then
      JNE -- five bytes more, at each of eight loops. probe/DECLOOP.PAS tries
      seven spellings of "count down and stop at zero" -- Dec then `until = 0`,
@@ -901,11 +936,11 @@ end;
   jumps to the procedure's own RETF.
   -------------------------------------------------------------------------- }
 
-{ @asm 003 1139:0335 }
+{ [re] @asm 003 1139:0335 }
 procedure SetPalette768(var P); assembler;
 asm
   PUSH DS               { OUTSB sources from DS:SI, so DS must be restored   }
-  LDS  SI, P            { DS:SI := the caller's 768-byte buffer, from [BP+4] }
+  LDS  SI, P            { DS:SI := the caller's 768-byte buffer            }
   MOV  DX, $3C8         { $3C8 is the DAC WRITE index register               }
   MOV  AL, 0            { start at colour 0                                  }
   OUT  DX, AL           { select it                                          }
@@ -916,17 +951,22 @@ asm
 end;
 
 
-  { RowOfs is the Mode-X unit's own table (1192:0000 fills it), not this
-    scene's -- see MODEX.PAS. It is imported, not declared here. }
+  { RowOfs is the Mode-X unit's own table, not this scene's -- see MODEX.PAS.
+    It is imported, and must not be declared here as well. }
 
 { CheckKey IS DEFINED HERE, BETWEEN FlipPage AND Set400Lines, AND NOT AT THE
-  END OF THE FILE. Definition order is segment order and the map at the top of
+  END OF THE FILE. Definition order is code order, so where a routine's body
+  sits decides where every routine after it sits. Moving this one to the end
+  behind a `forward` would pull all eighteen of its bytes past Scene3 and drag
+  everything between along with them.
+
+  [re] The map at the top of
   this file gives the original's: ModeX_FlipPage 1139:02c3, Morph_CheckKey
   02e0, VGA_Set400Lines 02f2. Defined last, behind a `forward`, its eighteen
   bytes sat past Scene3 instead and every routine from Set400Lines on came out
   eighteen bytes early -- Demo_Scene3 at 03a2 against the original's 03b4.
 
-  NOTHING IN THIS UNIT'S OWN MEASUREMENTS COULD SEE THAT. The segment is the
+  [re] NOTHING IN THIS UNIT'S OWN MEASUREMENTS COULD SEE THAT. The segment is the
   right size either way, the coverage walk locates each routine by content and
   scored them all aligned, and the initialised data image is identical. What
   found it was the PROGRAM segment: 1000:0082 is LCALL 1139:03b4, so the main
@@ -935,18 +975,18 @@ end;
   for byte is the only instrument here that reads them. }
 
 { --------------------------------------------------------------------------
-  VGA_Set400Lines (1139:02f2)
+  VGA_Set400Lines
   CRTC register 9, low five bits cleared: maximum scan line = 0, i.e. no
   double scanning. That turns the 320x200 Mode-X screen into 320x400.
   -------------------------------------------------------------------------- }
 { --------------------------------------------------------------------------
-  1192:0000 -- the Mode-X row table
+  the Mode-X row table
 
       for I := 0 to $31F do
         RowOfs[I] := (LogicalWidth * I) shl 1
 
-  LogicalWidth is the byte at DS:$76B6, which InitScene sets to 80, so the
-  stride is 160 bytes per row -- one plane of a 640-pixel logical line.
+  LogicalWidth is the byte InitScene sets to 80, so the stride is 160 bytes
+  per row -- one plane of a 640-pixel logical line.
 
   THIS IS NOT VGA.BuildRowTable. That one fills VGA's own YOfs with y * 320
   for the 200 rows of mode 13h, and it is what InitScene used to call: the
@@ -954,13 +994,12 @@ end;
   nothing. The two tables coexist and must not be conflated -- the note at the
   bottom of VGA.PAS says exactly that.
 
-  The code lives in segment 1192 with the rest of the VGA unit, but the table
-  it fills is at DS:$BEC6, in this scene's own data, which is why it is here.
+  The code lives in the VGA unit with the rest of the mode handling, but the
+  table it fills is this scene's own data, which is why it is described here.
   -------------------------------------------------------------------------- }
 
 { --------------------------------------------------------------------------
-  VGA_Set400Lines (1139:02f2)
-
+  VGA_Set400Lines
   CRTC register 9 is Maximum Scan Line. Its low five bits say how many times
   each character row is repeated; mode 13h leaves them at 1, which is what
   double-scans 200 lines into 400. Clearing them turns the double scan off,
@@ -978,10 +1017,10 @@ end;
   That Pascal is genuinely equivalent here. It is written in assembler
   because the original is, not because Pascal could not express it.
   -------------------------------------------------------------------------- }
-{ @asm 003 1139:034d }
+{ [re] @asm 003 1139:034d }
 procedure GetPalette768(var P); assembler;
 asm
-  LES  DI, P            { ES:DI := the caller's 768-byte buffer, from [BP+4] }
+  LES  DI, P            { ES:DI := the caller's 768-byte buffer            }
   MOV  DX, $3C7         { $3C7 is the DAC READ index register                }
   MOV  AL, 0            { start at colour 0                                  }
   OUT  DX, AL           { select it; the DAC now auto-increments             }
@@ -991,7 +1030,7 @@ asm
 end;
 
 { --------------------------------------------------------------------------
-  1139:0335 -- SetPalette768(var P)
+  SetPalette768(var P)
 
   The write side, likewise a single REP OUTSB. Note there is NO retrace wait
   in the original -- the Pascal version used to add one, which is a change in
@@ -1003,7 +1042,7 @@ end;
       for I := 0 to 767 do Port[$3C9] := B[I];
   -------------------------------------------------------------------------- }
 { --------------------------------------------------------------------------
-  Morph_FadeStep (1139:0365)
+  Morph_FadeStep
   Read the whole DAC back, decrement every non-zero component by one, wait
   for retrace and write it out again -- a one-step fade toward black, called
   once per frame during the closing segment.
@@ -1028,7 +1067,7 @@ begin
   asm
     MOV  DI, $0300               { ONE PAST the buffer, as the original -- below }
 @Next:                           { <- three bytes a pass, one DAC triple        }
-    MOV  AL, BYTE PTR Pal[DI]             { [BP+DI-$300]: this component                 }
+    MOV  AL, BYTE PTR Pal[DI]             { this component of this colour                }
     OR   AL, AL                  { already zero?                                }
     JZ   @Skip1                  {   yes: leave it, the fade SATURATES          }
     DEC  AL                      { one step darker                              }
@@ -1070,7 +1109,7 @@ begin
     at most 255 calls that byte reaches zero and the write stops for good. Total
     drift of the caller's BP is bounded at 255 bytes downward, not unbounded.
 
-    THE CALLER NEVER USES BP. Demo_Scene3 at 1139:03b4 is hand assembler from
+    [re] THE CALLER NEVER USES BP. Demo_Scene3 at 1139:03b4 is hand assembler from
     end to end: between the CALL at 1139:0560 and its own RETF at 1139:0583
     there is no ENTER, no PUSH BP, no LEAVE and not one BP-relative operand, and
     the same is true of the whole region above the call. So the register LEAVE
@@ -1103,20 +1142,20 @@ begin
 end;
 
 { --------------------------------------------------------------------------
-  Morph_InitScene (1139:02fe)
+  Morph_InitScene
   -------------------------------------------------------------------------- }
 { --------------------------------------------------------------------------
-  Demo_Scene3 (1139:03b4) -- HAND ASSEMBLER, and the whole procedure is.
+  Demo_Scene3 -- HAND ASSEMBLER, and the whole procedure is.
 
   THREE MEASUREMENTS SAY SO, and two of them had been made and disbelieved.
 
-  1. NO PROLOGUE AND NO EPILOGUE. 1139:03b4 goes straight into a CALL and the
+  [re] 1. NO PROLOGUE AND NO EPILOGUE. 1139:03b4 goes straight into a CALL and the
      routine ends at 0583 with a bare RETF. A compiled Turbo Pascal procedure
      opens PUSH BP / MOV BP,SP and closes LEAVE / RETF even with no locals at
      all -- probe/DECLOOP.PAS has seven such procedures and every one of them
      carries the frame. Only `assembler` omits it.
 
-  2. DEC FOLLOWED STRAIGHT BY JNE. 1139:0414 is DEC WORD PTR [Frames] / JNE,
+  [re] 2. DEC FOLLOWED STRAIGHT BY JNE. 1139:0414 is DEC WORD PTR [Frames] / JNE,
      six bytes. Turbo Pascal re-reads the variable: DEC, then CMP ...,0, then
      JNE -- five bytes more, at each of eight loops. probe/DECLOOP.PAS tries
      seven spellings of "count down and stop at zero" -- Dec then `until = 0`,
@@ -1323,12 +1362,14 @@ asm
 end;
 
 
-{ The original gives every unit an EMPTY initialisation section, and the
-  main body's opening far calls are the chain that runs them -- eleven of
-  them in this part, one per unit, ending at 1000:0041 where the real body
-  starts. Each stub is five bytes, PUSH BP / MOV BP,SP / LEAVE / RETF, and
-  it sits at the END of the unit's own segment. Without a `begin` here
-  Turbo Pascal emits neither the stub nor the chain entry. }
+{ THE EMPTY `begin end.` BELOW IS REQUIRED. Every unit in the original has an
+  initialisation section, even an empty one, and the main program's opening
+  calls are the chain that runs them all in turn. Without a `begin` here Turbo
+  Pascal emits neither this unit's stub nor its entry in that chain.
+
+  [re] Eleven stubs in this part, one per unit, ending at 1000:0041 where the
+  real body starts. Each is five bytes, PUSH BP / MOV BP,SP / LEAVE / RETF, at
+  the END of the unit's own segment. }
 
 begin
 end.
@@ -1336,7 +1377,7 @@ end.
 { ===========================================================================
   HAND-WRITTEN ASSEMBLER IN THIS SCENE
 
-  * VGA_SetPalette768 (1139:0335) -- LDS SI / MOV CX,$300 / REP OUTSB. The
+  [re] * VGA_SetPalette768 (1139:0335) -- LDS SI / MOV CX,$300 / REP OUTSB. The
     whole DAC written with one string instruction; unmistakably asm.
   * VGA_GetPalette768 (1139:034d) -- the matching read.
   * VGA_Set400Lines (1139:02f2) -- bare CRTC read-modify-write.
@@ -1358,7 +1399,7 @@ end.
     independently confirms the record layout, the shape base addresses, the
     slot spacing, the view distance and the projection scale.
 
-  RESOLVED
+  [re] RESOLVED
   * 1192:0000 is VGA_BuildRowTable, part of the VGA unit rather than this
     scene: RowOfs[i] := 160 * i for i = 0..799, at DS:$BEC6. The multiplier is
     the byte at DS:$76B6 (= 80, the Mode-X plane stride for 320 pixels) shifted

@@ -150,7 +150,7 @@ type
   TPal768 = array[0..255, 0..2] of Byte;
 
 var
-  I1, I2, I3 : Integer;           { $63ca, $63cc }
+  I1, I2, I3 : Integer;
   Texture    : Pointer;
   TabSin     : TTab;
   TabCos     : TTab;
