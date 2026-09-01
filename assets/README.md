@@ -129,6 +129,30 @@ data compiled into the executables' DGROUP. See
 | 003 | (embedded) |  | 4,590 | `part003/SHPSPHER.PNG` | embedded in DGROUP at DS:$0636, 765 points x 6b |
 | 003 | (embedded) |  | 4,590 | `part003/SHPCUBE.PNG` | embedded in DGROUP at DS:$5136, 765 points x 6b |
 | 003 | (embedded) |  | 4,590 | `part003/SHPGRID.PNG` | embedded in DGROUP at DS:$63F6, 765 points x 6b |
+| 002 | (embedded) |  | 450 | `part002/OBJENTER.BIN` | DGROUP DS:$0004, 75 vertices x 6b |
+| 002 | (embedded) |  | 1,938 | `part002/OBJENTTP.PNG` | 55 faces, sizes [3, 4, 6, 8], the view that identifies it, 532 trailing byte(s) the count never reads |
+| 002 | (embedded) |  | 1,544 | `part002/OBJENTSD.PNG` | 55 faces, sizes [3, 4, 6, 8] |
+| 002 | (embedded) |  | 1,923 | `part002/OBJENTFR.PNG` | 55 faces, sizes [3, 4, 6, 8] |
+| 002 | (embedded) |  | 1,640 | `part002/OBJENTLG.PNG` | 55 faces, sizes [3, 4, 6, 8] |
+| 002 | (embedded) |  | 1,456 | `part002/OBJENTL2.PNG` | 55 faces, sizes [3, 4, 6, 8] |
+| 002 | (embedded) |  | 408 | `part002/OBJREVLV.BIN` | DGROUP DS:$067E, 68 vertices x 6b |
+| 002 | (embedded) |  | 2,026 | `part002/OBJREVTP.PNG` | 64 faces, sizes [3, 4] |
+| 002 | (embedded) |  | 1,460 | `part002/OBJREVSD.PNG` | 64 faces, sizes [3, 4] |
+| 002 | (embedded) |  | 1,378 | `part002/OBJREVFR.PNG` | 64 faces, sizes [3, 4] |
+| 002 | (embedded) |  | 1,446 | `part002/OBJREVLG.PNG` | 64 faces, sizes [3, 4], the view that identifies it, 10 trailing byte(s) the count never reads |
+| 002 | (embedded) |  | 1,678 | `part002/OBJREVL2.PNG` | 64 faces, sizes [3, 4] |
+| 002 | (embedded) |  | 192 | `part002/OBJSAIL.BIN` | DGROUP DS:$0B06, 32 vertices x 6b |
+| 002 | (embedded) |  | 2,042 | `part002/OBJSAITP.PNG` | 21 faces, sizes [3, 4] |
+| 002 | (embedded) |  | 1,596 | `part002/OBJSAISD.PNG` | 21 faces, sizes [3, 4] |
+| 002 | (embedded) |  | 2,090 | `part002/OBJSAIFR.PNG` | 21 faces, sizes [3, 4] |
+| 002 | (embedded) |  | 1,819 | `part002/OBJSAILG.PNG` | 21 faces, sizes [3, 4] |
+| 002 | (embedded) |  | 2,058 | `part002/OBJSAIL2.PNG` | 21 faces, sizes [3, 4], the view that identifies it, 10 trailing byte(s) the count never reads |
+| 002 | (embedded) |  | 24 | `part002/OBJQUAD.BIN` | DGROUP DS:$0CAE, 4 vertices x 6b |
+| 002 | (embedded) |  | 930 | `part002/OBJQUATP.PNG` | 1 faces, sizes [4], the view that identifies it |
+| 002 | (embedded) |  | 1,087 | `part002/OBJQUASD.PNG` | 1 faces, sizes [4] |
+| 002 | (embedded) |  | 1,138 | `part002/OBJQUAFR.PNG` | 1 faces, sizes [4] |
+| 002 | (embedded) |  | 1,138 | `part002/OBJQUALG.PNG` | 1 faces, sizes [4] |
+| 002 | (embedded) |  | 930 | `part002/OBJQUAL2.PNG` | 1 faces, sizes [4] |
 
 ## Hand-made, with no generator
 
@@ -138,31 +162,6 @@ tell somebody's work from sediment left behind by a rename.
 
 | File | What it is |
 |---|---|
-| `part002/DEAD1550.BIN` | 1,550 bytes, unidentified. The size matches the 5x5 font, so it may be an earlier carve of it. |
-| `part002/OBJENTER.BIN` | part 002's Enterprise model, extracted from DGROUP |
-| `part002/OBJENTFR.PNG` | a projection of the model above |
-| `part002/OBJENTL2.PNG` | a projection of the model above |
-| `part002/OBJENTLG.PNG` | a projection of the model above |
-| `part002/OBJENTSD.PNG` | a projection of the model above |
-| `part002/OBJENTTP.PNG` | a projection of the model above |
-| `part002/OBJQUAD.BIN` | the quad model |
-| `part002/OBJQUAFR.PNG` | a projection of the model above |
-| `part002/OBJQUAL2.PNG` | a projection of the model above |
-| `part002/OBJQUALG.PNG` | a projection of the model above |
-| `part002/OBJQUASD.PNG` | a projection of the model above |
-| `part002/OBJQUATP.PNG` | a projection of the model above |
-| `part002/OBJREVFR.PNG` | a projection of the model above |
-| `part002/OBJREVL2.PNG` | a projection of the model above |
-| `part002/OBJREVLG.PNG` | a projection of the model above |
-| `part002/OBJREVLV.BIN` | the revolver model |
-| `part002/OBJREVSD.PNG` | a projection of the model above |
-| `part002/OBJREVTP.PNG` | a projection of the model above |
-| `part002/OBJSAIFR.PNG` | a projection of the model above |
-| `part002/OBJSAIL.BIN` | the sailboat model |
-| `part002/OBJSAIL2.PNG` | a projection of the model above |
-| `part002/OBJSAILG.PNG` | a projection of the model above |
-| `part002/OBJSAISD.PNG` | a projection of the model above |
-| `part002/OBJSAITP.PNG` | a projection of the model above |
 | `part002/S2PANEL.PAL` | the palette the panel view below is rendered with |
 | `part002/S2PANEL.PNG` | the banner strip rendered with S2PANEL.PAL |
 | `part003/WAVECRVA.PNG` | all of the waves curves in one composite |

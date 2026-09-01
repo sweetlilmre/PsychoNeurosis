@@ -97,18 +97,13 @@ then for all 256 entries reads the current RGB back from the DAC and increments
 each channel by one if it is still below the target held at `DS:$E3EC`. Called
 64 times, so the palette walks up from black over 64 frames.
 
-## The dead 1,550-byte block
+## The 1,550-byte block is the 5 x 5 font
 
-The 1,550 bytes read at the start of the region are **dead, provably**: the same
-1,550 bytes appear byte-identically in part 002 (DAT `$080CB2`, loaded to
-`DS:$5448`), the block contains only the values 0 and `$AB`, and in both parts
-the only instruction that mentions the destination buffer is the `BlockRead`.
-Nothing consumes it in either place — the read simply walks the file pointer
-This was wrong. The block is the 5 x 5 bitmap font, indexed off a base
-806 bytes below where it is loaded, which is why nothing appears to
-reference the destination buffer. See
-[`assets/part002/FONT5X5.BIN`](../assets/part002/FONT5X5.BIN) and the
-worked explanation in [docs/15](15-part002.md).
+The 1,550 bytes read at the start of the region are the **5 x 5 bitmap font**, and the same bytes appear byte-identically in part 002 at DAT `$080BB2`, loaded to `DS:$5448`. See [`assets/part002/FONT5X5.BIN`](../assets/part002/FONT5X5.BIN) and the worked explanation in [docs/15](15-part002.md).
+
+**This section said "dead, provably" for months, and the argument for it is worth keeping because every clause of it was true.** The block holds only the values 0 and `$AB`, and in both parts the only instruction naming the destination buffer is the `BlockRead`. What made the conclusion wrong is that the font is indexed off a base 806 bytes BELOW where it is loaded — `$5448 - $5122`, which is `32 * 25 + 6`, a 5 x 5 glyph table biased by 32 — so no instruction mentions the destination and nothing needs to. An unreferenced destination buffer is evidence of a folded base, not of dead data.
+
+**And the offset in the old text was wrong too, which is how a second artefact came to exist.** It cited part 002's copy at `$080CB2`; the region begins at `$07D9B2` and the 12,800-byte screen before the font puts it at `$080BB2`. An extraction taken from `$080CB2` reads 1,550 bytes starting 256 into the font, and 256 is not a multiple of the 25-byte glyph, so the result is shredded glyphs that look like noise and confirm the "dead" reading. That mis-carve was committed as `part002/DEAD1550.BIN` and survived in `build_assets.py`'s KEPT table as "unidentified" until 1 Sep 2026, when comparing it against the font settled it in one line: its first 1,294 bytes are the font's last 1,294, and the 256 it ran past the end are zero. Deleted.
 
 ## Open
 

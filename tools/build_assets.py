@@ -5,13 +5,22 @@ saying otherwise is what let the tree drift for months: this script produced 128
 files where the tree held 163, and nothing measured the difference, so the claim
 in the old first line went on being false and unread.
 
-Twenty-eight of those files are HAND-MADE -- five projections of each of part
-002's four 3-D models, a panel view and its palette, a curve composite, and one
-1,550-byte block nobody has identified. They are listed in KEPT below, they have
-no generator, and they are somebody's work. `--audit` is what keeps that honest:
-it regenerates into a temporary directory and reports every difference between
-the tree and this script, classified, so a NEW extra file is a finding rather
-than sediment.
+THREE of those files are HAND-MADE -- a panel view, its palette, and a curve
+composite. They are listed in KEPT below, they have no generator, and they are
+somebody's work. `--audit` is what keeps that honest: it regenerates into a
+temporary directory and reports every difference between the tree and this
+script, classified, so a NEW extra file is a finding rather than sediment.
+
+IT SAID TWENTY-EIGHT UNTIL 1 Sep 2026, and twenty-five of those were wrong. One
+was a mis-carve of the 5x5 font that docs/15 had already identified and this
+table went on calling unidentified. The other twenty-four -- part 002's four
+solid models and five projections of each -- were labelled "rendered by hand"
+when in fact tools/vecobj.py had rendered them until it was archived as spent.
+Nothing regenerated them after that, so nothing compared them either, and every
+one of the twenty projections was drawn from a face index that was off by one.
+See carve_solid_models() and the note above KEPT. The pattern to take from it:
+"nothing generates this" is a claim, and an unexamined one decays into cover for
+a tool somebody deleted.
 
     python tools/build_assets.py            write the derived files
     python tools/build_assets.py --audit    report tree against generator
@@ -141,20 +150,33 @@ NAMES = {
 # If any of these is ever reproduced by code, delete its row -- a name on this
 # list is a statement that nothing generates it.
 KEPT = {
-    "part002/DEAD1550.BIN": "1,550 bytes, unidentified. The size matches the "
-                            "5x5 font, so it may be an earlier carve of it.",
-    "part002/OBJENTER.BIN": "part 002's Enterprise model, extracted from DGROUP",
-    "part002/OBJQUAD.BIN":  "the quad model",
-    "part002/OBJREVLV.BIN": "the revolver model",
-    "part002/OBJSAIL.BIN":  "the sailboat model",
     "part002/S2PANEL.PAL":  "the palette the panel view below is rendered with",
     "part002/S2PANEL.PNG":  "the banner strip rendered with S2PANEL.PAL",
     "part003/WAVECRVA.PNG": "all of the waves curves in one composite",
 }
-# Five projections of each model, rendered by hand: front, long, long2, side, top.
-for _m in ("OBJENT", "OBJQUA", "OBJREV", "OBJSAI"):
-    for _v in ("FR", "LG", "L2", "SD", "TP"):
-        KEPT["part002/%s%s.PNG" % (_m, _v)] = "a projection of the model above"
+# TWO ENTRIES LEFT THIS TABLE, AND NEITHER WAS SOMEBODY'S WORK.
+#
+# `part002/DEAD1550.BIN` was carried here as "1,550 bytes, unidentified. The size
+# matches the 5x5 font, so it may be an earlier carve of it." The guess was
+# right, and one comparison settles it: the file is NEUROSIS.DAT at $080CB2 and
+# the font is the same 1,550 bytes at $080BB2 -- 256 bytes earlier. So
+# DEAD1550[0:1294] == FONT5X5[256:1550] exactly, and the 256 bytes it ran off the
+# end are all zero. It held no byte the font does not, 256 is not a multiple of
+# the 25-byte glyph, and that is why it looked like meaningless soup. docs/15 had
+# already worked this out and said the file "should be ignored"; nothing acted on
+# it, so the KEPT row went on describing it as unidentified. Deleted.
+#
+# `part002/OBJ*` -- the four models and their twenty projections -- were declared
+# "rendered by hand". They were not: tools/vecobj.py made them, and when that was
+# archived under #29 they became files with no producer. carve_solid_models()
+# above generates them now, and it found the bug that six months of no generator
+# had hidden. See its docstring.
+#
+# The lesson, and it is the same one this table exists for: a KEPT row is a claim
+# that nothing generates a file, and the reason it needs to be read as a claim is
+# that both of these were false in the direction that costs something -- one file
+# that was fully explained elsewhere in the repository, and twenty-four that had
+# a generator until somebody deleted it.
 
 # Files that are inputs to the build rather than outputs of this script.
 NOT_ASSETS = ("NEUROSIS.MAN", "README.md")
@@ -193,6 +215,61 @@ EMBEDDED = [
     ("003", 0x1761, 0x5136, 765, 6, "SHPCUBE"),
     ("003", 0x1761, 0x63F6, 765, 6, "SHPGRID"),
 ]
+
+# Part 002's four solid models: a vertex array of signed word triples followed
+# by a variable-length face stream. Unlike EMBEDDED above these have topology,
+# so they get a wireframe from five axis pairs rather than a point cloud.
+#
+# The BIN name and the PNG prefix differ because both have to be 8.3 and the
+# five view suffixes are two characters: OBJENTER.BIN, but OBJENTTP.PNG.
+#
+# THE INDEX BIAS IS PER MODEL, and it is the whole reason this table exists
+# rather than a loop. The Enterprise's face indices are stored zero-based and
+# the other three models' are stored one-based, in the same face stream format,
+# in the same segment. The authority is P2SOLID.PAS's own loader, which part 002
+# rebuilds BYTE-IDENTICAL from:
+#
+#     Obj[1].Face[I].Idx[K] := FaceEnterprise[P] + 1;      <- the Enterprise
+#     Obj[2].Face[I].Idx[K] := FaceRevolver[P];            <- and the other
+#     Obj[3].Face[I].Idx[K] := FaceSailboat[P];               three, verbatim
+#     Obj[4].Face[I].Idx[K] := FaceQuad[P];
+#
+# So "indices are stored zero-based and incremented on load" -- what vecobj.py's
+# docstring said, and what the generated P2OBJ.INC and docs/15 both repeated --
+# is true of ONE model out of four. vecobj.py applied the +1 to all four, which
+# is why the Enterprise came out clean and became the picture docs/15 links to,
+# while the revolver and the sailboat were a cross-hatch nobody could read and
+# the quad drew a triangle. A rule inferred from the model that happened to be
+# looked at first, applied to three that were not.
+# (part, seg, vert off, verts, face off, faces, bias, BIN name, PNG prefix, best)
+SOLID_MODELS = [
+    ("002", 0x1866, 0x0004, 75, 0x01C6, 55, 1, "OBJENTER", "OBJENT", "TP"),
+    ("002", 0x1866, 0x067E, 68, 0x0816, 64, 0, "OBJREVLV", "OBJREV", "LG"),
+    ("002", 0x1866, 0x0B06, 32, 0x0BC6, 21, 0, "OBJSAIL",  "OBJSAI", "L2"),
+    ("002", 0x1866, 0x0CAE,  4, 0x0CC6,  1, 0, "OBJQUAD",  "OBJQUA", "TP"),
+]
+
+# A model is often unrecognisable from the obvious X/Y view: the Enterprise only
+# reads from above, and the revolver and the sailboat are both modelled along Y,
+# so they only read once Y is horizontal. Tag -> (across axis, down axis).
+SOLID_VIEWS = {
+    "TP": (0, 2),      # top    -- X across, Z down
+    "SD": (2, 1),      # side   -- Z across, Y down
+    "FR": (0, 1),      # front  -- X across, Y down
+    "LG": (1, 0),      # long   -- Y across, X down
+    "L2": (1, 2),      # long2  -- Y across, Z down
+}
+
+# Where the NEXT model's vertices start, so the face stream's length can be
+# compared against the room it has. The revolver and the sailboat each leave 10
+# bytes their face count never reads -- one more well-formed 3-vertex face
+# apiece. That is not a miscount: P2SOLID.PAS writes both counts as IMMEDIATES
+# and part 002 rebuilds byte-identical, so 64 and 21 are the original's own
+# numbers and the trailing face is data the 1994 code does not draw either.
+SOLID_NEXT = {"OBJENTER": 0x067E, "OBJREVLV": 0x0B06, "OBJSAIL": 0x0CAE,
+              "OBJQUAD": None}
+
+W_OBJ, H_OBJ = 320, 200
 
 # Screens whose palette is loaded by a different region than their own. A
 # carried-forward palette is a guess; these are known. Scene 4's four screens
@@ -366,6 +443,139 @@ def carve_embedded(manifest):
         png_indexed(d / f"{name}.PNG", bytes(px), ramp_palette(), W, H)
         manifest.append((part, None, None, len(raw), f"part{part}/{name}.PNG",
                          f"embedded in DGROUP at DS:${off:04X}, {count} points x {stride}b"))
+
+
+def obj_line(px, x0, y0, x1, y1, c):
+    """Bresenham, clipped by test. The wireframe's only drawing primitive."""
+    dx, dy = abs(x1 - x0), abs(y1 - y0)
+    sx = 1 if x0 < x1 else -1
+    sy = 1 if y0 < y1 else -1
+    err = dx - dy
+    while True:
+        if 0 <= x0 < W_OBJ and 0 <= y0 < H_OBJ:
+            px[y0 * W_OBJ + x0] = c
+        if x0 == x1 and y0 == y1:
+            break
+        e2 = 2 * err
+        if e2 > -dy:
+            err -= dy
+            x0 += sx
+        if e2 < dx:
+            err += dx
+            y0 += sy
+
+
+def parse_faces(raw, base, foff, nfaces, nverts, bias, name):
+    """The face stream: for each face, `count, index1 .. indexN, colour`.
+
+    `bias` is the per-model increment from P2SOLID.PAS's loader -- 1 for the
+    Enterprise, 0 for the rest. See the note on SOLID_MODELS for why it is not
+    one rule, and why assuming it was cost every projection but the Enterprise's.
+
+    AN OUT-OF-RANGE INDEX REFUSES HERE, and that is the change that matters more
+    than the bias itself. The old renderer filtered them -- `for i in idx if
+    1 <= i <= nv` -- so a wrong bias drew a partial polygon instead of failing.
+    The revolver had three faces silently reduced to triangles and the quad drew
+    a triangle for its only face, and no run ever said anything. With the filter
+    replaced by a refusal, getting this wrong is a stack trace rather than a
+    picture nobody compares.
+
+    BUT THE RANGE CHECK CATCHES ONLY TWO OF THE FOUR MODELS' BIAS ERRORS, and
+    saying so is the point of writing it down. A wrong bias is only visible here
+    when it pushes an index off the end, which needs the model's highest vertex
+    to be used by some face: the revolver and the quad refuse, the Enterprise and
+    the sailboat read perfectly in range with either bias. So this is a backstop,
+    not the authority. The authority is P2SOLID.PAS's four loader lines, and the
+    only way to check a bias is to read them.
+    """
+    faces, p = [], 0
+    for f in range(nfaces):
+        cnt = struct.unpack_from("<h", raw, base + foff + p * 2)[0]
+        if not 3 <= cnt <= 8:
+            raise SystemExit("  %s face %d has a vertex count of %d -- the face "
+                             "stream has drifted" % (name, f, cnt))
+        idx = [struct.unpack_from("<h", raw, base + foff + (p + 1 + k) * 2)[0]
+               + bias for k in range(cnt)]
+        bad = [i for i in idx if not 1 <= i <= nverts]
+        if bad:
+            raise SystemExit(
+                "  %s face %d indexes vertex %s of %d, with bias %d -- the "
+                "stream has drifted or the bias is wrong. P2SOLID.PAS's loader "
+                "is what settles the bias." % (name, f, bad, nverts, bias))
+        faces.append(idx)
+        p += cnt + 2
+    return faces, p
+
+
+def carve_solid_models(manifest):
+    """Part 002's four solid models, and five projections of each.
+
+    WHY THESE ARE GENERATED AND WERE NOT. tools/vecobj.py made these files and
+    was deleted under #29 as spent. Its disposition in docs/32 checked that
+    build_assets.py reproduced part 001's vector_globe and vector_logo_a and
+    concluded the tool was superseded -- but part 002's four models and their
+    twenty projections had no producer here at all. They survived as files
+    nothing generated, so --audit could only class them as somebody's work, and
+    a KEPT row went in calling them "rendered by hand". They never were.
+
+    The cost of that was not the wrong label. It was that the +1 bias above went
+    unmeasured, because nothing regenerated the pictures to compare.
+
+    The projection is orthographic and auto-scaled -- a preview for identifying
+    a model, not what the demo draws, which is solid and depth-sorted.
+    """
+    for part, seg, voff, nv, foff, nf, bias, binname, pngpre, best in SOLID_MODELS:
+        h = parse(Path(f"work/split/NEUROSIS_{part}.exe"))
+        raw = h["raw"]
+        base = h["hdrsize"] + seg * 16 - 0x10000
+
+        pts = [struct.unpack_from("<hhh", raw, base + voff + i * 6)
+               for i in range(nv)]
+        faces, words = parse_faces(raw, base, foff, nf, nv, bias, binname)
+
+        d = OUT / f"part{part}"
+        d.mkdir(parents=True, exist_ok=True)
+        (d / f"{binname}.BIN").write_bytes(raw[base + voff:base + voff + nv * 6])
+
+        for tag, (ai, bi) in SOLID_VIEWS.items():
+            av = [q[ai] for q in pts]
+            bv = [q[bi] for q in pts]
+            # Scale from the axes that have an extent. A planar model viewed
+            # edge-on has none on one axis -- obj_quad's Z is 0 throughout --
+            # and that is a real projection, not a case to fudge.
+            cand = [(W_OBJ - 20) / (max(av) - min(av)) for _ in (0,)
+                    if max(av) > min(av)]
+            cand += [(H_OBJ - 20) / (max(bv) - min(bv)) for _ in (0,)
+                     if max(bv) > min(bv)]
+            sc = min(cand) if cand else 1.0
+            ca, cb = (max(av) + min(av)) / 2, (max(bv) + min(bv)) / 2
+            px = bytearray(W_OBJ * H_OBJ)
+            for idx in faces:
+                poly = [(int((pts[i - 1][ai] - ca) * sc) + W_OBJ // 2,
+                         int((pts[i - 1][bi] - cb) * sc) + H_OBJ // 2)
+                        for i in idx]
+                for k in range(len(poly)):
+                    a, b = poly[k], poly[(k + 1) % len(poly)]
+                    obj_line(px, a[0], a[1], b[0], b[1], 200)
+            png_indexed(d / f"{pngpre}{tag}.PNG", bytes(px), ramp_palette(),
+                        W_OBJ, H_OBJ)
+
+        sizes = sorted({len(f) for f in faces})
+        trailing = ""
+        if SOLID_NEXT.get(binname) is not None:
+            over = (SOLID_NEXT[binname] - foff) - words * 2
+            if over:
+                trailing = (", %d trailing byte(s) the count never reads"
+                            % over)
+        manifest.append((part, None, None, nv * 6, f"part{part}/{binname}.BIN",
+                         f"DGROUP DS:${voff:04X}, {nv} vertices x 6b"))
+        for tag in SOLID_VIEWS:
+            png = d / f"{pngpre}{tag}.PNG"
+            manifest.append((part, None, None, png.stat().st_size,
+                             f"part{part}/{pngpre}{tag}.PNG",
+                             f"{nf} faces, sizes {sizes}"
+                             f"{', the view that identifies it' if tag == best else ''}"
+                             f"{trailing if tag == best else ''}"))
 
 
 def carve_embedded_palettes(manifest):
@@ -548,6 +758,7 @@ def main(write_readme=True):
     build_composites(manifest)
     visualise_offset_tables(manifest)
     carve_embedded(manifest)
+    carve_solid_models(manifest)
 
     lines = [
         "# Extracted assets",

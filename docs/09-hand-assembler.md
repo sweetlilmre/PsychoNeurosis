@@ -75,9 +75,9 @@ part 002. A model rendered from a single axis pair is easy to misname:
 | 68 verts | a street lamp (Y vertical) | a **revolver** (Y horizontal) |
 | 32 verts | a telegraph pole (Y vertical) | a **sailboat** (Y horizontal) |
 
-Models built along Y read as tall thin towers until Y is turned horizontal.
-`tools/vecobj.py` now renders five axis pairs per object for this reason.
-Render every view before naming anything.
+Models built along Y read as tall thin towers until Y is turned horizontal. `tools/build_assets.py` renders five axis pairs per object for this reason (`tools/vecobj.py` did until it was archived). Render every view before naming anything.
+
+**And render them from the right indices, which is the sharper version of the same lesson.** Three of these four models had their face indices read with an off-by-one for months, so the revolver and the sailboat were a cross-hatch and the quad drew a triangle — see [docs/15](15-part002.md). The Enterprise was the model the bias was inferred from and the only one it was correct for, so the picture that looked right is what made the other three look like a rendering problem rather than a parsing one.
 
 ## Register-convention calls found so far
 
