@@ -11,10 +11,8 @@
   [re] 125e:0741 is why. The original indexes it as
   Captions[N, Row][Col]: IMUL DI,[BP+4],$0A00 for the member, a separate
   Row*256, and Col added last. A flat array[1..40] indexed
-  Captions[(N-1)*10 + Row] emits a DEC and an IMUL by 10 instead -- the same
-  address by a different route, because the displacement absorbs the
-  difference, so the bytes never match. Same 10,240 bytes either way.
-
+  Captions[(N-1)*10 + Row] emits a DEC and an IMUL by 10 instead, so the bytes
+  never match.
 
   STRING[255], AND THE STRIDE THIS TABLE IS READ WITH IS WHY. A Borland
   String[n] occupies n+1 bytes, so $100 is String[255]; the declaration used to

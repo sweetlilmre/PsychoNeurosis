@@ -1,19 +1,54 @@
-"""Emit the compiled-in data of parts 001, 002, 005 and 006 as Pascal typed
-constants, the same way tools/emit_pascal_data.py does for part 003.
+"""Emit the compiled-in data of parts 001, 002, 003 and 006 as Pascal typed
+constants -- the tables that need CODE to read.
 
 Anything in DGROUP's *initialised* region was a typed constant in the original
 source. Plain `var` lands in BSS and is not stored in the executable, so
 whatever we can read out of the file image must have carried an initialiser.
 
+THE DECLARATIVE EMITTER IS THE OTHER HALF OF THIS JOB, and it is where a table
+belongs unless it needs code. `kit/tools/pascal/emit.py` reads `emit.toml` and
+covers anything expressible as offset, count, element type and one group size;
+P3PAL, P3SINE, P3SHAPE and (since 1 Sep 2026) P5MESH live there. This file is
+for the rest, and each one earns its place:
+
+    P1VECT      three arrays, one of which is never read at run time
+    P2OBJ/2     the face array's EXTENT is computed by walking a variable-length
+                record stream, scalars are interleaved between the arrays, and
+                the split across two files is at a measured point
+    P6TEXT      Borland String[n] read at a stride, with blank padding for the
+                slots that fall past the load image
+    P6CELL      a THREE-dimensional constant -- two levels of nesting
+    P3CAPT      strings and two levels of nesting together
+
+An earlier version of this line said "the same way tools/emit_pascal_data.py
+does for part 003". That file no longer exists: it was archived under #29 and
+superseded by the declarative emitter above. It also said parts 001, 002, 005
+and 006, which named the one part that has now moved out and omitted 003.
+
 DGROUP is always the highest segment in the relocation map:
 
-    part 001  $18F8      part 002  $1866      part 003  $1761
-    part 005  $166C      part 006  $164E
+    part 001  $18F8      part 002  $1866
+    part 003  $1761      part 006  $164E
 
 Output goes to src/gen/ and is included by the hand-written units.
+
+    python tools/emit_pascal_data2.py            write src/gen/
+    python tools/emit_pascal_data2.py --check    compare src/gen against this
+                                                 script, write nothing
+
+**RUN `--check` BEFORE REGENERATING.** All seven of these files were hand-edited
+under ticket #70 to keep reverse-engineering apparatus out of the documentation
+copy, and this script was not updated to match, so for months regenerating would
+have reverted a closed ticket. The divergence was comment-only and the data
+identical, which is precisely why nothing caught it: no compiled byte changes, so
+the build stays byte-identical and every artefact row goes on holding. See
+check() for what that costs and why the comparison is worth having.
 """
+import re
+import shutil
 import struct
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -24,11 +59,14 @@ sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] /
                       "kit" / "tools"))
 from substrate.mzinfo import parse
+# The formatter, so there is ONE of it. See fmt() below for what this replaced
+# and what is left behind.
+from pascal.emit import fmt_array
 
 OUT = Path("src/gen")
 
 DGROUP = {"001": 0x18F8, "002": 0x1866, "003": 0x1761,
-          "005": 0x166C, "006": 0x164E}
+          "006": 0x164E}
 
 
 def dg(part):
@@ -36,36 +74,40 @@ def dg(part):
     return h["raw"], h["hdrsize"] + DGROUP[part] * 16 - 0x10000
 
 
-def fmt(name, typ, values, per_line=12, conv=str, group=None):
-    """Emit a Pascal typed-constant array.
+def fmt(name, typ, values, per_line=12, group=None):
+    """A Pascal typed-constant array.
 
     Multidimensional arrays need NESTED parentheses: `array[1..N, 1..3]` takes
     ((a,b,c), (d,e,f), ...), not a flat list. Getting this wrong is what
     produced `Error 88: "(" expected` the first time these reached TPC.
     Pass group=3 for [N,3]; group=(16,8) for [N,16,8].
+
+    THE FLAT AND SINGLE-GROUP CASES ARE THE KIT'S NOW. This file carried its own
+    copy of that formatter, character for character, and the copy is exactly how
+    `{ 1 faces the loader reads }` could be wrong here and right in the tree: a
+    duplicated formatter means a fix lands in one of them. Verified by emitting
+    every remaining file both ways -- byte-identical.
+
+    What stays is the TWO-level case, because `fmt_array` does one level and only
+    P6CELL and P3CAPT need two. When a string element type and two-level nesting
+    move to the kit, those two files move with them and this function goes.
     """
+    if not isinstance(group, tuple):
+        return fmt_array(name, typ, values, per_line, group=group)
+
+    # array[1..27, 1..16, 1..8]: one parenthesised block per band, one row per
+    # column inside it. per_line does not apply -- the inner dimension sets the
+    # line length, which is why the P6CELL call's 32 was never read.
+    outer, inner = group
     lines = [f"  {name} : {typ} = ("]
-    if group is None:
-        for i in range(0, len(values), per_line):
-            chunk = ", ".join(conv(v) for v in values[i:i + per_line])
-            lines.append(f"    {chunk}" + ("," if i + per_line < len(values) else ""))
-    elif isinstance(group, int):
-        rows = [values[i:i + group] for i in range(0, len(values), group)]
-        per = max(1, per_line // (group + 1))
-        for i in range(0, len(rows), per):
-            body = ", ".join("(" + ", ".join(conv(v) for v in r) + ")"
-                             for r in rows[i:i + per])
-            lines.append(f"    {body}" + ("," if i + per < len(rows) else ""))
-    else:
-        outer, inner = group
-        blk = outer * inner
-        for b in range(0, len(values), blk):
-            rows = [values[b:b + blk][i:i + inner] for i in range(0, blk, inner)]
-            lines.append("    (")
-            for j, r in enumerate(rows):
-                body = "(" + ", ".join(conv(v) for v in r) + ")"
-                lines.append(f"      {body}" + ("," if j + 1 < len(rows) else ""))
-            lines.append("    )" + ("," if b + blk < len(values) else ""))
+    blk = outer * inner
+    for b in range(0, len(values), blk):
+        rows = [values[b:b + blk][i:i + inner] for i in range(0, blk, inner)]
+        lines.append("    (")
+        for j, r in enumerate(rows):
+            body = "(" + ", ".join(str(v) for v in r) + ")"
+            lines.append(f"      {body}" + ("," if j + 1 < len(rows) else ""))
+        lines.append("    )" + ("," if b + blk < len(values) else ""))
     lines.append("  );")
     return "\n".join(lines)
 
@@ -80,8 +122,8 @@ def emit_p001():
     raw, base = dg("001")
     out = [header("""Part 001 scene 5 -- the two 3-D vector objects.
 
-  Compiled into DGROUP as signed integer (X, Y, Z) triples and converted to
-  Real at load time by Math_IntToReal (1483:0000) into 12-byte records.
+  Compiled in as signed integer (X, Y, Z) triples and converted to Real at
+  load time into 12-byte records.
 
   VecLogoA is flat (Z = 0 throughout) -- the circled "A" logo mark.
   VecGlobe is three orthogonal rings, +/-50 on every axis.
@@ -167,11 +209,25 @@ def emit_p002():
 
       count, index1 .. indexN, colour        (count + 2 words)
 
-  Indices are stored zero-based and incremented on load. Faces have 3, 4, 6
-  or 8 vertices. Scene2_Intro (108b:1bbd) is the loader.
+  Faces have 3, 4, 6 or 8 vertices.
 
-  See assets/part002/obj_*.png -- five projections of each, because a model
-  is often unrecognisable from the obvious X/Y view.""")]
+  THE INDEX BASE IS PER MODEL, and only the loader says which. The Enterprise's
+  indices are stored ZERO-based and Scene2_Setup adds one; the revolver's, the
+  sailboat's and the quad's are stored ONE-based and are used as read. Same
+  format, same segment, three models one way and one the other:
+
+      Obj[1].Face[I].Idx[K] := FaceEnterprise[P] + 1;
+      Obj[2].Face[I].Idx[K] := FaceRevolver[P];
+      Obj[3].Face[I].Idx[K] := FaceSailboat[P];
+      Obj[4].Face[I].Idx[K] := FaceQuad[P];
+
+  This header read "indices are stored zero-based and incremented on load" until
+  1 Sep 2026, which is one model of four. The quad settles it alone: four
+  vertices, one four-vertex face, and 1, 2, 3, 4 on disk.
+
+  See assets/part002/OBJ*.PNG -- five projections of each, because a model is
+  often unrecognisable from the obvious X/Y view. Whatever renders them has to
+  carry the bias per model; one rule for all four is wrong three times.""")]
     total = 0
     for name, voff, nv, foff, fend, nf, note in P2_OBJECTS:
         # the ARRAY spans the whole extent; nf is only what the loader reads
@@ -182,7 +238,7 @@ def emit_p002():
         verts = []
         for i in range(nv):
             verts.extend(struct.unpack_from("<hhh", raw, base + voff + i * 6))
-        out.append(f"\n  {{ {note} -- vertices DS:${voff:04X} }}")
+        out.append(f"\n  {{ {note} -- vertices }}")
         # The counts are emitted rather than written into the loader by hand:
         # Scene2_Setup reads them back OUT of the object it just filled,
         # so the only place a literal belongs is beside the table it counts.
@@ -209,8 +265,8 @@ def emit_p002():
         faces = [struct.unpack_from("<h", raw, base + foff + i * 2)[0]
                  for i in range(nw)]
         p = nw
-        out.append(f"  {{ {nf} faces the loader reads, {nw} words in DGROUP"
-                   f" -- DS:${foff:04X} }}")
+        out.append(f"  {{ {nf} face{'' if nf == 1 else 's'} the loader reads, "
+                   f"{nw} words }}")
         # ZERO-BASED, LIKE THE VERTEX ARRAYS ABOVE, and Scene2_Setup's counter
         # says so: 108b:1d9c is XOR AX,AX / MOV [BP-$06],AX -- the walk index
         # starts at 0 -- and every read of it is a bare MOV DI,[BP-$06] with no
@@ -233,32 +289,22 @@ def emit_p002():
     # constants, and includes the second.
     OUT.joinpath("P2OBJ.INC").write_text("\n".join(first) + "\n", encoding="ascii")
     OUT.joinpath("P2OBJ2.INC").write_text(
-        "{ Part 002 scene 2 -- models two, three and four. Generated by\n"
-        "  tools/emit_pascal_data2.py -- do not edit. The FIRST model is in\n"
-        "  P2OBJ.INC and included BEFORE MViewW; these come after Msg2, which\n"
-        "  is where the original's DGROUP has them. }\n"
+        "{ GENERATED by tools/emit_pascal_data2.py -- DO NOT EDIT.\n"
+        "\n"
+        "  Part 002 scene 2 -- models two, three and four. The FIRST model is in\n"
+        "  P2OBJ.INC and included BEFORE MViewW; these come after Msg2, which is where\n"
+        "  the original has them. Include order is declaration order, so moving either\n"
+        "  include moves everything after it. }\n"
         + "\n".join(out) + "\n", encoding="ascii")
     return total
 
 
-# ---------------------------------------------------------------- part 005
-
-def emit_p005():
-    raw, base = dg("005")
-    tris = [struct.unpack_from("<HHH", raw, base + 2 + i * 6) for i in range(1922)]
-    flat = [v for t in tris for v in t]
-    body = header("""Part 005 -- the mesh triangle list.
-
-  A 32 x 32 vertex grid (indices 0..1023) triangulated into 1,922 triangles:
-  each of the 31 x 31 quads becomes the pair
-
-      (n, n+1, n+32)  and  (n+1, n+33, n+32)
-
-  The list is compiled in rather than generated, so the renderer walks it
-  directly. DS:$0002 .. $2D0D.""")
-    body += fmt("MeshTris", "array[1..1922, 1..3] of Word", flat, 12, group=3)
-    OUT.joinpath("P5MESH.INC").write_text(body + "\n", encoding="ascii")
-    return len(flat)
+# PART 005 IS NOT HERE ANY MORE. P5MESH.INC moved to emit.toml on 1 Sep 2026 --
+# it was offset, count, element and one group size with no logic around it, so
+# the declarative config could already say all of it, and a hand-written emitter
+# for a pure table only bought a second copy of the same formatter. Verified by
+# emitting it both ways and comparing: the const body is BYTE-IDENTICAL, 5,766
+# values, 34,844 bytes. What is left in this file is the data that needs code.
 
 
 # ---------------------------------------------------------------- part 006
@@ -311,14 +357,12 @@ def emit_p006_text():
     lines += [blank] * (P6_CREDIT_LINES - len(lines))
     body = header(f"""Part 006 scene 4 -- the credits text.
 
-  A Borland `array[1..{P6_CREDIT_LINES}] of String[{P6_CREDIT_WIDTH}]` at DS:$0D8A, 256 bytes
-  per element, which is why the stride in DGROUP is $100. Only the first
-  {sum(1 for s in lines if s.strip())} lines carry text in the load image; the rest fall past its end
-  and are blank at run time, so they are blank here.
+  A Borland `array[1..{P6_CREDIT_LINES}] of String[{P6_CREDIT_WIDTH}]` -- {P6_CREDIT_WIDTH + 1} bytes per element, which is
+  why the stride is $100. Only the first {sum(1 for s in lines if s.strip())} lines carry text in the load
+  image; the rest fall past its end and are blank at run time, so they are
+  blank here.
 
-  Four blocks, one per member: EzE, GoTH, Denthor and Fubar.
-
-  Generated by tools/emit_pascal_data2.py -- do not edit.""")
+  Four blocks, one per member: EzE, GoTH, Denthor and Fubar.""")
     body += "  CreditText : array[1..%d] of String[%d] = (\n" % (
         P6_CREDIT_LINES, P6_CREDIT_WIDTH)
     for i, s in enumerate(lines):
@@ -349,7 +393,7 @@ def emit_p006_cells():
     vals = list(raw[base + A: base + A + 27 * 128])
     body = header("""Part 006 scene 2 -- the whoosh board.
 
-  array[1..27, 1..16, 1..8] of Byte, DS:$000A. Each band is one letter cell
+  array[1..27, 1..16, 1..8] of Byte. Each band is one letter cell
   block; the value is the CELL TYPE drawn at that grid position (1 = letter,
   0 = nothing; Whoosh_Load pre-fills the whole board with 2 = background).
 
@@ -383,15 +427,19 @@ def emit_p003_captions():
     lines = pascal_strings(raw, base, 0x76B8, 0x0100)
     body = header(f"""Part 003 scene 7 -- the member captions, {len(lines)} lines.
 
-  array[1..4, 1..10] of String[255], DS:$76B8, stride $100. Ten lines per
-  member, in the same order as the four rotating portraits.
-  TWO-DIMENSIONAL, and 125e:0741 is why. The original indexes it as
+  array[1..4, 1..10] of String[255], stride $100. Ten lines per member, in
+  the same order as the four rotating portraits.
+
+  TWO-DIMENSIONAL, not flat: the two subscripts are applied separately, so the
+  displacement absorbs the low bounds. A flat array of 40 indexed
+  Captions[(N-1)*10 + Row] reaches the same address by a different route and
+  emits different code. Same 10,240 bytes either way.
+
+  [re] 125e:0741 is why. The original indexes it as
   Captions[N, Row][Col]: IMUL DI,[BP+4],$0A00 for the member, a separate
   Row*256, and Col added last. A flat array[1..40] indexed
-  Captions[(N-1)*10 + Row] emits a DEC and an IMUL by 10 instead -- the same
-  address by a different route, because the displacement absorbs the
-  difference, so the bytes never match. Same 10,240 bytes either way.
-
+  Captions[(N-1)*10 + Row] emits a DEC and an IMUL by 10 instead, so the bytes
+  never match.
 
   STRING[255], AND THE STRIDE THIS TABLE IS READ WITH IS WHY. A Borland
   String[n] occupies n+1 bytes, so $100 is String[255]; the declaration used to
@@ -419,20 +467,108 @@ def emit_p003_captions():
     return len(lines)
 
 
-def main():
+# Every file this script writes. P2OBJ2.INC has no emitter of its own -- it is
+# the second half of emit_p002 -- so it has to be named here or a check would
+# silently skip it.
+FILES = ("P1VECT.INC", "P2OBJ.INC", "P2OBJ2.INC",
+         "P6TEXT.INC", "P6CELL.INC", "P3CAPT.INC")
+
+
+def emit_all():
     OUT.mkdir(parents=True, exist_ok=True)
-    results = [
+    return [
         ("P1VECT.INC", emit_p001(), "values"),
         ("P2OBJ.INC", emit_p002(), "values"),
-        ("P5MESH.INC", emit_p005(), "values"),
         ("P6TEXT.INC", emit_p006_text(), "strings"),
         ("P6CELL.INC", emit_p006_cells(), "bytes"),
         ("P3CAPT.INC", emit_p003_captions(), "strings"),
     ]
-    for name, n, unit in results:
+
+
+def code_only(data):
+    """The file with every Pascal comment removed, for comparing DATA alone."""
+    text = data.decode("latin-1")
+    while True:
+        stripped = re.sub(r"\{[^{}]*\}", "", text, flags=re.S)
+        if stripped == text:
+            break
+        text = stripped
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def check():
+    """Regenerate into a temporary directory and compare against src/gen.
+
+    WHY THIS EXISTS, and it is the whole reason to run it. These files are
+    generated, and for months they were not what this script produces. Ticket
+    #70 edited all seven BY HAND to keep reverse-engineering apparatus out of
+    the documentation copy, and nothing updated the emitter -- so running the
+    emitter silently REVERTED a closed ticket, and the only thing preventing
+    that was nobody happening to run it.
+
+    It stayed invisible because the divergence was comment-only and the data
+    identical in all seven files. Every byte instrument in the tree was blind to
+    it by construction: a comment changes no compiled byte, so the build stayed
+    byte-identical and every artefact row went on holding. Nothing was WRONG
+    with the tree. What was wrong was that two things claimed to be the same
+    file and nobody compared them.
+
+    A generated file that nothing checks against its generator is a hand-written
+    file with a misleading banner on top.
+    """
+    global OUT
+    tree = OUT
+    tmp = Path(tempfile.mkdtemp(prefix="emitcheck-"))
+    try:
+        OUT = tmp
+        emit_all()
+        bad, data_bad = 0, 0
+        print("regenerated into a temporary directory and compared against "
+              "%s\n" % tree)
+        for name in FILES:
+            a, b = tree / name, tmp / name
+            if not a.exists():
+                print("  %-14s MISSING from the tree" % name)
+                bad += 1
+                continue
+            ab, bb = a.read_bytes(), b.read_bytes()
+            if ab == bb:
+                print("  %-14s identical" % name)
+                continue
+            bad += 1
+            if code_only(ab) == code_only(bb):
+                print("  %-14s DIFFERS in comments only -- the data is "
+                      "identical, so no build changes" % name)
+            else:
+                data_bad += 1
+                print("  %-14s DIFFERS IN THE DATA -- this changes what the "
+                      "compiler sees" % name)
+        print("\n  %d of %d file(s) differ from what this script produces."
+              % (bad, len(FILES)))
+        if data_bad:
+            print("  %d of them differ in DATA. Do not regenerate over the tree "
+                  "until that is\n  understood: a byte-identical build is "
+                  "resting on the committed copies." % data_bad)
+        elif bad:
+            print("  All comment-only. Either the tree was edited by hand and "
+                  "this script needs\n  the same edit, or this script was "
+                  "changed and the tree needs regenerating.\n  Whichever it is, "
+                  "they disagree, and running the emitter would overwrite the\n"
+                  "  tree's wording without saying so.")
+        else:
+            print("  The tree is exactly what this script writes.")
+        return 1 if bad else 0
+    finally:
+        OUT = tree
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def main():
+    for name, n, unit in emit_all():
         p = OUT / name
-        print(f"  {name:<14} {n:>7,} {unit:<8} {len(p.read_text(encoding="ascii", errors="replace").splitlines()):>6,} lines")
+        lines = len(p.read_text(encoding="ascii", errors="replace").splitlines())
+        print(f"  {name:<14} {n:>7,} {unit:<8} {lines:>6,} lines")
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(check() if "--check" in sys.argv else main())

@@ -8,7 +8,6 @@
   Captions[(N-1)*10 + Row] reaches the same address by a different route and
   emits different code. Same 10,240 bytes either way.
 
-
   STRING[255], AND THE STRIDE THIS TABLE IS READ WITH IS WHY. A Borland
   String[n] occupies n+1 bytes, so $100 is String[255]; the declaration used to
   say String[50], a stride of 51. Across forty slots that is 8,200 bytes, and

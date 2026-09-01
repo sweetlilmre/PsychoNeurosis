@@ -46,9 +46,11 @@ segment = 0x1761
 header  = """
 { Sine table, 16.14 fixed point (x16384), 455 entries.
   More than 360 because cos(a) is read as sin(a+90) from the same table --
-  see Morph_SetAngles. 455 and not 450: the sine-shaped words run to
-  DS:$0634 and the shapes begin at $0636, so the table is 910 bytes. The
-  five missing entries were ten bytes of this part's DGROUP size."""
+  see Morph_SetAngles.
+
+  455 AND NOT 450. The sine-shaped words run right up to where the shape data
+  begins, so the table is 910 bytes; the five entries beyond a full circle are
+  really there, and dropping them loses ten bytes of this part's data."""
 
   [[file.array]]
   name = "SinTab"
@@ -141,3 +143,40 @@ header  = """
   count = 800
   group = 3
   per_line = 9
+
+# MOVED HERE FROM tools/emit_pascal_data2.py, 1 Sep 2026. It was a pure table --
+# offset, count, element, one group size -- with no logic around it, so it needed
+# nothing this config could not already say, and keeping it in a hand-written
+# emitter meant a second copy of the same formatter. The const body came out
+# BYTE-IDENTICAL from both, 5,766 values, which is the check that made the move
+# safe. The header changed on purpose: it now names the binary and the offset,
+# which is what a generated file has to carry before its emitter can be retired.
+#
+# Note the binary is the _fpu variant, per target.original, where the old
+# emitter read the plain file. The trap rewriting does not touch DGROUP, and the
+# 5,766 values were compared across both copies before this moved rather than
+# taken on trust.
+[[file]]
+name    = "P5MESH.INC"
+part    = "005"
+segment = 0x166C
+header  = """
+{ Part 005 -- the mesh triangle list.
+
+  A 32 x 32 vertex grid (indices 0..1023) triangulated into 1,922 triangles:
+  each of the 31 x 31 quads becomes the pair
+
+      (n, n+1, n+32)  and  (n+1, n+33, n+32)
+
+  The list is compiled in rather than built at run time, so the renderer walks
+  it directly."""
+
+  [[file.array]]
+  name = "MeshTris"
+  type = "array[1..1922, 1..3] of Word"
+  element = "word"
+  offset = 0x0002
+  count = 1922
+  group = 3
+  per_line = 12
+  comment_offset = false
