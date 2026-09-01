@@ -8,8 +8,10 @@ whatever we can read out of the file image must have carried an initialiser.
 THE DECLARATIVE EMITTER IS THE OTHER HALF OF THIS JOB, and it is where a table
 belongs unless it needs code. `kit/tools/pascal/emit.py` reads `emit.toml` and
 covers anything expressible as offset, count, element type and one group size;
-P3PAL, P3SINE, P3SHAPE and (since 1 Sep 2026) P5MESH live there. This file is
-for the rest, and each one earns its place:
+P3PAL, P3SINE, P3SHAPE and (since 1 Sep 2026) P5MESH live there. **Both emitters
+now have a `--check`, and BOTH need running**: they write into the same directory
+and neither can see the other's files. This file is for the rest, and each one
+earns its place:
 
     P1VECT      three arrays, one of which is never read at run time
     P2OBJ/2     the face array's EXTENT is computed by walking a variable-length
@@ -44,7 +46,6 @@ identical, which is precisely why nothing caught it: no compiled byte changes, s
 the build stays byte-identical and every artefact row goes on holding. See
 check() for what that costs and why the comparison is worth having.
 """
-import re
 import shutil
 import struct
 import sys
@@ -61,7 +62,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] /
 from substrate.mzinfo import parse
 # The formatter, so there is ONE of it. See fmt() below for what this replaced
 # and what is left behind.
-from pascal.emit import fmt_array
+from pascal.emit import code_only, fmt_array
 
 OUT = Path("src/gen")
 
@@ -483,17 +484,6 @@ def emit_all():
         ("P6CELL.INC", emit_p006_cells(), "bytes"),
         ("P3CAPT.INC", emit_p003_captions(), "strings"),
     ]
-
-
-def code_only(data):
-    """The file with every Pascal comment removed, for comparing DATA alone."""
-    text = data.decode("latin-1")
-    while True:
-        stripped = re.sub(r"\{[^{}]*\}", "", text, flags=re.S)
-        if stripped == text:
-            break
-        text = stripped
-    return re.sub(r"\s+", " ", text).strip()
 
 
 def check():
