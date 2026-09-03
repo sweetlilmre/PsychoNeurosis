@@ -42,8 +42,9 @@ min_span = 16
 
 [part."001"]
 exe  = "NEUROSIS.001"
-map  = "NEUR1.MAP"
+map      = "build/BIN/NEUR1.MAP"
 end_at   = 0x1543
+dgroup_at = 0x18f8
 segments = [
   { segment = 0x1012, name = "P1LOGO" },
   { segment = 0x1082, name = "P1TITLE" },
@@ -60,8 +61,9 @@ segments = [
 [part."002"]
 # The real program, from src/NEUR2.PAS: no harness, no driver unit.
 exe  = "NEUROSIS.002"
-map  = "NEUR2.MAP"
+map      = "build/BIN/NEUR2.MAP"
 end_at   = 0x14b1
+dgroup_at = 0x1866
 segments = [
   { segment = 0x1008, name = "P2GARAGE" },
   { segment = 0x107c, name = "MODEX" },
@@ -76,8 +78,9 @@ segments = [
 [part."003"]
 # The real program, from src/NEUR3.PAS: no harness, no driver unit.
 exe  = "NEUROSIS.003"
-map  = "NEUR3.MAP"
+map      = "build/BIN/NEUR3.MAP"
 end_at   = 0x137b
+dgroup_at = 0x1761
 segments = [
   { segment = 0x1015, name = "P3TUNNEL" },
   { segment = 0x10b8, name = "P3STARS" },
@@ -95,8 +98,9 @@ segments = [
 [part."005"]
 # The real program, from src/NEUR5.PAS: no harness, no driver unit.
 exe  = "NEUROSIS.005"
-map  = "NEUR5.MAP"
+map      = "build/BIN/NEUR5.MAP"
 end_at   = 0x12d9
+dgroup_at = 0x166c
 segments = [
   { segment = 0x100e, name = "P5MESH" },
   { segment = 0x1096, name = "P5ROTO" },
@@ -110,8 +114,9 @@ segments = [
 [part."004"]
 # The real program: an eighty-byte call, as the original's segment 1000 is.
 exe  = "NEUROSIS.004"
-map  = "NEUR4.MAP"
+map      = "build/BIN/NEUR4.MAP"
 end_at   = 0x1288
+dgroup_at = 0x1373
 segments = [
   { segment = 0x1005, name = "P4LEMS" },
   { segment = 0x11d9, name = "DEMOVT" },
@@ -122,8 +127,9 @@ segments = [
 [part."006"]
 # The real program, from src/NEUR6.PAS: no harness, no driver unit.
 exe  = "NEUROSIS.006"
-map  = "NEUR6.MAP"
+map      = "build/BIN/NEUR6.MAP"
 end_at   = 0x128a
+dgroup_at = 0x164e
 segments = [
   { segment = 0x100f, name = "P6TILES" },
   { segment = 0x1095, name = "P6WHOOSH" },
@@ -140,8 +146,9 @@ segments = [
 # the harness program and the driver unit -- are gone and the runtime sits on
 # its own paragraph.
 exe  = "NEUROSIS.007"
-map  = "NEUR7.MAP"
+map      = "build/BIN/NEUR7.MAP"
 end_at   = 0x110c
+dgroup_at = 0x14ce
 segments = [
   { segment = 0x100b, name = "VGA" },
   { segment = 0x100f, name = "P7FLIC" },
@@ -178,8 +185,9 @@ segments = [
 [part."000"]
 exe  = "NEUROSIS.000"
 # The compiler names its map after the SOURCE, so it keeps the built name.
-map  = "NEUR0.MAP"
+map      = "build/BIN/NEUR0.MAP"
 end_at   = 0x1213
+dgroup_at = 0x12ed
 segments = [
   { segment = 0x11ad, name = "DETECT" },
   { segment = 0x11b1, name = "CRT" }
@@ -190,8 +198,9 @@ segments = [
 # 1,680 until the program segment left this list.
 [part."009"]
 exe  = "NEUROSIS.009"
-map  = "NEUR9.MAP"
+map      = "build/BIN/NEUR9.MAP"
 end_at   = 0x1069
+dgroup_at = 0x10c3
 segments = [
   { segment = 0x1007, name = "CRT" }
 ]
@@ -201,8 +210,9 @@ segments = [
 # being measured -- one instrument stopped counting another one's bytes.
 [part."psycho"]
 exe  = "PSYCHO.EXE"
-map  = "TPSYCHO.MAP"
+map      = "build/BIN/TPSYCHO.MAP"
 end_at   = 0x1019
+dgroup_at = 0x106d
 segments = [
   { segment = 0x100b, name = "DOS" }
 ]
