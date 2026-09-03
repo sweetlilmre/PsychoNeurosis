@@ -28,54 +28,58 @@
 # costs. The main program block at 0x1000 is deliberately excluded everywhere:
 # a harness supplies its own main, so it can never match by construction.
 #
-# `segs` is in ASCENDING order and each segment's extent is the NEXT entry's
-# base -- so the list has to be complete, and `rtl` is the first runtime segment,
-# which caps the last user one. That is the same arithmetic the link instruments
-# use, and for the same reason: a length table beside an address table is a
-# second copy of one measurement.
+# `segments` is in ASCENDING order and each segment's extent is the NEXT entry's
+# base -- so the list has to be complete, and `end_at` is the bound that makes the
+# LAST one computable. That is why neither can become a length table beside an
+# address table: two tables of one measurement drift.
+#
+# `end_at` is named for what every reader does with it -- the last bound -- and not
+# for what happens to sit there. In this target that address is where Borland's
+# runtime begins, so this key was once called `rtl`; but dgroup.py uses the same
+# number as where DGROUP starts, and a C or assembler target would have neither.
 
 min_span = 16
 
 [part."001"]
 exe  = "NEUROSIS.001"
 map  = "NEUR1.MAP"
-rtl  = 0x1543
-segs = [0x1012, 0x1082, 0x10e3, 0x1107, 0x12b2, 0x12c5, 0x1483, 0x1491, 0x14d0, 0x1532]
+end_at   = 0x1543
+segments = [0x1012, 0x1082, 0x10e3, 0x1107, 0x12b2, 0x12c5, 0x1483, 0x1491, 0x14d0, 0x1532]
 
 [part."002"]
 # The real program, from src/NEUR2.PAS: no harness, no driver unit.
 exe  = "NEUROSIS.002"
 map  = "NEUR2.MAP"
-rtl  = 0x14b1
-segs = [0x1008, 0x107c, 0x108b, 0x13f9, 0x140c, 0x142a, 0x1436, 0x144f]
+end_at   = 0x14b1
+segments = [0x1008, 0x107c, 0x108b, 0x13f9, 0x140c, 0x142a, 0x1436, 0x144f]
 
 [part."003"]
 # The real program, from src/NEUR3.PAS: no harness, no driver unit.
 exe  = "NEUROSIS.003"
 map  = "NEUR3.MAP"
-rtl  = 0x137b
-segs = [0x1015, 0x10b8, 0x1139, 0x1192, 0x119d, 0x11f3, 0x120f, 0x125e, 0x12f8, 0x1309, 0x136b]
+end_at   = 0x137b
+segments = [0x1015, 0x10b8, 0x1139, 0x1192, 0x119d, 0x11f3, 0x120f, 0x125e, 0x12f8, 0x1309, 0x136b]
 
 [part."005"]
 # The real program, from src/NEUR5.PAS: no harness, no driver unit.
 exe  = "NEUROSIS.005"
 map  = "NEUR5.MAP"
-rtl  = 0x12d9
-segs = [0x100e, 0x1096, 0x1102, 0x124a, 0x1252, 0x1266, 0x12c8]
+end_at   = 0x12d9
+segments = [0x100e, 0x1096, 0x1102, 0x124a, 0x1252, 0x1266, 0x12c8]
 
 [part."004"]
 # The real program: an eighty-byte call, as the original's segment 1000 is.
 exe  = "NEUROSIS.004"
 map  = "NEUR4.MAP"
-rtl  = 0x1288
-segs = [0x1005, 0x11d9, 0x11e3, 0x1226]
+end_at   = 0x1288
+segments = [0x1005, 0x11d9, 0x11e3, 0x1226]
 
 [part."006"]
 # The real program, from src/NEUR6.PAS: no harness, no driver unit.
 exe  = "NEUROSIS.006"
 map  = "NEUR6.MAP"
-rtl  = 0x128a
-segs = [0x100f, 0x1095, 0x1118, 0x11bb, 0x11ee, 0x1217, 0x1279]
+end_at   = 0x128a
+segments = [0x100f, 0x1095, 0x1118, 0x11bb, 0x11ee, 0x1217, 0x1279]
 
 [part."007"]
 # THE REAL PROGRAM, NOT A HARNESS. src/NEUR7.PAS carries the main body that
@@ -84,8 +88,8 @@ segs = [0x100f, 0x1095, 0x1118, 0x11bb, 0x11ee, 0x1217, 0x1279]
 # its own paragraph.
 exe  = "NEUROSIS.007"
 map  = "NEUR7.MAP"
-rtl  = 0x110c
-segs = [0x100b, 0x100f, 0x1099, 0x10fb]
+end_at   = 0x110c
+segments = [0x100b, 0x100f, 0x1099, 0x10fb]
 
 # THE THREE THAT ALREADY REBUILD BYTE-IDENTICAL, and they are here as a CHECK
 # ON THIS FILE rather than as work. artefact.py holds all three at R7 -- NEUR0,
@@ -109,17 +113,17 @@ segs = [0x100b, 0x100f, 0x1099, 0x10fb]
 exe  = "NEUROSIS.000"
 # The compiler names its map after the SOURCE, so it keeps the built name.
 map  = "NEUR0.MAP"
-rtl  = 0x1213
-segs = [0x1000, 0x11ad, 0x11b1]
+end_at   = 0x1213
+segments = [0x1000, 0x11ad, 0x11b1]
 
 [part."009"]
 exe  = "NEUROSIS.009"
 map  = "NEUR9.MAP"
-rtl  = 0x1069
-segs = [0x1000, 0x1007]
+end_at   = 0x1069
+segments = [0x1000, 0x1007]
 
 [part."psycho"]
 exe  = "PSYCHO.EXE"
 map  = "TPSYCHO.MAP"
-rtl  = 0x1019
-segs = [0x1000, 0x100b]
+end_at   = 0x1019
+segments = [0x1000, 0x100b]
