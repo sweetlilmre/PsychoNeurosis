@@ -46,10 +46,14 @@ min_span = 16
 # and are bounded by `end_at` and `dgroup_at` instead.
 [lists]
 rtl = ["System", "Crt"]
+# Units that emit no code segment, so the link order says nothing about
+# them. This target has none: every unit it links carries code.
+noseg = []
 
 [part."001"]
 exe  = "NEUROSIS.001"
 map      = "build/BIN/NEUR1.MAP"
+main_unit = "NEUR1"
 end_at   = 0x1543
 dgroup_at = 0x18f8
 segments = [
@@ -69,6 +73,7 @@ segments = [
 # The real program, from src/NEUR2.PAS: no harness, no driver unit.
 exe  = "NEUROSIS.002"
 map      = "build/BIN/NEUR2.MAP"
+main_unit = "NEUR2"
 end_at   = 0x14b1
 dgroup_at = 0x1866
 segments = [
@@ -86,6 +91,7 @@ segments = [
 # The real program, from src/NEUR3.PAS: no harness, no driver unit.
 exe  = "NEUROSIS.003"
 map      = "build/BIN/NEUR3.MAP"
+main_unit = "NEUR3"
 end_at   = 0x137b
 dgroup_at = 0x1761
 segments = [
@@ -106,6 +112,7 @@ segments = [
 # The real program, from src/NEUR5.PAS: no harness, no driver unit.
 exe  = "NEUROSIS.005"
 map      = "build/BIN/NEUR5.MAP"
+main_unit = "NEUR5"
 end_at   = 0x12d9
 dgroup_at = 0x166c
 segments = [
@@ -122,6 +129,7 @@ segments = [
 # The real program: an eighty-byte call, as the original's segment 1000 is.
 exe  = "NEUROSIS.004"
 map      = "build/BIN/NEUR4.MAP"
+main_unit = "NEUR4"
 end_at   = 0x1288
 dgroup_at = 0x1373
 segments = [
@@ -135,6 +143,7 @@ segments = [
 # The real program, from src/NEUR6.PAS: no harness, no driver unit.
 exe  = "NEUROSIS.006"
 map      = "build/BIN/NEUR6.MAP"
+main_unit = "NEUR6"
 end_at   = 0x128a
 dgroup_at = 0x164e
 segments = [
@@ -154,6 +163,7 @@ segments = [
 # its own paragraph.
 exe  = "NEUROSIS.007"
 map      = "build/BIN/NEUR7.MAP"
+main_unit = "NEUR7"
 end_at   = 0x110c
 dgroup_at = 0x14ce
 segments = [
@@ -192,6 +202,7 @@ segments = [
 [part."000"]
 exe  = "NEUROSIS.000"
 # The compiler names its map after the SOURCE, so it keeps the built name.
+main_unit = "NEUR0"
 map      = "build/BIN/NEUR0.MAP"
 end_at   = 0x1213
 dgroup_at = 0x12ed
@@ -206,6 +217,7 @@ segments = [
 [part."009"]
 exe  = "NEUROSIS.009"
 map      = "build/BIN/NEUR9.MAP"
+main_unit = "NEUR9"
 end_at   = 0x1069
 dgroup_at = 0x10c3
 segments = [
@@ -218,8 +230,15 @@ segments = [
 [part."psycho"]
 exe  = "PSYCHO.EXE"
 map      = "build/BIN/TPSYCHO.MAP"
+main_unit = "PSYCHO"
 end_at   = 0x1019
 dgroup_at = 0x106d
 segments = [
   { segment = 0x100b, name = "DOS" }
 ]
+
+# Source unit name -> the name the linker map uses, where the two differ.
+# This target needs no rows: its unit identifiers are already eight
+# characters or fewer, so nothing is abbreviated. The table exists because a
+# sibling's are not, and the reader wants the mapping either way.
+[unitname]
