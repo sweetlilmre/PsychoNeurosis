@@ -92,6 +92,17 @@ first_para = 0x1000
 # the sibling repository.
 "009" = "work/split/NEUROSIS_009.exe"
 
+# THE LAUNCHER. Not a split part -- it is a whole program of its own, which is
+# why it is keyed by name rather than by a three-digit number and why nothing
+# carved it out of the release. Its absence here was invisible while the
+# layout config could not answer per part at all; once dgroup could measure
+# nine of the ten it named the tenth as the gap.
+#
+# bin/PSYCHO.EXE rather than work/split/PSYCHO_EXE.exe -- the two files are
+# byte-for-byte the same, and this is the path the guarded [artefact."TPSYCHO"]
+# row already compares against. Two names for one original is how they drift.
+psycho = "bin/PSYCHO.EXE"
+
 # WHICH ORIGINAL A COVERAGE WALK USES, and it is NOT the table above. That one
 # names the trap-rewritten copies where they exist, so a per-routine check reads
 # an x87 site as a tolerated hole. A walk over every byte must use the SHIPPED
