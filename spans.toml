@@ -40,6 +40,13 @@
 
 min_span = 16
 
+# Borland's own units, which are not this target's to transcribe. Measured as
+# the unit names appearing in all ten linker maps that are not ours: System is
+# in all ten, Crt in nine. DATA, STACK and HEAP are segments rather than units
+# and are bounded by `end_at` and `dgroup_at` instead.
+[lists]
+rtl = ["System", "Crt"]
+
 [part."001"]
 exe  = "NEUROSIS.001"
 map      = "build/BIN/NEUR1.MAP"
