@@ -135,7 +135,11 @@ psycho = "bin/PSYCHO.EXE"
 # constant inside the tool naming one repository's folders; the folders it named
 # have since been emptied by the migration, and the kit's own scripts were never
 # scanned by it at all.
-dirs = ["tools", "kit/tools", "kit/tools/substrate", "kit/tools/pascal", "kit/tools/wikitools"]
+# Two entries, not five. The three kit subfolders were listed by hand because
+# encaudit globbed a directory flat and never entered them -- it reported
+# `0 site(s) in 7 file(s)` over a tree of 77. It recurses now, so a folder
+# added tomorrow is audited without anybody remembering to add it here.
+dirs = ["tools", "kit/tools"]
 
 [undeclared]
 # Units whose exported names any other unit may use without declaring them --
