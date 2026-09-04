@@ -61,6 +61,11 @@ built_pattern = [
   "PSYCHO.EXE",
 ]
 
+# This tree is [re]-tagged, so tagcheck.py gates on it in the session list.
+# Tag as you WRITE -- more than half the apparatus carries no mechanical tell,
+# so the check cannot find what you did not mark.
+tagged   = true
+
 [target]
 # Facts about the thing being reverse engineered, read out of it by a person.
 
