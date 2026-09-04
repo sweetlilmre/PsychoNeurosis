@@ -79,3 +79,8 @@ run.bat
 # A DOSBox config written by following the README's TL;DR. It carries the host
 # path of wherever the demo was copied to, so it is nobody else's.
 psycho.conf
+
+# asmgen's scratch folder. `[assembler].workdir` names it and defaults to
+# this; the tool's docstring says to ignore whatever you name, because it
+# is created beside the config -- a repository root -- on every run.
+asmwork/
