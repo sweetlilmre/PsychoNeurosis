@@ -1,3 +1,4 @@
 [submodule "kit"]
 	path = kit
 	url = https://github.com/sweetlilmre/re-kit.git
+	branch = main
