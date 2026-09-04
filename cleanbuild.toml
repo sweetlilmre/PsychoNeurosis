@@ -34,6 +34,16 @@ timeout = 180
 lint    = "kit/tools/pascal/paslint.py"
 
 [compiler]
+# No `binpath` here: the kit derives the DOS bin directory from
+# `toolchain.<entry>` in kit.local.toml, which is where a machine path
+# belongs -- and where a rename actually gets corrected.
+#
+# THE VALUES THIS FILE USED TO CARRY WERE RIGHT, and that is why the
+# derivation could be trusted: all four matched the answers file, and
+# deriving reproduced all four exactly. The sibling consumer's fifteen were
+# stale -- the leftovers of the TP6/TP600 rename, in the one place that
+# compiles nothing, since every invocation BUILD.BAT writes is fully
+# qualified. A duplicate that cannot fail is a duplicate nobody corrects.
 # TP 7.00, NOT 7.01, AND IT IS MEASURED. The two installs are told apart by
 # TURBO.TPL, which the Borland patch notes size at 48,432 for 7.00 and 48,464
 # for 7.01: C:\TP700 is the former and C:\TP the latter. Building against 7.00
@@ -65,14 +75,12 @@ default = "tp700"
 # The switch line is tp700's, with only the unit path changed; the notes that
 # explain it live there, on the entry that actually builds the demo.
 dialect  = "tp7"
-binpath  = "C:\\TP701\\BIN"
 switches = "/EBIN /UBIN;.;C:\\TP701\\UNITS /I.;GEN;ASM /OBIN /$S- /GD"
 
 [compiler.tp700]
 # THE ONE THE DEMO IS BUILT WITH. See the [compiler] note above for the
 # evidence that it is 7.00 and not 7.01.
 dialect = "tp7"
-binpath = "C:\\TP700\\BIN"
 # /E<dir>  where the .EXE goes         /U<dirs> where to LOOK for units
 # /I<dirs> where {$I} includes live    /$S-     STACK CHECKING OFF
 #
