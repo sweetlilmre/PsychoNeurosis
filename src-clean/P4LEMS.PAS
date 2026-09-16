@@ -169,8 +169,6 @@ var
   Spawned    : Word;
 
 
-
-
 { --------------------------------------------------------------------------
   THE ASSETS.  LoadAssets seeks once into NEUROSIS.DAT and reads twenty blocks
   in order. Every sprite bank is indexed ONE-BASED. }
@@ -520,10 +518,6 @@ begin
   for I := $E0 to $E9 do SetRGB(I, 0, 0, 0);
 end;
 
-{ --------------------------------------------------------------------------
-  blank the DAC, put the hillside up, fade it in, then run a
-  seven-frame animation BACKWARDS at (5, 50) and start the music.
-  -------------------------------------------------------------------------- }
 
 procedure VLine(X, YTop, YBottom : Integer;
                 Colour : Byte; Segment : Word); assembler;
@@ -869,18 +863,6 @@ end;
   The scroller
   ========================================================================== }
 
-{ --------------------------------------------------------------------------
-  write ONE column of one glyph into the buffer's run-up.
-
-  The font is 62 glyphs from space upward, each 378 bytes = 21 columns of 18
-  rows stored column-major, so a column is 18 consecutive bytes. Each call
-  drops one such column into buffer column 320 -- the right-hand edge, just
-  off screen -- and ScrollRender then slides it into view.
-
-  RET 4: Ch at BP+6, Col at BP+4. The original's index is
-  Ch * 378 + Col * 18 + Row + 1 - 12115, and 12115 is 32 * 378 + 18 + 1, so
-  the character is 32-based and the column one-based.
-  -------------------------------------------------------------------------- }
 
 procedure CopyScreen(SrcSeg, DestSeg : Word); assembler;
 asm
@@ -1752,9 +1734,6 @@ begin
   until Done;
 end;
 
-{ --------------------------------------------------------------------------
-  Demo_Main.
-  -------------------------------------------------------------------------- }
 
 { the two heap blocks the scene needs beyond the virtual screen. }
 procedure Setup;

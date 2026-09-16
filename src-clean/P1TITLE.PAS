@@ -145,6 +145,48 @@ begin
   BlockRead(F, FontBuf^, SizeOf(TFontBuf));
 end;
 
+{ --------------------------------------------------------------------------
+  Sprite_BlitClipped -- the comet. HAND ASSEMBLER, verbatim.
+
+  A 65 x 48 transparent blit clipped against four bounds in DGROUP:
+
+  The clip is done by adjusting the START POINTER and the row and column COUNTS
+  before the copy, never per pixel: a top clip advances the source by
+  (rows * 65) with a MUL, a left clip advances the destination and shortens the
+  row, and both leftovers are added back between rows. Zero bytes are skipped.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      Rows := CometH;  Cols := CometW;  SkipL := 0;  SkipR := 0;
+      if ClipY1 - Y > 0 then
+      begin
+        if ClipY1 - Y >= Rows then Exit;
+        Dec(Rows, ClipY1 - Y);  Inc(P, (ClipY1 - Y) * CometW);  Y := ClipY1;
+      end;
+      if ClipY2 - Y <= 0 then Exit;
+      if ClipY2 - Y < Rows then Rows := ClipY2 - Y + 1;
+      D := YOfs[Y] + X;
+      if ClipX1 - X > 0 then
+      begin
+        if ClipX1 - X >= Cols then Exit;
+        SkipL := ClipX1 - X;  Inc(D, SkipL);  Dec(Cols, SkipL);
+      end;
+      if ClipX2 - X <= 0 then Exit;
+      if ClipX2 - X < Cols then
+      begin
+        SkipR := Cols - (ClipX2 - X);  Cols := ClipX2 - X;
+      end;
+      for Row := 1 to Rows do
+      begin
+        Inc(P, SkipL);
+        for Col := 1 to Cols do
+        begin
+          if P^ <> 0 then Mem[Segment : D] := P^;
+          Inc(P);  Inc(D);
+        end;
+        Inc(P, SkipR);  Inc(D, 320 - Cols);
+      end;
+  -------------------------------------------------------------------------- }
 { Redraw the characters revealed so far.
 
   A 150-row by 26-column masked blit out of the working buffer.
@@ -246,24 +288,6 @@ asm
 @@Done:                                 { 01cc is the LEAVE / RET $A         }
 end;
 
-{ --------------------------------------------------------------------------
-  Title_ShowWord
-
-  Called twice -- once with 'ASPHYXIA' (1082:$055E) and once with
-  'PRESENTS' (1082:$0567). A counter runs from 80 down to -18 while a comet
-  sprite flies across; as it passes, characters are revealed one at a time.
-  When the counter reaches -18 a 100-frame outro plays.
-
-  ASSETS, out of NEUROSIS.DAT:
-            assets/part001/INTROPAL.PAL    768 B
-            assets/part001/COMET0.PNG .. COMET9.PNG
-                                      10 frames of 65x48 -- a flaming comet
-            assets/part001/INTROBAK.PNG   64,000 B
-            assets/part001/00FD00D.BIN        15,104 B = a 59-character
-                                      16x16 font (59 x 256), drawn two
-                                      rows at a time by DrawChar
-          A 5,200-byte working buffer is allocated separately.
-  -------------------------------------------------------------------------- }
 
 procedure DrawRevealed; assembler;
 asm
@@ -370,49 +394,6 @@ end;
 
 
 { --------------------------------------------------------------------------
-  Sprite_BlitClipped -- the comet. HAND ASSEMBLER, verbatim.
-
-  A 65 x 48 transparent blit clipped against four bounds in DGROUP:
-
-  The clip is done by adjusting the START POINTER and the row and column COUNTS
-  before the copy, never per pixel: a top clip advances the source by
-  (rows * 65) with a MUL, a left clip advances the destination and shortens the
-  row, and both leftovers are added back between rows. Zero bytes are skipped.
-
-  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
-
-      Rows := CometH;  Cols := CometW;  SkipL := 0;  SkipR := 0;
-      if ClipY1 - Y > 0 then
-      begin
-        if ClipY1 - Y >= Rows then Exit;
-        Dec(Rows, ClipY1 - Y);  Inc(P, (ClipY1 - Y) * CometW);  Y := ClipY1;
-      end;
-      if ClipY2 - Y <= 0 then Exit;
-      if ClipY2 - Y < Rows then Rows := ClipY2 - Y + 1;
-      D := YOfs[Y] + X;
-      if ClipX1 - X > 0 then
-      begin
-        if ClipX1 - X >= Cols then Exit;
-        SkipL := ClipX1 - X;  Inc(D, SkipL);  Dec(Cols, SkipL);
-      end;
-      if ClipX2 - X <= 0 then Exit;
-      if ClipX2 - X < Cols then
-      begin
-        SkipR := Cols - (ClipX2 - X);  Cols := ClipX2 - X;
-      end;
-      for Row := 1 to Rows do
-      begin
-        Inc(P, SkipL);
-        for Col := 1 to Cols do
-        begin
-          if P^ <> 0 then Mem[Segment : D] := P^;
-          Inc(P);  Inc(D);
-        end;
-        Inc(P, SkipR);  Inc(D, 320 - Cols);
-      end;
-  -------------------------------------------------------------------------- }
-
-{ --------------------------------------------------------------------------
   Title_ShowWord
 
   Called twice -- once with 'ASPHYXIA' (1082:$055E) and once with
@@ -500,7 +481,6 @@ begin
     CopyScreen(VirtScrSeg, $A000);
   end;
 end;
-
 
 
 procedure Scene2;

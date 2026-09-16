@@ -166,58 +166,6 @@ var
 
 
 { --------------------------------------------------------------------------
-  Sprite_DrawRotated -- HAND ASSEMBLER, transcribed verbatim.
-
-  Draws one 56x56 sprite rotated about its top-left corner into the virtual
-  screen. It is a plain rotate-and-sample: two fixed-point accumulators walk
-  the source square, stepping by (SinA, CosA) along a row and (CosA, -SinA)
-  down a column, so the rotation costs two adds per pixel and no multiplies
-  at all. Coordinates are 6-bit fixed point, hence the SHL 6 on the way in
-  and the SHR 6 on the way out.
-
-  Three things are worth knowing before reading it:
-
-  * SI IS THE SOURCE INDEX AND IT MUST ADVANCE BY EXACTLY ONE PER PIXEL,
-    whether the pixel is drawn or not. MOVSB/MOVSW advance it by one or two
-    of their own accord, so the routine brackets the store with INC SI /
-    DEC SI to land back on the right byte either way. That bookkeeping is the
-    reason this cannot be written as Pascal without changing what it does.
-
-  Clipping is one-sided: Y must be in 1..189 ($3F < FixY < $2F80) and X must
-  be at least 1, but there is NO upper bound on X, so a sprite pushed far
-  enough right wraps onto the following rows. The original has the same hole.
-
-  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
-
-      FixX := X shl 6;
-      FixY := Y shl 6;
-      S    := 0;
-      for Row := 1 to 56 do
-      begin
-        U := FixX;  V := FixY;
-        for Col := 1 to 56 do
-        begin
-          if (V < $2F80) and (V > $3F) and (U > $3F) then
-          begin
-            D := (U shr 6) + (V and $FFC0) * 5;
-            if Ang > 180 then
-            begin
-              Mem[VirtScrSeg : D + 1] := Src^[S];
-              Mem[VirtScrSeg : D    ] := Src^[S + 1];
-            end
-            else
-            begin
-              Mem[VirtScrSeg : D    ] := Src^[S];
-              Mem[VirtScrSeg : D + 1] := Src^[S + 1];
-            end;
-          end;
-          Inc(U, SinA);  Inc(V, CosA);  Inc(S);
-        end;
-        Inc(FixX, CosA);  Dec(FixY, SinA);
-      end;
-
-  Where that Pascal is not the same thing: }
-{ --------------------------------------------------------------------------
   Sprites_DrawChar -- compiled Pascal in the binary, so it is
   Pascal here.
 
@@ -329,23 +277,57 @@ begin
 end;
 
 { --------------------------------------------------------------------------
-  Sprites_Prepare -- one member's introduction, all three phases.
+  Sprite_DrawRotated -- HAND ASSEMBLER, transcribed verbatim.
 
-  Not the caption-only routine an earlier pass took it for. The caption is
-  phase 3 of three; phases 1 and 2 are the portrait flying in and orbiting.
+  Draws one 56x56 sprite rotated about its top-left corner into the virtual
+  screen. It is a plain rotate-and-sample: two fixed-point accumulators walk
+  the source square, stepping by (SinA, CosA) along a row and (CosA, -SinA)
+  down a column, so the rotation costs two adds per pixel and no multiplies
+  at all. Coordinates are 6-bit fixed point, hence the SHL 6 on the way in
+  and the SHR 6 on the way out.
 
-  with N = 1..4 and Row = 1..10. That is a flat array of 256-byte String
-  slots: $6BB8 + 11*$100 = $76B8 is member 1's first line, which is exactly
-  where the strings were first found. In Pascal terms it is
+  Three things are worth knowing before reading it:
 
-      Captions[N, Row][Col]
+  * SI IS THE SOURCE INDEX AND IT MUST ADVANCE BY EXACTLY ONE PER PIXEL,
+    whether the pixel is drawn or not. MOVSB/MOVSW advance it by one or two
+    of their own accord, so the routine brackets the store with INC SI /
+    DEC SI to land back on the right byte either way. That bookkeeping is the
+    reason this cannot be written as Pascal without changing what it does.
 
-  and the two addresses agree exactly -- see gen/P3CAPT.INC.
+  Clipping is one-sided: Y must be in 1..189 ($3F < FixY < $2F80) and X must
+  be at least 1, but there is NO upper bound on X, so a sprite pushed far
+  enough right wraps onto the following rows. The original has the same hole.
 
-  A keypress abandons the whole introduction at any point. It is never
-  consumed, so Run's remaining Prepare calls fall straight through too and
-  the scene ends.
-  -------------------------------------------------------------------------- }
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      FixX := X shl 6;
+      FixY := Y shl 6;
+      S    := 0;
+      for Row := 1 to 56 do
+      begin
+        U := FixX;  V := FixY;
+        for Col := 1 to 56 do
+        begin
+          if (V < $2F80) and (V > $3F) and (U > $3F) then
+          begin
+            D := (U shr 6) + (V and $FFC0) * 5;
+            if Ang > 180 then
+            begin
+              Mem[VirtScrSeg : D + 1] := Src^[S];
+              Mem[VirtScrSeg : D    ] := Src^[S + 1];
+            end
+            else
+            begin
+              Mem[VirtScrSeg : D    ] := Src^[S];
+              Mem[VirtScrSeg : D + 1] := Src^[S + 1];
+            end;
+          end;
+          Inc(U, SinA);  Inc(V, CosA);  Inc(S);
+        end;
+        Inc(FixX, CosA);  Dec(FixY, SinA);
+      end;
+
+  Where that Pascal is not the same thing: }
 
 procedure DrawRotated(Ang, SinA, CosA, X, Y : Integer; Src : Pointer);
   assembler;
@@ -606,9 +588,6 @@ begin
   end;
 end;
 
-{ --------------------------------------------------------------------------
-  Demo_Scene7
-  -------------------------------------------------------------------------- }
 
 { --------------------------------------------------------------------------
   Demo_Scene7

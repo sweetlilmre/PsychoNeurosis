@@ -137,6 +137,22 @@ type
 {$I gen/P3SHAPE.INC}     { const ShapeSphere, ShapeCube, ShapeGrid : TShape }
 
 var
+
+{ --------------------------------------------------------------------------
+  SetAngles.  AngX in BX, AngY in CX, AngZ in DX.
+
+  Hand assembler, reached by a plain CALL from StepAngles with the angles
+  already in registers. One table serves both functions: cos(a) is sin(a+90),
+  so the cosine lookup is the same table 90 entries -- 180 bytes -- further
+  along. That is why the original quotes two base addresses, $02A8 and $035C,
+  for one table. No trig call anywhere in the frame path.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      SinX := SinTab[AngX];  CosX := SinTab[AngX + 90];
+      SinY := SinTab[AngY];  CosY := SinTab[AngY + 90];
+      SinZ := SinTab[AngZ];  CosZ := SinTab[AngZ + 90];
+  -------------------------------------------------------------------------- }
   { The rotation's sines and cosines, COSINE FIRST IN EVERY PAIR -- Z as well
     as X and Y, which is easy to get wrong because nothing in the rotation
     itself distinguishes them. Exchanging a pair on one axis compiles, runs,
@@ -215,17 +231,6 @@ var
   keeps the tables in DGROUP. Removing the call took 32 bytes out and left the
   initialised image identical. }
 
-{ --------------------------------------------------------------------------
-  GetPalette768(var P)
-
-  Hand assembler. The whole DAC comes back in a single REP INSB rather than a
-  counted loop, which is why there is no loop here to transcribe.
-
-  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
-
-      Port[$3C7] := 0;
-      for I := 0 to 767 do B[I] := Port[$3C9];
-  -------------------------------------------------------------------------- }
 { [re] @asm 003 1139:0000 ? }
 procedure SetAngles; assembler;
 asm
@@ -543,21 +548,29 @@ asm
 end;
 
 { --------------------------------------------------------------------------
-  ClearPage.  Blanks the half of each row belonging to the back
-  page. Hand assembler: a REP STOSW per row with a fixed skip between them.
+  Morph_DrawShape -- draw one shape straight.
 
-  Note it runs 399 rows, not 400 -- the last row of the page is never
-  cleared. That is the original's count and is kept.
+  ASSETS  The shapes are compiled into the program itself, not held in
+          NEUROSIS.DAT with the rest of the demo's data. Copies are kept at
+            assets/part003/SHPSPHER.BIN / .png
+            assets/part003/SHPCUBE.BIN  / .png
+            assets/part003/SHPGRID.BIN  / .png
+          765 points x 6 bytes, three signed words (X, Y, Z).
+          The .png files are previews rendered with the constants below.
+          See docs/08-part3-scene3-morph.md.
+  -------------------------------------------------------------------------- }
+
+{ --------------------------------------------------------------------------
+  DrawShape.  Reads CurShape, walks 765 points six bytes at a
+  time and hands each to TransformPoint in BX, CX, DX, whose results go
+  straight on to PlotPixel in DI and BX. Assembler in the original; the
+  register hand-off between the three is the whole reason.
 
   EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
 
-      P := PageOfs;
-      PortW[$3C4] := $0F02;
-      for Y := 1 to 399 do
-      begin
-        for I := 1 to 40 do  MemW[$A000 : P] := 0, then Inc(P, 2);
-        Inc(P, 80);
-      end;
+      S := Ptr(DSeg, CurShape);
+      for I := 1 to 765 do
+        PlotPixel(TransformPoint(S^[I,1], S^[I,2], S^[I,3]));
   -------------------------------------------------------------------------- }
 { [re] @asm 003 1139:01f9 }
 procedure DrawShape; assembler;
@@ -673,10 +686,21 @@ asm
 end;
 
 { --------------------------------------------------------------------------
-  Morph_FadeStep
-  Read the whole DAC back, decrement every non-zero component by one, wait
-  for retrace and write it out again -- a one-step fade toward black, called
-  once per frame during the closing segment.
+  ClearPage.  Blanks the half of each row belonging to the back
+  page. Hand assembler: a REP STOSW per row with a fixed skip between them.
+
+  Note it runs 399 rows, not 400 -- the last row of the page is never
+  cleared. That is the original's count and is kept.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      P := PageOfs;
+      PortW[$3C4] := $0F02;
+      for Y := 1 to 399 do
+      begin
+        for I := 1 to 40 do  MemW[$A000 : P] := 0, then Inc(P, 2);
+        Inc(P, 80);
+      end;
   -------------------------------------------------------------------------- }
 
 { [re] @asm 003 1139:02a2 }
@@ -733,18 +757,6 @@ asm
 end;
 
 { --------------------------------------------------------------------------
-  Morph_DrawShape -- draw one shape straight.
-
-  ASSETS  The shapes are compiled into the program itself, not held in
-          NEUROSIS.DAT with the rest of the demo's data. Copies are kept at
-            assets/part003/SHPSPHER.BIN / .png
-            assets/part003/SHPCUBE.BIN  / .png
-            assets/part003/SHPGRID.BIN  / .png
-          765 points x 6 bytes, three signed words (X, Y, Z).
-          The .png files are previews rendered with the constants below.
-          See docs/08-part3-scene3-morph.md.
-  -------------------------------------------------------------------------- }
-{ --------------------------------------------------------------------------
   Morph_CheckKey -- ASSEMBLER, AND IT RETURNS IN DX.
 
   The scene tests for a key through a routine of its own rather than calling
@@ -790,16 +802,48 @@ asm
 end;
 
 { --------------------------------------------------------------------------
-  DrawShape.  Reads CurShape, walks 765 points six bytes at a
-  time and hands each to TransformPoint in BX, CX, DX, whose results go
-  straight on to PlotPixel in DI and BX. Assembler in the original; the
-  register hand-off between the three is the whole reason.
+  VGA_Set400Lines
+  CRTC register 9, low five bits cleared: maximum scan line = 0, i.e. no
+  double scanning. That turns the 320x200 Mode-X screen into 320x400.
+  -------------------------------------------------------------------------- }
+
+{ --------------------------------------------------------------------------
+  the Mode-X row table
+
+      for I := 0 to $31F do
+        RowOfs[I] := (LogicalWidth * I) shl 1
+
+  LogicalWidth is the byte InitScene sets to 80, so the stride is 160 bytes
+  per row -- one plane of a 640-pixel logical line.
+
+  THIS IS NOT VGA.BuildRowTable. That one fills VGA's own YOfs with y * 320
+  for the 200 rows of mode 13h, and it is what InitScene used to call: the
+  table below stayed all zeros, every dot landed on row 0, and the scene drew
+  nothing. The two tables coexist and must not be conflated -- the note at the
+  bottom of VGA.PAS says exactly that.
+
+  The code lives in the VGA unit with the rest of the mode handling, but the
+  table it fills is this scene's own data, which is why it is described here.
+  -------------------------------------------------------------------------- }
+
+{ --------------------------------------------------------------------------
+  VGA_Set400Lines
+  CRTC register 9 is Maximum Scan Line. Its low five bits say how many times
+  each character row is repeated; mode 13h leaves them at 1, which is what
+  double-scans 200 lines into 400. Clearing them turns the double scan off,
+  so the 320x200 Mode-X screen becomes 320x400 with no other change.
+
+  The top three bits of register 9 are not ours to touch -- bit 7 is the
+  200-line double word mode flag and bits 5-6 are the start row of the text
+  cursor -- so the write is read-modify-write with AND $E0, not a plain MOV.
 
   EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
 
-      S := Ptr(DSeg, CurShape);
-      for I := 1 to 765 do
-        PlotPixel(TransformPoint(S^[I,1], S^[I,2], S^[I,3]));
+      Port[$3D4] := 9;
+      Port[$3D5] := Port[$3D5] and $E0;
+
+  That Pascal is genuinely equivalent here. It is written in assembler
+  because the original is, not because Pascal could not express it.
   -------------------------------------------------------------------------- }
 { [re] @asm 003 1139:02f2 }
 procedure Set400Lines; assembler;
@@ -814,19 +858,7 @@ asm
 end;
 
 { --------------------------------------------------------------------------
-  SetAngles.  AngX in BX, AngY in CX, AngZ in DX.
-
-  Hand assembler, reached by a plain CALL from StepAngles with the angles
-  already in registers. One table serves both functions: cos(a) is sin(a+90),
-  so the cosine lookup is the same table 90 entries -- 180 bytes -- further
-  along. That is why the original quotes two base addresses, $02A8 and $035C,
-  for one table. No trig call anywhere in the frame path.
-
-  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
-
-      SinX := SinTab[AngX];  CosX := SinTab[AngX + 90];
-      SinY := SinTab[AngY];  CosY := SinTab[AngY + 90];
-      SinZ := SinTab[AngZ];  CosZ := SinTab[AngZ + 90];
+  Morph_InitScene
   -------------------------------------------------------------------------- }
 { HAND ASSEMBLER, and it has to be written that way: Turbo Pascal gives every
   Pascal procedure a stack frame, and this routine has none.
@@ -870,9 +902,16 @@ asm
 end;
 
 { --------------------------------------------------------------------------
-  Demo_Scene3
-  Eight scripted segments of 45 frames (63 for the last). Odd segments hold a
-  shape, even segments morph to the next one. The closing segment also fades.
+  SetPalette768(var P)
+
+  The write side, likewise a single REP OUTSB. Note there is NO retrace wait
+  in the original -- the Pascal version used to add one, which is a change in
+  behaviour, not a tidy-up.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      Port[$3C8] := 0;
+      for I := 0 to 767 do Port[$3C9] := B[I];
   -------------------------------------------------------------------------- }
 { ONLY A FORWARD DECLARATION MAY GO HERE. The body belongs after Scene3, and
   moving it above would shift Scene3 and all eight of its blocks along with it.
@@ -882,59 +921,6 @@ end;
   [re] It is declared after Scene3, at 1139:0670. Placing the body before
   Scene3 puts Scene3 at the wrong offset -- 476 bytes, the largest single span
   in this target, and all of it downstream of one declaration's position. }
-{ --------------------------------------------------------------------------
-  Demo_Scene3 -- HAND ASSEMBLER, and the whole procedure is.
-
-  THREE MEASUREMENTS SAY SO, and two of them had been made and disbelieved.
-
-  [re] 1. NO PROLOGUE AND NO EPILOGUE. 1139:03b4 goes straight into a CALL and the
-     routine ends at 0583 with a bare RETF. A compiled Turbo Pascal procedure
-     opens PUSH BP / MOV BP,SP and closes LEAVE / RETF even with no locals at
-     all -- probe/DECLOOP.PAS has seven such procedures and every one of them
-     carries the frame. Only `assembler` omits it.
-
-  [re] 2. DEC FOLLOWED STRAIGHT BY JNE. 1139:0414 is DEC WORD PTR [Frames] / JNE,
-     six bytes. Turbo Pascal re-reads the variable: DEC, then CMP ...,0, then
-     JNE -- five bytes more, at each of eight loops. probe/DECLOOP.PAS tries
-     seven spellings of "count down and stop at zero" -- Dec then `until = 0`,
-     with a call in the body, `until <= 0`, an assignment instead of Dec, Word,
-     Byte, and a while -- across Turbo Pascal 7, 6.0 and 6.1. EVERY ONE emits
-     the CMP. There is no such peephole in any dialect.
-
-  3. OR DX,DX. Turbo Pascal returns a Boolean in AL, a word in AX, a LongInt or
-     a pointer in DX:AX, and NOTHING in DX alone. The DX form appears exactly
-     once in the whole demo -- here -- while every part carries the runtime's AL
-     form. CheckKey below is an assembler function returning DX by the author's
-     own convention, and only asm can test it.
-
-  AND THE JUMPS OUT PROVE IT TWICE OVER, which is the detail that settles any
-  doubt about extent. Eight loops test the key and leave the scene; the first
-  five write JE over a JMP and the last three write a plain JNE. A compiler is
-  consistent. A PERSON writes `JNE @@Done` every time, and inverts it only where
-  the assembler complains that the target is out of a short branch's reach --
-  which is exactly the first five, whose exits are $1A3 down to $109 bytes away,
-  and exactly not the last three, at $6D, $43 and $06. The inconsistency is the
-  signature.
-
-  So it is transcribed verbatim below, per the standing rule for this target.
-  THE EQUIVALENT PASCAL, which is what was here before and is behaviourally the
-  same thing:
-
-      InitScene;  PageOfs := PageOfsB;
-      CurShape := ShapeSphere; MorphFrom := ShapeSphere; MorphTo := ShapeCube;
-      StepX := SpinX; StepY := SpinY; StepZ := SpinZ;
-      AngX := 0; AngY := 0; AngZ := 0;
-      Frames := SegFrames;
-      repeat ClearPage; DrawShape; FlipPage; WaitRetrace; StepAngles;
-             if CheckKey then Exit; Dec(Frames) until Frames = 0;
-
-  and seven more of those, alternating DrawShape and DrawMorph, with MorphFrom
-  and MorphTo walking sphere -> cube -> grid -> cube -> sphere and the last one
-  fading the palette out as it morphs.
-
-  A key abandons the WHOLE scene rather than one segment of it -- every test
-  jumps to the procedure's own RETF.
-  -------------------------------------------------------------------------- }
 
 { [re] @asm 003 1139:0335 }
 procedure SetPalette768(var P); assembler;
@@ -951,6 +937,17 @@ asm
 end;
 
 
+{ --------------------------------------------------------------------------
+  GetPalette768(var P)
+
+  Hand assembler. The whole DAC comes back in a single REP INSB rather than a
+  counted loop, which is why there is no loop here to transcribe.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      Port[$3C7] := 0;
+      for I := 0 to 767 do B[I] := Port[$3C9];
+  -------------------------------------------------------------------------- }
   { RowOfs is the Mode-X unit's own table, not this scene's -- see MODEX.PAS.
     It is imported, and must not be declared here as well. }
 
@@ -974,49 +971,7 @@ end;
   segment is a list of every unit's entry-point offsets, and comparing it byte
   for byte is the only instrument here that reads them. }
 
-{ --------------------------------------------------------------------------
-  VGA_Set400Lines
-  CRTC register 9, low five bits cleared: maximum scan line = 0, i.e. no
-  double scanning. That turns the 320x200 Mode-X screen into 320x400.
-  -------------------------------------------------------------------------- }
-{ --------------------------------------------------------------------------
-  the Mode-X row table
 
-      for I := 0 to $31F do
-        RowOfs[I] := (LogicalWidth * I) shl 1
-
-  LogicalWidth is the byte InitScene sets to 80, so the stride is 160 bytes
-  per row -- one plane of a 640-pixel logical line.
-
-  THIS IS NOT VGA.BuildRowTable. That one fills VGA's own YOfs with y * 320
-  for the 200 rows of mode 13h, and it is what InitScene used to call: the
-  table below stayed all zeros, every dot landed on row 0, and the scene drew
-  nothing. The two tables coexist and must not be conflated -- the note at the
-  bottom of VGA.PAS says exactly that.
-
-  The code lives in the VGA unit with the rest of the mode handling, but the
-  table it fills is this scene's own data, which is why it is described here.
-  -------------------------------------------------------------------------- }
-
-{ --------------------------------------------------------------------------
-  VGA_Set400Lines
-  CRTC register 9 is Maximum Scan Line. Its low five bits say how many times
-  each character row is repeated; mode 13h leaves them at 1, which is what
-  double-scans 200 lines into 400. Clearing them turns the double scan off,
-  so the 320x200 Mode-X screen becomes 320x400 with no other change.
-
-  The top three bits of register 9 are not ours to touch -- bit 7 is the
-  200-line double word mode flag and bits 5-6 are the start row of the text
-  cursor -- so the write is read-modify-write with AND $E0, not a plain MOV.
-
-  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
-
-      Port[$3D4] := 9;
-      Port[$3D5] := Port[$3D5] and $E0;
-
-  That Pascal is genuinely equivalent here. It is written in assembler
-  because the original is, not because Pascal could not express it.
-  -------------------------------------------------------------------------- }
 { [re] @asm 003 1139:034d }
 procedure GetPalette768(var P); assembler;
 asm
@@ -1029,18 +984,6 @@ asm
   REP  INSB             { read them all straight into ES:DI                  }
 end;
 
-{ --------------------------------------------------------------------------
-  SetPalette768(var P)
-
-  The write side, likewise a single REP OUTSB. Note there is NO retrace wait
-  in the original -- the Pascal version used to add one, which is a change in
-  behaviour, not a tidy-up.
-
-  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
-
-      Port[$3C8] := 0;
-      for I := 0 to 767 do Port[$3C9] := B[I];
-  -------------------------------------------------------------------------- }
 { --------------------------------------------------------------------------
   Morph_FadeStep
   Read the whole DAC back, decrement every non-zero component by one, wait
@@ -1142,7 +1085,9 @@ begin
 end;
 
 { --------------------------------------------------------------------------
-  Morph_InitScene
+  Demo_Scene3
+  Eight scripted segments of 45 frames (63 for the last). Odd segments hold a
+  shape, even segments morph to the next one. The closing segment also fades.
   -------------------------------------------------------------------------- }
 { --------------------------------------------------------------------------
   Demo_Scene3 -- HAND ASSEMBLER, and the whole procedure is.

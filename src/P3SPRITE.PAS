@@ -183,84 +183,6 @@ var
 
 
 { --------------------------------------------------------------------------
-  Sprite_DrawRotated -- HAND ASSEMBLER, transcribed verbatim.
-
-  Draws one 56x56 sprite rotated about its top-left corner into the virtual
-  screen. It is a plain rotate-and-sample: two fixed-point accumulators walk
-  the source square, stepping by (SinA, CosA) along a row and (CosA, -SinA)
-  down a column, so the rotation costs two adds per pixel and no multiplies
-  at all. Coordinates are 6-bit fixed point, hence the SHL 6 on the way in
-  and the SHR 6 on the way out.
-
-  Three things are worth knowing before reading it:
-
-  [re] * TWO BYTES ARE WRITTEN PER SOURCE PIXEL. At 64/64 = 1.0 units per step a
-    rotated sample grid leaves gaps, so each store is a WORD -- the sampled
-    pixel and the one after it -- which smears the sprite one pixel wide and
-    fills them. Above 180 degrees the pair is written in the other order
-    (125e:03d6), because that is the side the gap falls on once the rotation
-    has passed the half turn.
-
-  * SI IS THE SOURCE INDEX AND IT MUST ADVANCE BY EXACTLY ONE PER PIXEL,
-    whether the pixel is drawn or not. MOVSB/MOVSW advance it by one or two
-    of their own accord, so the routine brackets the store with INC SI /
-    DEC SI to land back on the right byte either way. That bookkeeping is the
-    reason this cannot be written as Pascal without changing what it does.
-
-  [re] * THE DESTINATION IS ALWAYS VirtScrSeg, taken straight from DS:$E770. It is
-    not a parameter.
-
-  [re] The address arithmetic at 125e:03c4 is
-        DI := (FixX shr 6) + (FixY and $FFC0) * 5
-  which is the same as (FixY shr 6) * 320 + (FixX shr 6), since masking off
-  the low six bits and multiplying by five gives 64*5 = 320 per whole row.
-  The multiply by five is done as x + x*4 with a shift, so there is no MUL.
-
-  Clipping is one-sided: Y must be in 1..189 ($3F < FixY < $2F80) and X must
-  be at least 1, but there is NO upper bound on X, so a sprite pushed far
-  enough right wraps onto the following rows. The original has the same hole.
-
-  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
-
-      FixX := X shl 6;
-      FixY := Y shl 6;
-      S    := 0;
-      for Row := 1 to 56 do
-      begin
-        U := FixX;  V := FixY;
-        for Col := 1 to 56 do
-        begin
-          if (V < $2F80) and (V > $3F) and (U > $3F) then
-          begin
-            D := (U shr 6) + (V and $FFC0) * 5;
-            if Ang > 180 then
-            begin
-              Mem[VirtScrSeg : D + 1] := Src^[S];
-              Mem[VirtScrSeg : D    ] := Src^[S + 1];
-            end
-            else
-            begin
-              Mem[VirtScrSeg : D    ] := Src^[S];
-              Mem[VirtScrSeg : D + 1] := Src^[S + 1];
-            end;
-          end;
-          Inc(U, SinA);  Inc(V, CosA);  Inc(S);
-        end;
-        Inc(FixX, CosA);  Dec(FixY, SinA);
-      end;
-
-  Where that Pascal is not the same thing:
-
-  [re] * Src^[S + 1] over-reads the heap block by one byte on the very last pixel.
-    The original does too -- MOVSW at 125e:03e5 reads bytes 3135 and 3136 of
-    a 3,136-byte block -- but Pascal with range checking on would trap it.
-  * the two byte stores are one word store in the original, so the original
-    is atomic across the pair and half the bus cycles.
-  * S, U, V, D and the two loop counters live in SI, CX, AX, DI, BL and BH.
-    There is no frame traffic in the inner loop whatsoever, and the whole
-    thing is eleven instructions per pixel in the common case.
-  -------------------------------------------------------------------------- }
-{ --------------------------------------------------------------------------
   Sprites_DrawChar -- compiled Pascal in the binary, so it is
   Pascal here.
 
@@ -395,26 +317,82 @@ begin
 end;
 
 { --------------------------------------------------------------------------
-  Sprites_Prepare -- one member's introduction, all three phases.
+  Sprite_DrawRotated -- HAND ASSEMBLER, transcribed verbatim.
 
-  Not the caption-only routine an earlier pass took it for. The caption is
-  phase 3 of three; phases 1 and 2 are the portrait flying in and orbiting.
+  Draws one 56x56 sprite rotated about its top-left corner into the virtual
+  screen. It is a plain rotate-and-sample: two fixed-point accumulators walk
+  the source square, stepping by (SinA, CosA) along a row and (CosA, -SinA)
+  down a column, so the rotation costs two adds per pixel and no multiplies
+  at all. Coordinates are 6-bit fixed point, hence the SHL 6 on the way in
+  and the SHR 6 on the way out.
 
-  [re] The caption addressing at 125e:0741 is
+  Three things are worth knowing before reading it:
 
-      DS:$6BB8 + N * $A00 + Row * $100 + Col
+  [re] * TWO BYTES ARE WRITTEN PER SOURCE PIXEL. At 64/64 = 1.0 units per step a
+    rotated sample grid leaves gaps, so each store is a WORD -- the sampled
+    pixel and the one after it -- which smears the sprite one pixel wide and
+    fills them. Above 180 degrees the pair is written in the other order
+    (125e:03d6), because that is the side the gap falls on once the rotation
+    has passed the half turn.
 
-  with N = 1..4 and Row = 1..10. That is a flat array of 256-byte String
-  slots: $6BB8 + 11*$100 = $76B8 is member 1's first line, which is exactly
-  where the strings were first found. In Pascal terms it is
+  * SI IS THE SOURCE INDEX AND IT MUST ADVANCE BY EXACTLY ONE PER PIXEL,
+    whether the pixel is drawn or not. MOVSB/MOVSW advance it by one or two
+    of their own accord, so the routine brackets the store with INC SI /
+    DEC SI to land back on the right byte either way. That bookkeeping is the
+    reason this cannot be written as Pascal without changing what it does.
 
-      Captions[N, Row][Col]
+  [re] * THE DESTINATION IS ALWAYS VirtScrSeg, taken straight from DS:$E770. It is
+    not a parameter.
 
-  and the two addresses agree exactly -- see gen/P3CAPT.INC.
+  [re] The address arithmetic at 125e:03c4 is
+        DI := (FixX shr 6) + (FixY and $FFC0) * 5
+  which is the same as (FixY shr 6) * 320 + (FixX shr 6), since masking off
+  the low six bits and multiplying by five gives 64*5 = 320 per whole row.
+  The multiply by five is done as x + x*4 with a shift, so there is no MUL.
 
-  A keypress abandons the whole introduction at any point. It is never
-  consumed, so Run's remaining Prepare calls fall straight through too and
-  the scene ends.
+  Clipping is one-sided: Y must be in 1..189 ($3F < FixY < $2F80) and X must
+  be at least 1, but there is NO upper bound on X, so a sprite pushed far
+  enough right wraps onto the following rows. The original has the same hole.
+
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
+
+      FixX := X shl 6;
+      FixY := Y shl 6;
+      S    := 0;
+      for Row := 1 to 56 do
+      begin
+        U := FixX;  V := FixY;
+        for Col := 1 to 56 do
+        begin
+          if (V < $2F80) and (V > $3F) and (U > $3F) then
+          begin
+            D := (U shr 6) + (V and $FFC0) * 5;
+            if Ang > 180 then
+            begin
+              Mem[VirtScrSeg : D + 1] := Src^[S];
+              Mem[VirtScrSeg : D    ] := Src^[S + 1];
+            end
+            else
+            begin
+              Mem[VirtScrSeg : D    ] := Src^[S];
+              Mem[VirtScrSeg : D + 1] := Src^[S + 1];
+            end;
+          end;
+          Inc(U, SinA);  Inc(V, CosA);  Inc(S);
+        end;
+        Inc(FixX, CosA);  Dec(FixY, SinA);
+      end;
+
+  Where that Pascal is not the same thing:
+
+  [re] * Src^[S + 1] over-reads the heap block by one byte on the very last pixel.
+    The original does too -- MOVSW at 125e:03e5 reads bytes 3135 and 3136 of
+    a 3,136-byte block -- but Pascal with range checking on would trap it.
+  * the two byte stores are one word store in the original, so the original
+    is atomic across the pair and half the bus cycles.
+  * S, U, V, D and the two loop counters live in SI, CX, AX, DI, BL and BH.
+    There is no frame traffic in the inner loop whatsoever, and the whole
+    thing is eleven instructions per pixel in the common case.
   -------------------------------------------------------------------------- }
 
 { [re] @asm 003 125e:0388 }
@@ -726,9 +704,6 @@ begin
   end;
 end;
 
-{ --------------------------------------------------------------------------
-  Demo_Scene7
-  -------------------------------------------------------------------------- }
 
 { --------------------------------------------------------------------------
   Demo_Scene7

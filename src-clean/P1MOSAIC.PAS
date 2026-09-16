@@ -35,22 +35,6 @@ const
   MosaicLevels = 5;
 
 { --------------------------------------------------------------------------
-  Mosaic_Run
-
-  Progressive pixelate, in and out. For each level the block size doubles and
-  the shift grows by 2, so `sum shr Shift` is exactly the block average and
-  there is no division anywhere:
-
-      4x4    16 px   shr 4
-      8x8    64 px   shr 6
-     16x16  256 px   shr 8
-     32x32 1024 px   shr 10
-     64x64 4096 px   shr 12
-
-  ASSETS  NEUROSIS.DAT $02AEE0, 64,000 bytes:
-            assets/part001/INTROSCR.PNG
-  -------------------------------------------------------------------------- }
-{ --------------------------------------------------------------------------
   THIS UNIT'S ONLY GLOBAL, and it was a local in Load. }
 var
   F : file;
@@ -84,6 +68,22 @@ begin
     SetRGB(I, Round(I * 0.247), Round(I * 0.247), Round(I * 0.247));
 end;
 
+{ --------------------------------------------------------------------------
+  Mosaic_Run
+
+  Progressive pixelate, in and out. For each level the block size doubles and
+  the shift grows by 2, so `sum shr Shift` is exactly the block average and
+  there is no division anywhere:
+
+      4x4    16 px   shr 4
+      8x8    64 px   shr 6
+     16x16  256 px   shr 8
+     32x32 1024 px   shr 10
+     64x64 4096 px   shr 12
+
+  ASSETS  NEUROSIS.DAT $02AEE0, 64,000 bytes:
+            assets/part001/INTROSCR.PNG
+  -------------------------------------------------------------------------- }
 procedure MosaicRun;
 var
   { ENTER $18 IS TWENTY-FOUR BYTES AND EVERY ONE OF THEM IS NOW ACCOUNTED FOR,

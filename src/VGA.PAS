@@ -889,6 +889,17 @@ begin
   end;
 end;
 
+{ --------------------------------------------------------------------------
+  1491:0330 -- PaletteFadeOut(Pause). Compiled Pascal (ENTER $302).
+
+  Reads the live DAC back, then 64 rounds of show-then-darken with
+  Delay(Pause) between them. Note the order: it SHOWS the buffer and then
+  dims it, so the first frame is the palette exactly as it was and the last
+  is 63 steps down -- not quite black if anything started above 63, which
+  nothing does.
+
+  [re] Called once in the whole demo, from Demo_Scene2 at 1082:05BB with Pause=10.
+  -------------------------------------------------------------------------- }
 { [re] ORDER: this sits between PaletteDim and WaitRetrace because that is
   where 1436:00d6 puts it -- PaletteDim ends at $00D6, this runs to
   $011A and WaitRetrace's fourteen bytes follow, with CopyScreen at
@@ -1055,18 +1066,6 @@ end;
   around the unit's own Palette global. Both are gone with it: there is nothing
   for them to wrap, and the only caller now passes its own buffer. }
 
-
-{ --------------------------------------------------------------------------
-  1491:0330 -- PaletteFadeOut(Pause). Compiled Pascal (ENTER $302).
-
-  Reads the live DAC back, then 64 rounds of show-then-darken with
-  Delay(Pause) between them. Note the order: it SHOWS the buffer and then
-  dims it, so the first frame is the palette exactly as it was and the last
-  is 63 steps down -- not quite black if anything started above 63, which
-  nothing does.
-
-  [re] Called once in the whole demo, from Demo_Scene2 at 1082:05BB with Pause=10.
-  -------------------------------------------------------------------------- }
 
 begin
   { 1436:017f -- the unit's initialization, and it does ONE thing. }

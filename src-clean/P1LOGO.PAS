@@ -154,22 +154,24 @@ begin
 end;
 
 { --------------------------------------------------------------------------
-gather the working cell through the lens table. HAND ASSEMBLER.
+  SaveUnder(X, Y, Dest, Segment). HAND ASSEMBLER, verbatim.
 
-  THE ADDRESSES ALSO TILE, and that is what identifies the frame's four slots:
+  Copies the 40 x 40 block centred on (X, Y) out of Segment into Dest.
 
- IMUL DI,N,$669 then LEA AX,[DI-$37F]  =  Ofs(Under[N])
-               $669 is 1641, a saved cell; N * 1641 - 895 is a ONE-based
-               array whose element 1 sits at $2EA, which is Under
- $4FD6  =  Ofs(Cell)
- $4304  =  Ofs(LensTab), and $4304 - $2EA is 16,410,
-               which is ten rows of 1641 -- so Under has ten of them
- a Byte, zeroed at the top of every iteration
+  The screen offset is built with shifts, not a multiply: BX takes the row
+  shifted up a byte (row * 256) and AX the row shifted left six (row * 64),
+  and the two are added to give row * 320.
+
+  RET $A: X at BP+$C, Y at BP+$A, Dest at BP+6, Segment at BP+4.
 
   EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
 
-      for I := 1599 downto 0 do
-        Cell[I] := Under[N, LensTab[I]];
+      P := Dest;
+      for Row := 0 to 39 do
+      begin
+        Move(Mem[Segment : (Y - 20 + Row) * 320 + X - 20], P^, 40);
+        Inc(LongInt(P), 40);
+      end;
   -------------------------------------------------------------------------- }
 procedure SaveUnder(X, Y : Integer; Dest : Pointer; Segment : Word); assembler;
 asm
@@ -287,50 +289,23 @@ asm
 end;
 
 { --------------------------------------------------------------------------
-build the lens table.
+gather the working cell through the lens table. HAND ASSEMBLER.
 
-  The bouncing objects are NOT sprites. Nothing in this scene loads any sprite
-  data: Logo_Load reads a 768-byte palette and one 320x200 screen and stops.
-  Each bouncer is a MAGNIFYING LENS over whatever it is sitting on.
+  THE ADDRESSES ALSO TILE, and that is what identifies the frame's four slots:
 
-  The table has one word per pixel of the 40 x 40 block, and EVERY pixel gets
-  an entry -- that is the part an earlier reconstruction got wrong, which is
-  why it drew a solid square with a lens inside it.
+ IMUL DI,N,$669 then LEA AX,[DI-$37F]  =  Ofs(Under[N])
+               $669 is 1641, a saved cell; N * 1641 - 895 is a ONE-based
+               array whose element 1 sits at $2EA, which is Under
+ $4FD6  =  Ofs(Cell)
+ $4304  =  Ofs(LensTab), and $4304 - $2EA is 16,410,
+               which is ten rows of 1641 -- so Under has ten of them
+ a Byte, zeroed at the top of every iteration
 
-      X*X + Y*Y >  300   IDENTITY. The gather reads the pixel back from its
-                         own position, the blit writes it straight back, and
-                         the corner is invisible. There is no transparency
-                         test anywhere: the blit is a flat REP MOVSB.
+  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
 
-      X*X + Y*Y <= 300   the lens proper:
-
-                             Scale := R / (R + Sqrt(R*R - (X*X + Y*Y - 400)) + K)
-                             SX    := Round(Scale * X)
-                             SY    := Round(Scale * Y)
-
-                         with R = 40 and K = 1.0, so
-
-                             Scale = 40 / (41 + Sqrt(2000 - (X*X + Y*Y)))
-
-                         which runs from about 0.467 at the centre to 0.486 at
-                         the rim -- a roughly even 2x magnification with a
-                         slight barrel to it.
-
-  THE ORIGINAL WALKS ONE QUADRANT AND MIRRORS IT. X and Y each run 0 to 20 --
-  twenty-one values, not twenty -- and every iteration writes FOUR entries,
-  one per sign pairing, with SX and SY carrying the same signs as X and Y:
-
-      Lens[( Y+20)*40 + ( X+20)] := ( SY+20)*40 + ( SX+20)
-      Lens[(-Y+20)*40 + (-X+20)] := (-SY+20)*40 + (-SX+20)
-      Lens[(-Y+20)*40 + ( X+20)] := (-SY+20)*40 + ( SX+20)
-      Lens[( Y+20)*40 + (-X+20)] := ( SY+20)*40 + (-SX+20)
-
-  A previous reconstruction walked -20..19 once instead, on the argument that
-  the formula is symmetric so one full pass is the same thing. For the 1600
-  cells the blit reads it IS the same thing -- but it is not the same code,
-  and it is not the same table: 0..20 mirrored reaches index 1640, which is
-  why the table is 1641 words and why the loop bound above is 20 and not 19.
-  It is also four times less square root: 441 evaluations instead of 1600. }
+      for I := 1599 downto 0 do
+        Cell[I] := Under[N, LensTab[I]];
+  -------------------------------------------------------------------------- }
 
 procedure BuildCell(N : Integer); assembler;
 var
@@ -452,15 +427,6 @@ asm
 end;
 end;
 
-{ --------------------------------------------------------------------------
-  Demo_Scene1
-
-  ASSETS  NEUROSIS.DAT $000000, 64,768 bytes:
-            assets/part001/LOGOPAL.PAL    768 B
-            assets/part001/ASPHLOGO.PNG   64,000 B -- the chrome/green
-                                               ASPHYXIA logo with reflection
-          See docs/14-part001-intro.md.
-  -------------------------------------------------------------------------- }
 { --------------------------------------------------------------------------
   Bounce_Run.
 
@@ -584,24 +550,13 @@ begin
 end;
 
 { --------------------------------------------------------------------------
-  SaveUnder(X, Y, Dest, Segment). HAND ASSEMBLER, verbatim.
+  Demo_Scene1
 
-  Copies the 40 x 40 block centred on (X, Y) out of Segment into Dest.
-
-  The screen offset is built with shifts, not a multiply: BX takes the row
-  shifted up a byte (row * 256) and AX the row shifted left six (row * 64),
-  and the two are added to give row * 320.
-
-  RET $A: X at BP+$C, Y at BP+$A, Dest at BP+6, Segment at BP+4.
-
-  EQUIVALENT PASCAL, for reference -- the assembler below is what runs:
-
-      P := Dest;
-      for Row := 0 to 39 do
-      begin
-        Move(Mem[Segment : (Y - 20 + Row) * 320 + X - 20], P^, 40);
-        Inc(LongInt(P), 40);
-      end;
+  ASSETS  NEUROSIS.DAT $000000, 64,768 bytes:
+            assets/part001/LOGOPAL.PAL    768 B
+            assets/part001/ASPHLOGO.PNG   64,000 B -- the chrome/green
+                                               ASPHYXIA logo with reflection
+          See docs/14-part001-intro.md.
   -------------------------------------------------------------------------- }
 { --------------------------------------------------------------------------
   The scene: load, draw the frame, then hand over to BounceRun.

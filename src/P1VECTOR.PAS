@@ -348,62 +348,20 @@ begin
 end;
 
 { --------------------------------------------------------------------------
-  Project(var X, Y, Z) -- perspective divide and screen offset
+  DepthSort(Lo, Hi), nested inside SortAll
 
-  [re] Byte-for-byte the same routine as scene 4's 1107:1a04. The divisor is
-  [BP+4], the LAST declared parameter, and 12c5:01b0 calls it (X, Y, Z) --
-  so it divides by Z, the ordinary way round. (An earlier note here claimed it
-  divided by X. That was Ghidra printing arguments in ascending [BP+n] order,
-  which is the reverse of the declaration.)
+  The same Hoare quicksort as scene 4's, over the six-byte screen records and
+  keyed on D -- but scene 5 sorts ASCENDING where scene 4 sorts descending.
+  12c5:004c breaks the i-scan on `key >= pivot`, so i advances over elements
+  BELOW the pivot. Near points are therefore drawn first and far ones over the
+  top. That is back to front for a painter's algorithm, and it is what the
+  code does; it barely shows because every point is the same sprite.
 
-      sx := round(X/Z * Scale) + [$0280] div 2      = +160
-      sy := [$0282] div 2 - round(Y/Z * Scale)      = -round(...), see CentreY
-
-  Scale is [$AABE], set by Vector_Run to (ScreenWidth / 2) * 10 = 1600.0 --
-  the same expression scene 4 uses. The source previously had a hand-picked
-  `160 + (X*128) div (Z+256)`, which is neither the right scale nor the right
-  depth origin.
+  12c5:0190 runs it twice -- Sort(1, N) for the object and Sort(N+1, 2N) for
+  the reflection -- and RenderObject calls it before drawing anything. It was
+  missing here entirely.
   -------------------------------------------------------------------------- }
 
-{ --------------------------------------------------------------------------
-  Obj_TransformAll(Obj, A1, A2, A3), which fans out to TransformPoint
-
-  [re] once per point. Per point: rotate (12c5:19df), add the translation, project,
-  then store TWO six-byte screen records:
-
-      [re] Scr[I]           X,  $85 - sy       12c5:0244 / 12c5:024b
-      Scr[I + Count]   X,  sy + $85 + 1   12c5:0290 / 12c5:029a
-
-  A mirror pair about row 133.5 -- the floor, exactly where Vector_Load's
-  gradient turns around. Both carry D = Trunc(Z) for the depth sort.
-  -------------------------------------------------------------------------- }
-{ --------------------------------------------------------------------------
-  TransformPoint, and it is A ROUTINE OF ITS OWN.
-
-  [re] This body was INLINED here, in ObjTransformAll's loop. A note further down
-  this file already said 12c5:02e3 "fans out to 12c5:01b0" and the code did
-  not do it; ten spans traced to this address.
-
-  [re] THE PARAMETER LIST IS RECOVERED FROM THE CALL SITE, not guessed. RET $1E, so
-  30 bytes of parameters, and 12c5:0366..0393 pushes exactly that:
-
-    [re] ES:DI = Obj^ + I*12 - 12    4   [BP+1E]   the point, BY VALUE
-    [bp+8] [bp+6] [bp+4] CWD   12   [BP+1A] [BP+16] [BP+12]
-    three cached LongInts      12   [BP+0E] [BP+0A] [BP+06]
-    [bp-2]                      2   [BP+04]   the loop index
-
-  Pascal convention pushes left to right, so the first parameter declared is
-  the one pushed first and it sits at the HIGHEST offset. Hence this order.
-
-  [re] A1, A2, A3 ARE PASSED AND NEVER READ -- the routine touches [BP+04], +06,
-  +08, +0A, +0C, +0E, +10 and +1E and nothing in between. The three angles
-  were already consumed by the SinCos calls before the loop, so they are dead
-  here. They are transcribed anyway: they are three of the thirty bytes, and
-  dropping them moves every parameter after them.
-
-  The caller widens each angle with CWD, so the parameters are LongInt while
-  the arguments are Integer.
-  -------------------------------------------------------------------------- }
 { [re] SortAll IS DEFINED HERE, BEFORE TransformPoint, AND THE ORIGINAL'S SEGMENT
   ORDER IS WHY. 12c5:0190 is SortAll and 12c5:01b0 TransformPoint -- thirty-two
   bytes apart, SortAll first -- and definition order is segment order. Defined
@@ -472,6 +430,52 @@ begin
   DepthSort(PtCount + 1, PtCount * 2);            { 12c5:01a1 }
 end;
 
+{ --------------------------------------------------------------------------
+  Project(var X, Y, Z) -- perspective divide and screen offset
+
+  [re] Byte-for-byte the same routine as scene 4's 1107:1a04. The divisor is
+  [BP+4], the LAST declared parameter, and 12c5:01b0 calls it (X, Y, Z) --
+  so it divides by Z, the ordinary way round. (An earlier note here claimed it
+  divided by X. That was Ghidra printing arguments in ascending [BP+n] order,
+  which is the reverse of the declaration.)
+
+      sx := round(X/Z * Scale) + [$0280] div 2      = +160
+      sy := [$0282] div 2 - round(Y/Z * Scale)      = -round(...), see CentreY
+
+  Scale is [$AABE], set by Vector_Run to (ScreenWidth / 2) * 10 = 1600.0 --
+  the same expression scene 4 uses. The source previously had a hand-picked
+  `160 + (X*128) div (Z+256)`, which is neither the right scale nor the right
+  depth origin.
+  -------------------------------------------------------------------------- }
+
+
+{ --------------------------------------------------------------------------
+  TransformPoint, and it is A ROUTINE OF ITS OWN.
+
+  [re] This body was INLINED here, in ObjTransformAll's loop. A note further down
+  this file already said 12c5:02e3 "fans out to 12c5:01b0" and the code did
+  not do it; ten spans traced to this address.
+
+  [re] THE PARAMETER LIST IS RECOVERED FROM THE CALL SITE, not guessed. RET $1E, so
+  30 bytes of parameters, and 12c5:0366..0393 pushes exactly that:
+
+    [re] ES:DI = Obj^ + I*12 - 12    4   [BP+1E]   the point, BY VALUE
+    [bp+8] [bp+6] [bp+4] CWD   12   [BP+1A] [BP+16] [BP+12]
+    three cached LongInts      12   [BP+0E] [BP+0A] [BP+06]
+    [bp-2]                      2   [BP+04]   the loop index
+
+  Pascal convention pushes left to right, so the first parameter declared is
+  the one pushed first and it sits at the HIGHEST offset. Hence this order.
+
+  [re] A1, A2, A3 ARE PASSED AND NEVER READ -- the routine touches [BP+04], +06,
+  +08, +0A, +0C, +0E, +10 and +1E and nothing in between. The three angles
+  were already consumed by the SinCos calls before the loop, so they are dead
+  here. They are transcribed anyway: they are three of the thirty bytes, and
+  dropping them moves every parameter after them.
+
+  The caller widens each angle with CWD, so the parameters are LongInt while
+  the arguments are Integer.
+  -------------------------------------------------------------------------- }
 procedure TransformPoint(P          : TPoint3;
                          A1, A2, A3 : LongInt;
                          TX, TY, TZ : LongInt;
@@ -545,6 +549,18 @@ begin
   Scr[I + PtCount].D := FixedToIntTrunc(P.Z);
 end;
 
+{ --------------------------------------------------------------------------
+  Obj_TransformAll(Obj, A1, A2, A3), which fans out to TransformPoint
+
+  [re] once per point. Per point: rotate (12c5:19df), add the translation, project,
+  then store TWO six-byte screen records:
+
+      [re] Scr[I]           X,  $85 - sy       12c5:0244 / 12c5:024b
+      Scr[I + Count]   X,  sy + $85 + 1   12c5:0290 / 12c5:029a
+
+  A mirror pair about row 133.5 -- the floor, exactly where Vector_Load's
+  gradient turns around. Both carry D = Trunc(Z) for the depth sort.
+  -------------------------------------------------------------------------- }
 procedure ObjTransformAll(AObj : PObj; A1, A2, A3 : Integer);
 var
   { [re] ENTER $12 is 18 bytes and the arithmetic closes WITHOUT a spare, once the
@@ -630,20 +646,6 @@ begin
   end;
 end;
 
-{ --------------------------------------------------------------------------
-  DepthSort(Lo, Hi), nested inside SortAll
-
-  The same Hoare quicksort as scene 4's, over the six-byte screen records and
-  keyed on D -- but scene 5 sorts ASCENDING where scene 4 sorts descending.
-  12c5:004c breaks the i-scan on `key >= pivot`, so i advances over elements
-  BELOW the pivot. Near points are therefore drawn first and far ones over the
-  top. That is back to front for a painter's algorithm, and it is what the
-  code does; it barely shows because every point is the same sprite.
-
-  12c5:0190 runs it twice -- Sort(1, N) for the object and Sort(N+1, 2N) for
-  the reflection -- and RenderObject calls it before drawing anything. It was
-  missing here entirely.
-  -------------------------------------------------------------------------- }
 { [re] Load IS DEFINED HERE, BETWEEN ObjTranslate AND DrawPoint, AND THE SEGMENT
   SAYS SO. 12c5:0413 opens ENTER $482 -- 1,154 bytes, which is the 768-byte
   palette buffer at [BP-$481] plus the rest -- and then runs Assign against the

@@ -705,6 +705,14 @@ begin
   end;
 end;
 
+{ --------------------------------------------------------------------------
+PaletteFadeOut(Pause). Compiled Pascal (ENTER $302).
+
+  Reads the live DAC back, then 64 rounds of show-then-darken with
+  Delay(Pause) between them. Note the order: it SHOWS the buffer and then
+  dims it, so the first frame is the palette exactly as it was and the last
+  is 63 steps down -- not quite black if anything started above 63, which
+  nothing does. }
 procedure PaletteFadeOut(Pause : Word);
 var
   Buf  : TPalette;
@@ -841,15 +849,6 @@ end;
   around the unit's own Palette global. Both are gone with it: there is nothing
   for them to wrap, and the only caller now passes its own buffer. }
 
-
-{ --------------------------------------------------------------------------
-PaletteFadeOut(Pause). Compiled Pascal (ENTER $302).
-
-  Reads the live DAC back, then 64 rounds of show-then-darken with
-  Delay(Pause) between them. Note the order: it SHOWS the buffer and then
-  dims it, so the first frame is the palette exactly as it was and the last
-  is 63 steps down -- not quite black if anything started above 63, which
-  nothing does. }
 
 begin
   { the unit's initialization, and it does ONE thing. }

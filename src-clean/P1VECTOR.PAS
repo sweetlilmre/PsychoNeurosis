@@ -244,29 +244,20 @@ begin
 end;
 
 { --------------------------------------------------------------------------
-  Project(var X, Y, Z) -- perspective divide and screen offset
+  DepthSort(Lo, Hi), nested inside SortAll
 
-  Scale is [$AABE], set by Vector_Run to (ScreenWidth / 2) * 10 = 1600.0 --
-  the same expression scene 4 uses. The source previously had a hand-picked
-  `160 + (X*128) div (Z+256)`, which is neither the right scale nor the right
-  depth origin.
+  The same Hoare quicksort as scene 4's, over the six-byte screen records and
+  keyed on D -- but scene 5 sorts ASCENDING where scene 4 sorts descending.
+ breaks the i-scan on `key >= pivot`, so i advances over elements
+  BELOW the pivot. Near points are therefore drawn first and far ones over the
+  top. That is back to front for a painter's algorithm, and it is what the
+  code does; it barely shows because every point is the same sprite.
+
+ runs it twice -- Sort(1, N) for the object and Sort(N+1, 2N) for
+  the reflection -- and RenderObject calls it before drawing anything. It was
+  missing here entirely.
   -------------------------------------------------------------------------- }
 
-{ --------------------------------------------------------------------------
-  Obj_TransformAll(Obj, A1, A2, A3), which fans out to TransformPoint
-
-  A mirror pair about row 133.5 -- the floor, exactly where Vector_Load's
-  gradient turns around. Both carry D = Trunc(Z) for the depth sort.
-  -------------------------------------------------------------------------- }
-{ --------------------------------------------------------------------------
-  TransformPoint, and it is A ROUTINE OF ITS OWN.
-
-  Pascal convention pushes left to right, so the first parameter declared is
-  the one pushed first and it sits at the HIGHEST offset. Hence this order.
-
-  The caller widens each angle with CWD, so the parameters are LongInt while
-  the arguments are Integer.
-  -------------------------------------------------------------------------- }
 
 procedure SortAll(Arr : PScrArr);
 { SORT ONLY -- the drawing loops belong to RenderObject, not here. It takes
@@ -299,6 +290,25 @@ begin
   DepthSort(PtCount + 1, PtCount * 2);
 end;
 
+{ --------------------------------------------------------------------------
+  Project(var X, Y, Z) -- perspective divide and screen offset
+
+  Scale is [$AABE], set by Vector_Run to (ScreenWidth / 2) * 10 = 1600.0 --
+  the same expression scene 4 uses. The source previously had a hand-picked
+  `160 + (X*128) div (Z+256)`, which is neither the right scale nor the right
+  depth origin.
+  -------------------------------------------------------------------------- }
+
+
+{ --------------------------------------------------------------------------
+  TransformPoint, and it is A ROUTINE OF ITS OWN.
+
+  Pascal convention pushes left to right, so the first parameter declared is
+  the one pushed first and it sits at the HIGHEST offset. Hence this order.
+
+  The caller widens each angle with CWD, so the parameters are LongInt while
+  the arguments are Integer.
+  -------------------------------------------------------------------------- }
 procedure TransformPoint(P          : TPoint3;
                          A1, A2, A3 : LongInt;
                          TX, TY, TZ : LongInt;
@@ -341,6 +351,12 @@ begin
   Scr[I + PtCount].D := FixedToIntTrunc(P.Z);
 end;
 
+{ --------------------------------------------------------------------------
+  Obj_TransformAll(Obj, A1, A2, A3), which fans out to TransformPoint
+
+  A mirror pair about row 133.5 -- the floor, exactly where Vector_Load's
+  gradient turns around. Both carry D = Trunc(Z) for the depth sort.
+  -------------------------------------------------------------------------- }
 procedure ObjTransformAll(AObj : PObj; A1, A2, A3 : Integer);
 var
   I          : Integer;
@@ -384,20 +400,6 @@ begin
   end;
 end;
 
-{ --------------------------------------------------------------------------
-  DepthSort(Lo, Hi), nested inside SortAll
-
-  The same Hoare quicksort as scene 4's, over the six-byte screen records and
-  keyed on D -- but scene 5 sorts ASCENDING where scene 4 sorts descending.
- breaks the i-scan on `key >= pivot`, so i advances over elements
-  BELOW the pivot. Near points are therefore drawn first and far ones over the
-  top. That is back to front for a painter's algorithm, and it is what the
-  code does; it barely shows because every point is the same sprite.
-
- runs it twice -- Sort(1, N) for the object and Sort(N+1, 2N) for
-  the reflection -- and RenderObject calls it before drawing anything. It was
-  missing here entirely.
-  -------------------------------------------------------------------------- }
 
 { --------------------------------------------------------------------------
   Vector_Load -- what it reads out of NEUROSIS.DAT:

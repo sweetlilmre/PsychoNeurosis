@@ -126,6 +126,11 @@ var
 
   F             : file;
 
+{ --------------------------------------------------------------------------
+  Tunnel_UploadPalette
+  225 colours from index 1 up. Note R, G and B come from three separate
+  arrays -- the rotations below are what make this worth re-uploading.
+  -------------------------------------------------------------------------- }
   { NO `Unread : LongInt` HERE ANY MORE, and its removal is the measurement.
     Four bytes were declared at this point to make the block reach $A880,
     because with PanX/PanY, Angle/Radius and RotTmp all in the wrong places the
@@ -198,6 +203,11 @@ asm
   LOOP @@Next
 end;
 
+{ --------------------------------------------------------------------------
+  Tunnel_RotateBandsCoarse
+  Rotates the whole 225-entry table right by one complete band: the last 15
+  entries are saved, everything shifts up by 15, the saved block goes to front.
+  -------------------------------------------------------------------------- }
 { UNROLLED PER TABLE, and no nested procedure and no Move. The original is
   three groups of three loops -- save the last band, shift everything up by one
   band, put the saved band at the front -- written out once for each table. }
@@ -230,12 +240,6 @@ begin
     Blue[I] := RotTmp[I];
 end;
 
-{ --------------------------------------------------------------------------
-  VGA_SetDisplayStart
-  Coarse pan via the CRTC start address (4-pixel granularity, because four
-  pixels share a byte address across the planes) and fine pan via Attribute
-  Controller register $13. Together they give single-pixel smooth scrolling.
-  -------------------------------------------------------------------------- }
 { --------------------------------------------------------------------------
   Tunnel_RotateBandsFine
   Rotates each 15-colour band left by one, independently, in all three tables.
@@ -304,11 +308,6 @@ begin
 end;
 
 { --------------------------------------------------------------------------
-  Tunnel_RotateBandsCoarse
-  Rotates the whole 225-entry table right by one complete band: the last 15
-  entries are saved, everything shifts up by 15, the saved block goes to front.
-  -------------------------------------------------------------------------- }
-{ --------------------------------------------------------------------------
   Tunnel_InitTables
   -------------------------------------------------------------------------- }
 procedure InitTables;
@@ -329,20 +328,10 @@ begin
 end;
 
 { --------------------------------------------------------------------------
-  Tunnel_LoadTexture
-  Reads the four planes straight into VGA memory -- one BlockRead into a
-  staging buffer per plane, then a 32,000-word copy to video memory.
-
-  ASSETS  NEUROSIS.DAT $081A76, four consecutive 64000-byte planes:
-            assets/part003/TUNNPLN0.RAW   plane 0  (x mod 4 = 0)
-            assets/part003/TUNNPLN1.RAW   plane 1
-            assets/part003/TUNNPLN2.RAW   plane 2
-            assets/part003/TUNNPLN3.RAW   plane 3
-          De-interleaved, these are one 640x400 image:
-            assets/part003/TUNNEL.PNG
-          A single plane viewed at 320 wide shows a phantom second ring
-          centre -- that is a stride artefact, not the artwork.
-          See docs/06-part3-scene1-tunnel.md.
+  VGA_SetDisplayStart
+  Coarse pan via the CRTC start address (4-pixel granularity, because four
+  pixels share a byte address across the planes) and fine pan via Attribute
+  Controller register $13. Together they give single-pixel smooth scrolling.
   -------------------------------------------------------------------------- }
 { HAND ASSEMBLER, transcribed verbatim. The tell is the CRTC pair: the
   original loads Addr into BX ONCE and writes both halves as 16-bit OUT
@@ -440,7 +429,20 @@ begin
 end;
 
 { --------------------------------------------------------------------------
-  Demo_Scene1
+  Tunnel_LoadTexture
+  Reads the four planes straight into VGA memory -- one BlockRead into a
+  staging buffer per plane, then a 32,000-word copy to video memory.
+
+  ASSETS  NEUROSIS.DAT $081A76, four consecutive 64000-byte planes:
+            assets/part003/TUNNPLN0.RAW   plane 0  (x mod 4 = 0)
+            assets/part003/TUNNPLN1.RAW   plane 1
+            assets/part003/TUNNPLN2.RAW   plane 2
+            assets/part003/TUNNPLN3.RAW   plane 3
+          De-interleaved, these are one 640x400 image:
+            assets/part003/TUNNEL.PNG
+          A single plane viewed at 320 wide shows a phantom second ring
+          centre -- that is a stride artefact, not the artwork.
+          See docs/06-part3-scene1-tunnel.md.
   -------------------------------------------------------------------------- }
 
 { NO PARAMETER, NO LOOP, AND THE BUFFER IS VGA'S VIRTUAL SCREEN. }
@@ -471,11 +473,6 @@ begin
   Close(F);
 end;
 
-{ --------------------------------------------------------------------------
-  Tunnel_UploadPalette
-  225 colours from index 1 up. Note R, G and B come from three separate
-  arrays -- the rotations below are what make this worth re-uploading.
-  -------------------------------------------------------------------------- }
 {  FOR REFERENCE ONLY, the equivalent Pascal -- not what the binary does:
     Port[$3C8] := 1;
     for I := 0 to NumColours - 1 do begin
@@ -521,14 +518,8 @@ begin
 end;
 
 
-{ --------------------------------------------------------------------------
-  VGA_SetMode -- mode 13h, then unchain into Mode-X.
-  -------------------------------------------------------------------------- }
 { SelectPlane IS NOT DECLARED HERE -- it is MODEX's, reached by a far call. }
 
-{ --------------------------------------------------------------------------
-  Tunnel_InitTables
-  -------------------------------------------------------------------------- }
 
 begin
 end.
